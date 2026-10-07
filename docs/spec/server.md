@@ -9,7 +9,9 @@
 | 예약 생성·변경·취소·연장 | Server Action | 겹침 방지는 DB 제약이 최종 방어선. 액션은 인증·검증·결과 반환 |
 | 메시지 전송, 공지, 문의 응답 | Server Action | `client_id`로 중복 방지, 커밋 뒤 실시간 채널에 발행 |
 | 공간 상태 변경, 평면도 초안 저장·게시 | Server Action | 게시는 검증과 트랜잭션을 한 액션 안에서 |
-| 통화 입장 토큰, 로그인·데모 계정 | Server Action | 비밀 키가 서버에만 있음 |
+| 통화 입장 토큰, 데모 계정 로그인 | Server Action | 비밀 키가 서버에만 있음 |
+| 가입, 로그인, 로그아웃, 이메일 인증, 비밀번호 재설정 | Better Auth의 Route Handler (`/api/auth/[...all]`) | 인증 라이브러리가 쿠키와 OAuth 콜백을 직접 다룸 |
+| 팀 만들기, 초대, 가입 요청 | Server Action | 다른 쓰기와 같은 래퍼를 쓴다 |
 | 첫 화면 데이터 | Server Component에서 `features/*/queries.ts` 호출 | 읽기에는 액션을 쓰지 않음 |
 | 게시된 평면도 JSON, 이전 메시지 불러오기 | Route Handler (GET) | 액션은 POST라 캐시가 안 되고, 한 번에 하나씩만 실행됨 |
 | 실시간 반영 (예약 상태, 새 메시지, 평면도 게시) | 브라우저가 실시간 채널을 직접 구독 | 액션은 서버가 먼저 보내는 통신을 못 함 |
@@ -27,7 +29,7 @@
               └─ lib/db             Drizzle 클라이언트와 스키마
 ```
 
-- `lib/db`는 `lib/db`, `lib/dal`, `drizzle.config.*`, `tests/db` 안에서만 import한다.
+- `lib/db`는 `lib/db`, `lib/dal`, `lib/auth/auth.ts`, `drizzle.config.*`, `tests/db` 안에서만 import한다.
 - 액션 핸들러는 `lib/db`를 import할 수 없으므로, 여러 쓰기를 묶을 때는 `lib/dal`이 내보내는 `withTransaction(fn)`을 쓴다. `lib/dal` 함수는 드라이버마다 모양이 다른 `db.execute()`의 원시 결과에 기대지 않는다.
 - `lib/dal` 함수는 "누가 부르는지"를 인자로 받지 않는 순수한 데이터 함수다. 권한 판정은 그 위(액션, 쿼리)에서 한다. 단, 접근 범위에 따라 공간 이름·상태를 걸러 주는 조회는 `lib/dal`이 아니라 `features/*/queries.ts`에서 `canAccess()`를 거쳐 만든다.
 
@@ -47,8 +49,12 @@ export type ActionErrorCode =
   | 'NOT_FOUND'
   | 'BOOKING_CONFLICT'   // 겹치는 예약 (Postgres 23P01)
   | 'SPACE_BLOCKED'      // 점검 구간과 겹침
-  | 'LIMIT_EXCEEDED'     // 역할별 예약 한도 초과
+  | 'LIMIT_EXCEEDED'     // 한도 초과 (역할별 예약 한도, 관리하는 팀 수, 대기 중 초대·요청 수)
   | 'PLAN_INVALID'       // 평면도 게시 검증 실패
+  | 'TEAM_NAME_TAKEN'    // 같은 이름의 팀이 있음
+  | 'ALREADY_MEMBER'     // 이미 그 팀의 팀원
+  | 'ALREADY_REQUESTED'  // 대기 중인 가입 요청이 있음
+  | 'INVITE_INVALID'     // 초대가 만료·취소·처리됐거나 다른 사람의 초대
   | 'INTERNAL';          // 그 밖의 오류. 서버 로그에만 자세히 남긴다
 ```
 
@@ -96,14 +102,23 @@ export const cancelBooking = createAction({
 ```ts
 export type Session = { userId: string; email: string; name: string };
 export async function getSession(): Promise<Session | null>;
-export async function requireSession(): Promise<Session>; // 없으면 ActionError('UNAUTHENTICATED')
+export async function requireSession(): Promise<Session>;                 // 없으면 ActionError('UNAUTHENTICATED'). 액션과 queries용
+export async function requirePageSession(next: string): Promise<Session>; // 없으면 redirect('/login?next=…'). (app) 페이지용
+export async function requireOperatorPage(): Promise<Session>;            // admin 페이지용. docs/spec/auth.md
 ```
 
-- 실제 인증(Neon Auth 예정)은 이 두 함수 뒤에 숨긴다. 다른 코드는 인증 라이브러리를 직접 부르지 않는다.
-- 셋업 단계에서는 데모 모드만 구현한다. `AUTH_MODE=demo`일 때 서명된 httpOnly 쿠키에 담긴 사용자 id로 `users` 행을 찾아 세션을 만든다. 서명 키는 `AUTH_SECRET`이다.
-- 쿠키 이름은 `floor_session`, 값은 `{ sub: userId }`를 담은 HS256 JWT, 만료는 7일이다. 서명과 검증은 `jose` 같은 검증된 라이브러리로 한다.
-- `lib/auth/session.ts`에 `createSessionCookie(userId)`와 `clearSessionCookie()`를 둔다. 이 둘을 부르는 로그인 액션과 화면은 셋업에서 만들지 않는다 (PFQV-46).
-- `AUTH_MODE`가 `demo`가 아니면(비어 있는 문자열 포함) `getSession()`은 null을 돌려주고, 실제 인증 연결은 이후 작업(PFQV-11)으로 남긴다.
+- 인증은 Better Auth를 직접 운영한다. 자세한 규칙은 `docs/spec/auth.md`에 있다.
+- Better Auth는 이 함수들 뒤에 숨긴다. 다른 코드는 인증 라이브러리를 직접 부르지 않는다. 예외는 `lib/auth/*`(인증 인스턴스, 운영자 생성 함수), `/api/auth/[...all]` Route Handler, `(auth)` 화면과 머리글 로그아웃 버튼이 쓰는 인증 클라이언트뿐이다.
+- `getSession()`은 세션 쿠키가 없으면 인증 인스턴스를 만들지 않고 null을 돌려준다.
+- 셋업 때 만든 데모 세션(`AUTH_MODE`, `floor_session` 쿠키, `createSessionCookie`, `clearSessionCookie`)은 인증 작업(PFQV-63)에서 없앤다.
+- Cache Components가 켜져 있으므로 세션을 읽는 컴포넌트는 `<Suspense>` 아래에 둔다. 세션이나 권한 결과를 읽는 함수에는 `use cache` 종류를 어느 것도 붙이지 않는다.
+- 레이아웃은 보호 수단이 아니다. `(app)`의 모든 페이지가 `requirePageSession()`을, `admin`의 모든 페이지가 `requireOperatorPage()`를, queries의 모든 함수와 액션이 세션 확인을 직접 한다.
+- `lib/db`를 import할 수 있는 곳에 인증 인스턴스를 만드는 파일 하나(`lib/auth/auth.ts`)를 더한다. Drizzle 어댑터가 DB와 스키마를 직접 받아야 하기 때문이다.
+
+## 메일
+
+- 메일은 `lib/email`의 `EmailSender` 인터페이스로만 보낸다 (`docs/spec/auth.md`). 구현은 콘솔과 테스트용 메모리 두 가지이고, 실제 발송 서비스는 아직 정하지 않았다. 콘솔 구현은 배포 환경에서 출력하지 않고 오류를 던진다.
+- 메일을 보내는 일은 DB 커밋 뒤에 한다. 메일 발송이 실패해도 이미 저장한 초대나 요청을 되돌리지 않고, 실패를 로그에 남긴다.
 
 ## DB 연결
 
@@ -148,8 +163,9 @@ export type RealtimeEvent =
 | 이름 | 필수 | 설명 |
 | --- | --- | --- |
 | `DATABASE_URL` | 실행 시 | Neon 연결 문자열. 빌드·테스트에는 없어도 됨 |
-| `AUTH_MODE` | 아니오 | `demo` 또는 비움. 기본값은 비움 |
-| `AUTH_SECRET` | `AUTH_MODE=demo`일 때 | 데모 세션 쿠키 서명 키 |
-| `NEXT_PUBLIC_APP_URL` | 아니오 | 기본값 `http://localhost:3000` |
+| `AUTH_SECRET` | 실행 시 | Better Auth 비밀 키. 빌드·테스트에는 없어도 됨 |
+| `NEXT_PUBLIC_APP_URL` | 아니오 | 기본값 `http://localhost:3000`. 인증의 기준 주소로도 쓴다 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 아니오 | 둘 다 있을 때만 구글 로그인을 켠다 |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | 아니오 | 둘 다 있을 때만 GitHub 로그인을 켠다 |
 
 실시간, LiveKit, 파일 저장소 변수는 해당 작업에서 추가한다.

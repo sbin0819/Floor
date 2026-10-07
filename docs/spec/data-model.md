@@ -32,20 +32,38 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | `team_role` | `admin`, `member` |
 | `app_role` | `user`, `team_member`, `team_admin`, `operator` |
 | `grant_target` | `floor`, `space` |
+| `join_request_status` | `pending`, `approved`, `rejected`, `cancelled` |
 
 ## 테이블
 
 ### users
 
-앱이 가진 사용자 프로필이다. 인증 제공자의 계정과는 `auth_id`로만 이어서, 인증을 바꿔도 다른 테이블의 외래 키는 그대로다.
+사용자다. Better Auth의 user 모델을 이 테이블에 매핑한다 (`docs/spec/auth.md`). 인증용 테이블을 따로 두지 않으므로 다른 테이블의 `user_id`가 곧 로그인한 사용자다.
 
 | 컬럼 | 타입 | 제약 |
 | --- | --- | --- |
 | id | uuid | PK |
-| auth_id | text | unique, null 허용 (데모·시드 계정은 null) |
-| email | text | not null, unique |
+| email | text | not null, unique. 소문자로 저장 |
+| email_verified | boolean | not null, 기본값 false |
 | name | text | not null |
-| avatar_url | text | null 허용 |
+| avatar_url | text | null 허용. Better Auth의 `image`에 해당 |
+| updated_at | timestamptz | not null, 기본값 now() |
+
+- 셋업 때 있던 `auth_id` 컬럼은 없앤다.
+
+### auth_sessions, auth_accounts, auth_verifications (인증)
+
+Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설치한 Better Auth 버전이 요구하는 것을 그대로 따르고, 이름만 이 문서의 규칙(snake_case, uuid id, `timestamptz`)에 맞춘다.
+
+| 테이블 | 내용 | 꼭 지킬 것 |
+| --- | --- | --- |
+| auth_sessions | 로그인 세션. `user_id`, `token`, `expires_at`, 접속 정보 | `user_id` FK → users, on delete cascade. `token` unique |
+| auth_accounts | 로그인 수단. 제공자(`provider_id`)와 그쪽 계정 id(`account_id`), 비밀번호 해시 | `user_id` FK → users, on delete cascade. `unique (provider_id, account_id)` |
+| auth_verifications | 이메일 인증과 비밀번호 재설정 토큰 | `expires_at` not null |
+
+- 비밀번호는 Better Auth가 만든 해시만 저장한다. 평문을 저장하거나 로그에 남기지 않는다.
+- 이 세 테이블은 Better Auth만 읽고 쓴다. 앱 코드는 직접 쿼리하지 않는다. 운영자 계정 스크립트도 인증 인스턴스를 통해서만 쓴다.
+- Drizzle 속성 이름은 Better Auth의 필드 이름(camelCase)과 같게 둔다. 어댑터의 필드 매핑은 DB 컬럼 이름이 아니라 Drizzle 속성 이름을 쓴다.
 
 ### branches (지점)
 
@@ -189,8 +207,15 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | 컬럼 | 타입 | 제약 |
 | --- | --- | --- |
 | id | uuid | PK |
-| name | text | not null |
+| name | text | not null. 2–40자. 정규화(NFC, 앞뒤 공백 제거, 연속 공백 하나로)한 값을 저장 |
 | created_by | uuid | not null, FK → users. 만든 사람이 첫 팀 관리자 |
+| home_branch_id | uuid | null 허용, FK → branches. 주 이용 지점. 참고 정보이고 권한 판정에는 쓰지 않는다 |
+| headcount | integer | null 허용. 인원 규모 |
+| contact_phone | text | null 허용. 담당자 연락처. 숫자와 맨 앞의 `+`만 저장. 팀 관리자에게만 내려보낸다 (`docs/spec/auth.md`) |
+
+- 이름은 대소문자를 무시하고 유일하다: `unique (lower(name))` (이름 `teams_name_unique`)
+- `CHECK (headcount is null or headcount between 1 and 1000)` (이름 `teams_headcount_valid`)
+- 셋업 뒤에 추가된 세 컬럼은 null을 허용한다. 필수 여부는 팀 만들기 양식에서 검사한다 (`docs/spec/auth.md`).
 
 ### team_members (팀 소속)
 
@@ -199,8 +224,9 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | team_id | uuid | not null, FK → teams, on delete cascade |
 | user_id | uuid | not null, FK → users |
 | role | team_role | not null, 기본값 `member` |
+| title | text | null 허용. 그 팀에서의 직함 |
 
-- PK `(team_id, user_id)`. 한 사람이 여러 팀에 속할 수 있고, 팀이 없어도 된다.
+- PK `(team_id, user_id)` (이름 `team_members_team_id_user_id_pk`). 한 사람이 여러 팀에 속할 수 있고, 팀이 없어도 된다.
 - 인덱스: `(user_id)`
 
 ### team_invites (초대)
@@ -209,11 +235,34 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | --- | --- | --- |
 | id | uuid | PK |
 | team_id | uuid | not null, FK → teams, on delete cascade |
-| email | text | null 허용 (링크 초대는 null) |
-| token | text | not null, unique |
+| email | text | null 허용. 소문자로 저장. 이메일 초대는 값이 있고, 공유 링크 초대(이후 작업)는 null |
+| token | text | not null, unique. 추측할 수 없는 무작위 값 |
+| message | text | null 허용. 초대 메시지, 200자 이하 |
 | expires_at | timestamptz | not null (기본 7일 뒤) |
 | accepted_at | timestamptz | null 허용 |
+| declined_at | timestamptz | null 허용 |
+| revoked_at | timestamptz | null 허용. 팀 관리자가 취소한 시각 |
 | created_by | uuid | not null, FK → users |
+
+- `accepted_at`, `declined_at`, `revoked_at`이 모두 null이면 대기 중이다. 대기 중이어도 `expires_at`이 지났으면 쓸 수 없다.
+- 같은 팀이 같은 이메일에 보낸 대기 중 초대는 하나: `unique (team_id, email) where email is not null and accepted_at is null and declined_at is null and revoked_at is null` (이름 `team_invites_one_pending`)
+- 만료된 초대가 대기 중으로 남아 있을 수 있으므로, 다시 초대할 때는 이전 초대를 취소하고 새로 만드는 일을 한 트랜잭션으로 한다.
+- 인덱스: `(email)`
+
+### team_join_requests (가입 요청)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| id | uuid | PK |
+| team_id | uuid | not null, FK → teams, on delete cascade |
+| user_id | uuid | not null, FK → users. 요청한 사람 |
+| message | text | null 허용. 200자 이하 |
+| status | join_request_status | not null, 기본값 `pending` |
+| decided_by | uuid | null 허용, FK → users. 승인·거절한 팀 관리자. 초대 수락으로 승인 처리된 요청은 초대를 보낸 사람 |
+| decided_at | timestamptz | null 허용 |
+
+- 팀과 사람마다 대기 중 요청은 하나: `unique (team_id, user_id) where status = 'pending'` (이름 `team_join_requests_one_pending`)
+- 인덱스: `(user_id)`
 
 ### branch_staff (운영자)
 
@@ -251,7 +300,7 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 
 ## 테스트로 확인할 제약
 
-`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 10개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다.
+`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 14개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서 만든다.
 
 1. 같은 공간에 시간이 겹치는 `confirmed` 예약 두 개는 들어가지 않는다 (`23P01`).
 2. 끝과 시작이 맞닿은 예약(10:00–11:00, 11:00–12:00)은 들어간다.
@@ -263,3 +312,7 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 8. 한 방에 끝나지 않은 통화 두 개는 들어가지 않는다.
 9. 한 방에 `seq`가 같은 메시지 두 개는 들어가지 않는다. `client_id`가 같은 메시지 두 개도 들어가지 않는다.
 10. `kind`에 맞는 참조가 없는 채팅방은 들어가지 않는다.
+11. 대소문자만 다른 같은 이름의 팀 두 개는 들어가지 않는다.
+12. `headcount`가 0이거나 1000을 넘는 팀은 들어가지 않는다.
+13. 같은 팀이 같은 이메일에 보낸 대기 중 초대 두 개는 들어가지 않는다. 앞의 초대가 취소·거절·수락된 뒤에는 들어간다.
+14. 같은 팀에 같은 사람의 대기 중 가입 요청 두 개는 들어가지 않는다. 앞의 요청이 거절·취소된 뒤에는 들어간다.
