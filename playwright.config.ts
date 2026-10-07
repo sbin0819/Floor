@@ -11,5 +11,14 @@ export default defineConfig({
     command: "pnpm start --port 3100",
     url: "http://127.0.0.1:3100",
     reuseExistingServer: false,
+    env: {
+      AUTH_SECRET: "floor-e2e-placeholder-secret-at-least-32-bytes",
+      DATABASE_URL: "postgresql://invalid:invalid@127.0.0.1:1/floor",
+      NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3100",
+      GOOGLE_CLIENT_ID: "",
+      GOOGLE_CLIENT_SECRET: "",
+      GITHUB_CLIENT_ID: "",
+      GITHUB_CLIENT_SECRET: "",
+    },
   },
 });
