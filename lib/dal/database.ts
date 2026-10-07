@@ -2,7 +2,7 @@ import "server-only";
 
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 
-import { getDb } from "@/lib/db/client";
+import { closeDb, getDb } from "@/lib/db/client";
 
 export type DalDatabase = Pick<
   PgDatabase<PgQueryResultHKT>,
@@ -20,4 +20,8 @@ export async function withTransaction<T>(
   database: TransactionDatabase = getDb(),
 ): Promise<T> {
   return database.transaction(callback);
+}
+
+export async function closeDatabase(): Promise<void> {
+  await closeDb();
 }

@@ -12,7 +12,13 @@ const eslintConfig = defineConfig([
   prettier,
   {
     files: ["**/*.{ts,tsx,js,mjs}"],
-    ignores: ["lib/db/**", "lib/dal/**", "drizzle.config.*", "tests/db/**"],
+    ignores: [
+      "lib/db/**",
+      "lib/dal/**",
+      "lib/auth/auth.ts",
+      "drizzle.config.*",
+      "tests/db/**",
+    ],
     rules: {
       "no-restricted-imports": [
         "error",

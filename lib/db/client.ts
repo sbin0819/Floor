@@ -8,6 +8,7 @@ import * as schema from "./schema";
 export type Database = NeonDatabase<typeof schema>;
 
 let database: Database | undefined;
+let pool: Pool | undefined;
 
 export function getDb(): Database {
   if (database) return database;
@@ -18,7 +19,14 @@ export function getDb(): Database {
   }
 
   neonConfig.webSocketConstructor = WebSocket;
-  const client = new Pool({ connectionString: DATABASE_URL });
-  database = drizzle({ client, schema });
+  pool = new Pool({ connectionString: DATABASE_URL });
+  database = drizzle({ client: pool, schema });
   return database;
+}
+
+export async function closeDb(): Promise<void> {
+  const activePool = pool;
+  pool = undefined;
+  database = undefined;
+  await activePool?.end();
 }

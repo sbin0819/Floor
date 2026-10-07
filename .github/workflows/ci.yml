@@ -14,7 +14,6 @@ jobs:
     timeout-minutes: 15
     env:
       DATABASE_URL: ""
-      AUTH_MODE: ""
       AUTH_SECRET: ""
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:

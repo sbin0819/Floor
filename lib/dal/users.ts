@@ -15,6 +15,18 @@ export async function getUserById(id: string, database: DalDatabase = getDb()) {
   return user ?? null;
 }
 
+export async function getUserByEmail(
+  email: string,
+  database: DalDatabase = getDb(),
+) {
+  const [user] = await database
+    .select()
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1);
+  return user ?? null;
+}
+
 export async function getMemberships(
   userId: string,
   database: DalDatabase = getDb(),

@@ -1,189 +1,122 @@
-import { jwtVerify, SignJWT } from "jose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { ActionError } from "@/lib/actions/result";
 import {
-  clearSessionCookie,
-  createSessionCookie,
   getSession,
+  requireOperatorPage,
+  requirePageSession,
   requireSession,
-  sessionCookieName,
-  sessionMaxAge,
 } from "@/lib/auth/session";
 
 const mocks = vi.hoisted(() => ({
-  env: {
-    AUTH_MODE: "demo",
-    AUTH_SECRET: "test-secret-for-signed-demo-cookie",
-    NODE_ENV: "test",
-  },
-  cookieValue: undefined as string | undefined,
-  setCookie: vi.fn(),
-  deleteCookie: vi.fn(),
-  readCookies: vi.fn(),
-  getUserById: vi.fn(),
+  headers: vi.fn(),
+  getAuth: vi.fn(),
+  readSession: vi.fn(),
+  getOperatorBranches: vi.fn(),
+  redirect: vi.fn((url: string): never => {
+    throw new Error(`redirect:${url}`);
+  }),
+}));
+vi.mock("next/headers", () => ({ headers: mocks.headers }));
+vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("@/lib/auth/auth", () => ({ getAuth: mocks.getAuth }));
+vi.mock("@/lib/dal", () => ({
+  getOperatorBranches: mocks.getOperatorBranches,
 }));
 
-vi.mock("@/lib/env", () => ({ getEnv: () => mocks.env }));
-vi.mock("@/lib/dal", () => ({ getUserById: mocks.getUserById }));
-vi.mock("next/headers", () => ({ cookies: mocks.readCookies }));
-
-const user = {
-  id: crypto.randomUUID(),
+const profile = {
+  id: "8b11dca4-a05e-4be6-9b05-e4a40e1f23a6",
   email: "member@example.test",
-  name: "현재 이름",
+  name: "회원",
+  emailVerified: true,
 };
-const encoder = new TextEncoder();
+const appSession = {
+  userId: profile.id,
+  email: profile.email,
+  name: profile.name,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.env.AUTH_MODE = "demo";
-  mocks.env.AUTH_SECRET = "test-secret-for-signed-demo-cookie";
-  mocks.env.NODE_ENV = "test";
-  mocks.cookieValue = undefined;
-  mocks.getUserById.mockResolvedValue(user);
-  mocks.setCookie.mockImplementation((_name: string, value: string) => {
-    mocks.cookieValue = value;
+  mocks.headers.mockResolvedValue(
+    new Headers({ cookie: "better-auth.session_token=test-token" }),
+  );
+  mocks.getAuth.mockReturnValue({ api: { getSession: mocks.readSession } });
+  mocks.readSession.mockResolvedValue({
+    user: profile,
+    session: { token: "never-exposed" },
   });
-  mocks.readCookies.mockResolvedValue({
-    get: () =>
-      mocks.cookieValue
-        ? { name: sessionCookieName, value: mocks.cookieValue }
-        : undefined,
-    set: mocks.setCookie,
-    delete: mocks.deleteCookie,
-  });
+  mocks.getOperatorBranches.mockResolvedValue([
+    { id: "branch", name: "가상 지점" },
+  ]);
 });
 
-describe("demo session", () => {
-  it("creates a seven-day HS256 cookie with no trusted role or profile claims", async () => {
-    await createSessionCookie(user.id);
-    const token = mocks.cookieValue;
-    expect(token).toBeDefined();
-    if (!token) throw new Error("Expected the created cookie");
-    const { payload, protectedHeader } = await jwtVerify(
-      token,
-      encoder.encode(mocks.env.AUTH_SECRET),
-    );
-    expect(protectedHeader.alg).toBe("HS256");
-    expect(Object.keys(payload).sort()).toEqual(["exp", "iat", "sub"]);
-    expect(payload.sub).toBe(user.id);
-    expect(payload.exp! - payload.iat!).toBe(sessionMaxAge);
-    expect(mocks.setCookie).toHaveBeenCalledWith(sessionCookieName, token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      path: "/",
-      maxAge: sessionMaxAge,
-      expires: new Date(payload.exp! * 1000),
-    });
-    await expect(getSession()).resolves.toEqual({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-    });
-    expect(mocks.getUserById).toHaveBeenCalledExactlyOnceWith(user.id);
+describe("Better Auth session boundary", () => {
+  it("returns null without constructing auth when the cookie is absent", async () => {
+    mocks.headers.mockResolvedValue(new Headers());
+    expect(await getSession()).toBeNull();
+    expect(mocks.getAuth).not.toHaveBeenCalled();
   });
-
-  it("requires HTTPS for production cookies", async () => {
-    mocks.env.NODE_ENV = "production";
-    await createSessionCookie(user.id);
-    expect(mocks.setCookie).toHaveBeenCalledWith(
-      sessionCookieName,
-      expect.any(String),
-      expect.objectContaining({ secure: true }),
+  it("ignores unrelated cookies", async () => {
+    mocks.headers.mockResolvedValue(
+      new Headers({ cookie: "preference=light" }),
     );
+    expect(await getSession()).toBeNull();
+    expect(mocks.getAuth).not.toHaveBeenCalled();
   });
-
-  it("does not read cookies or query the database when demo mode is disabled", async () => {
-    mocks.env.AUTH_MODE = "";
-    await expect(getSession()).resolves.toBeNull();
-    await expect(createSessionCookie(user.id)).rejects.toMatchObject({
+  it("forwards request headers and returns only the app session contract", async () => {
+    expect(await getSession()).toEqual(appSession);
+    expect(mocks.readSession).toHaveBeenCalledExactlyOnceWith({
+      headers: await mocks.headers(),
+    });
+  });
+  it("recognizes the secure production cookie", async () => {
+    mocks.headers.mockResolvedValue(
+      new Headers({ cookie: "__Secure-better-auth.session_token=test-token" }),
+    );
+    expect(await getSession()).toEqual(appSession);
+  });
+  it("returns null for an invalid or expired cookie without redirecting", async () => {
+    mocks.readSession.mockResolvedValue(null);
+    expect(await getSession()).toBeNull();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+  it("does not hide database failures as anonymous sessions", async () => {
+    mocks.readSession.mockRejectedValue(new Error("database unavailable"));
+    await expect(getSession()).rejects.toThrow("database unavailable");
+  });
+  it("requires a session for actions and queries", async () => {
+    expect(await requireSession()).toEqual(appSession);
+    mocks.readSession.mockResolvedValue(null);
+    await expect(requireSession()).rejects.toMatchObject({
       code: "UNAUTHENTICATED",
     });
-    await clearSessionCookie();
-    expect(mocks.readCookies).not.toHaveBeenCalled();
-    expect(mocks.getUserById).not.toHaveBeenCalled();
   });
-
-  it("returns null when there is no cookie or the user no longer exists", async () => {
-    await expect(getSession()).resolves.toBeNull();
-    expect(mocks.getUserById).not.toHaveBeenCalled();
-    await createSessionCookie(user.id);
-    mocks.getUserById.mockResolvedValue(null);
-    await expect(getSession()).resolves.toBeNull();
-  });
-
-  it.each([
-    "tampered",
-    "expired",
-    "wrong-algorithm",
-    "missing-expiration",
-    "invalid-subject",
-  ] as const)("rejects a %s token before a database read", async (kind) => {
-    const now = Math.floor(Date.now() / 1000);
-    let token = new SignJWT({})
-      .setProtectedHeader({
-        alg: kind === "wrong-algorithm" ? "HS384" : "HS256",
-      })
-      .setSubject(kind === "invalid-subject" ? "invalid-user-id" : user.id)
-      .setIssuedAt(now - 60);
-    if (kind !== "missing-expiration")
-      token = token.setExpirationTime(kind === "expired" ? now - 1 : now + 60);
-    mocks.cookieValue = await token.sign(
-      encoder.encode(
-        kind === "tampered" ? "wrong-secret" : mocks.env.AUTH_SECRET,
-      ),
+  it("redirects anonymous pages with a safe return destination", async () => {
+    mocks.readSession.mockResolvedValue(null);
+    await expect(requirePageSession("/invite/abc?x=1")).rejects.toThrow(
+      "redirect:/login?next=%2Finvite%2Fabc%3Fx%3D1",
     );
-    await expect(getSession()).resolves.toBeNull();
-    expect(mocks.getUserById).not.toHaveBeenCalled();
-  });
-
-  it("loads the current profile instead of trusting profile claims in a cookie", async () => {
-    mocks.cookieValue = await new SignJWT({
-      email: "forged@example.test",
-      name: "forged",
-      role: "operator",
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setSubject(user.id)
-      .setIssuedAt()
-      .setExpirationTime("7d")
-      .sign(encoder.encode(mocks.env.AUTH_SECRET));
-    await expect(getSession()).resolves.toEqual({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-    });
-  });
-
-  it("does not disguise a database outage as an invalid session", async () => {
-    await createSessionCookie(user.id);
-    const error = new Error("database offline");
-    mocks.getUserById.mockRejectedValue(error);
-    await expect(getSession()).rejects.toBe(error);
-  });
-
-  it("requireSession returns the session or the known authentication error", async () => {
-    await expect(requireSession()).rejects.toEqual(
-      new ActionError("UNAUTHENTICATED"),
+    await expect(requirePageSession("https://evil.test")).rejects.toThrow(
+      "redirect:/login?next=%2F",
     );
-    await createSessionCookie(user.id);
-    await expect(requireSession()).resolves.toEqual({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-    });
   });
-
-  it("clears the exact session cookie and rejects invalid creation subjects", async () => {
-    await clearSessionCookie();
-    expect(mocks.deleteCookie).toHaveBeenCalledExactlyOnceWith(
-      sessionCookieName,
+  it("returns signed-in page sessions", async () => {
+    expect(await requirePageSession("/")).toEqual(appSession);
+  });
+  it("redirects anonymous operators to their sign-in page", async () => {
+    mocks.readSession.mockResolvedValue(null);
+    await expect(requireOperatorPage()).rejects.toThrow(
+      "redirect:/admin/login",
     );
-    await expect(createSessionCookie("invalid-user-id")).rejects.toMatchObject({
-      code: "INVALID_INPUT",
-    });
-    expect(mocks.setCookie).not.toHaveBeenCalled();
+    expect(mocks.getOperatorBranches).not.toHaveBeenCalled();
+  });
+  it("rejects a signed-in user without any operator membership", async () => {
+    mocks.getOperatorBranches.mockResolvedValue([]);
+    await expect(requireOperatorPage()).rejects.toThrow(
+      "redirect:/admin/login?error=not_operator",
+    );
+  });
+  it("allows an operator based on fresh DAL membership", async () => {
+    expect(await requireOperatorPage()).toEqual(appSession);
+    expect(mocks.getOperatorBranches).toHaveBeenCalledWith(profile.id);
   });
 });
