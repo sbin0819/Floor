@@ -1,0 +1,291 @@
+import "server-only";
+
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
+import type { DalDatabase } from "@/lib/dal/database";
+import { getDb } from "@/lib/db/client";
+import { serializeTimeRange, type TimeRange } from "@/lib/db/range";
+import {
+  bookings,
+  branches,
+  floors,
+  spaceBlocks,
+  spaces,
+  teamMembers,
+  teams,
+  users,
+} from "@/lib/db/schema";
+import { addDays, localDate, zonedDateTime } from "@/lib/time/zoned";
+
+export type ScheduleRange = { spaceIds: string[]; during: TimeRange };
+export type BookingActor = { userId: string } | { teamId: string };
+
+export async function listSpaceBookings(
+  { spaceIds, during }: ScheduleRange,
+  database: DalDatabase = getDb(),
+) {
+  if (spaceIds.length === 0) return [];
+  return database
+    .select({
+      ...getTableColumns(bookings),
+      userName: users.name,
+      teamName: teams.name,
+    })
+    .from(bookings)
+    .innerJoin(users, eq(users.id, bookings.userId))
+    .leftJoin(teams, eq(teams.id, bookings.teamId))
+    .where(
+      and(
+        inArray(bookings.spaceId, spaceIds),
+        eq(bookings.status, "confirmed"),
+        sql`${bookings.during} && ${serializeTimeRange(during)}::tstzrange`,
+      ),
+    )
+    .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id));
+}
+
+export async function listSpaceBlocks(
+  { spaceIds, during }: ScheduleRange,
+  database: DalDatabase = getDb(),
+) {
+  if (spaceIds.length === 0) return [];
+  return database
+    .select()
+    .from(spaceBlocks)
+    .where(
+      and(
+        inArray(spaceBlocks.spaceId, spaceIds),
+        sql`${spaceBlocks.during} && ${serializeTimeRange(during)}::tstzrange`,
+      ),
+    )
+    .orderBy(asc(sql`lower(${spaceBlocks.during})`), asc(spaceBlocks.id));
+}
+
+export async function sumBookedMinutes(
+  {
+    branchId,
+    during,
+    actor,
+  }: { branchId: string; during: TimeRange; actor: BookingActor },
+  database: DalDatabase = getDb(),
+): Promise<number> {
+  const [result] = await database
+    .select({
+      minutes:
+        sql<string>`coalesce(sum(extract(epoch from (upper(${bookings.during}) - lower(${bookings.during}))) / 60), 0)`.mapWith(
+          Number,
+        ),
+    })
+    .from(bookings)
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .innerJoin(floors, eq(floors.id, spaces.floorId))
+    .where(
+      and(
+        eq(floors.branchId, branchId),
+        eq(bookings.status, "confirmed"),
+        sql`lower(${bookings.during}) >= ${during.start.toISOString()}::timestamptz`,
+        sql`lower(${bookings.during}) < ${during.end.toISOString()}::timestamptz`,
+        "teamId" in actor
+          ? eq(bookings.teamId, actor.teamId)
+          : and(eq(bookings.userId, actor.userId), isNull(bookings.teamId)),
+      ),
+    );
+  return result?.minutes ?? 0;
+}
+
+export async function insertBooking(
+  input: typeof bookings.$inferInsert,
+  database: DalDatabase = getDb(),
+) {
+  const [booking] = await database.insert(bookings).values(input).returning();
+  if (!booking) throw new Error("Booking insertion returned no row.");
+  return booking;
+}
+
+export async function cancelBookingRecord(
+  { bookingId, userId, now }: { bookingId: string; userId: string; now: Date },
+  database: DalDatabase = getDb(),
+) {
+  const [booking] = await database
+    .update(bookings)
+    .set({ status: "cancelled", cancelledAt: now, cancelledBy: userId })
+    .where(
+      and(
+        eq(bookings.id, bookingId),
+        eq(bookings.status, "confirmed"),
+        sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
+      ),
+    )
+    .returning();
+  return booking ?? null;
+}
+
+function locatedBookings(database: DalDatabase) {
+  return database
+    .select({
+      booking: bookings,
+      space: spaces,
+      floor: floors,
+      branch: branches,
+      userName: users.name,
+      teamName: teams.name,
+    })
+    .from(bookings)
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .innerJoin(floors, eq(floors.id, spaces.floorId))
+    .innerJoin(branches, eq(branches.id, floors.branchId))
+    .innerJoin(users, eq(users.id, bookings.userId))
+    .leftJoin(teams, eq(teams.id, bookings.teamId));
+}
+
+export async function getBookingWithLocation(
+  bookingId: string,
+  database: DalDatabase = getDb(),
+) {
+  const [row] = await locatedBookings(database)
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function listMyBookings(
+  userId: string,
+  now: Date,
+  database: DalDatabase = getDb(),
+) {
+  const bookedBranches = await database
+    .select({ id: branches.id, timezone: branches.timezone })
+    .from(bookings)
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .innerJoin(floors, eq(floors.id, spaces.floorId))
+    .innerJoin(branches, eq(branches.id, floors.branchId))
+    .where(eq(bookings.userId, userId))
+    .groupBy(branches.id, branches.timezone);
+  const recentAtBranch = bookedBranches.map((branch) => {
+    const oldestDate = addDays(localDate(now, branch.timezone), -30);
+    const cutoff = zonedDateTime(oldestDate, "00:00", branch.timezone);
+    return and(
+      eq(branches.id, branch.id),
+      sql`lower(${bookings.during}) >= ${cutoff.toISOString()}::timestamptz`,
+    );
+  });
+  const upcoming = await locatedBookings(database)
+    .where(
+      and(
+        eq(bookings.userId, userId),
+        eq(bookings.status, "confirmed"),
+        sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
+      ),
+    )
+    .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id));
+  const past = recentAtBranch.length
+    ? await locatedBookings(database)
+        .where(
+          and(
+            eq(bookings.userId, userId),
+            or(
+              eq(bookings.status, "cancelled"),
+              sql`upper(${bookings.during}) <= ${now.toISOString()}::timestamptz`,
+            ),
+            or(...recentAtBranch),
+          ),
+        )
+        .orderBy(desc(sql`lower(${bookings.during})`), asc(bookings.id))
+        .limit(50)
+    : [];
+  return { upcoming, past };
+}
+
+export async function getUserDefaultBranch(
+  userId: string,
+  database: DalDatabase = getDb(),
+): Promise<string | null> {
+  const [row] = await database
+    .select({ defaultBranchId: users.defaultBranchId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row?.defaultBranchId ?? null;
+}
+
+export async function setUserDefaultBranch(
+  userId: string,
+  branchId: string,
+  database: DalDatabase = getDb(),
+) {
+  const [row] = await database
+    .update(users)
+    .set({ defaultBranchId: branchId })
+    .where(eq(users.id, userId))
+    .returning({ id: users.id, defaultBranchId: users.defaultBranchId });
+  return row ?? null;
+}
+
+export function listUserTeamHomeBranches(
+  userId: string,
+  database: DalDatabase = getDb(),
+) {
+  return database
+    .select({
+      id: teams.id,
+      name: teams.name,
+      homeBranchId: teams.homeBranchId,
+    })
+    .from(teamMembers)
+    .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+    .where(eq(teamMembers.userId, userId))
+    .orderBy(asc(teams.name), asc(teams.id));
+}
+
+export async function lockFloorForBooking(
+  floorId: string,
+  transaction: DalDatabase,
+) {
+  const [floor] = await transaction
+    .select()
+    .from(floors)
+    .where(eq(floors.id, floorId))
+    .for("share");
+  return floor ?? null;
+}
+
+export async function lockSpaceForBooking(
+  spaceId: string,
+  transaction: DalDatabase,
+) {
+  const [space] = await transaction
+    .select()
+    .from(spaces)
+    .where(eq(spaces.id, spaceId))
+    .for("share");
+  return space ?? null;
+}
+
+export async function lockBookingActor(
+  { userId, teamId }: { userId: string; teamId: string | null },
+  transaction: DalDatabase,
+): Promise<boolean> {
+  // 팀 가입 처리와 사용자 → 팀 순서를 맞춰 INSERT의 FK 잠금과 역전되지 않게 해요.
+  const [user] = await transaction
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .for(teamId === null ? "update" : "key share");
+  if (!user) return false;
+  if (teamId === null) return true;
+  const [team] = await transaction
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .for("update");
+  return Boolean(team);
+}
