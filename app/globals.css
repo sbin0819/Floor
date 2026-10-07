@@ -167,6 +167,12 @@
 }
 
 @layer base {
+  .admin-shell {
+    --sidebar: #1c1c1a;
+    --sidebar-foreground: #d6d4cd;
+    --sidebar-accent: #33332f;
+    --sidebar-accent-foreground: #d6d4cd;
+  }
   * {
     @apply border-border outline-ring/50;
   }

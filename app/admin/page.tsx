@@ -1,10 +1,13 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireOperatorPage } from "@/lib/auth/session";
 import { getOperatorHome } from "@/features/admin/queries";
 
 async function AdminContent() {
   await requireOperatorPage();
   const { branches } = await getOperatorHome();
+  if (branches.length === 1) redirect(`/admin/branches/${branches[0]!.id}`);
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-6 py-10">
       <h1 className="text-2xl font-semibold">운영자 화면</h1>
@@ -14,8 +17,13 @@ async function AdminContent() {
         </h2>
         <ul className="divide-y divide-border rounded-lg border border-border">
           {branches.map((branch) => (
-            <li key={branch.id} className="p-5">
-              {branch.name}
+            <li key={branch.id}>
+              <Link
+                className="flex min-h-11 p-5 hover:bg-muted"
+                href={`/admin/branches/${branch.id}`}
+              >
+                {branch.name}
+              </Link>
             </li>
           ))}
         </ul>
