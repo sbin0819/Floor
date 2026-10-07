@@ -65,6 +65,8 @@ describe("operator administration query boundaries", () => {
       await expect(
         queries(fixture[key]).getAdminFloor(fixture.branchId, fixture.floorId),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(metadata).not.toHaveBeenCalled();
+      expect(counts).not.toHaveBeenCalled();
     },
   );
   it("makes malformed, nonexistent and forged branch/floor combinations indistinguishable", async () => {

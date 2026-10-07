@@ -191,6 +191,16 @@ describe("authenticated team queries and safe DTOs", () => {
     expect(data).not.toHaveProperty("headcount");
   });
 
+  it.each(["owner", "member"] as const)(
+    "preserves %s access for an uppercase UUID",
+    async (role) => {
+      const subject = queries(actors[role]);
+      expect(await subject.getTeamPageData(teamId.toUpperCase())).toEqual(
+        await subject.getTeamPageData(teamId),
+      );
+    },
+  );
+
   it("returns only viewer-specific flags alongside safe team search projections", async () => {
     const data = await queries().getTeamStartData("  가상   회사  ");
     expect(data.search).toEqual({

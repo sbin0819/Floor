@@ -1,12 +1,13 @@
 import "server-only";
 
 import { and, asc, count, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { cache } from "react";
 
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
 import { accessGrants, floors, spaces } from "@/lib/db/schema";
 
-export async function listFloorSpaceAccess(
+async function readFloorSpaceAccess(
   floorId: string,
   database: DalDatabase = getDb(),
 ) {
@@ -44,6 +45,16 @@ export async function listFloorSpaceAccess(
     if (teamId !== null) result.allowedTeamIds.push(teamId);
   }
   return [...grouped.values()];
+}
+
+const cachedFloorSpaceAccess = cache((floorId: string) =>
+  readFloorSpaceAccess(floorId),
+);
+
+export function listFloorSpaceAccess(floorId: string, database?: DalDatabase) {
+  return database === undefined
+    ? cachedFloorSpaceAccess(floorId)
+    : readFloorSpaceAccess(floorId, database);
 }
 
 export async function getSpacesByIds(

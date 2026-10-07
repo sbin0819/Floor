@@ -10,6 +10,7 @@ import {
 import type { DalDatabase } from "@/lib/dal/database";
 import { getRoleSettings } from "@/lib/dal/role-settings";
 import { getMemberships } from "@/lib/dal/users";
+import { listFloorSpaceAccess } from "@/lib/dal/spaces";
 import {
   loadPermissionContext,
   loadPermissionData,
@@ -111,6 +112,19 @@ const cases = [
     read: (db?: DalDatabase) => listFloorsWithAccess(branchId, db),
     rows: [[{ floor, teamId: "team-a" }]],
     keys: [branchId],
+  },
+  {
+    name: "floor space access",
+    read: (db?: DalDatabase) => listFloorSpaceAccess(floorId, db),
+    rows: [
+      [
+        {
+          space: { id: "space-a", type: "meeting_room", access: "teams" },
+          teamId: "team-a",
+        },
+      ],
+    ],
+    keys: [floorId],
   },
 ];
 

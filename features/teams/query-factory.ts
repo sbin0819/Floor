@@ -114,6 +114,7 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
     async getTeamPageData(teamId: string): Promise<TeamPageData | null> {
       const session = await readSession();
       if (!z.uuid().safeParse(teamId).success) return null;
+      teamId = teamId.toLowerCase();
       const [membership, isManager] = await Promise.all([
         getTeamMember(teamId, session.userId, database),
         canManageTeam(session, teamId, database),
