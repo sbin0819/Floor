@@ -37,3 +37,28 @@ export function socialAccountLinkedEmail({
     text: `${provider} 로그인이 연결됐어요. 계정을 안전하게 보호하기 위해 이전 비밀번호와 로그인 세션을 해제했어요.\n\n비밀번호로도 로그인하려면 아래 주소에서 새 비밀번호를 정해 주세요.\n\n${url}`,
   };
 }
+
+export function teamInviteEmail({
+  to,
+  teamName,
+  senderName,
+  message,
+  url,
+  expiresAt,
+}: LinkMessage & {
+  teamName: string;
+  senderName: string;
+  message: string | null;
+  expiresAt: Date;
+}): EmailMessage {
+  const expires = new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(expiresAt);
+  return {
+    to,
+    subject: `Floor의 ${teamName} 팀에서 초대했어요`,
+    text: `${senderName}님이 ${teamName} 팀에 초대했어요.${message ? `\n\n보낸 메시지: ${message}` : ""}\n\n아래 링크에서 초대를 수락하거나 거절할 수 있어요. 초대받은 이메일의 계정으로 로그인해 주세요.\n\n${url}\n\n만료일: ${expires} (한국 시간)\n\n이메일로 새로 가입하면 인증 후 로그인하고 홈의 ‘받은 초대’에서 이 초대를 찾아 주세요.`,
+  };
+}
