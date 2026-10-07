@@ -1,0 +1,94 @@
+{
+  "sourceCommit": "d70fca7124dbae1c5fdb0ba77d96d859db4a86e1",
+  "measurement": "PGlite execution batches after one timer turn; session, migrations and fixtures excluded",
+  "fixture": "seedBookingActors: two branch floors, two memberships, one booking, one received invite and one join request",
+  "queries": {
+    "bookings.getBranchList": {
+      "stages": 2,
+      "statements": 2,
+      "perStage": [1, 1]
+    },
+    "bookings.getBookingEntry.teamFallback": {
+      "stages": 2,
+      "statements": 2,
+      "perStage": [1, 1]
+    },
+    "bookings.getBookingEntry.noBranch": {
+      "stages": 2,
+      "statements": 2,
+      "perStage": [1, 1]
+    },
+    "bookings.getBookingEntry.defaultBranch": {
+      "stages": 1,
+      "statements": 1,
+      "perStage": [1]
+    },
+    "bookings.getBranchFloors": {
+      "stages": 4,
+      "statements": 6,
+      "perStage": [1, 3, 1, 1]
+    },
+    "bookings.getFloorDay": {
+      "stages": 12,
+      "statements": 14,
+      "perStage": [1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "bookings.getSpaceDay.memberTwoTeams": {
+      "stages": 16,
+      "statements": 18,
+      "perStage": [1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "bookings.getSpaceDay.person": {
+      "stages": 14,
+      "statements": 16,
+      "perStage": [1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "bookings.getMyBookings": {
+      "stages": 3,
+      "statements": 3,
+      "perStage": [1, 1, 1]
+    },
+    "teams.getHomeData": { "stages": 2, "statements": 4, "perStage": [3, 1] },
+    "teams.getTeamStartData.search": {
+      "stages": 2,
+      "statements": 6,
+      "perStage": [5, 1]
+    },
+    "teams.getTeamStartData.noSearch": {
+      "stages": 2,
+      "statements": 5,
+      "perStage": [4, 1]
+    },
+    "teams.getTeamPageData.admin": {
+      "stages": 5,
+      "statements": 8,
+      "perStage": [1, 1, 1, 2, 3]
+    },
+    "teams.getTeamPageData.member": {
+      "stages": 4,
+      "statements": 5,
+      "perStage": [1, 1, 1, 2]
+    },
+    "teams.getInvitePageData": {
+      "stages": 2,
+      "statements": 2,
+      "perStage": [1, 1]
+    },
+    "admin.getAdminBranch.twoFloors": {
+      "stages": 6,
+      "statements": 10,
+      "perStage": [1, 3, 1, 1, 2, 2]
+    },
+    "admin.getAdminFloor.search": {
+      "stages": 9,
+      "statements": 11,
+      "perStage": [1, 1, 1, 3, 1, 1, 1, 1, 1]
+    },
+    "admin.getAdminFloor.noSearch": {
+      "stages": 8,
+      "statements": 10,
+      "perStage": [1, 1, 1, 3, 1, 1, 1, 1]
+    },
+    "dal.getOperatorBranches": { "stages": 1, "statements": 1, "perStage": [1] }
+  }
+}
