@@ -9,7 +9,7 @@ import {
 import type { OperatingWindow } from "@/features/bookings/operating-state";
 
 const intervalStyles = {
-  other: "z-0 bg-status-restricted-border",
+  other: "z-0 bg-booked-strong",
   mine: "z-10 bg-status-mine-strong",
   maintenance: "z-20 bg-status-maintenance-hatch",
 };
@@ -36,7 +36,7 @@ export function AvailabilityBar({
       <div
         role="img"
         aria-label={availabilityLabel(intervals, timeZone)}
-        className="relative isolate h-2 overflow-hidden rounded-full bg-status-free"
+        className="relative isolate h-3 overflow-hidden rounded-full bg-status-free"
       >
         {intervals.map((interval) => {
           const position = intervalPosition(interval, window);

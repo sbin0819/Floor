@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { Grid2X2 } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import { getAccountMenuData } from "@/features/auth/queries";
 import { AccountMenu } from "@/components/account-menu";
@@ -31,13 +32,19 @@ export function AccountMenuPlaceholder() {
 
 export function AppHeader() {
   return (
-    <header className="h-16 border-b border-border bg-card">
+    <header className="h-15 border-b border-border bg-card">
       <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-4 px-4 md:px-8">
-        <div className="flex min-w-0 items-center gap-6">
+        <div className="flex h-full min-w-0 items-center gap-6">
           <Link
-            className="inline-flex min-h-11 shrink-0 items-center rounded-lg text-xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg text-xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             href="/"
           >
+            <span
+              aria-hidden="true"
+              className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+            >
+              <Grid2X2 className="size-5" />
+            </span>
             Floor
           </Link>
           <Suspense

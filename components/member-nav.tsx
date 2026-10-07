@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, House, LayoutGrid, Users } from "lucide-react";
+import { cn } from "cn";
 import { LinkPending } from "@/components/link-pending";
 import {
   shouldInterceptNavigation,
@@ -44,7 +45,9 @@ export function MemberNav({
     <nav
       aria-label={mobile ? "하단 회원 메뉴" : "회원 메뉴"}
       className={
-        mobile ? "grid h-16 grid-cols-4" : "hidden items-center gap-1 md:flex"
+        mobile
+          ? "grid h-16 grid-cols-4"
+          : "hidden h-full items-center gap-1 md:flex"
       }
     >
       {memberNavItems.map(({ key, href, label }) => {
@@ -60,10 +63,21 @@ export function MemberNav({
               navigation.change(key, href);
             }}
             aria-current={selected ? "page" : undefined}
-            className={`relative inline-flex min-h-11 items-center justify-center rounded-lg px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${mobile ? "flex-col gap-1 text-xs" : "text-sm"} ${selected ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+            className={cn(
+              "relative inline-flex min-h-11 items-center justify-center px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              mobile
+                ? "flex-col gap-1 rounded-lg text-xs"
+                : "h-full gap-2 border-b-2 text-sm",
+              selected
+                ? mobile
+                  ? "font-semibold text-primary"
+                  : "border-foreground font-semibold text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+              !selected && !mobile && "border-transparent",
+            )}
           >
             <LinkPending />
-            {mobile && <Icon aria-hidden="true" className="relative size-5" />}
+            <Icon aria-hidden="true" className="relative size-5" />
             <span className="relative">{label}</span>
           </Link>
         );

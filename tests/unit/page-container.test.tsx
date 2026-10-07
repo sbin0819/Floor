@@ -35,7 +35,7 @@ describe("shared page frame", () => {
     );
     expect(
       screen.getByRole("heading", { level: 1, name: "내 예약" }),
-    ).toHaveClass("text-2xl", "font-semibold");
+    ).toHaveClass("text-[26px]", "font-bold", "tracking-[-0.025em]");
     expect(screen.getByText("다가오는 예약을 확인해 주세요")).toHaveClass(
       "text-muted-foreground",
     );

@@ -102,6 +102,25 @@ describe("member navigation", () => {
     expect(screen.getByRole("navigation")).toHaveClass("hidden", "md:flex");
   });
 
+  it("shows icons and a 2px underline on the current desktop menu", () => {
+    render(<MemberNav />);
+    for (const link of screen.getAllByRole("link"))
+      expect(link.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    const current = screen.getByRole("link", { current: "page" });
+    expect(current).toHaveClass(
+      "border-b-2",
+      "border-foreground",
+      "font-semibold",
+    );
+    expect(current).not.toHaveClass("bg-muted");
+    for (const link of screen
+      .getAllByRole("link")
+      .filter((link) => link !== current)) {
+      expect(link).toHaveClass("border-transparent", "text-muted-foreground");
+      expect(link).not.toHaveClass("border-transparenttext-muted-foreground");
+    }
+  });
+
   it("uses the same selection in a 64px safe-area-aware mobile bar", () => {
     mocks.pathname = "/invite/token";
     const { container } = render(<MobileNav />);
@@ -111,6 +130,13 @@ describe("member navigation", () => {
     expect(navigation).toHaveClass("h-16", "grid-cols-4");
     expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
       "팀",
+    );
+    expect(screen.getByRole("link", { current: "page" })).toHaveClass(
+      "text-primary",
+    );
+    expect(screen.getByRole("link", { current: "page" })).not.toHaveClass(
+      "bg-muted",
+      "border-b-2",
     );
     expect(container.firstElementChild).toHaveClass(
       "fixed",

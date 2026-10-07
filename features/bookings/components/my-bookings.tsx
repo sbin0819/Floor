@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PageContainer, PageHeading } from "@/components/page-container";
+import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SkeletonRegion } from "@/components/skeleton-region";
@@ -153,36 +154,36 @@ export function MyBookings({
           </Button>
         }
       />
-      <nav
-        aria-label="예약 목록 선택"
-        className="flex gap-1 border-b border-border"
-      >
+      <SegmentedLinks label="예약 목록 선택">
         {(["upcoming", "past"] as const).map((value) => {
           const href = value === "past" ? "/bookings?tab=past" : "/bookings";
           return (
-            <Link
+            <SegmentedLink
               key={value}
-              href={href}
-              aria-current={selection.value === value ? "page" : undefined}
-              onClick={(event) => {
-                if (!shouldInterceptNavigation(event)) return;
-                event.preventDefault();
-                selection.change(value, href);
-              }}
-              className={`inline-flex min-h-11 items-center gap-2 rounded-t-lg px-4 text-sm focus-visible:outline-2 focus-visible:outline-ring ${selection.value === value ? "border-b-2 border-foreground font-medium" : "text-muted-foreground"}`}
+              asChild
+              selected={selection.value === value}
             >
-              {value === "upcoming" ? (
-                <>
-                  다가오는 예약{" "}
-                  <span className="tabular-nums">{data.upcoming.length}</span>
-                </>
-              ) : (
-                "지난 예약"
-              )}
-            </Link>
+              <Link
+                href={href}
+                onClick={(event) => {
+                  if (!shouldInterceptNavigation(event)) return;
+                  event.preventDefault();
+                  selection.change(value, href);
+                }}
+              >
+                {value === "upcoming" ? (
+                  <>
+                    다가오는 예약{" "}
+                    <span className="tabular-nums">{data.upcoming.length}</span>
+                  </>
+                ) : (
+                  "지난 예약"
+                )}
+              </Link>
+            </SegmentedLink>
           );
         })}
-      </nav>
+      </SegmentedLinks>
       {pending ? (
         <SkeletonRegion>
           <SkeletonRows count={3} action />

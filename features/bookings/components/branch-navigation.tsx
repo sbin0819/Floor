@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PageContainer } from "@/components/page-container";
+import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
 import { getBookingDateWindow } from "@/features/bookings/date";
 import { floorHref, formatBookingDate } from "@/features/bookings/format";
 import { getOperatingState } from "@/features/bookings/operating-state";
@@ -114,16 +115,9 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
         </p>
       </header>
       <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <nav
-          aria-label="층 선택"
-          className="flex w-fit flex-wrap gap-1 rounded-xl bg-muted p-1"
-        >
+        <SegmentedLinks label="층 선택">
           {data.floors.map((item) => (
-            <Button
-              key={item.id}
-              asChild
-              variant={item.id === floorId ? "secondary" : "ghost"}
-            >
+            <SegmentedLink key={item.id} asChild selected={item.id === floorId}>
               <FloorNavigationLink
                 href={floorHref(data.branch.id, item.id, date)}
                 location={{ floorId: item.id, date, spaceId: null }}
@@ -131,9 +125,9 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
               >
                 {item.name}
               </FloorNavigationLink>
-            </Button>
+            </SegmentedLink>
           ))}
-        </nav>
+        </SegmentedLinks>
         {floorId && (
           <nav
             aria-label="날짜 선택"

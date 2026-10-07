@@ -33,7 +33,7 @@ describe("AvailabilityBar", () => {
     );
     expect(
       screen.getByRole("img", { name: "예약된 시간이 없어요" }),
-    ).toHaveClass("bg-status-free");
+    ).toHaveClass("bg-status-free", "h-3");
     expect(
       container.querySelector('[data-slot="availability-ticks"]'),
     ).toHaveAttribute("aria-hidden", "true");
@@ -58,7 +58,7 @@ describe("AvailabilityBar", () => {
       }),
     ).toBeVisible();
     expect(container.querySelector('[data-kind="other"]')).toHaveClass(
-      "bg-status-restricted-border",
+      "bg-booked-strong",
     );
     expect(container.querySelector('[data-kind="mine"]')).toHaveClass(
       "bg-status-mine-strong",
