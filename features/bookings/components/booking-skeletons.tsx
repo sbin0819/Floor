@@ -8,18 +8,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 function FloorNavigationShape() {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <SkeletonHeading />
-        <div className="flex gap-2">
-          <Skeleton className="h-11 w-20" />
-          <Skeleton className="h-11 w-36" />
-          <Skeleton className="h-11 w-20" />
-        </div>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-4">
+        <Skeleton className="h-11 w-32" />
+        <Skeleton className="h-5 w-48" />
       </div>
-      <div className="flex gap-2">
-        <Skeleton className="h-11 w-16" />
-        <Skeleton className="h-11 w-16" />
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex gap-2">
+          <Skeleton className="h-11 w-16" />
+          <Skeleton className="h-11 w-16" />
+        </div>
+        <div
+          data-slot="skeleton-date-window"
+          className="flex min-w-0 gap-2 overflow-hidden"
+        >
+          {Array.from({ length: 7 }, (_, index) => (
+            <Skeleton key={index} className="h-14 min-w-11" />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -29,7 +35,35 @@ function FloorSpaceListShape() {
   return (
     <div className="space-y-3">
       <Skeleton className="h-6 w-32" />
-      <SkeletonRows count={4} action />
+      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+        {[0, 1, 2, 3].map((key) => (
+          <div
+            key={key}
+            data-slot="skeleton-row"
+            className="grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)] sm:items-center sm:gap-5"
+          >
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-48 max-w-full" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between gap-4">
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton
+                data-slot="skeleton-availability"
+                className="h-2 w-full rounded-full"
+              />
+              <div className="flex justify-between">
+                <Skeleton className="h-3 w-5" />
+                <Skeleton className="h-3 w-5" />
+                <Skeleton className="h-3 w-5" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

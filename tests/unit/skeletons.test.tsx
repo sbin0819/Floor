@@ -146,6 +146,12 @@ describe("screen-specific loading geometry", () => {
     ).toHaveLength(4);
     expect(container.querySelector(".border-dashed")).toBeInTheDocument();
     expect(
+      container.querySelector('[data-slot="skeleton-date-window"]')?.children,
+    ).toHaveLength(7);
+    expect(
+      container.querySelectorAll('[data-slot="skeleton-availability"]'),
+    ).toHaveLength(4);
+    expect(
       container.querySelectorAll('[data-slot="skeleton-region"]'),
     ).toHaveLength(1);
   });

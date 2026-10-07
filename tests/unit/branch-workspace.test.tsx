@@ -173,7 +173,9 @@ describe("persistent branch controls", () => {
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
     );
-    expect(screen.getByRole("link", { name: "다음 날" })).toHaveAttribute(
+    expect(
+      screen.getByRole("link", { name: "10월 8일 목요일" }),
+    ).toHaveAttribute(
       "href",
       `/branches/branch/floors/floor?date=2026-10-08&space=${spaceId}`,
     );
@@ -181,7 +183,7 @@ describe("persistent branch controls", () => {
       "href",
       `/branches/branch/floors/floor?date=${date}`,
     );
-    expect(screen.getByRole("button", { name: "이전 날" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "이전 7일" })).toBeDisabled();
   });
   it("drops an invalid selection from generated links and normalizes an out-of-range date", () => {
     navigation.query = "date=2099-01-01&space=invalid";
@@ -190,11 +192,10 @@ describe("persistent branch controls", () => {
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
     );
-    expect(screen.getByRole("link", { name: "다음 날" })).toHaveAttribute(
-      "href",
-      "/branches/branch/floors/floor?date=2026-10-08",
-    );
-    expect(screen.getByRole("button", { name: "이전 날" })).toBeDisabled();
+    expect(
+      screen.getByRole("link", { name: "10월 8일 목요일" }),
+    ).toHaveAttribute("href", "/branches/branch/floors/floor?date=2026-10-08");
+    expect(screen.getByRole("button", { name: "이전 7일" })).toBeDisabled();
   });
   it("renders no date row or selected floor on the branch entry route", () => {
     navigation.floorId = undefined;
@@ -223,13 +224,12 @@ describe("persistent branch controls", () => {
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
     );
-    expect(screen.getByRole("link", { name: "이전 날" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /^오늘 ·/ })).toHaveAttribute(
       "href",
       "/branches/branch/floors/floor?date=2026-10-07",
     );
-    expect(screen.getByRole("link", { name: "오늘" })).toHaveAttribute(
-      "href",
-      "/branches/branch/floors/floor?date=2026-10-07",
-    );
+    expect(
+      screen.getByRole("link", { name: "10월 8일 목요일" }),
+    ).toHaveAttribute("aria-current", "date");
   });
 });
