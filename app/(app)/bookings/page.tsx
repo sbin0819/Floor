@@ -4,14 +4,19 @@ import { getMyBookings } from "@/features/bookings/queries";
 import { MyBookings } from "@/features/bookings/components/my-bookings";
 import { MyBookingsSkeleton } from "@/features/bookings/components/booking-skeletons";
 
-async function BookingsContent() {
-  await requirePageSession("/bookings");
-  return <MyBookings data={await getMyBookings()} />;
+type Props = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+async function BookingsContent({ searchParams }: Props) {
+  const query = await searchParams;
+  const tab = query?.tab === "past" ? "past" : "upcoming";
+  await requirePageSession(tab === "past" ? "/bookings?tab=past" : "/bookings");
+  return <MyBookings data={await getMyBookings()} tab={tab} />;
 }
-export default function BookingsPage() {
+export default function BookingsPage(props: Props = {}) {
   return (
     <Suspense fallback={<MyBookingsSkeleton />}>
-      <BookingsContent />
+      <BookingsContent {...props} />
     </Suspense>
   );
 }

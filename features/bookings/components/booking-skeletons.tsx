@@ -147,14 +147,17 @@ export function BranchFloorsSkeleton() {
 
 export function MyBookingsSkeleton() {
   return (
-    <SkeletonRegion width="standard" className="space-y-8">
-      <Skeleton className="h-8 w-36" />
-      {[0, 1].map((key) => (
-        <div key={key} className="space-y-4">
-          <Skeleton className="h-7 w-40" />
-          <SkeletonRows count={2} action={key === 0} />
-        </div>
-      ))}
+    <SkeletonRegion width="standard" className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-8 w-36" />
+        <Skeleton className="h-11 w-28" />
+      </div>
+      <div data-slot="skeleton-booking-tabs" className="flex gap-2">
+        <Skeleton className="h-11 w-28" />
+        <Skeleton className="h-11 w-28" />
+      </div>
+      <Skeleton className="h-5 w-36" />
+      <SkeletonRows count={3} action />
     </SkeletonRegion>
   );
 }

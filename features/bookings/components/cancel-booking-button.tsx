@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,7 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
           variant="ghost"
           className="text-destructive"
           disabled={mutation.pending}
+          data-cancelling={mutation.pending && open ? "true" : undefined}
         >
           취소
         </Button>
@@ -57,8 +59,15 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
             variant="destructive"
             disabled={mutation.pending}
             onClick={() => void mutation.submit({ bookingId })}
+            className="min-w-28"
           >
-            예약 취소
+            {mutation.pending && (
+              <LoaderCircle
+                aria-hidden="true"
+                className="animate-spin motion-reduce:animate-none"
+              />
+            )}
+            {mutation.pending ? "취소하고 있어요" : "예약 취소"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -156,12 +156,15 @@ describe("screen-specific loading geometry", () => {
     ).toHaveLength(1);
   });
 
-  it("keeps both booking-history sections and uses the standard content width", () => {
+  it("keeps booking tabs and one list within the standard content width", () => {
     const { container } = render(<MyBookingsSkeleton />);
     expect(container.firstElementChild).toHaveClass("max-w-[880px]");
     expect(
       container.querySelectorAll('[data-slot="skeleton-row"]'),
-    ).toHaveLength(4);
+    ).toHaveLength(3);
+    expect(
+      container.querySelector('[data-slot="skeleton-booking-tabs"]')?.children,
+    ).toHaveLength(2);
   });
 
   it("matches the team choice cards and the member table", () => {
