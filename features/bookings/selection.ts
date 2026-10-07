@@ -63,3 +63,23 @@ export function suggestedEnd(slots: SelectableSlot[], start: string): string {
   const ends = selectableEnds(slots, start);
   return (ends[1] ?? ends[0])?.end ?? "";
 }
+
+export type BookingSelection = { start: string; end: string };
+
+export function selectBookingSlot(
+  slots: SelectableSlot[],
+  selection: BookingSelection | null,
+  clickedStart: string,
+): BookingSelection | null {
+  const clicked = slots.find(
+    (slot) => slot.start === clickedStart && slot.state === "free",
+  );
+  if (!clicked) return selection;
+  if (selection && Date.parse(clicked.start) > Date.parse(selection.start)) {
+    const reachable = selectableEnds(slots, selection.start).find(
+      (slot) => slot.start === clicked.start,
+    );
+    if (reachable) return { start: selection.start, end: reachable.end };
+  }
+  return { start: clicked.start, end: suggestedEnd(slots, clicked.start) };
+}
