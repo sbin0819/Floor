@@ -50,7 +50,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `pnpm dev` | 개발 서버 |
 | `pnpm build` | 프로덕션 빌드 |
 | `pnpm lint` | ESLint |
-| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm typecheck` | `next typegen` 후 `tsc --noEmit` |
 | `pnpm test` | Vitest (단위 + PGlite 통합 테스트) |
 | `pnpm test:e2e` | Playwright |
 | `pnpm format` | Prettier |
