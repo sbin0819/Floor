@@ -20,7 +20,8 @@ export function safeNext(
     if (target.origin !== base.origin || decodedTarget.origin !== base.origin)
       return "/";
     for (const path of [target.pathname, decodedTarget.pathname]) {
-      if (path === "/api" || path.startsWith("/api/")) return "/";
+      if (path.startsWith("//") || path === "/api" || path.startsWith("/api/"))
+        return "/";
     }
     // 로그인 화면을 목적지로 삼으면 이미 로그인한 사용자에게 순환 이동이 생겨요.
     if (
