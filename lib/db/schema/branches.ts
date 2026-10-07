@@ -10,16 +10,14 @@ import {
 import { createdAt, id } from "./common";
 import { accessScope } from "./enums";
 import { floorPlans } from "./floor-plans";
+import type { OpenHours } from "@/lib/time/open-hours";
 
 export const branches = pgTable("branches", {
   id: id(),
   name: text("name").notNull(),
   address: text("address"),
   timezone: text("timezone").notNull().default("Asia/Seoul"),
-  openHours: jsonb("open_hours")
-    .$type<Record<string, unknown>>()
-    .notNull()
-    .default({}),
+  openHours: jsonb("open_hours").$type<OpenHours>().notNull().default({}),
   createdAt: createdAt(),
 });
 
