@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { AdminFloorData } from "@/features/admin/types";
 import { FloorForm } from "./floor-form";
 import { SpaceTable } from "./space-table";
+import { AccessEditor } from "./access-editor";
 
 export function FloorDetail({ data }: { data: AdminFloorData }) {
   return (
@@ -22,6 +23,9 @@ export function FloorDetail({ data }: { data: AdminFloorData }) {
             floor={data.floor}
             canManage={data.permissions.manageSpaces}
           />
+        </section>
+        <section className="rounded-xl border bg-card p-5">
+          <AccessEditor key={data.floor.id} data={data} />
         </section>
       </div>
       <SpaceTable data={data} />

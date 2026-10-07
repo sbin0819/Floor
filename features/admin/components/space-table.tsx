@@ -27,16 +27,10 @@ import {
 import type { AdminFloorData, AdminSpace } from "@/features/admin/types";
 import { spaceTypeLabels } from "@/features/bookings/format";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
+import { AccessEditor, accessLabels } from "./access-editor";
 import { SpaceForm } from "./space-form";
 import { FormMessage } from "./form-fields";
 import { useAdminMutation } from "./use-admin-mutation";
-
-const accessLabels = {
-  everyone: "전체 이용",
-  teams: "지정 팀",
-  closed: "사용 안 함",
-  inherit: "층 설정 따름",
-};
 
 function ArchiveButton({
   space,
@@ -208,6 +202,15 @@ export function SpaceTable({ data }: { data: AdminFloorData }) {
               canManage={data.permissions.manageSpaces}
               onSaved={() => setSelected(null)}
             />
+          )}
+          {current && (
+            <div className="border-t pt-5">
+              <AccessEditor
+                key={`${current.id}-access`}
+                data={data}
+                space={current}
+              />
+            </div>
           )}
         </DialogContent>
       </Dialog>
