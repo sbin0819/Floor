@@ -23,7 +23,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/01-setup.md` | 기본 셋업 작업 지시서 (끝남) | 셋업에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/02-auth.md` | 가입과 로그인 작업 지시서 (끝남) | 인증에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/03-team-join.md` | 일반 회원에서 팀 회원으로 작업 지시서 (끝남) | 팀 가입에서 왜 그렇게 했는지 확인할 때 |
-| `docs/codex/04-seed.md` | 목 데이터와 관리자 계정 작업 지시서 | 시드 작업을 받았을 때 |
+| `docs/codex/04-seed.md` | 목 데이터와 관리자 계정 작업 지시서 (끝남) | 시드에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/05-booking.md` | 공간 찾기와 예약 작업 지시서 | 예약 작업을 받았을 때 |
 | `docs/codex/06-space-admin.md` | 운영자의 지점·층·공간 관리 작업 지시서 | 운영자 공간 관리 작업을 받았을 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
@@ -67,7 +67,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `pnpm db:migrate` | `DATABASE_URL`에 마이그레이션 적용 |
 | `pnpm storybook` / `pnpm build-storybook` | Storybook |
 | `pnpm admin:create` | 운영자 계정 생성 |
-| `pnpm db:seed` | 개발용 가상 데이터와 계정 넣기 (지시서 04에서 추가). 배포 환경에서는 실행되지 않는다 |
+| `pnpm db:seed` | 허용한 개발 DB에 가상 데이터와 계정 넣기. 원격 DB는 `SEED_ALLOW_HOST`가 필요하고 배포 환경에서는 실행되지 않는다 |
 
 작업을 마치기 전에 `pnpm lint && pnpm typecheck && pnpm test && pnpm build`를 직접 돌려서 통과를 확인한다. 실패하면 고치고, 못 고치면 실패 내용을 그대로 보고한다. 돌리지 않은 검사를 통과했다고 쓰지 않는다.
 
@@ -91,7 +91,7 @@ lib/realtime/        발행·구독 인터페이스
 lib/floor-plan/      평면도 zod 스키마와 검증
 lib/env.ts           zod로 검증한 환경 변수
 drizzle/             생성된 마이그레이션 SQL
-scripts/             운영자 계정 생성 같은 명령줄 스크립트
+scripts/             운영자 계정 생성·시드 실행과 인자·환경 검사
 tests/               단위·통합 테스트(tests/unit, tests/db), e2e(tests/e2e)
 docs/                명세와 작업 지시서
 ```
