@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageContainer, PageHeading } from "@/components/page-container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { HomeData } from "@/features/teams/types";
@@ -12,10 +13,8 @@ export function TeamHome({
   bookingHref?: string;
 }) {
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        안녕하세요, {data.name}님
-      </h1>
+    <PageContainer as="main" width="wide" className="space-y-6">
+      <PageHeading title={`안녕하세요, ${data.name}님`} />
       {bookingHref && (
         <Card className="max-w-2xl">
           <CardHeader>
@@ -88,6 +87,6 @@ export function TeamHome({
           운영자 화면
         </Link>
       )}
-    </main>
+    </PageContainer>
   );
 }

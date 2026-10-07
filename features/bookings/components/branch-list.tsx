@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { PageContainer, PageHeading } from "@/components/page-container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -16,8 +17,8 @@ export function BranchList({ branches }: { branches: BranchListItem[] }) {
     onSuccess: ({ branchId }) => router.push(`/branches/${branchId}`),
   });
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-      <h1 className="text-2xl font-semibold">이용할 지점을 골라 주세요</h1>
+    <PageContainer as="main" className="space-y-6">
+      <PageHeading title="이용할 지점을 골라 주세요" />
       {branches.length === 0 && (
         <p className="text-muted-foreground">
           이용할 수 있는 지점이 아직 없어요
@@ -57,6 +58,6 @@ export function BranchList({ branches }: { branches: BranchListItem[] }) {
       <p role="status" aria-live="polite">
         {mutation.message}
       </p>
-    </main>
+    </PageContainer>
   );
 }

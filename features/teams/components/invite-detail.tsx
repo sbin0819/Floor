@@ -1,19 +1,18 @@
 import type { InvitePageData } from "@/features/teams/types";
+import { PageContainer, PageHeading } from "@/components/page-container";
 import { InviteResponse } from "./invite-response";
 import { TeamDate, TeamSection } from "./team-display";
 
 export function InviteDetail({ data }: { data: InvitePageData | null }) {
   if (!data)
     return (
-      <main className="mx-auto max-w-2xl px-6 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          이 초대는 더 이상 쓸 수 없어요
-        </h1>
-      </main>
+      <PageContainer as="main" width="form">
+        <PageHeading title="이 초대는 더 이상 쓸 수 없어요" />
+      </PageContainer>
     );
   return (
-    <main className="mx-auto max-w-2xl space-y-6 px-6 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">팀 초대</h1>
+    <PageContainer as="main" width="form" className="space-y-6">
+      <PageHeading title="팀 초대" />
       <TeamSection title={data.teamName}>
         <p>{data.inviterName}님이 초대했어요</p>
         {data.message && (
@@ -24,6 +23,6 @@ export function InviteDetail({ data }: { data: InvitePageData | null }) {
         </p>
         <InviteResponse token={data.token} leaveOnDecline />
       </TeamSection>
-    </main>
+    </PageContainer>
   );
 }

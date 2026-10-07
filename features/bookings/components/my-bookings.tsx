@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageContainer, PageHeading } from "@/components/page-container";
 import { Badge } from "@/components/ui/badge";
 import {
   floorHref,
@@ -67,8 +68,8 @@ function BookingList({
 }
 export function MyBookings({ data }: { data: MyBookingsData }) {
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-6 py-8">
-      <h1 className="text-2xl font-semibold">내 예약</h1>
+    <PageContainer as="main" className="space-y-8">
+      <PageHeading title="내 예약" />
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">다가오는 예약</h2>
         <BookingList bookings={data.upcoming} upcoming />
@@ -77,6 +78,6 @@ export function MyBookings({ data }: { data: MyBookingsData }) {
         <h2 className="text-xl font-semibold">지난 예약</h2>
         <BookingList bookings={data.past} upcoming={false} />
       </section>
-    </main>
+    </PageContainer>
   );
 }

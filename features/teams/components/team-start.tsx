@@ -1,4 +1,5 @@
 import type { TeamStartData } from "@/features/teams/types";
+import { PageContainer, PageHeading } from "@/components/page-container";
 import { CreateTeamForm } from "./create-team-form";
 import { InviteResponse } from "./invite-response";
 import { CancelJoinRequest, JoinRequestForm } from "./request-controls";
@@ -7,10 +8,8 @@ import { TeamSearchForm } from "./team-search-form";
 
 export function TeamStart({ data }: { data: TeamStartData }) {
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-6 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        팀 회원으로 전환
-      </h1>
+    <PageContainer as="main" width="form" className="space-y-6">
+      <PageHeading title="팀 회원으로 전환" />
       <div id="received-invites">
         <TeamSection title="받은 초대">
           {data.invites.length === 0 ? (
@@ -99,6 +98,6 @@ export function TeamStart({ data }: { data: TeamStartData }) {
           )}
         </div>
       </TeamSection>
-    </main>
+    </PageContainer>
   );
 }

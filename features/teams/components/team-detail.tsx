@@ -1,4 +1,5 @@
 import { StatusBadge } from "@/components/status-badge";
+import { PageContainer, PageHeading } from "@/components/page-container";
 import {
   Table,
   TableBody,
@@ -20,14 +21,16 @@ import {
 
 export function TeamDetail({ data }: { data: TeamPageData }) {
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          <span className="tabular-nums">팀원 {data.memberCount}명</span> · 내
-          역할: {roleLabel(data.role)}
-        </p>
-      </header>
+    <PageContainer as="main" className="space-y-6">
+      <PageHeading
+        title={data.name}
+        description={
+          <>
+            <span className="tabular-nums">팀원 {data.memberCount}명</span> · 내
+            역할: {roleLabel(data.role)}
+          </>
+        }
+      />
       {data.role === "admin" && (
         <TeamSection title="팀원 초대">
           <SendInviteForm teamId={data.id} canSendEmail={data.canSendEmail} />
@@ -132,6 +135,6 @@ export function TeamDetail({ data }: { data: TeamPageData }) {
           </TeamSection>
         </>
       )}
-    </main>
+    </PageContainer>
   );
 }

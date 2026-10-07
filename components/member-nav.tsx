@@ -2,27 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CalendarDays, House, LayoutGrid, Users } from "lucide-react";
+import { LinkPending } from "@/components/link-pending";
+import {
+  activeMemberNav,
+  memberNavItems,
+} from "@/components/member-navigation";
 
-export function MemberNav() {
+const icons = {
+  home: House,
+  spaces: LayoutGrid,
+  bookings: CalendarDays,
+  teams: Users,
+};
+
+export function MemberNav({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
+  const active = activeMemberNav(pathname);
   return (
-    <nav aria-label="회원 메뉴" className="flex flex-wrap gap-1">
-      {[
-        ["/", "홈"],
-        ["/branches", "공간 예약"],
-        ["/bookings", "내 예약"],
-      ].map(([href, label]) => {
-        const active =
-          pathname === href ||
-          (href === "/branches" && pathname.startsWith("/branches/"));
+    <nav
+      aria-label={mobile ? "하단 회원 메뉴" : "회원 메뉴"}
+      className={
+        mobile ? "grid h-16 grid-cols-4" : "hidden items-center gap-1 md:flex"
+      }
+    >
+      {memberNavItems.map(({ key, href, label }) => {
+        const Icon = icons[key];
+        const selected = active === key;
         return (
           <Link
             key={href}
-            href={href!}
-            aria-current={active ? "page" : undefined}
-            className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring ${active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted"}`}
+            href={href}
+            aria-current={selected ? "page" : undefined}
+            className={`relative inline-flex min-h-11 items-center justify-center rounded-lg px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${mobile ? "flex-col gap-1 text-xs" : "text-sm"} ${selected ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
           >
-            {label}
+            <LinkPending />
+            {mobile && <Icon aria-hidden="true" className="relative size-5" />}
+            <span className="relative">{label}</span>
           </Link>
         );
       })}
