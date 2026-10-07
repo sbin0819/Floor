@@ -25,6 +25,7 @@ import { localDate } from "@/lib/time/zoned";
 import { BookingTimeline } from "./booking-timeline";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { useBookingMutation } from "./use-booking-mutation";
+import { useFloorSelection } from "./branch-workspace";
 
 function TimeSelect({
   id,
@@ -75,8 +76,22 @@ function TimeSelect({
 
 export function BookingForm({ data }: { data: SpaceDayData }) {
   const id = useId();
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
+  const workspace = useFloorSelection();
+  const [localRange, setLocalRange] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
+  const range = workspace
+    ? workspace.selection?.spaceId === data.space.id
+      ? workspace.selection
+      : null
+    : localRange;
+  const start = range?.start ?? "";
+  const end = range?.end ?? "";
+  const setRange = (next: { start: string; end: string } | null) => {
+    if (workspace) workspace.changeRange(data.space.id, next);
+    else setLocalRange(next);
+  };
   const [title, setTitle] = useState("");
   const [showTitle, setShowTitle] = useState(false);
   const [actorId, setActorId] = useState(data.actors[0]?.teamId ?? "personal");
@@ -102,16 +117,14 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
       restricted: !data.actors.some(({ teamId }) => teamId === null),
     },
     onSuccess: () => {
-      setStart("");
-      setEnd("");
+      setRange(null);
       setTitle("");
     },
   });
   const disabled =
     mutation.pending || !data.openHours || !data.space.bookable || !actor;
   const selectStart = (value: string) => {
-    setStart(value);
-    setEnd(suggestedEnd(slots, value));
+    setRange({ start: value, end: suggestedEnd(slots, value) });
   };
   const duration =
     selectedStart && selectedEnd
@@ -161,8 +174,7 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
               value,
             );
             if (selection) {
-              setStart(selection.start);
-              setEnd(selection.end);
+              setRange(selection);
             }
           }}
         />
@@ -234,7 +246,7 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
                 label="끝"
                 value={selectedEnd}
                 disabled={disabled || !selectedStart}
-                onChange={setEnd}
+                onChange={(value) => setRange({ start, end: value })}
                 options={ends.map((slot) => ({
                   value: slot.end,
                   label: slot.endLabel,

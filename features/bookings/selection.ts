@@ -65,6 +65,21 @@ export function suggestedEnd(slots: SelectableSlot[], start: string): string {
 }
 
 export type BookingSelection = { start: string; end: string };
+export type FloorBookingSelection = BookingSelection & { spaceId: string };
+
+export function selectFloorBookingSlot(
+  spaceId: string,
+  slots: SelectableSlot[],
+  selection: FloorBookingSelection | null,
+  clickedStart: string,
+): FloorBookingSelection | null {
+  const next = selectBookingSlot(
+    slots,
+    selection?.spaceId === spaceId ? selection : null,
+    clickedStart,
+  );
+  return next ? { spaceId, ...next } : null;
+}
 
 export function selectBookingSlot(
   slots: SelectableSlot[],
