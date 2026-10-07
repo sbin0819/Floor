@@ -4,12 +4,31 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { HomeData } from "@/features/teams/types";
 import { roleLabel, TeamSection, teamLinkClassName } from "./team-display";
 
-export function TeamHome({ data }: { data: HomeData }) {
+export function TeamHome({
+  data,
+  bookingHref,
+}: {
+  data: HomeData;
+  bookingHref?: string;
+}) {
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
       <h1 className="text-2xl font-semibold tracking-tight">
         안녕하세요, {data.name}님
       </h1>
+      {bookingHref && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <h2 className="text-xl font-semibold">공간 예약하기</h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p>지점과 층을 골라 회의실을 예약해요</p>
+            <Button asChild>
+              <Link href={bookingHref}>공간 예약하기</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       {data.teams.length === 0 ? (
         <Card className="max-w-2xl">
           <CardHeader>

@@ -4,9 +4,13 @@ import Home from "@/app/(app)/page";
 import { requirePageSession } from "@/lib/auth/session";
 import { getHomeData } from "@/features/teams/queries";
 import { resolvePageContent } from "./page-test-utils";
+import { getBookingEntry } from "@/features/bookings/queries";
 
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("@/features/teams/queries", () => ({ getHomeData: vi.fn() }));
+vi.mock("@/features/bookings/queries", () => ({
+  getBookingEntry: vi.fn().mockResolvedValue(null),
+}));
 
 it("checks the session on the page and greets the current member", async () => {
   vi.mocked(requirePageSession).mockResolvedValue({
@@ -29,12 +33,17 @@ it("checks the session on the page and greets the current member", async () => {
     screen.getByRole("link", { name: "팀 회원으로 전환" }),
   ).toHaveAttribute("href", "/teams/start");
   expect(screen.getByText("받은 초대 2개")).toBeVisible();
+  expect(screen.getByRole("link", { name: "공간 예약하기" })).toHaveAttribute(
+    "href",
+    "/branches",
+  );
   expect(
     screen.queryByRole("link", { name: "운영자 화면" }),
   ).not.toBeInTheDocument();
 });
 
 it("shows memberships and the operator destination without unrelated navigation", async () => {
+  vi.mocked(getBookingEntry).mockResolvedValue("default-branch");
   vi.mocked(getHomeData).mockResolvedValue({
     name: "가상 회원",
     teams: [{ id: "team", name: "가상 팀", role: "admin" }],
@@ -55,4 +64,8 @@ it("shows memberships and the operator destination without unrelated navigation"
     "/admin",
   );
   expect(screen.queryByText("팀 예약")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "공간 예약하기" })).toHaveAttribute(
+    "href",
+    "/branches/default-branch",
+  );
 });

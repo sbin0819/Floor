@@ -4,14 +4,18 @@ import { unstable_doesMiddlewareMatch as unstable_doesProxyMatch } from "next/ex
 import { config, proxy } from "@/proxy";
 
 describe("optimistic route protection", () => {
-  it.each(["/", "/teams/start", "/invite/token", "/admin", "/admin/branches"])(
-    "matches protected route %s",
-    (url) => {
-      expect(unstable_doesProxyMatch({ config, nextConfig: {}, url })).toBe(
-        true,
-      );
-    },
-  );
+  it.each([
+    "/",
+    "/teams/start",
+    "/invite/token",
+    "/admin",
+    "/admin/branches",
+    "/branches",
+    "/branches/branch/floors/floor",
+    "/bookings",
+  ])("matches protected route %s", (url) => {
+    expect(unstable_doesProxyMatch({ config, nextConfig: {}, url })).toBe(true);
+  });
   it.each([
     "/login",
     "/signup",
