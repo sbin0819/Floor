@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "spaces_floor_name_unique" ON "spaces" USING btree ("floor_id",lower("name")) WHERE "spaces"."archived_at" IS NULL;

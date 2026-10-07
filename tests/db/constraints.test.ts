@@ -512,6 +512,69 @@ describe("database constraints from the real migrations", () => {
     });
   });
 
+  it("17. rejects active space names that differ only by case on the same floor", async () => {
+    await database.db
+      .insert(spaces)
+      .values({ floorId, type: "meeting_room", name: "Room Alpha" });
+    await expect(
+      database.db
+        .insert(spaces)
+        .values({ floorId, type: "phone_booth", name: "rOOM aLPHA" }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "spaces_floor_name_unique" },
+    });
+    await expect(
+      database.db
+        .update(spaces)
+        .set({ name: "ROOM ALPHA" })
+        .where(eq(spaces.id, otherSpaceId)),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "spaces_floor_name_unique" },
+    });
+  });
+
+  it("17. reuses archived names but rejects restoring a conflicting active name", async () => {
+    const archivedId = crypto.randomUUID();
+    await database.db
+      .insert(spaces)
+      .values({
+        id: archivedId,
+        floorId,
+        type: "meeting_room",
+        name: "Room Alpha",
+      });
+    await database.db
+      .update(spaces)
+      .set({ archivedAt: during.start })
+      .where(eq(spaces.id, archivedId));
+    await expect(
+      database.db
+        .insert(spaces)
+        .values({ floorId, type: "meeting_room", name: "room alpha" }),
+    ).resolves.toBeDefined();
+    await expect(
+      database.db
+        .update(spaces)
+        .set({ archivedAt: null })
+        .where(eq(spaces.id, archivedId)),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "spaces_floor_name_unique" },
+    });
+  });
+
+  it("17. permits the same active name on different floors", async () => {
+    const otherFloorId = crypto.randomUUID();
+    await database.db
+      .insert(floors)
+      .values({ id: otherFloorId, branchId, level: 8, name: "8F" });
+    await expect(
+      database.db.insert(spaces).values([
+        { floorId, type: "meeting_room", name: "Room Alpha" },
+        { floorId: otherFloorId, type: "meeting_room", name: "ROOM ALPHA" },
+      ]),
+    ).resolves.toBeDefined();
+  });
+
   it("enforces both sides of the floor/published-plan circular reference", async () => {
     await expect(
       database.db

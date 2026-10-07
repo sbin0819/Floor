@@ -43,6 +43,13 @@
       "when": 1791362098103,
       "tag": "0005_booking-foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791363379086,
+      "tag": "0006_space-admin",
+      "breakpoints": true
     }
   ]
 }

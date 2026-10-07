@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
@@ -7,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { floors } from "./branches";
@@ -37,6 +39,9 @@ export const spaces = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
+    uniqueIndex("spaces_floor_name_unique")
+      .on(table.floorId, sql`lower(${table.name})`)
+      .where(sql`${table.archivedAt} IS NULL`),
     index("spaces_floor_id_idx").on(table.floorId),
     index("spaces_parent_id_idx").on(table.parentId),
   ],
