@@ -42,7 +42,7 @@
 | `/booking` | 화면이 없다. 내 지점의 첫 층으로 보낸다 (`docs/spec/ui.md`). 쿼리 `date`가 맞는 값이면 층 주소에 붙여 보낸다 (`docs/spec/ui-2.md`) |
 | `/branches` | 지점 목록. 카드를 누르면 그 지점으로 간다. 기본 지점은 "기본 지점으로 설정"으로 따로 정한다 |
 | `/branches/[branchId]` | 그 지점에서 내가 쓸 수 있는 첫 층으로 보낸다. 쓸 수 있는 층이 없으면 안내를 보여준다 |
-| `/branches/[branchId]/floors/[floorId]` | 공간 목록과 예약. 쿼리 `date`(YYYY-MM-DD), `space`(공간 id), `view`(`list`, `timeline`) |
+| `/branches/[branchId]/floors/[floorId]` | 공간 목록과 예약. 쿼리 `date`(YYYY-MM-DD), `space`(공간 id), `view`(`list`, `timeline`), `detail`(`1`. 시간표에서 공간 상세를 연 상태) |
 | `/bookings` | 내 예약. 쿼리 `tab`(`past`), `view`(`calendar`), `month`(YYYY-MM), `day`(YYYY-MM-DD) |
 
 - 모두 `(app)` 그룹이고 모든 페이지가 `requirePageSession()`을 부른다.

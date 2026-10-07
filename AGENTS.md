@@ -29,10 +29,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/07-speed-and-loading.md` | 조회 속도, 공통 틀, 로딩 상태 작업 지시서 (끝남) | 로딩과 속도에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/08-member-screens.md` | 멤버 화면 다시 짜기 작업 지시서 (끝남) | 멤버 화면에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/09-admin-auth-screens.md` | 운영자 화면과 로그인 화면 다듬기 작업 지시서 (끝남) | 그 화면에서 왜 그렇게 했는지 확인할 때 |
-| `docs/codex/10-photos-and-look.md` | 공간 사진과 전체 인상 작업 지시서 | 그 작업을 받았을 때 |
-| `docs/codex/11-floor-timetable.md` | 층 화면: 날짜 달력, 시간표, 목록과 공간 상세 작업 지시서 | 그 작업을 받았을 때 |
-| `docs/codex/12-calendar-home-branches.md` | 내 예약 달력, 홈, 지점 목록 작업 지시서 | 그 작업을 받았을 때 |
-| `docs/codex/night-run-10-12.md` | 지시서 10–12를 사람 없이 이어서 돌릴 때의 규칙 (질문하지 않기, 하지 않는 것, 멈추는 때, 진행 기록) | 프롬프트가 이 문서를 가리킬 때 |
+| `docs/codex/10-photos-and-look.md` | 공간 사진과 전체 인상 작업 지시서 (끝남) | 사진과 토큰에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/11-floor-timetable.md` | 층 화면: 날짜 달력, 시간표, 목록과 공간 상세 작업 지시서 (끝남) | 층 화면에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/12-calendar-home-branches.md` | 내 예약 달력, 홈, 지점 목록 작업 지시서 (끝남) | 그 화면에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/13-timetable-space-detail.md` | 시간표에서 공간 칸을 눌러 공간 상세를 여는 작업 지시서 | 그 작업을 받았을 때 |
 | `docs/spec/ui.md` | 화면 구성, 로딩 상태(스켈레톤, 바뀌는 부분만 바꾸기), 조회 속도 예산, 화면별 구성과 문구 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/ui-2.md` | 화면 구성 2차: 공간 사진, 날짜 달력, 층 시간표, 내 예약 달력, 홈·지점 목록·공간 상세. `ui.md`와 다르면 이 문서가 맞다 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
@@ -45,7 +45,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/spec/design-tokens.md` | 색, 타이포, 간격, shadcn 변수 매핑 | UI를 만질 때 |
 | `docs/design/floor-*.png` | 처음 그린 화면 시안 9장, 다이어그램 4장 | 화면을 만들 때 참고 |
 | `docs/design/ui-*.png` | 07–09의 시안 11장 (홈, 지점, 층, 내 예약, 팀, 로딩, 좁은 화면). `docs/spec/ui.md`와 같이 본다 | 팀 화면과 로딩 상태를 볼 때 |
-| `docs/design/ui2-*.png` | 화면 구성 2차의 시안 7장 (층 시간표, 층 목록과 공간 상세, 날짜 달력, 내 예약 달력, 홈, 지점 목록, 좁은 화면). `docs/spec/ui-2.md`와 같이 본다. 같은 화면이 `ui-*.png`에도 있으면 이쪽이 맞다 | 멤버 화면을 만들 때 |
+| `docs/design/ui2-*.png` | 화면 구성 2차의 시안 8장 (층 시간표, 시간표에서 연 공간 상세, 층 목록과 공간 상세, 날짜 달력, 내 예약 달력, 홈, 지점 목록, 좁은 화면). `docs/spec/ui-2.md`와 같이 본다. 같은 화면이 `ui-*.png`에도 있으면 이쪽이 맞다 | 멤버 화면을 만들 때 |
 | `docs/spec/examples/seed-photos.json`, `public/seed/photos/` | 공간 사진과 지점 대표 사진의 시드와 그림 파일 29개 | 사진을 만질 때 |
 | `docs/jira-issues.md` | Jira 이슈 90개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
 
