@@ -28,7 +28,8 @@ export function BranchForm({
   return (
     <form
       noValidate
-      className="space-y-5 rounded-xl border bg-card p-5"
+      aria-label="지점 설정"
+      className="space-y-6"
       onSubmit={(event) => {
         event.preventDefault();
         if (!disabled)
@@ -40,41 +41,58 @@ export function BranchForm({
           });
       }}
     >
-      <h2 className="text-lg font-semibold">지점 정보</h2>
-      {!canManage && (
-        <p className="text-muted-foreground">
-          읽기 전용이에요. 지점 정보를 고칠 권한이 없어요
-        </p>
-      )}
-      <Field id={`${id}-name`} label="지점 이름" error={mutation.errors.name}>
-        <Input
-          id={`${id}-name`}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          disabled={disabled}
-          maxLength={40}
-          {...fieldAria(`${id}-name`, mutation.errors.name)}
-        />
-      </Field>
-      <Field id={`${id}-address`} label="주소" error={mutation.errors.address}>
-        <Input
+      <section
+        aria-labelledby={`${id}-info-heading`}
+        className="space-y-4 rounded-xl border border-border bg-card p-5"
+      >
+        <h2 id={`${id}-info-heading`} className="text-lg font-semibold">
+          지점 정보
+        </h2>
+        {!canManage && (
+          <p className="text-muted-foreground">
+            읽기 전용이에요. 지점 정보를 고칠 권한이 없어요
+          </p>
+        )}
+        <Field id={`${id}-name`} label="지점 이름" error={mutation.errors.name}>
+          <Input
+            id={`${id}-name`}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            disabled={disabled}
+            maxLength={40}
+            {...fieldAria(`${id}-name`, mutation.errors.name)}
+          />
+        </Field>
+        <Field
           id={`${id}-address`}
-          value={address}
-          onChange={(event) => setAddress(event.target.value)}
+          label="주소"
+          error={mutation.errors.address}
+        >
+          <Input
+            id={`${id}-address`}
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            disabled={disabled}
+            maxLength={100}
+            {...fieldAria(`${id}-address`, mutation.errors.address)}
+          />
+        </Field>
+        <p className="text-muted-foreground">
+          시간대: {branch.timezone} · 운영 시간을 바꿔도 이미 있는 예약은
+          유지돼요
+        </p>
+      </section>
+      <section
+        aria-label="운영 시간 설정"
+        className="rounded-xl border border-border bg-card p-5"
+      >
+        <OpenHoursFields
+          value={openHours}
+          onChange={setOpenHours}
           disabled={disabled}
-          maxLength={100}
-          {...fieldAria(`${id}-address`, mutation.errors.address)}
+          errors={mutation.errors}
         />
-      </Field>
-      <p className="text-muted-foreground">
-        시간대: {branch.timezone} · 운영 시간을 바꿔도 이미 있는 예약은 유지돼요
-      </p>
-      <OpenHoursFields
-        value={openHours}
-        onChange={setOpenHours}
-        disabled={disabled}
-        errors={mutation.errors}
-      />
+      </section>
       <FormMessage message={mutation.message} />
       <Button disabled={disabled} type="submit">
         {mutation.pending ? "저장하고 있어요" : "지점 정보 저장"}
