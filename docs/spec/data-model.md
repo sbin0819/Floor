@@ -48,8 +48,10 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | name | text | not null |
 | avatar_url | text | null 허용. Better Auth의 `image`에 해당 |
 | updated_at | timestamptz | not null, 기본값 now() |
+| default_branch_id | uuid | null 허용, FK → branches, on delete set null. 주로 쓰는 지점. 지점을 고를 때 바뀐다 (`docs/spec/booking.md`) |
 
 - 셋업 때 있던 `auth_id` 컬럼은 없앤다.
+- `default_branch_id`는 Better Auth가 쓰지 않는 컬럼이다. Better Auth의 필드로 등록하지 않고 `lib/dal`로만 읽고 쓴다.
 
 ### auth_sessions, auth_accounts, auth_verifications (인증)
 
@@ -73,7 +75,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | name | text | not null |
 | address | text | null 허용 |
 | timezone | text | not null, 기본값 `'Asia/Seoul'` |
-| open_hours | jsonb | not null, 기본값 `'{}'` |
+| open_hours | jsonb | not null, 기본값 `'{}'`. 요일별 운영 시간. 모양과 기본값은 `docs/spec/booking.md`의 "운영 시간". Drizzle 타입은 `OpenHours` |
 
 ### floors (층)
 
@@ -104,12 +106,14 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | amenities | text[] | not null, 기본값 `'{}'` |
 | booking_rules | jsonb | not null, 기본값 `'{}'` |
 | access | access_scope | null 허용. null이면 층 설정을 따른다 |
-| archived_at | timestamptz | null 허용 |
+| archived_at | timestamptz | null 허용. 값이 있으면 보관된 공간이다. 멤버 화면과 예약에서 빠진다 |
 
 - 좌석은 따로 테이블을 두지 않는다. `type = 'desk'`이고 `parent_id`가 `desk_area` 공간을 가리키는 행이 좌석이다.
 - 코어, 계단, 창고 같은 고정물은 평면도 JSON의 `fixtures[]`에만 있고 `spaces` 행을 만들지 않는다.
 - 좌석 행이 있는 `desk_area`는 `bookable = false`로 둔다. 구역과 그 안의 좌석을 같은 시간에 따로 예약하는 일을 겹침 제약이 막지 못하기 때문이다. 좌석 행 없이 구역 단위로만 운영하는 `desk_area`는 `bookable = true`가 될 수 있다.
 - 공간의 접근 범위는 층보다 넓을 수 없다. 이 규칙은 DB가 아니라 저장할 때 서버에서 검사한다 (`docs/spec/roles-and-access.md`).
+- 같은 층의 보관되지 않은 공간은 이름이 유일하다 (대소문자 무시): `unique (floor_id, lower(name)) where archived_at is null` (이름 `spaces_floor_name_unique`)
+- `amenities`에는 `docs/spec/booking.md`의 여섯 개 키만 넣는다. DB가 아니라 저장할 때 서버에서 검사한다.
 - 인덱스: `(floor_id)`, `(parent_id)`
 
 ### floor_plans (평면도 버전)
@@ -141,9 +145,13 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | during | tstzrange | not null |
 | title | text | null 허용 |
 | status | booking_status | not null, 기본값 `confirmed` |
+| cancelled_at | timestamptz | null 허용. 취소한 시각 |
+| cancelled_by | uuid | null 허용, FK → users. 취소한 사람. 본인일 수도, 팀 관리자나 운영자일 수도 있다 |
 
 - 겹침 금지 (이름 `bookings_no_overlap`): `EXCLUDE USING gist (space_id WITH =, during WITH &&) WHERE (status = 'confirmed')`
 - 구간 검사 (이름 `bookings_during_valid`): `CHECK (NOT isempty(during) AND NOT lower_inf(during) AND NOT upper_inf(during) AND lower_inc(during) AND NOT upper_inc(during))`. 경계가 `[)`가 아니면 맞닿은 예약이 겹침으로 잡히므로 DB에서 강제한다.
+- 취소 기록 (이름 `bookings_cancel_consistent`): `CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL))`. 취소된 예약에는 취소 시각이 있고, 확정 예약에는 없다.
+- 예약은 지우지 않는다. 취소하면 상태만 바꾼다. (시드 스크립트가 자기 id의 예약을 다시 넣는 것만 예외다.)
 - 인덱스: `(user_id)`, `(team_id)`
 - 겹치는 예약을 넣으면 Postgres가 SQLSTATE `23P01`을 낸다. 액션 래퍼가 이것을 `BOOKING_CONFLICT`로 바꾼다.
 
@@ -300,7 +308,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 
 ## 테스트로 확인할 제약
 
-`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 14개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서 만든다.
+`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 17개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서 만든다.
 
 1. 같은 공간에 시간이 겹치는 `confirmed` 예약 두 개는 들어가지 않는다 (`23P01`).
 2. 끝과 시작이 맞닿은 예약(10:00–11:00, 11:00–12:00)은 들어간다.
@@ -316,3 +324,6 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 12. `headcount`가 0이거나 1000을 넘는 팀은 들어가지 않는다.
 13. 같은 팀이 같은 이메일에 보낸 대기 중 초대 두 개는 들어가지 않는다. 앞의 초대가 취소·거절·수락된 뒤에는 들어간다.
 14. 같은 팀에 같은 사람의 대기 중 가입 요청 두 개는 들어가지 않는다. 앞의 요청이 거절·취소된 뒤에는 들어간다.
+15. `cancelled`인데 `cancelled_at`이 없는 예약, `confirmed`인데 `cancelled_at`이 있는 예약은 들어가지 않는다.
+16. 지점을 지우면 그 지점을 기본 지점으로 둔 사용자의 `default_branch_id`가 null이 된다.
+17. 같은 층에 대소문자만 다른 같은 이름의 공간 두 개는 들어가지 않는다. 앞의 공간이 보관된 뒤에는 들어간다. 다른 층에는 들어간다.

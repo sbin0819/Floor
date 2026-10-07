@@ -55,6 +55,8 @@ export type ActionErrorCode =
   | 'ALREADY_MEMBER'     // 이미 그 팀의 팀원
   | 'ALREADY_REQUESTED'  // 대기 중인 가입 요청이 있음
   | 'INVITE_INVALID'     // 초대가 만료·취소·처리됐거나 다른 사람의 초대
+  | 'OUTSIDE_HOURS'      // 운영 시간 밖이거나 쉬는 날
+  | 'SPACE_IN_USE'       // 앞으로의 예약이 있어 공간을 보관하거나 예약 불가로 바꿀 수 없음
   | 'INTERNAL';          // 그 밖의 오류. 서버 로그에만 자세히 남긴다
 ```
 

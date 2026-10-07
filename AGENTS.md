@@ -21,16 +21,21 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | 파일 | 내용 | 언제 읽나 |
 | --- | --- | --- |
 | `docs/codex/01-setup.md` | 기본 셋업 작업 지시서 (끝남) | 셋업에서 왜 그렇게 했는지 확인할 때 |
-| `docs/codex/02-auth.md` | 가입과 로그인 작업 지시서 (범위, 단계, 완료 기준) | 가입·로그인 작업을 받았을 때 |
-| `docs/codex/03-team-join.md` | 일반 회원에서 팀 회원으로 작업 지시서 | 팀 만들기·초대·가입 요청 작업을 받았을 때 |
+| `docs/codex/02-auth.md` | 가입과 로그인 작업 지시서 (끝남) | 인증에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/03-team-join.md` | 일반 회원에서 팀 회원으로 작업 지시서 (끝남) | 팀 가입에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/04-seed.md` | 목 데이터와 관리자 계정 작업 지시서 | 시드 작업을 받았을 때 |
+| `docs/codex/05-booking.md` | 공간 찾기와 예약 작업 지시서 | 예약 작업을 받았을 때 |
+| `docs/codex/06-space-admin.md` | 운영자의 지점·층·공간 관리 작업 지시서 | 운영자 공간 관리 작업을 받았을 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
+| `docs/spec/booking.md` | 지점 → 층 → 공간 → 예약 흐름, 사용자 행동별 데이터, 시간 규칙, 한도 | 공간 목록·예약을 만질 때 |
+| `docs/spec/space-admin.md` | 운영자가 지점·층·공간·이용 대상을 입력하는 규칙 | 운영자 화면을 만질 때 |
 | `docs/spec/data-model.md` | 테이블, 컬럼, 제약 | DB 스키마·쿼리를 만질 때 |
 | `docs/spec/server.md` | Server Actions 규칙, 결과 타입, 데이터 접근 계층, 세션, 메일, 실시간 | 서버 코드를 만질 때 |
 | `docs/spec/roles-and-access.md` | 역할 4개, 권한 키, 기본값, 층·공간 접근 범위 | 권한·접근 판정을 만질 때 |
 | `docs/spec/floor-plan.md` | 평면도 JSON 형식과 검증 규칙 | 평면도 스키마·렌더러·편집기를 만질 때 |
 | `docs/spec/design-tokens.md` | 색, 타이포, 간격, shadcn 변수 매핑 | UI를 만질 때 |
 | `docs/design/*.png` | 화면 시안 9장, 다이어그램 4장 | 화면을 만들 때 참고 |
-| `docs/jira-issues.md` | Jira 이슈 68개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
+| `docs/jira-issues.md` | Jira 이슈 71개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
 
 ## 기술 스택 (확정)
 
@@ -61,7 +66,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `pnpm db:generate` | Drizzle 스키마에서 마이그레이션 SQL 생성 |
 | `pnpm db:migrate` | `DATABASE_URL`에 마이그레이션 적용 |
 | `pnpm storybook` / `pnpm build-storybook` | Storybook |
-| `pnpm admin:create` | 운영자 계정 생성 (지시서 02에서 추가) |
+| `pnpm admin:create` | 운영자 계정 생성 |
+| `pnpm db:seed` | 개발용 가상 데이터와 계정 넣기 (지시서 04에서 추가). 배포 환경에서는 실행되지 않는다 |
 
 작업을 마치기 전에 `pnpm lint && pnpm typecheck && pnpm test && pnpm build`를 직접 돌려서 통과를 확인한다. 실패하면 고치고, 못 고치면 실패 내용을 그대로 보고한다. 돌리지 않은 검사를 통과했다고 쓰지 않는다.
 
@@ -76,6 +82,9 @@ lib/db/              Drizzle 클라이언트와 스키마 (lib/db/schema/*.ts)
 lib/dal/             데이터 접근 계층. DB를 읽고 쓰는 유일한 곳
 lib/auth/            Better Auth 인스턴스(auth.ts), 세션 확인 함수(session.ts), 운영자 생성(operators.ts)
 lib/email/           메일 발송 인터페이스와 콘솔·메모리 구현, 메일 문구
+lib/time/            시간대 계산과 운영 시간 (순수 함수)
+lib/spaces/          편의 시설 목록 같은 공간 공통 값
+lib/seed/            시드 데이터 읽기·검증과 실행 함수
 lib/permissions/     권한 키, 기본값, can(), canAccess()
 lib/actions/         Server Action 래퍼와 결과 타입
 lib/realtime/        발행·구독 인터페이스
@@ -105,9 +114,14 @@ docs/                명세와 작업 지시서
 
 DB
 
-- 스키마 변경은 `lib/db/schema`를 고치고 `pnpm db:generate`로 SQL을 만든다. 이미 커밋된 마이그레이션 파일은 고치지 않는다.
+- 스키마 변경은 `lib/db/schema`를 고치고 `pnpm db:generate`로 SQL을 만든다. 이미 커밋된 마이그레이션 파일은 고치지 않는다. 방금 만든(아직 커밋하지 않은) SQL에 기존 행을 맞추는 문장을 손으로 더하는 것은 지시서가 시킬 때만 한다.
 - 부분 유니크 인덱스, CHECK, 순환 FK, gist 인덱스는 Drizzle 스키마에 선언한다. Drizzle로 표현할 수 없는 것(확장 설치, EXCLUDE 제약)만 손으로 쓴 마이그레이션에 넣는다. 제약마다 `tests/db`에 확인하는 테스트를 둔다.
-- 예약 겹침은 DB의 EXCLUDE 제약이 최종 방어선이다. 애플리케이션 코드의 사전 검사로 대신하지 않는다.
+- 예약 겹침은 DB의 EXCLUDE 제약이 최종 방어선이다. 애플리케이션 코드의 사전 검사로 대신하지 않는다. 시드 스크립트만 예외로, 자기 예약을 넣기 전에 겹침을 조회해 건너뛴다.
+- 예약 행은 지우지 않고 취소한다. 시드 스크립트가 자기 id의 예약을 지우고 다시 넣는 것만 예외다.
+- 상태를 바꾸는 쓰기(취소, 승인, 수락, 보관)는 "지금 그 상태일 때만 바꾸는" `UPDATE … WHERE … RETURNING` 한 문장으로 한다. 먼저 읽고 나서 바꾸지 않는다. 개수 한도와 "예약이 있으면 안 됨" 같은 검사는 같은 트랜잭션에서 기준 행을 잠근 뒤 센다.
+- 날짜와 시각 계산은 지점의 시간대로 하고 `lib/time`의 함수를 쓴다. 서버나 브라우저의 시간대에 기대는 호출(`getHours()`, 시간대 없는 `toLocaleString()` 등)을 쓰지 않는다.
+- 현재 시각이 결과를 바꾸는 쓰기와 조회는 SQL의 `now()`를 쓰지 않고, 함수가 받은 현재 시각을 바인딩한다. 테스트가 시각을 고정한다.
+- 여러 행을 잠글 때의 순서는 층 → 공간 → 사용자·팀이다.
 - id는 uuid, 시간은 `timestamptz`, 예약·점검 시간은 `tstzrange`(`[시작, 끝)`)다. DB는 snake_case, TypeScript는 camelCase다.
 
 UI
@@ -141,7 +155,7 @@ Drizzle, Neon 드라이버, shadcn/ui, Storybook, Tailwind도 버전에 따라 �
 
 - 지시서에 없는 기능 화면, 평면도 렌더러, 채팅, 영상 통화를 만들지 않는다.
 - 비밀번호, 세션 토큰, 인증·재설정 링크를 로그나 오류 메시지에 남기지 않는다. 예외는 둘뿐이다: 개발용 콘솔 메일 구현이 메일 본문을 출력하는 것(배포 환경에서는 출력하지 않는다), `pnpm admin:create`가 새로 만든 비밀번호를 표준 출력에 한 번 출력하는 것.
-- 비밀 값을 커밋하지 않는다. `.env*`는 `.env.example`만 커밋한다.
+- 비밀 값을 커밋하지 않는다. `.env*`는 `.env.example`만 커밋한다. `docs/spec/examples/seed.json`과 README에 적힌 시드 계정의 비밀번호는 비밀 값이 아니다. 개발용 가상 계정의 값이고, 시드는 배포 환경에서 실행되지 않는다.
 - 원격 저장소에 push하거나 배포하지 않는다. 외부 서비스 계정을 만들지 않는다.
 - 실제 회사 이름, 실제 공유오피스 도면을 쓰지 않는다. 데이터는 모두 가상이다.
 - 테스트를 통과시키려고 테스트를 지우거나 약하게 만들지 않는다.
