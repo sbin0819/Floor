@@ -12,9 +12,9 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
   return (
     <section
       aria-label="공간 상세"
-      className="space-y-6 rounded-xl border border-border bg-card p-5"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
     >
-      <header className="space-y-3">
+      <header className="shrink-0 space-y-2 border-b border-border p-4">
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-semibold">{data.space.name}</h2>
           <Button asChild variant="ghost" size="icon">

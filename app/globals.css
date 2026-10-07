@@ -218,6 +218,12 @@
     left: 50%;
     transform: translate(-50%, -50%);
   }
+  @media (min-width: 1024px) {
+    /* 하루 일정은 선택 상자와 키보드로도 조작하므로 겹치지 않는 28px 칸을 쓴다. */
+    button[data-booking-slot]::before {
+      height: 28px;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
