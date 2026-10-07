@@ -131,6 +131,7 @@ describe("photos in existing member screens", () => {
             floors: data.floors,
             branches: [],
             today: data.date,
+            bookingDates: [],
             now: data.now,
           }}
         />

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "cn";
@@ -16,6 +16,7 @@ import {
 import { PageContainer } from "@/components/page-container";
 import { SpacePhoto } from "@/components/photos/space-photo";
 import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
+import { StatusLine } from "@/components/status-line";
 import { getBookingDateWindow } from "@/features/bookings/date";
 import { floorHref, formatBookingDate } from "@/features/bookings/format";
 import { getOperatingState } from "@/features/bookings/operating-state";
@@ -25,8 +26,15 @@ import { getOpenHours } from "@/lib/time/open-hours";
 import { zonedDateTime } from "@/lib/time/zoned";
 import { useFloorSelection } from "./branch-workspace";
 import { FloorNavigationLink } from "./floor-navigation-link";
+import { FloorDatePicker } from "./floor-date-picker";
 
-export function BranchNavigation({ data }: { data: BranchNavigationData }) {
+export function BranchNavigation({
+  data,
+  viewControl,
+}: {
+  data: BranchNavigationData;
+  viewControl?: ReactNode;
+}) {
   const params = useParams<{ floorId?: string }>();
   const search = useSearchParams();
   const navigation = useFloorSelection();
@@ -41,7 +49,14 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
     navigation?.location.date || searchValue(search, "date"),
   );
   const date = dates.selected;
-  const selectedSpaceId = navigation?.location.spaceId ?? undefined;
+  const requestedSpace = searchValue(search, "space");
+  const requestedView = searchValue(search, "view");
+  const selectedSpaceId = navigation
+    ? (navigation.location.spaceId ?? undefined)
+    : typeof requestedSpace === "string"
+      ? requestedSpace
+      : undefined;
+  const view = typeof requestedView === "string" ? requestedView : undefined;
   const floor = data.floors.find(({ id }) => id === floorId);
   const hours = getOpenHours(data.branch.openHours, date);
   const operating = getOperatingState(
@@ -59,7 +74,7 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
     ? "쉬는 날"
     : `${date === data.today ? `${todayStatus} · ` : ""}${hours.open}–${hours.close}`;
   const link = (value: string) =>
-    floorHref(data.branch.id, floorId ?? "", value, selectedSpaceId);
+    floorHref(data.branch.id, floorId ?? "", value, selectedSpaceId, view);
   const location = (value: string) => ({
     floorId: floorId ?? "",
     date: value,
@@ -114,19 +129,11 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <p
-          className="text-sm text-muted-foreground tabular-nums"
-          aria-label="선택한 날짜 운영 시간"
-        >
-          {hoursLabel}
-        </p>
-      </header>
-      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <SegmentedLinks label="층 선택">
           {data.floors.map((item) => (
             <SegmentedLink key={item.id} asChild selected={item.id === floorId}>
               <FloorNavigationLink
-                href={floorHref(data.branch.id, item.id, date)}
+                href={floorHref(data.branch.id, item.id, date, undefined, view)}
                 location={{ floorId: item.id, date, spaceId: null }}
                 aria-current={item.id === floorId ? "page" : undefined}
               >
@@ -135,6 +142,19 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
             </SegmentedLink>
           ))}
         </SegmentedLinks>
+        <StatusLine
+          kind={
+            date === data.today && operating.status === "open" && hours
+              ? "free"
+              : "none"
+          }
+          aria-label="선택한 날짜 운영 시간"
+        >
+          {hoursLabel}
+        </StatusLine>
+        {viewControl && <div className="ml-auto">{viewControl}</div>}
+      </header>
+      <div className="flex min-w-0 items-center gap-3">
         {floorId && (
           <nav
             aria-label="날짜 선택"
@@ -166,7 +186,8 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
                 timeZone: data.branch.timezone,
                 weekday: "short",
               }).format(zonedDateTime(day, "12:00", data.branch.timezone));
-              const label = `${day === data.today ? "오늘 · " : ""}${formatBookingDate(day, data.branch.timezone)}${closed ? " · 쉬는 날" : ""}`;
+              const marked = data.bookingDates.includes(day);
+              const label = `${day === data.today ? "오늘 · " : ""}${formatBookingDate(day, data.branch.timezone)}${closed ? " · 쉬는 날" : ""}${marked ? " · 내 예약 있음" : ""}`;
               const content = (
                 <>
                   <span className="text-xs font-normal">
@@ -180,12 +201,18 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
                       쉬는 날
                     </span>
                   )}
+                  {marked && (
+                    <span
+                      aria-hidden="true"
+                      className="size-1 rounded-full bg-primary"
+                    />
+                  )}
                 </>
               );
               const className = cn(
-                "h-14 min-w-11 flex-col gap-0.5 px-3",
+                "h-16 min-w-11 flex-col gap-0.5 px-3",
                 day === date
-                  ? "border-foreground bg-foreground text-background hover:bg-foreground hover:text-background"
+                  ? "border-primary bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground"
                   : closed && "text-muted-foreground",
               );
               return disabled ? (
@@ -238,6 +265,28 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
             )}
           </nav>
         )}
+        {floorId && (
+          <FloorDatePicker
+            branchId={data.branch.id}
+            floorId={floorId}
+            date={date}
+            today={data.today}
+            timezone={data.branch.timezone}
+            openHours={data.branch.openHours}
+            bookingDates={data.bookingDates}
+            spaceId={selectedSpaceId}
+            view={view}
+          />
+        )}
+        <div
+          aria-label="공간 상태 범례"
+          className="ml-auto hidden shrink-0 items-center gap-4 lg:flex"
+        >
+          <StatusLine kind="free">비어 있음</StatusLine>
+          <StatusLine kind="busy">예약됨</StatusLine>
+          <StatusLine kind="mine">내 예약</StatusLine>
+          <StatusLine kind="maintenance">점검</StatusLine>
+        </div>
       </div>
       {floorId && !hours && (
         <p

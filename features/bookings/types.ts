@@ -39,6 +39,7 @@ export type BranchFloorsData = {
 };
 export type BranchNavigationData = BranchFloorsData & {
   branches: { id: string; name: string }[];
+  bookingDates: string[];
   today: string;
   now: string;
 };

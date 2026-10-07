@@ -30,6 +30,7 @@ function branchNavigation() {
       { id: "other", name: "다른 지점" },
     ],
     today: "2026-10-07",
+    bookingDates: [],
     now: data.now,
   };
 }

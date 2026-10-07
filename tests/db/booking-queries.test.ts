@@ -298,6 +298,7 @@ describe("booking query security and DTOs", () => {
         { id: fixture.otherBranchId, name: "서초점" },
       ],
       today: bookingDate,
+      bookingDates: [],
       now: bookingNow.toISOString(),
     });
     expect(

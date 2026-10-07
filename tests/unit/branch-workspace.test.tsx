@@ -49,6 +49,7 @@ function fixture(): BranchNavigationData {
     floors: data.floors,
     branches: [],
     today: date,
+    bookingDates: [],
     now: "2026-10-07T01:10:00.000Z",
   };
 }

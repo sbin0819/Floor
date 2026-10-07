@@ -39,10 +39,12 @@ export function floorHref(
   floorId: string,
   date?: string,
   spaceId?: string,
+  view?: string,
 ): string {
   const query = new URLSearchParams();
   if (date) query.set("date", date);
   if (spaceId) query.set("space", spaceId);
+  if (view) query.set("view", view);
   return `/branches/${branchId}/floors/${floorId}${query.size ? `?${query}` : ""}`;
 }
 

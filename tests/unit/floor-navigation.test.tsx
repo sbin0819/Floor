@@ -80,6 +80,7 @@ function page(
           ],
           branches: [],
           today,
+          bookingDates: [],
           now: detail.now,
         }}
       />

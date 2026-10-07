@@ -244,6 +244,36 @@ export async function listMyUpcomingBookings(
     .limit(3);
 }
 
+export async function listMyBranchBookingDates(
+  {
+    userId,
+    branchId,
+    today,
+    timezone,
+  }: { userId: string; branchId: string; today: string; timezone: string },
+  database: DalDatabase = getDb(),
+): Promise<string[]> {
+  const start = zonedDateTime(today, "00:00", timezone);
+  const end = zonedDateTime(addDays(today, 61), "00:00", timezone);
+  const rows = await database
+    .select({ during: bookings.during })
+    .from(bookings)
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .innerJoin(floors, eq(floors.id, spaces.floorId))
+    .where(
+      and(
+        eq(bookings.userId, userId),
+        eq(floors.branchId, branchId),
+        eq(bookings.status, "confirmed"),
+        sql`lower(${bookings.during}) >= ${start.toISOString()}::timestamptz`,
+        sql`lower(${bookings.during}) < ${end.toISOString()}::timestamptz`,
+      ),
+    );
+  return [
+    ...new Set(rows.map(({ during }) => localDate(during.start, timezone))),
+  ].sort();
+}
+
 export async function getBookingWithLocation(
   bookingId: string,
   database: DalDatabase = getDb(),

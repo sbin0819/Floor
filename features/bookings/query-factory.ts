@@ -56,6 +56,7 @@ import { getAllRoleSettings } from "@/lib/dal/role-settings";
 import { getMemberships } from "@/lib/dal/users";
 import {
   listMyBookings,
+  listMyBranchBookingDates,
   listMyUpcomingBookings,
   listSpaceBlocks,
   listSpaceBookings,
@@ -420,11 +421,22 @@ export function createBookingQueries(
         branchFloors(session, branchId),
         listBranches(db),
       ]);
+      const today = localDate(current, data.branch.timezone);
+      const bookingDates = await listMyBranchBookingDates(
+        {
+          userId: session.userId,
+          branchId: data.branch.id,
+          today,
+          timezone: data.branch.timezone,
+        },
+        db,
+      );
       return {
         branch: data.branch,
         floors: data.floors,
         branches,
-        today: localDate(current, data.branch.timezone),
+        today,
+        bookingDates,
         now: current.toISOString(),
       };
     },
