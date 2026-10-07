@@ -1,0 +1,43 @@
+"use client";
+
+import type { ReactNode } from "react";
+import {
+  FloorSpaceListSkeleton,
+  SpaceDetailSkeleton,
+} from "./booking-skeletons";
+import { useFloorSelection } from "./branch-workspace";
+
+export function EmptySpaceSelection() {
+  return (
+    <section className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground">
+      <h2 className="font-medium">공간을 골라 주세요</h2>
+      <p className="mt-2 text-sm">하루 일정과 예약 시간을 확인할 수 있어요</p>
+    </section>
+  );
+}
+
+export function FloorListRegion({ children }: { children: ReactNode }) {
+  const pending = useFloorSelection()?.listPending ?? false;
+  return (
+    <div>
+      {pending && <FloorSpaceListSkeleton />}
+      <div hidden={pending}>{children}</div>
+    </div>
+  );
+}
+
+export function FloorDetailRegion({ children }: { children: ReactNode }) {
+  const navigation = useFloorSelection();
+  const pending = navigation?.detailPending ?? false;
+  const cleared = navigation?.detailCleared ?? false;
+  return (
+    <div>
+      {cleared ? (
+        <EmptySpaceSelection />
+      ) : pending ? (
+        <SpaceDetailSkeleton />
+      ) : null}
+      <div hidden={pending || cleared}>{children}</div>
+    </div>
+  );
+}

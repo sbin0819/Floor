@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export type FloorLocation = {
+  floorId: string;
+  date: string;
+  spaceId: string | null;
+};
+
 export function requestedSpaceId(value: unknown): string | null {
   const parsed = z.uuid().safeParse(value);
   return parsed.success ? parsed.data.toLowerCase() : null;

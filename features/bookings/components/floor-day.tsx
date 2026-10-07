@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 import { floorHref, spaceTypeLabels } from "@/features/bookings/format";
 import type { FloorDayData, SpaceType } from "@/features/bookings/types";
 import { useFloorSelection } from "./branch-workspace";
+import { FloorNavigationLink } from "./floor-navigation-link";
 
 const types: SpaceType[] = [
   "meeting_room",
@@ -15,7 +15,7 @@ const types: SpaceType[] = [
   "lounge",
 ];
 export function FloorDay({ data }: { data: FloorDayData }) {
-  const selectedSpaceId = useFloorSelection()?.selectedSpaceId;
+  const selectedSpaceId = useFloorSelection()?.location.spaceId;
   return (
     <section aria-label="공간 목록" className="space-y-5">
       {data.spaces.length === 0 && (
@@ -37,13 +37,18 @@ export function FloorDay({ data }: { data: FloorDayData }) {
                       <StatusBadge status="restricted" />
                     </div>
                   ) : (
-                    <Link
+                    <FloorNavigationLink
                       href={floorHref(
                         data.branch.id,
                         data.floor.id,
                         data.date,
                         space.id,
                       )}
+                      location={{
+                        floorId: data.floor.id,
+                        date: data.date,
+                        spaceId: space.id,
+                      }}
                       aria-current={
                         selectedSpaceId === space.id ? "true" : undefined
                       }
@@ -67,7 +72,7 @@ export function FloorDay({ data }: { data: FloorDayData }) {
                             ? `좌석 ${space.deskCount}석 · 좌석 예약은 준비 중이에요`
                             : "예약 없이 이용해요"}
                       </p>
-                    </Link>
+                    </FloorNavigationLink>
                   )}
                 </li>
               ))}

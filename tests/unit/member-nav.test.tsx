@@ -1,11 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemberNav } from "@/components/member-nav";
 import { MobileNav } from "@/components/mobile-nav";
 import { activeMemberNav } from "@/components/member-navigation";
 
 const mocks = vi.hoisted(() => ({ pathname: "/", pending: false }));
-vi.mock("next/navigation", () => ({ usePathname: () => mocks.pathname }));
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => mocks.pathname,
+  useRouter: () => router,
+}));
 vi.mock("next/link", async (importOriginal) => {
   const original = await importOriginal<typeof import("next/link")>();
   return { ...original, useLinkStatus: () => ({ pending: mocks.pending }) };
@@ -17,6 +21,39 @@ beforeEach(() => {
 });
 
 describe("member navigation", () => {
+  it("selects the clicked menu before server navigation finishes and returns to the current route", async () => {
+    let finish: () => void = () => {};
+    const response = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const navigateAction = vi.fn(() => response);
+    render(<MemberNav navigateAction={navigateAction} />);
+    fireEvent.click(screen.getByRole("link", { name: "내 예약" }));
+    expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
+      "내 예약",
+    );
+    expect(navigateAction).toHaveBeenCalledWith("/bookings", {});
+    await act(async () => {
+      finish();
+      await response;
+    });
+    expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
+      "홈",
+    );
+  });
+
+  it("does not intercept a modified menu link", () => {
+    const navigateAction = vi.fn();
+    render(<MemberNav navigateAction={navigateAction} />);
+    fireEvent.click(screen.getByRole("link", { name: "내 예약" }), {
+      metaKey: true,
+    });
+    expect(navigateAction).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
+      "홈",
+    );
+  });
+
   it.each([
     ["/", "홈"],
     ["/branches", "공간 예약"],

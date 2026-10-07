@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/page-container";
@@ -11,20 +12,31 @@ import type { BranchNavigationData } from "@/features/bookings/types";
 import { getOpenHours } from "@/lib/time/open-hours";
 import { addDays } from "@/lib/time/zoned";
 import { useFloorSelection } from "./branch-workspace";
+import { FloorNavigationLink } from "./floor-navigation-link";
 
 export function BranchNavigation({ data }: { data: BranchNavigationData }) {
   const params = useParams<{ floorId?: string }>();
   const search = useSearchParams();
-  const floorId = params.floorId?.toLowerCase();
-  const date = normalizeBookingDateForToday(
-    searchValue(search, "date"),
-    data.today,
+  const navigation = useFloorSelection();
+  const registerNavigation = navigation?.registerNavigation;
+  useEffect(
+    () => registerNavigation?.(data.branch.id, data.today, data.now),
+    [registerNavigation, data.branch.id, data.today, data.now],
   );
-  const selectedSpaceId = useFloorSelection()?.selectedSpaceId ?? undefined;
+  const floorId = navigation?.location.floorId || params.floorId?.toLowerCase();
+  const date =
+    navigation?.location.date ||
+    normalizeBookingDateForToday(searchValue(search, "date"), data.today);
+  const selectedSpaceId = navigation?.location.spaceId ?? undefined;
   const floor = data.floors.find(({ id }) => id === floorId);
   const hours = getOpenHours(data.branch.openHours, date);
   const link = (value: string) =>
     floorHref(data.branch.id, floorId ?? "", value, selectedSpaceId);
+  const location = (value: string) => ({
+    floorId: floorId ?? "",
+    date: value,
+    spaceId: selectedSpaceId ?? null,
+  });
   return (
     <PageContainer width="wide" className="space-y-6 pb-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -54,7 +66,12 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
           >
             {date > data.today ? (
               <Button asChild variant="outline">
-                <Link href={link(addDays(date, -1))}>이전 날</Link>
+                <FloorNavigationLink
+                  href={link(addDays(date, -1))}
+                  location={location(addDays(date, -1))}
+                >
+                  이전 날
+                </FloorNavigationLink>
               </Button>
             ) : (
               <Button variant="outline" disabled>
@@ -66,7 +83,12 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
             </span>
             {date < addDays(data.today, 60) ? (
               <Button asChild variant="outline">
-                <Link href={link(addDays(date, 1))}>다음 날</Link>
+                <FloorNavigationLink
+                  href={link(addDays(date, 1))}
+                  location={location(addDays(date, 1))}
+                >
+                  다음 날
+                </FloorNavigationLink>
               </Button>
             ) : (
               <Button variant="outline" disabled>
@@ -74,7 +96,13 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
               </Button>
             )}
             <Button asChild variant="ghost">
-              <Link href={link(data.today)}>오늘</Link>
+              <FloorNavigationLink
+                href={link(data.today)}
+                location={location(data.today)}
+                aria-current={date === data.today ? "date" : undefined}
+              >
+                오늘
+              </FloorNavigationLink>
             </Button>
           </nav>
         )}
@@ -86,12 +114,13 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
             asChild
             variant={item.id === floorId ? "secondary" : "ghost"}
           >
-            <Link
+            <FloorNavigationLink
               href={floorHref(data.branch.id, item.id, date)}
+              location={{ floorId: item.id, date, spaceId: null }}
               aria-current={item.id === floorId ? "page" : undefined}
             >
               {item.name}
-            </Link>
+            </FloorNavigationLink>
           </Button>
         ))}
       </nav>

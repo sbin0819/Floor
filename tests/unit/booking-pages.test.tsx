@@ -88,7 +88,14 @@ async function floorRegions(
   const grid = page.props.children;
   if (!isValidElement<{ children: ReactNode }>(grid))
     throw new Error("Missing floor grid");
-  const [list, detail] = Children.toArray(grid.props.children);
+  const [listRegion, detailRegion] = Children.toArray(grid.props.children);
+  if (
+    !isValidElement<{ children: ReactNode }>(listRegion) ||
+    !isValidElement<{ children: ReactNode }>(detailRegion)
+  )
+    throw new Error("Expected optimistic list and detail regions");
+  const list = listRegion.props.children;
+  const detail = detailRegion.props.children;
   if (
     !isValidElement<SuspenseProps>(list) ||
     list.type !== Suspense ||

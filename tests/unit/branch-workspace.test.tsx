@@ -14,6 +14,7 @@ const navigation = vi.hoisted(() => ({
   branchId: "branch",
   floorId: "floor" as string | undefined,
   query: "",
+  router: { push: vi.fn(), replace: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({
   useParams: () => ({
@@ -21,6 +22,7 @@ vi.mock("next/navigation", () => ({
     floorId: navigation.floorId,
   }),
   useSearchParams: () => new URLSearchParams(navigation.query),
+  useRouter: () => navigation.router,
 }));
 const spaceId = "abcdefab-1234-4abc-9def-123456789abc";
 const otherId = "abcdefab-1234-4abc-9def-123456789abd";

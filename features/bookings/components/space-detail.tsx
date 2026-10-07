@@ -1,8 +1,12 @@
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
+import { floorHref } from "@/features/bookings/format";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 import type { SpaceDayData } from "@/features/bookings/types";
 import { BookingForm } from "./booking-form";
+import { FloorNavigationLink } from "./floor-navigation-link";
 
 export function SpaceDetail({ data }: { data: SpaceDayData }) {
   return (
@@ -11,7 +15,23 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
       className="space-y-6 rounded-xl border border-border bg-card p-5"
     >
       <header className="space-y-3">
-        <h2 className="text-xl font-semibold">{data.space.name}</h2>
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="text-xl font-semibold">{data.space.name}</h2>
+          <Button asChild variant="ghost" size="icon">
+            <FloorNavigationLink
+              href={floorHref(data.branch.id, data.floor.id, data.date)}
+              location={{
+                floorId: data.floor.id,
+                date: data.date,
+                spaceId: null,
+              }}
+              replace
+              aria-label="공간 상세 닫기"
+            >
+              <X aria-hidden="true" />
+            </FloorNavigationLink>
+          </Button>
+        </div>
         <p className="text-muted-foreground tabular-nums">
           {data.floor.level}층
           {data.space.capacity !== null && ` · 최대 ${data.space.capacity}인`}
