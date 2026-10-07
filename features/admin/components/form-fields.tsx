@@ -53,6 +53,7 @@ export function ChoiceSelect({
   options,
   disabled = false,
   error,
+  placeholder = "선택해 주세요",
 }: {
   id: string;
   value: string;
@@ -60,6 +61,7 @@ export function ChoiceSelect({
   options: { value: string; label: string }[];
   disabled?: boolean;
   error?: string;
+  placeholder?: string;
 }) {
   return (
     <Select
@@ -74,7 +76,9 @@ export function ChoiceSelect({
         className="min-h-11 w-full"
         {...fieldAria(id, error)}
       >
-        <SelectValue />
+        <SelectValue placeholder={placeholder}>
+          {options.find((option) => option.value === value)?.label}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
