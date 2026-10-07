@@ -22,11 +22,11 @@ export function pendingInvite() {
   );
 }
 
-export function usableInvite(email: string) {
+export function usableInvite(email: string, now?: Date) {
   return and(
     pendingInvite(),
     eq(teamInvites.email, email.toLowerCase()),
-    gt(teamInvites.expiresAt, sql`statement_timestamp()`),
+    gt(teamInvites.expiresAt, now ?? sql`statement_timestamp()`),
   );
 }
 
@@ -170,13 +170,14 @@ const receivedFields = {
 export function listReceivedInvites(
   email: string,
   database: DalDatabase = getDb(),
+  now: Date = new Date(),
 ) {
   return database
     .select(receivedFields)
     .from(teamInvites)
     .innerJoin(teams, eq(teamInvites.teamId, teams.id))
     .innerJoin(users, eq(teamInvites.createdBy, users.id))
-    .where(usableInvite(email))
+    .where(usableInvite(email, now))
     .orderBy(desc(teamInvites.createdAt), asc(teamInvites.id));
 }
 
@@ -184,6 +185,7 @@ export async function getInviteForRecipient(
   token: string,
   email: string,
   database: DalDatabase = getDb(),
+  now: Date = new Date(),
 ) {
   if (!isQueryableInviteToken(token)) return null;
   const [invite] = await database
@@ -191,7 +193,7 @@ export async function getInviteForRecipient(
     .from(teamInvites)
     .innerJoin(teams, eq(teamInvites.teamId, teams.id))
     .innerJoin(users, eq(teamInvites.createdBy, users.id))
-    .where(and(eq(teamInvites.token, token), usableInvite(email)))
+    .where(and(eq(teamInvites.token, token), usableInvite(email, now)))
     .limit(1);
   return invite ?? null;
 }

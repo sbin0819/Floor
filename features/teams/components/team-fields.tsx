@@ -101,7 +101,9 @@ export function BranchSelect({
           aria-invalid={!!error}
           aria-describedby={error ? `${id}-error` : undefined}
         >
-          <SelectValue placeholder="지점을 선택해 주세요" />
+          <SelectValue placeholder="지점을 선택해 주세요">
+            {branches.find((branch) => branch.id === value)?.name}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {branches.map((branch) => (

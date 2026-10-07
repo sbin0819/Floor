@@ -19,7 +19,7 @@ export function TeamSearchForm({ query }: { query: string }) {
       return;
     }
     setError("");
-    router.push(`/teams/start?q=${encodeURIComponent(parsed.data)}`);
+    router.push(`/teams/start?mode=join&q=${encodeURIComponent(parsed.data)}`);
   }
   return (
     <form
@@ -31,6 +31,7 @@ export function TeamSearchForm({ query }: { query: string }) {
       aria-label="팀 찾기"
       className="flex flex-wrap items-start gap-3"
     >
+      <input type="hidden" name="mode" value="join" />
       <div className="min-w-48 flex-1">
         <TeamInput
           label="팀 이름으로 찾기"
@@ -38,6 +39,7 @@ export function TeamSearchForm({ query }: { query: string }) {
           defaultValue={query}
           error={error}
           required
+          hint="팀 이름을 2자 이상 40자 이하로 입력해 주세요."
         />
       </div>
       <Button variant="outline" type="submit" className="mt-6">

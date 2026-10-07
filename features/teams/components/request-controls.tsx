@@ -12,18 +12,26 @@ import { revokeTeamInvite } from "@/features/teams/invite-management-actions";
 import { createJoinRequestSchema } from "@/features/teams/schema";
 import { TeamFeedback, TeamMessage } from "./team-fields";
 import { useTeamMutation, validationErrors } from "./use-team-mutation";
+import { TeamActionLabel } from "./team-action-label";
 
 export function JoinRequestForm({
   teamId,
   teamName,
+  submitLabel = "가입 요청",
+  onSuccess,
+  onCancel,
 }: {
   teamId: string;
   teamName: string;
+  submitLabel?: string;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const mutation = useTeamMutation({
     action: requestTeamJoin,
     successMessage: "가입 요청을 보냈어요. 팀 관리자가 승인하면 팀원이 돼요",
     limitMessage: "대기 중인 가입 요청은 10개까지 보낼 수 있어요",
+    onSuccess,
   });
   async function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,8 +59,27 @@ export function JoinRequestForm({
         error={mutation.errors.message}
       />
       <TeamFeedback message={mutation.message} />
-      <Button variant="outline" type="submit" disabled={mutation.pending}>
-        가입 요청
+      {onCancel && (
+        <Button
+          variant="ghost"
+          type="button"
+          disabled={mutation.pending}
+          onClick={onCancel}
+        >
+          취소
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        className="min-w-36"
+        type="submit"
+        disabled={mutation.pending}
+      >
+        <TeamActionLabel
+          pending={mutation.ownPending}
+          label={submitLabel}
+          pendingLabel="보내고 있어요"
+        />
       </Button>
     </form>
   );
@@ -64,13 +91,18 @@ export function CancelJoinRequest({ requestId }: { requestId: string }) {
     successMessage: "가입 요청을 취소했어요",
   });
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-team-pending={mutation.ownPending}>
       <Button
         variant="destructive"
+        className="min-w-36"
         disabled={mutation.pending}
         onClick={() => void mutation.submit({ requestId })}
       >
-        요청 취소
+        <TeamActionLabel
+          pending={mutation.ownPending}
+          label="요청 취소"
+          pendingLabel="취소하고 있어요"
+        />
       </Button>
       <TeamFeedback message={mutation.message} />
     </div>
@@ -92,21 +124,34 @@ export function ReviewJoinRequest({ requestId }: { requestId: string }) {
     onStart: () => setLatestAction("reject"),
   });
   return (
-    <div className="space-y-2">
+    <div
+      className="space-y-2"
+      data-team-pending={approve.ownPending || reject.ownPending}
+    >
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
+          className="min-w-36"
           disabled={approve.pending}
           onClick={() => void approve.submit({ requestId })}
         >
-          승인
+          <TeamActionLabel
+            pending={approve.ownPending}
+            label="승인"
+            pendingLabel="승인하고 있어요"
+          />
         </Button>
         <Button
           variant="destructive"
+          className="min-w-36"
           disabled={reject.pending}
           onClick={() => void reject.submit({ requestId })}
         >
-          거절
+          <TeamActionLabel
+            pending={reject.ownPending}
+            label="거절"
+            pendingLabel="거절하고 있어요"
+          />
         </Button>
       </div>
       <TeamFeedback
@@ -122,13 +167,18 @@ export function RevokeInvite({ inviteId }: { inviteId: string }) {
     successMessage: "초대를 취소했어요",
   });
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-team-pending={mutation.ownPending}>
       <Button
         variant="destructive"
+        className="min-w-36"
         disabled={mutation.pending}
         onClick={() => void mutation.submit({ inviteId })}
       >
-        초대 취소
+        <TeamActionLabel
+          pending={mutation.ownPending}
+          label="초대 취소"
+          pendingLabel="취소하고 있어요"
+        />
       </Button>
       <TeamFeedback message={mutation.message} />
     </div>

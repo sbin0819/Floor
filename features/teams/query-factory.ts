@@ -3,6 +3,8 @@ import { canManageTeam } from "@/features/teams/action-factory";
 import { teamSearchSchema } from "@/features/teams/schema";
 import type {
   HomeData,
+  HomeTeamsData,
+  TeamsData,
   InvitePageData,
   ReceivedInvite,
   TeamPageData,
@@ -20,6 +22,8 @@ import {
   listBranches,
   listMyJoinRequests,
   listMyTeams,
+  listMyTeamSummaries,
+  listTeamHubRequests,
   listReceivedInvites,
   listSentInvites,
   listTeamJoinRequests,
@@ -34,6 +38,7 @@ export type TeamQueryDependencies = {
   database?: DalDatabase;
   requireSession?: () => Promise<Session>;
   canSendEmail?: () => boolean;
+  now?: () => Date;
 };
 
 function receivedInvite(
@@ -52,11 +57,50 @@ function receivedInvite(
 export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
   const database = dependencies.database;
   const readSession = dependencies.requireSession ?? requireSession;
-  async function receivedInvites(session: Session) {
+  const now = dependencies.now ?? (() => new Date());
+  async function receivedInvites(session: Session, current = now()) {
     const user = await getUserById(session.userId, database);
-    return user?.emailVerified ? listReceivedInvites(user.email, database) : [];
+    return user?.emailVerified
+      ? listReceivedInvites(user.email, database, current)
+      : [];
   }
   return {
+    async getHomeTeams(): Promise<HomeTeamsData> {
+      const session = await readSession();
+      const [myTeams, invites] = await Promise.all([
+        listMyTeams(session.userId, database),
+        receivedInvites(session),
+      ]);
+      return { teams: myTeams, pendingInviteCount: invites.length };
+    },
+    async getTeamsData(): Promise<TeamsData> {
+      const session = await readSession();
+      const current = now();
+      const [myTeams, invites, requests] = await Promise.all([
+        listMyTeamSummaries(session.userId, database),
+        receivedInvites(session, current),
+        listTeamHubRequests(session.userId, current, database),
+      ]);
+      return {
+        teams: myTeams,
+        invites: invites.map(receivedInvite),
+        requests: requests.flatMap((request) =>
+          request.status === "pending" || request.status === "rejected"
+            ? [
+                {
+                  id: request.id,
+                  teamId: request.teamId,
+                  teamName: request.teamName,
+                  message: request.message,
+                  createdAt: request.createdAt.toISOString(),
+                  status: request.status,
+                  decidedAt: request.decidedAt?.toISOString() ?? null,
+                },
+              ]
+            : [],
+        ),
+      };
+    },
     async getHomeData(): Promise<HomeData> {
       const session = await readSession();
       const [myTeams, invites, branches] = await Promise.all([
@@ -87,13 +131,14 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
       );
       return {
         branches,
-        invites: invites.map(receivedInvite),
+        invites: invites.map(({ teamName }) => ({ teamName })),
         search: {
           query: normalized,
           results: results.map((team) => ({
             ...team,
             isMember: myTeams.some((membership) => membership.id === team.id),
             hasInvite: invites.some((invite) => invite.teamId === team.id),
+            hasRequest: requests.some((request) => request.teamId === team.id),
           })),
           ...(!parsed.success &&
           (typeof query === "string"
@@ -102,13 +147,6 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
             ? { error: "검색어는 2자 이상 40자 이하로 입력해 주세요" }
             : {}),
         },
-        requests: requests.map((request) => ({
-          id: request.id,
-          teamId: request.teamId,
-          teamName: request.teamName,
-          message: request.message,
-          createdAt: request.createdAt.toISOString(),
-        })),
       };
     },
     async getTeamPageData(teamId: string): Promise<TeamPageData | null> {
@@ -168,7 +206,12 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
       const session = await readSession();
       const user = await getUserById(session.userId, database);
       if (!user?.emailVerified) return null;
-      const invite = await getInviteForRecipient(token, user.email, database);
+      const invite = await getInviteForRecipient(
+        token,
+        user.email,
+        database,
+        now(),
+      );
       return invite ? receivedInvite(invite) : null;
     },
   };

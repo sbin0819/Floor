@@ -212,17 +212,16 @@ describe("authenticated team queries and safe DTOs", () => {
           homeBranchName: "가상 지점",
           isMember: false,
           hasInvite: true,
+          hasRequest: true,
         },
       ],
     });
-    expect(data.requests).toMatchObject([
-      { teamId, teamName: "가상 회사", message: "가입하고 싶어요" },
-    ]);
-    expect(data.invites).toMatchObject([
-      { token, teamId, teamName: "가상 회사", inviterName: actors.owner.name },
-    ]);
+    expect(data).not.toHaveProperty("requests");
+    expect(data.invites).toEqual([{ teamName: "가상 회사" }]);
+    expect(JSON.stringify(data)).not.toContain(token);
     expect(JSON.stringify(data.search)).not.toContain("01012345678");
     expect(JSON.stringify(data.search)).not.toContain("headcount");
+    expect(JSON.stringify(data.search)).not.toContain("memberCount");
     expect(JSON.stringify(data.search)).not.toContain(actors.owner.email);
     const member = await queries(actors.member).getTeamStartData("회사");
     expect(member.search.results[0]).toMatchObject({

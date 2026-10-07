@@ -2,7 +2,7 @@ export const memberNavItems = [
   { key: "home", href: "/", label: "홈" },
   { key: "spaces", href: "/branches", label: "공간 예약" },
   { key: "bookings", href: "/bookings", label: "내 예약" },
-  { key: "teams", href: "/teams/start", label: "팀" },
+  { key: "teams", href: "/teams", label: "팀" },
 ] as const;
 
 export type MemberNavKey = (typeof memberNavItems)[number]["key"];

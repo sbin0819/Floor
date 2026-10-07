@@ -1,9 +1,5 @@
 import { SkeletonRegion } from "@/components/skeleton-region";
-import {
-  SkeletonFields,
-  SkeletonHeading,
-  SkeletonRows,
-} from "@/components/skeleton-shapes";
+import { SkeletonHeading, SkeletonRows } from "@/components/skeleton-shapes";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function HomeSkeleton() {
@@ -25,21 +21,17 @@ export function HomeSkeleton() {
 
 export function TeamStartSkeleton() {
   return (
-    <SkeletonRegion width="form" className="space-y-6">
+    <SkeletonRegion width="standard" className="space-y-6">
       <Skeleton className="h-8 w-52" />
-      <div className="space-y-4 rounded-xl border bg-card p-5">
-        <SkeletonHeading compact />
-        <SkeletonRows count={1} action />
-      </div>
-      <div className="space-y-4 rounded-xl border bg-card p-5">
-        <SkeletonHeading compact />
-        <SkeletonFields count={5} className="sm:grid-cols-2" />
-        <Skeleton className="h-11 w-28" />
-      </div>
-      <div className="space-y-4 rounded-xl border bg-card p-5">
-        <SkeletonHeading compact />
-        <Skeleton className="h-11 w-full" />
-        <SkeletonRows count={2} />
+      <div className="grid gap-5 sm:grid-cols-2">
+        {[0, 1].map((key) => (
+          <div key={key} className="space-y-5 rounded-xl border bg-card p-6">
+            <Skeleton className="size-8" />
+            <SkeletonHeading />
+            <SkeletonRows count={3} />
+            <Skeleton className="h-11 w-full" />
+          </div>
+        ))}
       </div>
     </SkeletonRegion>
   );
@@ -74,9 +66,8 @@ export function TeamDetailSkeleton() {
 
 export function InviteSkeleton() {
   return (
-    <SkeletonRegion width="form" className="space-y-6">
-      <Skeleton className="h-8 w-28" />
-      <div className="space-y-5 rounded-xl border bg-card p-5">
+    <SkeletonRegion width="form">
+      <div className="mx-auto max-w-[480px] space-y-5 rounded-xl border bg-card p-6">
         <SkeletonHeading />
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-4 w-40" />
@@ -84,6 +75,22 @@ export function InviteSkeleton() {
           <Skeleton className="h-11 w-24" />
           <Skeleton className="h-11 w-24" />
         </div>
+      </div>
+    </SkeletonRegion>
+  );
+}
+
+export function TeamsSkeleton() {
+  return (
+    <SkeletonRegion width="standard" className="space-y-8">
+      <SkeletonHeading />
+      <div className="space-y-4 rounded-xl border bg-card p-5">
+        <SkeletonHeading compact />
+        <SkeletonRows count={2} action />
+      </div>
+      <div className="space-y-4 rounded-xl border bg-card p-5">
+        <SkeletonHeading compact />
+        <SkeletonRows count={2} />
       </div>
     </SkeletonRegion>
   );

@@ -9,6 +9,7 @@ import {
 } from "@/features/teams/invite-response-actions";
 import { TeamFeedback } from "./team-fields";
 import { useTeamMutation } from "./use-team-mutation";
+import { TeamActionLabel } from "./team-action-label";
 
 export function InviteResponse({
   token,
@@ -32,24 +33,37 @@ export function InviteResponse({
     successMessage: "초대를 거절했어요",
     onStart: () => setLatestAction("decline"),
     onSuccess: () => {
-      if (leaveOnDecline) router.push("/teams/start");
+      if (leaveOnDecline) router.push("/teams");
     },
   });
   return (
-    <div className="space-y-3">
+    <div
+      className="space-y-3"
+      data-team-pending={accept.ownPending || decline.ownPending}
+    >
       <div className="flex flex-wrap gap-2">
         <Button
           disabled={accept.pending}
+          className="min-w-36"
           onClick={() => void accept.submit({ token })}
         >
-          수락
+          <TeamActionLabel
+            pending={accept.ownPending}
+            label="수락"
+            pendingLabel="수락하고 있어요"
+          />
         </Button>
         <Button
-          variant="destructive"
+          variant="outline"
+          className="min-w-36"
           disabled={decline.pending}
           onClick={() => void decline.submit({ token })}
         >
-          거절
+          <TeamActionLabel
+            pending={decline.ownPending}
+            label="거절"
+            pendingLabel="거절하고 있어요"
+          />
         </Button>
       </div>
       <TeamFeedback

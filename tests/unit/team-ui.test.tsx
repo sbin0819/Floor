@@ -68,7 +68,6 @@ const emptyStart: TeamStartData = {
   branches: [],
   invites: [],
   search: { query: "", results: [] },
-  requests: [],
 };
 function renderUi(children: ReactNode) {
   const client = new QueryClient();
@@ -365,18 +364,19 @@ describe("invites and requests", () => {
 });
 
 describe("read-only views and search", () => {
-  it("keeps all empty transition sections visible", () => {
+  it("shows only the choice cards before a transition mode is chosen", () => {
     renderUi(<TeamStart data={emptyStart} />);
-    expect(screen.getByText("받은 초대가 없어요")).toBeVisible();
-    expect(screen.getByText("대기 중인 가입 요청이 없어요")).toBeVisible();
+    expect(screen.queryByText("받은 초대가 없어요")).not.toBeInTheDocument();
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "새 팀 만들기" })).toBeVisible();
     expect(
-      screen.getByRole("heading", { name: "기존 팀에 가입 요청" }),
+      screen.getByRole("heading", { name: "기존 팀에 가입" }),
     ).toBeVisible();
   });
   it("replaces join controls for an existing member or invitation", () => {
     renderUi(
       <TeamStart
+        mode="join"
         data={{
           ...emptyStart,
           search: {
@@ -388,6 +388,7 @@ describe("read-only views and search", () => {
                 homeBranchName: null,
                 isMember: true,
                 hasInvite: false,
+                hasRequest: false,
               },
               {
                 id: crypto.randomUUID(),
@@ -395,6 +396,7 @@ describe("read-only views and search", () => {
                 homeBranchName: "가상 지점",
                 isMember: false,
                 hasInvite: true,
+                hasRequest: false,
               },
             ],
           },
@@ -415,7 +417,7 @@ describe("read-only views and search", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "검색" }));
     expect(mocks.push).toHaveBeenCalledWith(
-      `/teams/start?q=${encodeURIComponent("가상 팀")}`,
+      `/teams/start?mode=join&q=${encodeURIComponent("가상 팀")}`,
     );
     expect(mocks.request).not.toHaveBeenCalled();
   });

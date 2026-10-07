@@ -74,7 +74,7 @@ export function TeamHome({
             {data.pendingInviteCount > 0 && (
               <Link
                 className={`${teamLinkClassName} tabular-nums`}
-                href="/teams/start#received-invites"
+                href="/teams"
               >
                 받은 초대 {data.pendingInviteCount}개
               </Link>

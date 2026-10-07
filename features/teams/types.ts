@@ -1,6 +1,11 @@
 export type TeamRole = "admin" | "member";
 
 export type MyTeam = { id: string; name: string; role: TeamRole };
+export type MyTeamSummary = MyTeam & {
+  memberCount: number;
+  homeBranchName: string | null;
+};
+export type HomeTeamsData = { teams: MyTeam[]; pendingInviteCount: number };
 export type ReceivedInvite = {
   token: string;
   teamId: string;
@@ -16,12 +21,22 @@ export type MyJoinRequest = {
   message: string | null;
   createdAt: string;
 };
+export type TeamHubRequest = MyJoinRequest & {
+  status: "pending" | "rejected";
+  decidedAt: string | null;
+};
+export type TeamsData = {
+  teams: MyTeamSummary[];
+  invites: ReceivedInvite[];
+  requests: TeamHubRequest[];
+};
 export type TeamSearchResult = {
   id: string;
   name: string;
   homeBranchName: string | null;
   isMember: boolean;
   hasInvite: boolean;
+  hasRequest: boolean;
 };
 export type HomeData = {
   name: string;
@@ -31,9 +46,8 @@ export type HomeData = {
 };
 export type TeamStartData = {
   branches: { id: string; name: string }[];
-  invites: ReceivedInvite[];
+  invites: { teamName: string }[];
   search: { query: string; results: TeamSearchResult[]; error?: string };
-  requests: MyJoinRequest[];
 };
 export type TeamMember = {
   id: string;

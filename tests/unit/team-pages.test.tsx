@@ -45,14 +45,13 @@ describe("team page session guards", () => {
     vi.mocked(getTeamStartData).mockResolvedValue({
       branches: [],
       invites: [],
-      requests: [],
       search: { query: "가상 팀", results: [] },
     });
     await resolvePageContent(
       TeamStartPage({ searchParams: Promise.resolve({ q: "가상 팀" }) }),
     );
     expect(requirePageSession).toHaveBeenCalledWith(
-      `/teams/start?q=${encodeURIComponent("가상 팀")}`,
+      `/teams/start?${new URLSearchParams({ q: "가상 팀" })}`,
     );
     expect(getTeamStartData).toHaveBeenCalledWith("가상 팀");
     expect(

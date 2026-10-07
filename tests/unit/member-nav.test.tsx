@@ -79,7 +79,7 @@ describe("member navigation", () => {
     );
     expect(screen.getByRole("link", { name: "팀" })).toHaveAttribute(
       "href",
-      "/teams/start",
+      "/teams",
     );
   });
 

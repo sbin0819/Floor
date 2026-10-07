@@ -158,12 +158,12 @@ describe("screen-specific loading geometry", () => {
     ).toHaveLength(4);
   });
 
-  it("matches the team creation fields and the member table", () => {
+  it("matches the team choice cards and the member table", () => {
     const start = render(<TeamStartSkeleton />);
-    expect(start.container.firstElementChild).toHaveClass("max-w-[640px]");
+    expect(start.container.firstElementChild).toHaveClass("max-w-[880px]");
     expect(
-      start.container.querySelectorAll('[data-slot="skeleton-field"]'),
-    ).toHaveLength(5);
+      start.container.querySelectorAll('[data-slot="skeleton-row"]'),
+    ).toHaveLength(6);
     start.unmount();
     const detail = render(<TeamDetailSkeleton />);
     const rows = detail.container.querySelectorAll(

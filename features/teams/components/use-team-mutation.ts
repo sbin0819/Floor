@@ -102,7 +102,14 @@ export function useTeamMutation<T>({
       lockedClients.delete(client);
     }
   }
-  return { submit, pending, message, errors, setErrors };
+  return {
+    submit,
+    pending,
+    ownPending: mutation.isPending,
+    message,
+    errors,
+    setErrors,
+  };
 }
 
 export function validationErrors(
