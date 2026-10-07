@@ -1,5 +1,17 @@
 import { expect, test } from "@playwright/test";
 
+for (const path of ["/booking", "/teams"]) {
+  test(`비로그인 ${path} 접근은 로그인으로 안내해요`, async ({ page }) => {
+    await page.goto(path);
+    await expect(
+      page.getByRole("heading", { name: "Floor에 로그인", exact: true }),
+    ).toBeVisible();
+    const url = new URL(page.url());
+    expect(url.pathname).toBe("/login");
+    expect(url.searchParams.get("next")).toBe(path);
+  });
+}
+
 test("비로그인 운영 지점 접근은 운영자 로그인으로 안내해요", async ({
   page,
 }) => {

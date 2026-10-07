@@ -190,6 +190,7 @@ describe("member branch and date controls", () => {
     expect(
       dates.getByRole("link", { name: "10월 11일 일요일 · 쉬는 날" }),
     ).toHaveAttribute("href", "/branches/branch/floors/floor?date=2026-10-11");
+    expect(dates.getByText("쉬는 날")).not.toHaveClass("sr-only");
     expect(
       dates.getByRole("link", { name: "오늘 · 10월 7일 수요일" }),
     ).toHaveAttribute("aria-current", "date");

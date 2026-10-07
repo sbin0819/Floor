@@ -174,7 +174,11 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
                   <span className="text-base font-semibold">
                     {Number(day.slice(-2))}
                   </span>
-                  {closed && <span className="sr-only">쉬는 날</span>}
+                  {closed && (
+                    <span className="text-[10px] leading-none font-normal">
+                      쉬는 날
+                    </span>
+                  )}
                 </>
               );
               const className = cn(
