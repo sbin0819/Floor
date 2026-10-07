@@ -7,6 +7,7 @@ import { FloorDay } from "./floor-day";
 import { FloorTimetable } from "./floor-timetable";
 import { useFloorView } from "./floor-view";
 import { useFloorSelection } from "./branch-workspace";
+import { ClosedFloorDay } from "./closed-floor-day";
 
 export function FloorViews({
   data,
@@ -18,6 +19,7 @@ export function FloorViews({
   const { view } = useFloorView(initialView);
   const registerFloor = useFloorSelection()?.registerFloor;
   useEffect(() => registerFloor?.(data), [registerFloor, data]);
+  if (!data.openHours) return <ClosedFloorDay data={data} />;
   if (view === "list") return <FloorDay data={data} />;
   if (view === "timeline") return <FloorTimetable data={data} />;
   return (

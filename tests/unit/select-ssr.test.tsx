@@ -82,10 +82,10 @@ describe("selected text before hydration", () => {
       serverHtml(<BranchSelect {...props} value="" />).getByRole("combobox"),
     ).toHaveTextContent("지점을 선택해 주세요");
   });
-  it("renders the current booking actor and empty time placeholders on the server", () => {
+  it("renders the current booking actor and empty time placeholders in the visible strip inputs on the server", () => {
     const data = spaceDayFixture();
     data.hasTeams = true;
-    const html = serverHtml(<BookingForm data={data} />);
+    const html = serverHtml(<BookingForm data={data} variant="strip" />);
     expect(html.getByRole("combobox", { name: "예약 방식" })).toHaveTextContent(
       "개인으로",
     );
@@ -95,6 +95,14 @@ describe("selected text before hydration", () => {
     expect(html.getByRole("combobox", { name: "끝" })).toHaveTextContent(
       "끝 시각 선택",
     );
+  });
+  it("keeps unselected panel inputs collapsed on the server", () => {
+    const html = serverHtml(<BookingForm data={spaceDayFixture()} />);
+    expect(html.getByText("시간을 골라 주세요")).toHaveTextContent(
+      "시간을 골라 주세요",
+    );
+    expect(html.queryByRole("combobox")).toBeNull();
+    expect(html.queryByRole("button", { name: "예약하기" })).toBeNull();
   });
   it("uses the placeholder when a controlled selection is empty", () => {
     expect(

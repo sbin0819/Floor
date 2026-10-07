@@ -219,6 +219,22 @@ describe("booking page guards", () => {
     pending.resolve(floorDayFixture());
     await list;
   });
+  it("does not register or open a space on a closed date", async () => {
+    vi.mocked(getSpaceDay).mockResolvedValue({
+      ...spaceDayFixture(),
+      openHours: null,
+    });
+    const regions = await floorRegions({
+      date: "2026-10-11",
+      space: selectedSpaceId,
+    });
+    const result = await resolvePageContent(regions.detail);
+    expect(result.props.spaceId).toBeNull();
+    const container = result.props.children;
+    expect(
+      isValidElement<{ closed?: boolean }>(container) && container.props.closed,
+    ).toBe(true);
+  });
   it("canonicalizes an uppercase selected-space UUID before the independently authorized detail query", async () => {
     const spaceId = "abcdefab-1234-4abc-9def-123456789abc";
     const data = floorDayFixture();

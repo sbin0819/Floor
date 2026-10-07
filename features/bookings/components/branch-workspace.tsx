@@ -57,6 +57,7 @@ type SelectionContext = {
     options?: { replace?: boolean },
   ) => void;
   listPending: boolean;
+  navigationPending: boolean;
   detailPending: boolean;
   detailCleared: boolean;
   rememberSpaceTrigger: (element: HTMLElement, spaceId: string) => void;
@@ -331,6 +332,7 @@ export function BranchWorkspace({
       location: navigation.value,
       change,
       listPending,
+      navigationPending: navigation.isPending,
       detailPending,
       detailCleared,
       rememberSpaceTrigger,
@@ -349,6 +351,7 @@ export function BranchWorkspace({
       navigation.value,
       change,
       listPending,
+      navigation.isPending,
       detailPending,
       detailCleared,
       rememberSpaceTrigger,

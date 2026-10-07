@@ -81,67 +81,86 @@ export function BranchNavigation({
     spaceId: selectedSpaceId ?? null,
   });
   return (
-    <PageContainer width="wide" className="space-y-5 pb-6">
+    <PageContainer
+      width="wide"
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-4 pb-6 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+    >
       <h1 className="sr-only">
         {floor ? `${floor.name} 공간 예약` : `${data.branch.name} 공간 예약`}
       </h1>
-      <header className="flex flex-wrap items-center gap-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              className="gap-3 text-lg font-semibold"
-              aria-label={`${data.branch.name} · 지점 바꾸기`}
-            >
-              <SpacePhoto
-                photo={data.branch.cover}
-                type="branch"
-                size={{ width: 32, height: 24 }}
-                decorative
-              />
-              {data.branch.name}
-              <ChevronDown
-                aria-hidden="true"
-                className="size-4 text-muted-foreground"
-              />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="min-w-48">
-            {data.branches.map((branch) => (
-              <DropdownMenuItem
-                asChild
-                key={branch.id}
-                className="min-h-11 px-3"
+      <header className="contents">
+        <div className="col-span-2 row-start-1 flex min-w-0 items-center gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="max-w-[55vw] shrink-0 gap-2 text-base font-semibold lg:max-w-none lg:gap-3 lg:text-lg"
+                aria-label={`${data.branch.name} · 지점 바꾸기`}
               >
-                <Link
-                  href={`/branches/${branch.id}`}
-                  aria-current={
-                    branch.id === data.branch.id ? "true" : undefined
-                  }
+                <SpacePhoto
+                  photo={data.branch.cover}
+                  type="branch"
+                  size={{ width: 32, height: 24 }}
+                  decorative
+                />
+                <span className="min-w-0 truncate">{data.branch.name}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="size-4 text-muted-foreground"
+                />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="min-w-48">
+              {data.branches.map((branch) => (
+                <DropdownMenuItem
+                  asChild
+                  key={branch.id}
+                  className="min-h-11 px-3"
                 >
-                  {branch.name}
-                </Link>
+                  <Link
+                    href={`/branches/${branch.id}`}
+                    aria-current={
+                      branch.id === data.branch.id ? "true" : undefined
+                    }
+                  >
+                    {branch.name}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+              {data.branches.length > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuItem asChild className="min-h-11 px-3">
+                <Link href="/branches">모든 지점 보기</Link>
               </DropdownMenuItem>
-            ))}
-            {data.branches.length > 0 && <DropdownMenuSeparator />}
-            <DropdownMenuItem asChild className="min-h-11 px-3">
-              <Link href="/branches">모든 지점 보기</Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <SegmentedLinks label="층 선택">
-          {data.floors.map((item) => (
-            <SegmentedLink key={item.id} asChild selected={item.id === floorId}>
-              <FloorNavigationLink
-                href={floorHref(data.branch.id, item.id, date, undefined, view)}
-                location={{ floorId: item.id, date, spaceId: null }}
-                aria-current={item.id === floorId ? "page" : undefined}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <SegmentedLinks
+            label="층 선택"
+            className="min-w-0 flex-nowrap overflow-x-auto"
+          >
+            {data.floors.map((item) => (
+              <SegmentedLink
+                key={item.id}
+                asChild
+                selected={item.id === floorId}
+                className="shrink-0"
               >
-                {item.name}
-              </FloorNavigationLink>
-            </SegmentedLink>
-          ))}
-        </SegmentedLinks>
+                <FloorNavigationLink
+                  href={floorHref(
+                    data.branch.id,
+                    item.id,
+                    date,
+                    undefined,
+                    view,
+                  )}
+                  location={{ floorId: item.id, date, spaceId: null }}
+                  aria-current={item.id === floorId ? "page" : undefined}
+                >
+                  {item.name}
+                </FloorNavigationLink>
+              </SegmentedLink>
+            ))}
+          </SegmentedLinks>
+        </div>
         <StatusLine
           kind={
             date === data.today && operating.status === "open" && hours
@@ -149,16 +168,21 @@ export function BranchNavigation({
               : "none"
           }
           aria-label="선택한 날짜 운영 시간"
+          className="col-start-1 row-start-3 min-w-0 lg:col-start-3 lg:row-start-1"
         >
           {hoursLabel}
         </StatusLine>
-        {viewControl && <div className="ml-auto">{viewControl}</div>}
+        {viewControl && (
+          <div className="col-start-2 row-start-3 justify-self-end lg:col-start-4 lg:row-start-1">
+            {viewControl}
+          </div>
+        )}
       </header>
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="col-span-2 row-start-2 flex min-w-0 items-center gap-3 lg:col-span-4">
         {floorId && (
           <nav
             aria-label="날짜 선택"
-            className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 tabular-nums"
+            className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1 tabular-nums lg:flex-none"
           >
             {dates.previous ? (
               <Button asChild variant="outline" size="icon">
@@ -282,20 +306,14 @@ export function BranchNavigation({
           aria-label="공간 상태 범례"
           className="ml-auto hidden shrink-0 items-center gap-4 lg:flex"
         >
-          <StatusLine kind="free">비어 있음</StatusLine>
+          {(date !== data.today || operating.status === "open") && (
+            <StatusLine kind="free">비어 있음</StatusLine>
+          )}
           <StatusLine kind="busy">예약됨</StatusLine>
           <StatusLine kind="mine">내 예약</StatusLine>
           <StatusLine kind="maintenance">점검</StatusLine>
         </div>
       </div>
-      {floorId && !hours && (
-        <p
-          role="status"
-          className="rounded-lg border border-border bg-muted p-4"
-        >
-          쉬는 날이에요. 다른 날짜를 골라 주세요
-        </p>
-      )}
     </PageContainer>
   );
 }

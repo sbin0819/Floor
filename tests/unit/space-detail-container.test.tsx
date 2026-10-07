@@ -205,7 +205,7 @@ describe("single responsive space detail", () => {
     ).toHaveClass("lg:sticky", "lg:w-[420px]");
     expect(
       view.container.querySelector('[data-space-detail-layout="panel"]'),
-    ).toHaveClass("lg:h-[calc(100dvh-17rem)]", "lg:min-h-[32rem]");
+    ).toHaveClass("lg:h-[calc(100dvh-15rem)]", "lg:min-h-[32rem]");
     expect(screen.getAllByTestId("single-detail")).toHaveLength(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

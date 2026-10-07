@@ -1,5 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { Suspense, use } from "react";
+import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SkeletonRegion } from "@/components/skeleton-region";
 import { SkeletonHeading } from "@/components/skeleton-shapes";
@@ -138,13 +139,22 @@ describe("screen-specific loading geometry", () => {
     expect(container.firstElementChild).toHaveClass("rounded-xl", "bg-card");
   });
 
-  it("matches the wide floor shell and preserves a separate empty-detail placeholder", () => {
+  it("matches the wide floor shell and uses CSS defaults for the unknown initial view", () => {
     const { container } = render(<FloorPageSkeleton />);
     expect(container.firstElementChild).toHaveClass("max-w-[1184px]");
     expect(
       container.querySelectorAll('[data-slot="skeleton-row"]'),
     ).toHaveLength(4);
-    expect(container.querySelector(".border-dashed")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-slot="skeleton-floor-default-list"]'),
+    ).toHaveClass("lg:hidden");
+    expect(
+      container.querySelector('[data-slot="skeleton-floor-default-timetable"]'),
+    ).toHaveClass("hidden", "lg:block");
+    expect(container.querySelector(".border-dashed")).not.toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-slot="skeleton-timetable-row"]'),
+    ).toHaveLength(4);
     expect(
       container.querySelector('[data-slot="skeleton-date-window"]')?.children,
     ).toHaveLength(7);
@@ -154,6 +164,89 @@ describe("screen-specific loading geometry", () => {
     expect(
       container.querySelectorAll('[data-slot="skeleton-region"]'),
     ).toHaveLength(1);
+  });
+
+  it("renders both unknown-view shapes on the server without browser or URL hooks", () => {
+    const html = renderToString(<FloorPageSkeleton />);
+    expect(html).toContain('data-slot="skeleton-floor-default-list"');
+    expect(html).toContain('data-slot="skeleton-floor-default-timetable"');
+    expect(html.match(/aria-busy="true"/g)).toHaveLength(1);
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+  });
+
+  it("reserves the same three mobile toolbar rows without duplicating controls", () => {
+    const { container } = render(<FloorNavigationSkeleton />);
+    const states = container.querySelectorAll(
+      '[data-slot="skeleton-operating-status"]',
+    );
+    const views = container.querySelectorAll(
+      '[data-slot="skeleton-view-control"]',
+    );
+    expect(states).toHaveLength(1);
+    expect(views).toHaveLength(1);
+    expect(states[0]).toHaveClass("row-start-3", "lg:row-start-1");
+    expect(views[0]).toHaveClass("row-start-3", "lg:row-start-1");
+    const dates = container.querySelector('[data-slot="skeleton-date-window"]');
+    const trigger = container.querySelector(
+      '[data-slot="skeleton-calendar-trigger"]',
+    );
+    expect(dates?.children).toHaveLength(7);
+    expect(dates).not.toContainElement(trigger as HTMLElement);
+    expect(trigger).toHaveClass("shrink-0", "h-11");
+  });
+
+  it("reserves larger desktop thumbnails, status lines and availability bars in each list row", () => {
+    const { container } = render(<FloorSpaceListSkeleton />);
+    const rows = container.querySelectorAll('[data-slot="skeleton-row"]');
+    expect(rows).toHaveLength(4);
+    for (const row of rows) {
+      expect(row.querySelector('[data-slot="skeleton-photo"]')).toHaveClass(
+        "h-11",
+        "w-14",
+        "md:h-[54px]",
+        "md:w-[72px]",
+      );
+      const status = row.querySelector('[data-slot="skeleton-status-line"]');
+      expect(status?.children).toHaveLength(2);
+      expect(status?.firstElementChild).toHaveClass("size-2", "rounded-full");
+      expect(
+        row.querySelector('[data-slot="skeleton-availability"]'),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("reserves four detail areas and prioritizes the day schedule over an expanded form", () => {
+    const { container } = render(<SpaceDetailSkeleton />);
+    expect(container.firstElementChild).toHaveClass(
+      "flex",
+      "h-full",
+      "flex-col",
+      "min-h-0",
+    );
+    expect(container.querySelector('[data-slot="skeleton-photo"]')).toHaveClass(
+      "h-[160px]",
+      "shrink-0",
+      "[@media(max-height:759px)]:h-[120px]",
+    );
+    expect(
+      container.querySelector('[data-slot="skeleton-detail-information"]'),
+    ).toHaveClass("shrink-0");
+    expect(
+      container.querySelector('[data-slot="skeleton-detail-schedule"]'),
+    ).toHaveClass("min-h-[280px]", "flex-1", "overflow-hidden");
+    const slots = container.querySelectorAll(
+      '[data-slot="skeleton-time-slot"]',
+    );
+    expect(slots).toHaveLength(12);
+    for (const slot of slots) expect(slot).toHaveClass("h-11", "lg:h-7");
+    const booking = container.querySelector(
+      '[data-slot="skeleton-detail-booking"]',
+    );
+    expect(booking).toHaveClass("shrink-0", "border-t");
+    expect(booking?.children).toHaveLength(2);
+    expect(
+      container.querySelector('[data-slot="skeleton-field"]'),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps booking tabs and one list within the standard content width", () => {

@@ -12,22 +12,25 @@ import { BookingStrip } from "./booking-strip";
 export function SpaceDetailContainer({
   children,
   matchMedia,
+  closed = false,
 }: {
   children: ReactNode;
   matchMedia?: MatchMedia;
+  closed?: boolean;
 }) {
   const wide = useWideScreen(matchMedia);
   const navigation = useFloorSelection();
   const params = useParams<{ branchId: string }>();
   const search = useSearchParams();
   const { effectiveView } = useFloorView();
+  if (closed || navigation?.floorData?.openHours === null) return null;
   if (wide && effectiveView === "timeline")
     return <BookingStrip>{children}</BookingStrip>;
   if (wide)
     return (
       <div
         data-space-detail-layout="panel"
-        className="hidden min-h-0 w-full lg:sticky lg:top-6 lg:block lg:h-[calc(100dvh-17rem)] lg:min-h-[32rem] lg:w-[420px]"
+        className="hidden min-h-0 w-full lg:sticky lg:top-6 lg:block lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:w-[420px]"
       >
         {children}
       </div>

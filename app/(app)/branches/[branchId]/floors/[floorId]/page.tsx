@@ -66,9 +66,9 @@ async function FloorDetailContent({
   return (
     <ResolvedSpaceSelection
       selectionKey={selectionKey}
-      spaceId={detail?.space.id ?? null}
+      spaceId={detail?.openHours ? detail.space.id : null}
     >
-      <SpaceDetailContainer>
+      <SpaceDetailContainer closed={detail?.openHours === null}>
         <FloorDetailRegion>
           {detail ? <SpaceDetail data={detail} /> : <EmptySpaceSelection />}
         </FloorDetailRegion>
