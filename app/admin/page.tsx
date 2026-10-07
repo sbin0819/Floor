@@ -1,7 +1,8 @@
+import { Suspense } from "react";
 import { requireOperatorPage } from "@/lib/auth/session";
 import { getOperatorHome } from "@/features/admin/queries";
 
-export default async function AdminHome() {
+async function AdminContent() {
   await requireOperatorPage();
   const { branches } = await getOperatorHome();
   return (
@@ -20,5 +21,19 @@ export default async function AdminHome() {
         </ul>
       </section>
     </main>
+  );
+}
+
+export default function AdminHome() {
+  return (
+    <Suspense
+      fallback={
+        <p role="status" className="p-6 text-muted-foreground">
+          운영자 화면을 불러오고 있어요.
+        </p>
+      }
+    >
+      <AdminContent />
+    </Suspense>
   );
 }

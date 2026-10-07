@@ -3,6 +3,7 @@ import { expect, it, vi } from "vitest";
 import Home from "@/app/(app)/page";
 import { requirePageSession } from "@/lib/auth/session";
 import { getHomeData } from "@/features/teams/queries";
+import { resolvePageContent } from "./page-test-utils";
 
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("@/features/teams/queries", () => ({ getHomeData: vi.fn() }));
@@ -19,7 +20,7 @@ it("checks the session on the page and greets the current member", async () => {
     pendingInviteCount: 2,
     isOperator: false,
   });
-  render(await Home());
+  render(await resolvePageContent(Home()));
   expect(requirePageSession).toHaveBeenCalledWith("/");
   expect(
     screen.getByRole("heading", { name: "안녕하세요, 가상 회원님" }),
@@ -40,7 +41,7 @@ it("shows memberships and the operator destination without unrelated navigation"
     pendingInviteCount: 0,
     isOperator: true,
   });
-  render(await Home());
+  render(await resolvePageContent(Home()));
   expect(screen.getByRole("link", { name: "가상 팀" })).toHaveAttribute(
     "href",
     "/teams/team",

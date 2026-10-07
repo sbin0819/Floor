@@ -8,6 +8,7 @@ import {
   getTeamPageData,
   getTeamStartData,
 } from "@/features/teams/queries";
+import { resolvePageContent } from "./page-test-utils";
 
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("@/features/teams/queries", () => ({
@@ -47,7 +48,9 @@ describe("team page session guards", () => {
       requests: [],
       search: { query: "가상 팀", results: [] },
     });
-    await TeamStartPage({ searchParams: Promise.resolve({ q: "가상 팀" }) });
+    await resolvePageContent(
+      TeamStartPage({ searchParams: Promise.resolve({ q: "가상 팀" }) }),
+    );
     expect(requirePageSession).toHaveBeenCalledWith(
       `/teams/start?q=${encodeURIComponent("가상 팀")}`,
     );
@@ -60,16 +63,16 @@ describe("team page session guards", () => {
     const teamId = crypto.randomUUID();
     vi.mocked(getTeamPageData).mockResolvedValue(null);
     await expect(
-      TeamPage({ params: Promise.resolve({ teamId }) }),
+      resolvePageContent(TeamPage({ params: Promise.resolve({ teamId }) })),
     ).rejects.toThrow("NOT_FOUND");
     expect(requirePageSession).toHaveBeenCalledWith(`/teams/${teamId}`);
     expect(getTeamPageData).toHaveBeenCalledWith(teamId);
   });
   it("guards an invitation using its return path without exposing an invalid reason", async () => {
     vi.mocked(getInvitePageData).mockResolvedValue(null);
-    const element = await InvitePage({
-      params: Promise.resolve({ token: "recipient-token" }),
-    });
+    const element = await resolvePageContent(
+      InvitePage({ params: Promise.resolve({ token: "recipient-token" }) }),
+    );
     expect(requirePageSession).toHaveBeenCalledWith("/invite/recipient-token");
     expect(element.props.data).toBeNull();
     expect(getInvitePageData).toHaveBeenCalledWith("recipient-token");
@@ -79,7 +82,9 @@ describe("team page session guards", () => {
       new Error("LOGIN_REDIRECT"),
     );
     await expect(
-      TeamPage({ params: Promise.resolve({ teamId: crypto.randomUUID() }) }),
+      resolvePageContent(
+        TeamPage({ params: Promise.resolve({ teamId: crypto.randomUUID() }) }),
+      ),
     ).rejects.toThrow("LOGIN_REDIRECT");
     expect(getTeamPageData).not.toHaveBeenCalled();
   });
