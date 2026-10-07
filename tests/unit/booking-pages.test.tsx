@@ -1,4 +1,10 @@
-import { isValidElement, Suspense, type SuspenseProps } from "react";
+import {
+  Children,
+  isValidElement,
+  Suspense,
+  type ReactNode,
+  type SuspenseProps,
+} from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BranchesPage from "@/app/(app)/branches/page";
@@ -75,6 +81,24 @@ const floorPage = (query: Record<string, string | string[] | undefined> = {}) =>
     searchParams: Promise.resolve(query),
   });
 
+async function floorRegions(
+  query: Record<string, string | string[] | undefined> = {},
+) {
+  const page = await resolvePageContent(floorPage(query));
+  const grid = page.props.children;
+  if (!isValidElement<{ children: ReactNode }>(grid))
+    throw new Error("Missing floor grid");
+  const [list, detail] = Children.toArray(grid.props.children);
+  if (
+    !isValidElement<SuspenseProps>(list) ||
+    list.type !== Suspense ||
+    !isValidElement<SuspenseProps>(detail) ||
+    detail.type !== Suspense
+  )
+    throw new Error("Expected sibling list and detail boundaries");
+  return { list, detail };
+}
+
 describe("booking page-local streaming", () => {
   it.each(["branches", "branch", "floor"] as const)(
     "%s returns a fallback without reading the session or params",
@@ -138,18 +162,43 @@ describe("booking page guards", () => {
       screen.getByText("이 지점에는 이용할 수 있는 층이 아직 없어요"),
     ).toBeVisible();
   });
-  it("checks the actual floor query before loading a selected accessible space", async () => {
-    const result = await resolvePageContent(
-      floorPage({ date: "2026-10-07", space: selectedSpaceId }),
-    );
+  it("checks the page session before starting the independent list and detail", async () => {
+    const regions = await floorRegions({
+      date: "2026-10-07",
+      space: selectedSpaceId,
+    });
     expect(requirePageSession).toHaveBeenCalledWith(
       "/branches/branch/floors/floor",
     );
+    expect(getFloorDay).not.toHaveBeenCalled();
+    expect(getSpaceDay).not.toHaveBeenCalled();
+    const [, result] = await Promise.all([
+      resolvePageContent(regions.list),
+      resolvePageContent(regions.detail),
+    ]);
     expect(getFloorDay).toHaveBeenCalledWith("branch", "floor", "2026-10-07");
-    expect(getSpaceDay).toHaveBeenCalledWith("branch", "floor", selectedSpaceId, "2026-10-07");
-    expect(result.props.selectedSpaceId).toBe(selectedSpaceId);
+    expect(getSpaceDay).toHaveBeenCalledWith(
+      "branch",
+      "floor",
+      selectedSpaceId,
+      "2026-10-07",
+    );
+    expect(result.props.spaceId).toBe(selectedSpaceId);
   });
-  it("canonicalizes an uppercase selected-space UUID before checking the authorized floor list", async () => {
+  it("starts and completes detail while the independent floor list is still pending", async () => {
+    const pending =
+      Promise.withResolvers<Awaited<ReturnType<typeof getFloorDay>>>();
+    vi.mocked(getFloorDay).mockReturnValue(pending.promise);
+    const regions = await floorRegions({ space: selectedSpaceId });
+    const list = resolvePageContent(regions.list);
+    const detail = await resolvePageContent(regions.detail);
+    expect(getFloorDay).toHaveBeenCalledTimes(1);
+    expect(getSpaceDay).toHaveBeenCalledTimes(1);
+    expect(detail.props.spaceId).toBe(selectedSpaceId);
+    pending.resolve(floorDayFixture());
+    await list;
+  });
+  it("canonicalizes an uppercase selected-space UUID before the independently authorized detail query", async () => {
     const spaceId = "abcdefab-1234-4abc-9def-123456789abc";
     const data = floorDayFixture();
     data.spaces = data.spaces.map((space) =>
@@ -159,33 +208,82 @@ describe("booking page guards", () => {
     detail.space.id = spaceId;
     vi.mocked(getFloorDay).mockResolvedValue(data);
     vi.mocked(getSpaceDay).mockResolvedValue(detail);
-    const result = await resolvePageContent(
-      floorPage({ space: spaceId.toUpperCase() }),
+    const { detail: boundary } = await floorRegions({
+      space: spaceId.toUpperCase(),
+    });
+    const result = await resolvePageContent(boundary);
+    expect(getSpaceDay).toHaveBeenCalledExactlyOnceWith(
+      "branch",
+      "floor",
+      spaceId,
+      undefined,
     );
-    expect(getSpaceDay).toHaveBeenCalledExactlyOnceWith("branch", "floor", spaceId, data.date);
-    expect(result.props.selectedSpaceId).toBe(spaceId);
+    expect(getFloorDay).not.toHaveBeenCalled();
+    expect(result.props.spaceId).toBe(spaceId);
   });
-  it.each([
-    otherFloorSpaceId,
-    restrictedSpaceId,
-    "invalid",
-    [selectedSpaceId, otherFloorSpaceId],
-  ])("does not query an unselected or inaccessible space %j", async (space) => {
-    const result = await resolvePageContent(floorPage({ space }));
-    expect(getSpaceDay).not.toHaveBeenCalled();
-    expect(result.props.selectedSpaceId).toBeUndefined();
-  });
-  it("drops a selection that becomes inaccessible between the two queries", async () => {
-    vi.mocked(getSpaceDay).mockRejectedValue(new ActionError("NOT_FOUND"));
-    const result = await resolvePageContent(
-      floorPage({ space: selectedSpaceId }),
-    );
-    expect(result.props.selectedSpaceId).toBeUndefined();
-  });
+  it.each([undefined, "invalid", [selectedSpaceId, otherFloorSpaceId]])(
+    "does not query a missing or malformed selection %j",
+    async (space) => {
+      const { detail } = await floorRegions({ space });
+      const result = await resolvePageContent(detail);
+      expect(getSpaceDay).not.toHaveBeenCalled();
+      expect(result.props.spaceId).toBeNull();
+      render(result);
+      expect(
+        screen.getByRole("heading", { name: "공간을 골라 주세요" }),
+      ).toBeVisible();
+    },
+  );
+  it.each([selectedSpaceId, restrictedSpaceId, otherFloorSpaceId])(
+    "drops inaccessible or wrong-floor selection %s without turning the page into a 404",
+    async (space) => {
+      vi.mocked(getSpaceDay).mockRejectedValue(new ActionError("NOT_FOUND"));
+      const { detail } = await floorRegions({ space });
+      const result = await resolvePageContent(detail);
+      expect(getSpaceDay).toHaveBeenCalledExactlyOnceWith(
+        "branch",
+        "floor",
+        space,
+        undefined,
+      );
+      expect(result.props.spaceId).toBeNull();
+      render(result);
+      expect(
+        screen.getByRole("heading", { name: "공간을 골라 주세요" }),
+      ).toBeVisible();
+    },
+  );
   it("turns a missing or inaccessible floor into the same notFound response", async () => {
     vi.mocked(getFloorDay).mockRejectedValue(new ActionError("NOT_FOUND"));
-    await expect(resolvePageContent(floorPage())).rejects.toThrow("NOT_FOUND");
+    const { list } = await floorRegions();
+    await expect(resolvePageContent(list)).rejects.toThrow("NOT_FOUND");
     expect(getSpaceDay).not.toHaveBeenCalled();
+  });
+  it("does not hide unexpected list or detail failures", async () => {
+    const failure = new Error("database failure");
+    vi.mocked(getFloorDay).mockRejectedValue(failure);
+    vi.mocked(getSpaceDay).mockRejectedValue(failure);
+    const { list, detail } = await floorRegions({ space: selectedSpaceId });
+    await expect(resolvePageContent(list)).rejects.toBe(failure);
+    await expect(resolvePageContent(detail)).rejects.toBe(failure);
+  });
+  it("keeps the list key stable for space-only changes and resets both boundaries for date changes", async () => {
+    const first = await floorRegions({
+      date: "2026-10-07",
+      space: selectedSpaceId,
+    });
+    const space = await floorRegions({
+      date: "2026-10-07",
+      space: otherFloorSpaceId,
+    });
+    const date = await floorRegions({
+      date: "2026-10-08",
+      space: selectedSpaceId,
+    });
+    expect(first.list.key).toBe(space.list.key);
+    expect(first.detail.key).not.toBe(space.detail.key);
+    expect(first.list.key).not.toBe(date.list.key);
+    expect(first.detail.key).not.toBe(date.detail.key);
   });
   it.each(["branches", "branch", "floor"] as const)(
     "does not query %s after its session guard rejects",

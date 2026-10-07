@@ -23,7 +23,7 @@ async function VerifyEmailContent({ searchParams }: AuthPageProps) {
 
 export default function VerifyEmailPage(props: AuthPageProps) {
   return (
-    <Suspense fallback={<AuthLoading />}>
+    <Suspense fallback={<AuthLoading variant="email" />}>
       <VerifyEmailContent {...props} />
     </Suspense>
   );

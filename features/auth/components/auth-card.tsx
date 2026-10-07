@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { AuthSkeleton, type AuthSkeletonVariant } from "./auth-skeleton";
 
 export type AuthPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -34,13 +35,6 @@ export function AuthCard({
   );
 }
 
-export function AuthLoading() {
-  return (
-    <p
-      role="status"
-      className="py-10 text-center text-sm text-muted-foreground"
-    >
-      화면을 준비하고 있어요.
-    </p>
-  );
+export function AuthLoading({ variant }: { variant?: AuthSkeletonVariant }) {
+  return <AuthSkeleton variant={variant} />;
 }

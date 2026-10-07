@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireOperatorPage } from "@/lib/auth/session";
 import { getOperatorHome } from "@/features/admin/queries";
+import { AdminHomeSkeleton } from "@/features/admin/components/admin-skeletons";
 
 async function AdminContent() {
   await requireOperatorPage();
@@ -34,13 +35,7 @@ async function AdminContent() {
 
 export default function AdminHome() {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          운영자 화면을 불러오고 있어요.
-        </p>
-      }
-    >
+    <Suspense fallback={<AdminHomeSkeleton />}>
       <AdminContent />
     </Suspense>
   );

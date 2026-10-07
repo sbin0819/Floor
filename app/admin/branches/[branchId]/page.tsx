@@ -4,6 +4,7 @@ import { requireOperatorPage } from "@/lib/auth/session";
 import { ActionError } from "@/lib/actions/result";
 import { getAdminBranch } from "@/features/admin/queries";
 import { BranchDetail } from "@/features/admin/components/branch-detail";
+import { AdminBranchSkeleton } from "@/features/admin/components/admin-skeletons";
 
 type Props = { params: Promise<{ branchId: string }> };
 async function BranchContent({ params }: Props) {
@@ -17,13 +18,7 @@ async function BranchContent({ params }: Props) {
 }
 export default function AdminBranchPage(props: Props) {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          지점 정보를 불러오고 있어요
-        </p>
-      }
-    >
+    <Suspense fallback={<AdminBranchSkeleton />}>
       <BranchContent {...props} />
     </Suspense>
   );

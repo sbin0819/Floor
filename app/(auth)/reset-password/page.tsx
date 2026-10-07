@@ -22,7 +22,7 @@ async function ResetPasswordContent({ searchParams }: AuthPageProps) {
 
 export default function ResetPasswordPage(props: AuthPageProps) {
   return (
-    <Suspense fallback={<AuthLoading />}>
+    <Suspense fallback={<AuthLoading variant="reset" />}>
       <ResetPasswordContent {...props} />
     </Suspense>
   );

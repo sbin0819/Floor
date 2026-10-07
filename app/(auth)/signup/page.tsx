@@ -28,7 +28,7 @@ async function SignupContent({ searchParams }: AuthPageProps) {
 
 export default function SignupPage(props: AuthPageProps) {
   return (
-    <Suspense fallback={<AuthLoading />}>
+    <Suspense fallback={<AuthLoading variant="signup" />}>
       <SignupContent {...props} />
     </Suspense>
   );

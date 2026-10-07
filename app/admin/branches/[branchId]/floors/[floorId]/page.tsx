@@ -4,6 +4,7 @@ import { requireOperatorPage } from "@/lib/auth/session";
 import { ActionError } from "@/lib/actions/result";
 import { getAdminFloor } from "@/features/admin/queries";
 import { FloorDetail } from "@/features/admin/components/floor-detail";
+import { AdminFloorSkeleton } from "@/features/admin/components/admin-skeletons";
 
 type Props = {
   params: Promise<{ branchId: string; floorId: string }>;
@@ -24,13 +25,7 @@ async function FloorContent({ params, searchParams }: Props) {
 }
 export default function AdminFloorPage(props: Props) {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          층 정보를 불러오고 있어요
-        </p>
-      }
-    >
+    <Suspense fallback={<AdminFloorSkeleton />}>
       <FloorContent {...props} />
     </Suspense>
   );

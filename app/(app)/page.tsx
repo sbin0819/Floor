@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { requirePageSession } from "@/lib/auth/session";
 import { getHomeData } from "@/features/teams/queries";
 import { TeamHome } from "@/features/teams/components/team-home";
+import { HomeSkeleton } from "@/features/teams/components/team-skeletons";
 import { getBookingEntry } from "@/features/bookings/queries";
 
 async function HomeContent() {
@@ -20,13 +21,7 @@ async function HomeContent() {
 
 export default function Home() {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          홈을 불러오고 있어요.
-        </p>
-      }
-    >
+    <Suspense fallback={<HomeSkeleton />}>
       <HomeContent />
     </Suspense>
   );

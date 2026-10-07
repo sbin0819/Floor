@@ -18,7 +18,7 @@ async function ForgotPasswordContent() {
 
 export default function ForgotPasswordPage() {
   return (
-    <Suspense fallback={<AuthLoading />}>
+    <Suspense fallback={<AuthLoading variant="email" />}>
       <ForgotPasswordContent />
     </Suspense>
   );

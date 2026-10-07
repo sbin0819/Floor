@@ -78,10 +78,13 @@ describe("protected page-local streaming boundaries", () => {
       }
       expect(shell.type).toBe(Suspense);
       expect(isValidElement(shell.props.children)).toBe(true);
-      render(shell.props.fallback);
-      expect(screen.getByRole("status")).toHaveTextContent(
-        route === "invite" ? "초대를 확인하고 있어요." : "불러오고 있어요.",
-      );
+      const { container } = render(shell.props.fallback);
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      expect(screen.getByRole("status")).toHaveTextContent("불러오고 있어요.");
+      expect(container.firstElementChild).toHaveAttribute("aria-busy", "true");
+      expect(
+        container.querySelectorAll('[data-slot="skeleton"]').length,
+      ).toBeGreaterThan(1);
 
       expect(teamParams.read).not.toHaveBeenCalled();
       expect(inviteParams.read).not.toHaveBeenCalled();

@@ -248,16 +248,14 @@ describe("navigation, lists and cancellation", () => {
   });
   it("shows a restricted badge without rendering a space link and handles empty floors", () => {
     const data = floorDayFixture();
-    const view = render(<FloorDay data={data} today={data.date} />);
+    const view = render(<FloorDay data={data} />);
     expect(screen.getByText("전용 공간")).toBeVisible();
     expect(view.container.querySelector('a[href*="restricted"]')).toBeNull();
     expect(screen.getByRole("link", { name: /회의실 C/ })).toHaveAttribute(
       "href",
       "/branches/branch/floors/floor?date=2026-10-07&space=space",
     );
-    view.rerender(
-      <FloorDay data={{ ...data, spaces: [] }} today={data.date} />,
-    );
+    view.rerender(<FloorDay data={{ ...data, spaces: [] }} />);
     expect(screen.getByText("이 층에는 공간이 아직 없어요")).toBeVisible();
   });
 });

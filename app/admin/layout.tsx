@@ -2,6 +2,7 @@ import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AdminNav } from "@/features/admin/components/admin-nav";
+import { AdminNavSkeleton } from "@/features/admin/components/admin-skeletons";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +14,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </Link>
           <span className="text-xs">운영자</span>
         </div>
-        <Suspense fallback={<p>메뉴를 불러오고 있어요</p>}>
+        <Suspense fallback={<AdminNavSkeleton />}>
           <AdminNav />
         </Suspense>
         <div className="lg:mt-auto">

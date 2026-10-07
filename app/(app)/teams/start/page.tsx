@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { requirePageSession } from "@/lib/auth/session";
 import { getTeamStartData } from "@/features/teams/queries";
 import { TeamStart } from "@/features/teams/components/team-start";
+import { TeamStartSkeleton } from "@/features/teams/components/team-skeletons";
 
 type TeamStartPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -19,13 +20,7 @@ async function TeamStartContent({ searchParams }: TeamStartPageProps) {
 
 export default function TeamStartPage(props: TeamStartPageProps) {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          팀 전환 화면을 불러오고 있어요.
-        </p>
-      }
-    >
+    <Suspense fallback={<TeamStartSkeleton />}>
       <TeamStartContent {...props} />
     </Suspense>
   );

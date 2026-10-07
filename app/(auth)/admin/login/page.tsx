@@ -31,7 +31,7 @@ async function OperatorLoginContent() {
 
 export default function OperatorLoginPage() {
   return (
-    <Suspense fallback={<AuthLoading />}>
+    <Suspense fallback={<AuthLoading variant="operator" />}>
       <OperatorLoginContent />
     </Suspense>
   );

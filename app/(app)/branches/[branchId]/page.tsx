@@ -6,6 +6,7 @@ import { requirePageSession } from "@/lib/auth/session";
 import { getBranchFloors } from "@/features/bookings/queries";
 import { floorHref } from "@/features/bookings/format";
 import { Button } from "@/components/ui/button";
+import { BranchFloorsSkeleton } from "@/features/bookings/components/booking-skeletons";
 
 type Props = { params: Promise<{ branchId: string }> };
 async function BranchContent({ params }: Props) {
@@ -28,13 +29,7 @@ async function BranchContent({ params }: Props) {
 }
 export default function BranchPage(props: Props) {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          층을 불러오고 있어요.
-        </p>
-      }
-    >
+    <Suspense fallback={<BranchFloorsSkeleton />}>
       <BranchContent {...props} />
     </Suspense>
   );

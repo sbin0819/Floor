@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { requirePageSession } from "@/lib/auth/session";
 import { getMyBookings } from "@/features/bookings/queries";
 import { MyBookings } from "@/features/bookings/components/my-bookings";
+import { MyBookingsSkeleton } from "@/features/bookings/components/booking-skeletons";
 
 async function BookingsContent() {
   await requirePageSession("/bookings");
@@ -9,13 +10,7 @@ async function BookingsContent() {
 }
 export default function BookingsPage() {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          예약을 불러오고 있어요.
-        </p>
-      }
-    >
+    <Suspense fallback={<MyBookingsSkeleton />}>
       <BookingsContent />
     </Suspense>
   );

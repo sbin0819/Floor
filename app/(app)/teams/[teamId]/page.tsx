@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requirePageSession } from "@/lib/auth/session";
 import { getTeamPageData } from "@/features/teams/queries";
 import { TeamDetail } from "@/features/teams/components/team-detail";
+import { TeamDetailSkeleton } from "@/features/teams/components/team-skeletons";
 
 type TeamPageProps = {
   params: Promise<{ teamId: string }>;
@@ -18,13 +19,7 @@ async function TeamPageContent({ params }: TeamPageProps) {
 
 export default function TeamPage(props: TeamPageProps) {
   return (
-    <Suspense
-      fallback={
-        <p role="status" className="p-6 text-muted-foreground">
-          팀 정보를 불러오고 있어요.
-        </p>
-      }
-    >
+    <Suspense fallback={<TeamDetailSkeleton />}>
       <TeamPageContent {...props} />
     </Suspense>
   );
