@@ -3,6 +3,7 @@ import { cn } from "cn";
 
 const widths = {
   wide: "max-w-[1184px]",
+  branches: "max-w-[1040px]",
   standard: "max-w-[880px]",
   form: "max-w-[640px]",
 } as const;

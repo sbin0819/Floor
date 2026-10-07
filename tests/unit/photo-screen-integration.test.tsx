@@ -151,8 +151,8 @@ describe("photos in existing member screens", () => {
     });
     expect(branch.querySelector("img")).toHaveAttribute("alt", "");
     expect(branch.querySelector("img")).toHaveAttribute("sizes", "32px");
-    const card = screen.getByRole("link", { name: /가상 지점.*가상 주소/ });
-    expect(card.querySelector("img")).toHaveAttribute("alt", "");
+    const card = screen.getByRole("link", { name: "가상 지점" });
+    expect(card.closest("article")?.querySelector("img")).toHaveAttribute("alt", photo.alt);
     expect(card.querySelector("button")).toBeNull();
   });
 

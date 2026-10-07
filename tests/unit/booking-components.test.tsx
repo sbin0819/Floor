@@ -574,7 +574,9 @@ describe("navigation, lists and cancellation", () => {
     await waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
     expect(navigation.push).not.toHaveBeenCalled();
     expect(setDefaultBranch).toHaveBeenCalledWith({ branchId: "branch" });
-    expect(screen.getByText("층 1개")).toBeVisible();
+    expect(
+      screen.getByText("이용할 수 있는 층").parentElement,
+    ).toHaveTextContent("1개");
   });
   it("shows a restricted badge without rendering a space link and handles empty floors", () => {
     const data = floorDayFixture();
