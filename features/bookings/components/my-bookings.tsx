@@ -23,6 +23,7 @@ import {
 } from "@/features/bookings/format";
 import type { MyBooking, MyBookingsData } from "@/features/bookings/types";
 import { CancelBookingButton } from "./cancel-booking-button";
+import { MyBookingsViewLinks } from "./my-bookings-view-links";
 
 export type BookingHistoryTab = "upcoming" | "past";
 function BookingList({
@@ -162,6 +163,7 @@ export function MyBookings({
           </Button>
         }
       />
+      <MyBookingsViewLinks view="list" />
       <SegmentedLinks label="예약 목록 선택">
         {(["upcoming", "past"] as const).map((value) => {
           const href = value === "past" ? "/bookings?tab=past" : "/bookings";

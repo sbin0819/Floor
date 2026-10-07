@@ -15,7 +15,13 @@ import {
 import { cancelBooking } from "@/features/bookings/actions";
 import { useBookingMutation } from "./use-booking-mutation";
 
-export function CancelBookingButton({ bookingId }: { bookingId: string }) {
+export function CancelBookingButton({
+  bookingId,
+  triggerLabel = "취소",
+}: {
+  bookingId: string;
+  triggerLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const mutation = useBookingMutation({
     action: cancelBooking,
@@ -32,7 +38,7 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
           disabled={mutation.pending}
           data-cancelling={mutation.pending && open ? "true" : undefined}
         >
-          취소
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent>

@@ -152,9 +152,11 @@ it("marks a clicked tab and replaces only the list before the response", async (
     />,
   );
   fireEvent.click(screen.getByRole("link", { name: "지난 예약" }));
-  expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
-    "지난 예약",
-  );
+  expect(
+    within(
+      screen.getByRole("navigation", { name: "예약 목록 선택" }),
+    ).getByRole("link", { current: "page" }),
+  ).toHaveTextContent("지난 예약");
   expect(screen.getByRole("heading", { name: "내 예약" })).toBeVisible();
   expect(screen.getByRole("status")).toHaveTextContent("불러오고 있어요");
   expect(navigateAction).toHaveBeenCalledWith("/bookings?tab=past", {});
@@ -162,9 +164,11 @@ it("marks a clicked tab and replaces only the list before the response", async (
     finish();
     await response;
   });
-  expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
-    "다가오는 예약",
-  );
+  expect(
+    within(
+      screen.getByRole("navigation", { name: "예약 목록 선택" }),
+    ).getByRole("link", { current: "page" }),
+  ).toHaveTextContent("다가오는 예약");
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
 
