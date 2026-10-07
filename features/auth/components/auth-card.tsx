@@ -17,7 +17,7 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="w-full gap-6 rounded-xl border bg-card py-5 shadow-none">
+    <Card className="mx-auto w-full max-w-[400px] gap-6 rounded-xl border bg-card py-5 shadow-none">
       <CardHeader className="gap-3 px-5">
         <Link
           href="/"

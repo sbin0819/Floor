@@ -7,6 +7,7 @@ import {
   type AuthPageProps,
 } from "@/features/auth/components/auth-card";
 import { LoginForm } from "@/features/auth/components/login-form";
+import { MemberAuthFrame } from "@/features/auth/components/member-auth-frame";
 import { getLoginNotice } from "@/features/auth/messages";
 import { getAuthUiOptions } from "@/lib/auth/auth";
 import { getSession } from "@/lib/auth/session";
@@ -34,8 +35,10 @@ async function LoginContent({ searchParams }: AuthPageProps) {
 
 export default function LoginPage(props: AuthPageProps) {
   return (
-    <Suspense fallback={<AuthLoading />}>
-      <LoginContent {...props} />
-    </Suspense>
+    <MemberAuthFrame>
+      <Suspense fallback={<AuthLoading />}>
+        <LoginContent {...props} />
+      </Suspense>
+    </MemberAuthFrame>
   );
 }

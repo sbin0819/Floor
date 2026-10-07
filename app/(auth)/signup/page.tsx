@@ -7,6 +7,7 @@ import {
   type AuthPageProps,
 } from "@/features/auth/components/auth-card";
 import { SignupForm } from "@/features/auth/components/signup-form";
+import { MemberAuthFrame } from "@/features/auth/components/member-auth-frame";
 import { getAuthUiOptions } from "@/lib/auth/auth";
 import { getSession } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/safe-next";
@@ -28,8 +29,10 @@ async function SignupContent({ searchParams }: AuthPageProps) {
 
 export default function SignupPage(props: AuthPageProps) {
   return (
-    <Suspense fallback={<AuthLoading variant="signup" />}>
-      <SignupContent {...props} />
-    </Suspense>
+    <MemberAuthFrame>
+      <Suspense fallback={<AuthLoading variant="signup" />}>
+        <SignupContent {...props} />
+      </Suspense>
+    </MemberAuthFrame>
   );
 }

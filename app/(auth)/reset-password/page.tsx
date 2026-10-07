@@ -6,6 +6,7 @@ import {
   type AuthPageProps,
 } from "@/features/auth/components/auth-card";
 import { ResetPasswordForm } from "@/features/auth/components/reset-password-form";
+import { MemberAuthFrame } from "@/features/auth/components/member-auth-frame";
 
 async function ResetPasswordContent({ searchParams }: AuthPageProps) {
   await connection();
@@ -22,8 +23,10 @@ async function ResetPasswordContent({ searchParams }: AuthPageProps) {
 
 export default function ResetPasswordPage(props: AuthPageProps) {
   return (
-    <Suspense fallback={<AuthLoading variant="reset" />}>
-      <ResetPasswordContent {...props} />
-    </Suspense>
+    <MemberAuthFrame>
+      <Suspense fallback={<AuthLoading variant="reset" />}>
+        <ResetPasswordContent {...props} />
+      </Suspense>
+    </MemberAuthFrame>
   );
 }

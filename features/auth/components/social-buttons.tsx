@@ -42,6 +42,12 @@ export function SocialButtons({
               })
             }
           >
+            <span
+              aria-hidden="true"
+              className="inline-flex size-5 items-center justify-center text-xs font-semibold"
+            >
+              {provider === "google" ? "G" : "GH"}
+            </span>
             {provider === "google" ? "Google" : "GitHub"}로 계속하기
           </Button>
         ))}

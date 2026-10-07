@@ -217,7 +217,7 @@ describe("signup form", () => {
       "이름을 입력해 주세요",
     );
     expect(screen.getByLabelText("비밀번호")).toHaveAccessibleDescription(
-      "비밀번호는 8자 이상 입력해 주세요",
+      "비밀번호는 8자 이상 입력해 주세요 비밀번호는 8자 이상 128자 이하로 입력해 주세요.",
     );
     expect(mocks.signup).not.toHaveBeenCalled();
   });

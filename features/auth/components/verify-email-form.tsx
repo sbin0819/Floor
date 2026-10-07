@@ -24,10 +24,12 @@ export function VerifyEmailForm({
   email,
   emailEnabled,
   providers,
+  development = false,
 }: {
   email?: string;
   emailEnabled: boolean;
   providers: AuthProvider[];
+  development?: boolean;
 }) {
   const request = useAuthRequest();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,6 +79,17 @@ export function VerifyEmailForm({
               : "메일의 인증 링크를 누른 뒤 로그인해 주세요. 인증 메일이 없다면 다시 받을 수 있어요."}
           </p>
           {fixedEmail && <p className="text-sm break-all">{fixedEmail}</p>}
+          <ol className="list-inside list-decimal space-y-2 text-sm tabular-nums">
+            <li>메일함을 열어 주세요</li>
+            <li>Floor 인증 메일의 링크를 눌러 주세요</li>
+            <li>돌아와서 로그인해 주세요</li>
+          </ol>
+          {development && (
+            <p className="rounded-lg bg-muted p-3 text-xs leading-relaxed text-muted-foreground">
+              개발 중에는 메일이 실제로 가지 않아요. 서버 로그의 링크를 열어
+              주세요
+            </p>
+          )}
           <form
             noValidate
             onSubmit={submit}

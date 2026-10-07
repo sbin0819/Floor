@@ -18,7 +18,7 @@ export function AuthSkeleton({
         ? 1
         : 2;
   return (
-    <SkeletonRegion className="w-full space-y-6 rounded-xl border bg-card p-5">
+    <SkeletonRegion className="mx-auto w-full max-w-[400px] space-y-6 rounded-xl border bg-card p-5">
       <div className="space-y-3">
         <Skeleton className="h-11 w-12" />
         <SkeletonHeading />

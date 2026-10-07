@@ -80,6 +80,19 @@ test("키보드로 로그인 양식을 확인할 수 있어요", async ({ page }
   await expect(page.getByLabel("비밀번호", { exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(
+    page.getByRole("button", { name: "비밀번호 보기" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("비밀번호", { exact: true })).toHaveAttribute(
+    "type",
+    "text",
+  );
+  await expect(
+    page.getByRole("button", { name: "비밀번호 숨기기" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(
     page.getByRole("button", { name: "로그인", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Enter");

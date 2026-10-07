@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { AuthCard, AuthLoading } from "@/features/auth/components/auth-card";
 import { ForgotPasswordForm } from "@/features/auth/components/forgot-password-form";
+import { MemberAuthFrame } from "@/features/auth/components/member-auth-frame";
 import { getAuthUiOptions } from "@/lib/auth/auth";
 
 async function ForgotPasswordContent() {
@@ -18,8 +19,10 @@ async function ForgotPasswordContent() {
 
 export default function ForgotPasswordPage() {
   return (
-    <Suspense fallback={<AuthLoading variant="email" />}>
-      <ForgotPasswordContent />
-    </Suspense>
+    <MemberAuthFrame>
+      <Suspense fallback={<AuthLoading variant="email" />}>
+        <ForgotPasswordContent />
+      </Suspense>
+    </MemberAuthFrame>
   );
 }

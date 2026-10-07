@@ -6,7 +6,9 @@ import {
   type AuthPageProps,
 } from "@/features/auth/components/auth-card";
 import { VerifyEmailForm } from "@/features/auth/components/verify-email-form";
+import { MemberAuthFrame } from "@/features/auth/components/member-auth-frame";
 import { getAuthUiOptions } from "@/lib/auth/auth";
+import { getEnv } from "@/lib/env";
 
 async function VerifyEmailContent({ searchParams }: AuthPageProps) {
   await connection();
@@ -15,6 +17,7 @@ async function VerifyEmailContent({ searchParams }: AuthPageProps) {
     <AuthCard title="메일을 확인해 주세요">
       <VerifyEmailForm
         {...getAuthUiOptions()}
+        development={getEnv().NODE_ENV !== "production"}
         email={typeof email === "string" ? email : undefined}
       />
     </AuthCard>
@@ -23,8 +26,10 @@ async function VerifyEmailContent({ searchParams }: AuthPageProps) {
 
 export default function VerifyEmailPage(props: AuthPageProps) {
   return (
-    <Suspense fallback={<AuthLoading variant="email" />}>
-      <VerifyEmailContent {...props} />
-    </Suspense>
+    <MemberAuthFrame>
+      <Suspense fallback={<AuthLoading variant="email" />}>
+        <VerifyEmailContent {...props} />
+      </Suspense>
+    </MemberAuthFrame>
   );
 }

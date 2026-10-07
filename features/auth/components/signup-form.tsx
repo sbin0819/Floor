@@ -97,14 +97,11 @@ export function SignupForm({
             name="password"
             type="password"
             autoComplete="new-password"
+            hint="비밀번호는 8자 이상 128자 이하로 입력해 주세요."
             required
             error={errors.password}
             disabled={request.pending}
           />
-          <p className="text-xs text-muted-foreground">
-            비밀번호는 <span className="tabular-nums">8–128</span>자로 입력해
-            주세요.
-          </p>
           <Button type="submit" disabled={request.pending} className="w-full">
             {request.pending ? "가입하고 있어요…" : "계정 만들기"}
           </Button>
