@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { ActionError } from "@/lib/actions/result";
 import { requirePageSession } from "@/lib/auth/session";
 import { localDate } from "@/lib/time/zoned";
-import { getFloorDay } from "@/features/bookings/queries";
+import { getFloorDay, getSpaceDay } from "@/features/bookings/queries";
 import { FloorDay } from "@/features/bookings/components/floor-day";
+import { SpaceDetail } from "@/features/bookings/components/space-detail";
 
 type Props = {
   params: Promise<{ branchId: string; floorId: string }>;
@@ -27,12 +28,23 @@ async function FloorContent({ params, searchParams }: Props) {
           (space) => space.kind === "accessible" && space.id === query.space,
         )
       : undefined;
+  let detail = null;
+  if (selected) {
+    try {
+      detail = await getSpaceDay(selected.id, data.date);
+    } catch (error) {
+      if (!(error instanceof ActionError && error.code === "NOT_FOUND"))
+        throw error;
+    }
+  }
   return (
     <FloorDay
       data={data}
       today={localDate(new Date(), data.branch.timezone)}
-      selectedSpaceId={selected?.id}
-    />
+      selectedSpaceId={detail?.space.id}
+    >
+      {detail ? <SpaceDetail data={detail} /> : undefined}
+    </FloorDay>
   );
 }
 export default function FloorPage(props: Props) {
