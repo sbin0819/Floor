@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -39,8 +40,20 @@ type SelectionContext = {
   listPending: boolean;
   detailPending: boolean;
   detailCleared: boolean;
+  rememberSpaceTrigger: (element: HTMLAnchorElement, spaceId: string) => void;
+  restoreSpaceTrigger: () => void;
 };
 const FloorSelectionContext = createContext<SelectionContext | null>(null);
+function isVisibleLink(element: HTMLAnchorElement) {
+  for (
+    let node: HTMLElement | null = element;
+    node;
+    node = node.parentElement
+  ) {
+    if (node.hidden || node.style.display === "none") return false;
+  }
+  return true;
+}
 export function useFloorSelection() {
   return useContext(FloorSelectionContext);
 }
@@ -70,6 +83,36 @@ export function BranchWorkspace({
   );
   const requested = requestedSpaceId(searchValue(search, "space"));
   const branchId = params.branchId.toLowerCase();
+  const trigger = useRef<HTMLAnchorElement | null>(null);
+  const lastSpace = useRef<string | null>(null);
+  const rememberSpaceTrigger = useCallback(
+    (element: HTMLAnchorElement, spaceId: string) => {
+      trigger.current = element;
+      lastSpace.current = spaceId;
+    },
+    [],
+  );
+  const restoreSpaceTrigger = useCallback(() => {
+    const previous = trigger.current;
+    if (previous?.isConnected && isVisibleLink(previous)) {
+      previous.focus();
+      return;
+    }
+    if (lastSpace.current === null) return;
+    const link = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>(
+        '[aria-label="공간 목록"] a[href]',
+      ),
+    ).find(
+      (link) =>
+        isVisibleLink(link) &&
+        new URL(link.href).searchParams.get("space") === lastSpace.current,
+    );
+    link?.focus();
+  }, []);
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  if (dismissedKey !== null && dismissedKey !== locationKey)
+    setDismissedKey(null);
   const [clock, setClock] = useState<{
     branchId: string;
     today: string;
@@ -99,6 +142,7 @@ export function BranchWorkspace({
       if (key !== locationKey || (spaceId !== null && spaceId !== requested))
         return () => {};
       const registration = Symbol();
+      if (spaceId !== null) lastSpace.current = spaceId;
       setSelection({ key, spaceId, registration });
       return () =>
         setSelection((current) =>
@@ -108,7 +152,9 @@ export function BranchWorkspace({
     [locationKey, requested],
   );
   const selectedSpaceId =
-    selection?.key === locationKey ? selection.spaceId : null;
+    selection?.key === locationKey && dismissedKey !== locationKey
+      ? selection.spaceId
+      : null;
   const today = clock?.branchId === branchId ? clock.today : null;
   const date = today
     ? normalizeBookingDateForToday(searchValue(search, "date"), today)
@@ -119,6 +165,14 @@ export function BranchWorkspace({
     [floorId, date, selectedSpaceId],
   );
   const navigation = useOptimisticNavigation(base, navigateAction ?? route);
+  const changeLocation = navigation.change;
+  const change = useCallback<SelectionContext["change"]>(
+    (next, href, options) => {
+      setDismissedKey(next.spaceId === null ? locationKey : null);
+      changeLocation(next, href, options);
+    },
+    [locationKey, changeLocation],
+  );
   const floorChanged = navigation.value.floorId !== base.floorId;
   const dateChanged = base.date !== "" && navigation.value.date !== base.date;
   const spaceChanged = navigation.value.spaceId !== base.spaceId;
@@ -126,27 +180,33 @@ export function BranchWorkspace({
   const detailChanged =
     navigation.isPending && (floorChanged || dateChanged || spaceChanged);
   const detailPending = detailChanged && navigation.value.spaceId !== null;
-  const detailCleared = detailChanged && navigation.value.spaceId === null;
+  const detailCleared =
+    dismissedKey === locationKey ||
+    (detailChanged && navigation.value.spaceId === null);
   const value = useMemo(
     () => ({
       selectedSpaceId,
       register,
       registerNavigation,
       location: navigation.value,
-      change: navigation.change,
+      change,
       listPending,
       detailPending,
       detailCleared,
+      rememberSpaceTrigger,
+      restoreSpaceTrigger,
     }),
     [
       selectedSpaceId,
       register,
       registerNavigation,
       navigation.value,
-      navigation.change,
+      change,
       listPending,
       detailPending,
       detailCleared,
+      rememberSpaceTrigger,
+      restoreSpaceTrigger,
     ],
   );
   return (

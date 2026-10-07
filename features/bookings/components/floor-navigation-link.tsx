@@ -24,6 +24,15 @@ export function FloorNavigationLink({
       onClick={(event) => {
         if (!navigation || !shouldInterceptNavigation(event)) return;
         event.preventDefault();
+        if (
+          location.spaceId !== null &&
+          location.spaceId !== navigation.location.spaceId
+        ) {
+          navigation.rememberSpaceTrigger(
+            event.currentTarget,
+            location.spaceId,
+          );
+        }
         navigation.change(location, href, { replace });
       }}
     />

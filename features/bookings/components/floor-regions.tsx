@@ -19,7 +19,7 @@ export function EmptySpaceSelection() {
 export function FloorListRegion({ children }: { children: ReactNode }) {
   const pending = useFloorSelection()?.listPending ?? false;
   return (
-    <div>
+    <div className="min-h-0">
       {pending && <FloorSpaceListSkeleton />}
       <div hidden={pending}>{children}</div>
     </div>
@@ -31,13 +31,15 @@ export function FloorDetailRegion({ children }: { children: ReactNode }) {
   const pending = navigation?.detailPending ?? false;
   const cleared = navigation?.detailCleared ?? false;
   return (
-    <div>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       {cleared ? (
         <EmptySpaceSelection />
       ) : pending ? (
         <SpaceDetailSkeleton />
       ) : null}
-      <div hidden={pending || cleared}>{children}</div>
+      <div hidden={pending || cleared} className="min-h-0 flex-1">
+        {children}
+      </div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from "@/features/bookings/floor-selection";
 import { FloorDay } from "@/features/bookings/components/floor-day";
 import { SpaceDetail } from "@/features/bookings/components/space-detail";
+import { SpaceDetailContainer } from "@/features/bookings/components/space-detail-container";
 import { ResolvedSpaceSelection } from "@/features/bookings/components/branch-workspace";
 import {
   EmptySpaceSelection,
@@ -58,7 +59,11 @@ async function FloorDetailContent({
       selectionKey={selectionKey}
       spaceId={detail?.space.id ?? null}
     >
-      {detail ? <SpaceDetail data={detail} /> : <EmptySpaceSelection />}
+      <SpaceDetailContainer>
+        <FloorDetailRegion>
+          {detail ? <SpaceDetail data={detail} /> : <EmptySpaceSelection />}
+        </FloorDetailRegion>
+      </SpaceDetailContainer>
     </ResolvedSpaceSelection>
   );
 }
@@ -76,7 +81,7 @@ async function FloorContent({ params, searchParams }: Props) {
   );
   return (
     <PageContainer as="main" width="wide" className="pt-0">
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,25rem)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <FloorListRegion>
           <Suspense
             key={`${floorId}:${dateKey}`}
@@ -89,22 +94,22 @@ async function FloorContent({ params, searchParams }: Props) {
             />
           </Suspense>
         </FloorListRegion>
-        <FloorDetailRegion>
-          <Suspense
-            key={`${floorId}:${spaceId}:${dateKey}`}
-            fallback={
-              spaceId ? <SpaceDetailSkeleton /> : <EmptySpaceSelection />
-            }
-          >
-            <FloorDetailContent
-              branchId={branchId}
-              floorId={floorId}
-              date={query.date}
-              spaceId={spaceId}
-              selectionKey={selectionKey}
-            />
-          </Suspense>
-        </FloorDetailRegion>
+        <Suspense
+          key={`${floorId}:${spaceId}:${dateKey}`}
+          fallback={
+            <SpaceDetailContainer>
+              {spaceId ? <SpaceDetailSkeleton /> : <EmptySpaceSelection />}
+            </SpaceDetailContainer>
+          }
+        >
+          <FloorDetailContent
+            branchId={branchId}
+            floorId={floorId}
+            date={query.date}
+            spaceId={spaceId}
+            selectionKey={selectionKey}
+          />
+        </Suspense>
       </div>
     </PageContainer>
   );

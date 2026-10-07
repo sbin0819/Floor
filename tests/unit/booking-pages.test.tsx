@@ -12,6 +12,7 @@ import BranchPage from "@/app/(app)/branches/[branchId]/page";
 import FloorPage from "@/app/(app)/branches/[branchId]/floors/[floorId]/page";
 import { requirePageSession } from "@/lib/auth/session";
 import { ActionError } from "@/lib/actions/result";
+import { SpaceDetailContainer } from "@/features/bookings/components/space-detail-container";
 import {
   getBranchList,
   getBranchFloors,
@@ -40,6 +41,7 @@ vi.mock("@/features/bookings/components/my-bookings", () => ({
   MyBookings: () => null,
 }));
 vi.mock("next/navigation", () => ({
+  useParams: () => ({ branchId: "branch", floorId: "floor" }),
   notFound: () => {
     throw new Error("NOT_FOUND");
   },
@@ -99,7 +101,7 @@ async function floorRegions(
   )
     throw new Error("Expected optimistic list and detail regions");
   const list = listRegion.props.children;
-  const detail = detailRegion.props.children;
+  const detail = detailRegion;
   if (
     !isValidElement<SuspenseProps>(list) ||
     list.type !== Suspense ||
@@ -195,6 +197,10 @@ describe("booking page guards", () => {
       "2026-10-07",
     );
     expect(result.props.spaceId).toBe(selectedSpaceId);
+    const container = result.props.children;
+    expect(isValidElement(container) && container.type).toBe(
+      SpaceDetailContainer,
+    );
   });
   it("starts and completes detail while the independent floor list is still pending", async () => {
     const pending =
