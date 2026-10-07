@@ -1,0 +1,311 @@
+{
+  "note": "가상 데이터다. 공간 사진과 지점 대표 사진의 시드다. 사진은 저장소의 public/seed/photos/ 아래에 있는 그림 파일이고(1200x750, WebP), 이 프로젝트를 위해 직접 그린 것이다. spacePhotos의 photos는 순서대로 저장하고 첫 장이 대표 사진이다. 여기에 없는 공간(리뷰룸, 폰부스 S-1, 좌석 전부)은 사진이 없다. spaceId는 seed.json과 gangnam-7f.spaces.json의 공간 id다.",
+  "width": 1200,
+  "height": 750,
+  "branchCovers": [
+    {
+      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+      "name": "강남점",
+      "path": "/seed/photos/lobby-oak.webp",
+      "alt": "강남점 안내 데스크와 입구"
+    },
+    {
+      "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709",
+      "name": "성수점",
+      "path": "/seed/photos/lobby-sage.webp",
+      "alt": "성수점 안내 데스크와 입구"
+    }
+  ],
+  "spacePhotos": [
+    {
+      "spaceId": "9c200441-5d30-51ad-90df-85a14b7b40ab",
+      "name": "회의실 6A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-oak.webp",
+          "alt": "회의실 6A 화이트보드와 테이블"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-oak.webp",
+          "alt": "회의실 6A 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "4ad8994c-0567-513d-945f-3e2de1984423",
+      "name": "회의실 6B",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-sage.webp",
+          "alt": "회의실 6B 화이트보드와 테이블"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-sage.webp",
+          "alt": "회의실 6B 모니터와 화상회의 장비"
+        },
+        {
+          "path": "/seed/photos/meeting-large-sage.webp",
+          "alt": "회의실 6B 회의 테이블과 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "0a698faf-59df-5eca-898a-a0a942f5c086",
+      "name": "회의실 6C",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-slate.webp",
+          "alt": "회의실 6C 회의 테이블과 창가"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-slate.webp",
+          "alt": "회의실 6C 모니터와 화상회의 장비"
+        },
+        {
+          "path": "/seed/photos/meeting-small-slate.webp",
+          "alt": "회의실 6C 화이트보드와 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "0f79dd53-fbf4-5b1d-838e-1be7cfcd73f5",
+      "name": "폰부스 6-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-clay.webp",
+          "alt": "폰부스 6-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "c64cc409-ebf2-5ed1-90ab-e04f80237410",
+      "name": "폰부스 6-2",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-sand.webp",
+          "alt": "폰부스 6-2 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "a3e0a622-86cb-52d9-8f27-266a7bc8da45",
+      "name": "6층 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-sand.webp",
+          "alt": "6층 라운지 소파와 창가"
+        },
+        {
+          "path": "/seed/photos/pantry-sand.webp",
+          "alt": "6층 라운지 커피 머신과 바 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "400527fa-3c66-5cd4-a627-bf65ffb0dee2",
+      "name": "회의실 A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-clay.webp",
+          "alt": "회의실 A 회의 테이블과 창가"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-clay.webp",
+          "alt": "회의실 A 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "bf9a611a-92eb-5825-9188-5ef9b191ca91",
+      "name": "회의실 B",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-sage.webp",
+          "alt": "회의실 B 화이트보드와 테이블"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-sage.webp",
+          "alt": "회의실 B 모니터와 화상회의 장비"
+        },
+        {
+          "path": "/seed/photos/meeting-large-sage.webp",
+          "alt": "회의실 B 회의 테이블과 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "0495a219-c757-56ae-abda-4e212be70e5c",
+      "name": "회의실 C",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-oak.webp",
+          "alt": "회의실 C 회의 테이블과 창가"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-oak.webp",
+          "alt": "회의실 C 모니터와 화상회의 장비"
+        },
+        {
+          "path": "/seed/photos/meeting-small-oak.webp",
+          "alt": "회의실 C 화이트보드와 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "62719efa-1f4a-5896-85ab-1dc1e1bbcfb8",
+      "name": "회의실 D",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-slate.webp",
+          "alt": "회의실 D 화이트보드와 테이블"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-slate.webp",
+          "alt": "회의실 D 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "975b3531-6fdb-526d-b1ee-f364384b14db",
+      "name": "폰부스 1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-clay.webp",
+          "alt": "폰부스 1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "b242f462-f1bf-5b6d-b1b0-8055297d9dd1",
+      "name": "폰부스 2",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-sand.webp",
+          "alt": "폰부스 2 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "name": "오픈 데스크",
+      "photos": [
+        {
+          "path": "/seed/photos/open-desk-oak.webp",
+          "alt": "오픈 데스크 창가의 데스크 자리"
+        },
+        {
+          "path": "/seed/photos/focus-room-oak.webp",
+          "alt": "오픈 데스크 집중 자리의 책상과 선반"
+        }
+      ]
+    },
+    {
+      "spaceId": "dbe95225-e73b-5014-a8c2-1347496bda7b",
+      "name": "라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-sage.webp",
+          "alt": "라운지 소파와 창가"
+        },
+        {
+          "path": "/seed/photos/pantry-sage.webp",
+          "alt": "라운지 커피 머신과 바 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "11bdd550-2a39-52d2-874b-9b00599172ca",
+      "name": "세미나룸",
+      "photos": [
+        {
+          "path": "/seed/photos/seminar-slate.webp",
+          "alt": "세미나룸 발표 화면과 좌석"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-slate.webp",
+          "alt": "세미나룸 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "a58589df-bc23-5f96-a0fd-6a8c3fa5fa8e",
+      "name": "디자인 스튜디오",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-sand.webp",
+          "alt": "디자인 스튜디오 회의 테이블과 창가"
+        },
+        {
+          "path": "/seed/photos/meeting-small-sand.webp",
+          "alt": "디자인 스튜디오 화이트보드와 테이블"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-sand.webp",
+          "alt": "디자인 스튜디오 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "af2366cf-0106-58d8-a3ee-aece36a41899",
+      "name": "폰부스 8-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-sage.webp",
+          "alt": "폰부스 8-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "2c084c31-af0c-5fc1-941b-550d3ddcfb47",
+      "name": "회의실 S1",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-clay.webp",
+          "alt": "회의실 S1 화이트보드와 테이블"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-clay.webp",
+          "alt": "회의실 S1 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "ae77b7ea-029d-5547-8dba-b5c2b14e3297",
+      "name": "회의실 S2",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-sand.webp",
+          "alt": "회의실 S2 화이트보드와 테이블"
+        },
+        {
+          "path": "/seed/photos/meeting-screen-sand.webp",
+          "alt": "회의실 S2 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "a92f419a-aa80-516b-b6ab-3ddf75152266",
+      "name": "성수 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-clay.webp",
+          "alt": "성수 라운지 소파와 창가"
+        },
+        {
+          "path": "/seed/photos/pantry-clay.webp",
+          "alt": "성수 라운지 커피 머신과 바 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "f504dedf-a3ca-5be1-a46a-179e940cac98",
+      "name": "회의실 S3",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-sage.webp",
+          "alt": "회의실 S3 회의 테이블과 창가"
+        }
+      ]
+    }
+  ]
+}

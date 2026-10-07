@@ -76,6 +76,12 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | address | text | null 허용 |
 | timezone | text | not null, 기본값 `'Asia/Seoul'` |
 | open_hours | jsonb | not null, 기본값 `'{}'`. 요일별 운영 시간. 모양과 기본값은 `docs/spec/booking.md`의 "운영 시간". Drizzle 타입은 `OpenHours` |
+| cover_photo_path | text | null 허용. 지점의 대표 사진. 사이트 안의 경로 (`docs/spec/ui-2.md`의 "사진") |
+| cover_photo_alt | text | null 허용. 대표 사진의 대체 글 |
+
+- 대표 사진의 경로와 대체 글은 둘 다 있거나 둘 다 없다: check `(cover_photo_path is null) = (cover_photo_alt is null)` (이름 `branches_cover_photo_pair`)
+- 경로의 형식: check `cover_photo_path is null or (cover_photo_path ~ '^/[a-z0-9/_-]+\.(webp|png|jpg)$' and cover_photo_path !~ '//')` (이름 `branches_cover_photo_path_format`)
+- 대체 글의 길이: check `cover_photo_alt is null or char_length(cover_photo_alt) between 1 and 120` (이름 `branches_cover_photo_alt_length`)
 
 ### floors (층)
 
@@ -115,6 +121,25 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 - 같은 층의 보관되지 않은 공간은 이름이 유일하다 (대소문자 무시): `unique (floor_id, lower(name)) where archived_at is null` (이름 `spaces_floor_name_unique`)
 - `amenities`에는 `docs/spec/booking.md`의 여섯 개 키만 넣는다. DB가 아니라 저장할 때 서버에서 검사한다.
 - 인덱스: `(floor_id)`, `(parent_id)`
+
+### space_photos (공간 사진)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| id | uuid | PK |
+| space_id | uuid | not null, FK → spaces, on delete cascade |
+| path | text | not null. 사이트 안의 경로. 예: `/seed/photos/meeting-small-sage.webp` |
+| alt | text | not null. 대체 글 |
+| sort_order | integer | not null. 0부터. 0이 대표 사진이다 |
+
+- 한 공간에서 순서는 겹치지 않는다: `unique (space_id, sort_order)` (이름 `space_photos_space_order_unique`)
+- 순서의 범위: check `sort_order between 0 and 9` (이름 `space_photos_sort_order_range`). 공간 하나에 10장까지다
+- 경로의 형식: check `path ~ '^/[a-z0-9/_-]+\.(webp|png|jpg)$' and path !~ '//'` (이름 `space_photos_path_format`). 바깥 주소와 `..`가 들어갈 수 없다 (`.`은 확장자 앞에만 올 수 있다)
+- 대체 글의 길이: check `char_length(alt) between 1 and 120` (이름 `space_photos_alt_length`)
+- 사진의 크기는 저장하지 않는다. 화면이 가로세로 비율을 정하고 사진을 그 안에 채운다.
+- 같은 파일을 여러 공간이 가리킬 수 있다.
+- 누구에게 보이는지는 `docs/spec/ui-2.md`의 "사진"이 정한다. 공간의 이름을 볼 수 없는 사람에게는 사진도 내려보내지 않는다.
+- 인덱스: `(space_id, sort_order)`는 위의 unique가 겸한다
 
 ### floor_plans (평면도 버전)
 
@@ -308,7 +333,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 
 ## 테스트로 확인할 제약
 
-`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 17개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서 만든다.
+`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 20개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서, 18–20은 공간 사진 작업에서 만든다.
 
 1. 같은 공간에 시간이 겹치는 `confirmed` 예약 두 개는 들어가지 않는다 (`23P01`).
 2. 끝과 시작이 맞닿은 예약(10:00–11:00, 11:00–12:00)은 들어간다.
@@ -327,3 +352,6 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 15. `cancelled`인데 `cancelled_at`이 없는 예약, `confirmed`인데 `cancelled_at`이 있는 예약은 들어가지 않는다.
 16. 지점을 지우면 그 지점을 기본 지점으로 둔 사용자의 `default_branch_id`가 null이 된다.
 17. 같은 층에 대소문자만 다른 같은 이름의 공간 두 개는 들어가지 않는다. 앞의 공간이 보관된 뒤에는 들어간다. 다른 층에는 들어간다.
+18. 한 공간에 `sort_order`가 같은 사진 두 장은 들어가지 않는다. `sort_order`가 -1이거나 10인 사진은 들어가지 않는다. 공간을 지우면 그 공간의 사진도 지워진다.
+19. 경로가 `https://example.com/a.webp`, `//example.com/a.webp`, `/a/../b.webp`, `seed/a.webp`, `/a.gif`, `/A.webp`, `/seed/photos/awebp`, `/seed/photos/a_png`인 사진은 각각 들어가지 않는다. `/seed/photos/a-1.webp`는 들어간다. 뒤의 두 경우는 정규식의 `\.`이 "아무 글자"로 바뀌지 않았는지 확인한다 (Drizzle의 `sql` 템플릿에서는 `\\.`으로 써야 `\.`이 남는다). 대체 글이 빈 문자열이거나 121자인 사진은 들어가지 않는다.
+20. 지점의 대표 사진은 경로만 있거나 대체 글만 있으면 들어가지 않는다. 경로의 형식이 틀려도 들어가지 않는다.

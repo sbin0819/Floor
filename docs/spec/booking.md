@@ -39,11 +39,11 @@
 | 주소 | 내용 |
 | --- | --- |
 | `/` | 홈. "공간 예약하기" 카드를 더한다 |
-| `/booking` | 화면이 없다. 내 지점의 첫 층으로 보낸다 (`docs/spec/ui.md`) |
+| `/booking` | 화면이 없다. 내 지점의 첫 층으로 보낸다 (`docs/spec/ui.md`). 쿼리 `date`가 맞는 값이면 층 주소에 붙여 보낸다 (`docs/spec/ui-2.md`) |
 | `/branches` | 지점 목록. 카드를 누르면 그 지점으로 간다. 기본 지점은 "기본 지점으로 설정"으로 따로 정한다 |
 | `/branches/[branchId]` | 그 지점에서 내가 쓸 수 있는 첫 층으로 보낸다. 쓸 수 있는 층이 없으면 안내를 보여준다 |
-| `/branches/[branchId]/floors/[floorId]` | 공간 목록과 예약. 쿼리 `date`(YYYY-MM-DD), `space`(공간 id) |
-| `/bookings` | 내 예약 |
+| `/branches/[branchId]/floors/[floorId]` | 공간 목록과 예약. 쿼리 `date`(YYYY-MM-DD), `space`(공간 id), `view`(`list`, `timeline`) |
+| `/bookings` | 내 예약. 쿼리 `tab`(`past`), `view`(`calendar`), `month`(YYYY-MM), `day`(YYYY-MM-DD) |
 
 - 모두 `(app)` 그룹이고 모든 페이지가 `requirePageSession()`을 부른다.
 - 홈의 "공간 예약하기"가 가는 곳: `users.default_branch_id`가 있으면 그 지점, 없으면 내 팀을 이름순으로 봤을 때 `home_branch_id`가 있는 첫 팀의 지점, 그것도 없으면 `/branches`.
@@ -209,7 +209,7 @@ data: { branchId: string }
 
 ## 화면
 
-화면의 구성과 로딩 상태는 `docs/spec/ui.md`가 정하고, 이 절과 다르면 `docs/spec/ui.md`가 맞다. 이 절에는 첫 구현(지시서 05)의 기준이 남아 있다. 동작 규칙(무엇을 고를 수 있나, 무엇이 보이나, 실패했을 때의 문구)은 그대로 유효하다.
+화면의 구성과 로딩 상태는 `docs/spec/ui.md`와 `docs/spec/ui-2.md`가 정하고, 이 절과 다르면 그 문서들이 맞다 (둘이 다르면 `docs/spec/ui-2.md`). 이 절에는 첫 구현(지시서 05)의 기준이 남아 있다. 동작 규칙(무엇을 고를 수 있나, 무엇이 보이나, 실패했을 때의 문구)은 그대로 유효하다.
 
 `docs/design/floor-main.png`의 오른쪽 패널(공간 이름, 편의 시설, 오늘 일정, "개인으로 / 팀으로", 한도 안내, "예약하기")이 공간 상세의 기준이다. 가운데 평면도 자리에 공간 목록이 온다. 시안의 지점 선택, 층 탭, 날짜도 같은 자리에 둔다. 왼쪽의 팀 레일, 메시지, 알림, 검색, "평면도 / 리스트" 전환, "참석자 채팅방 함께 만들기"는 만들지 않는다.
 

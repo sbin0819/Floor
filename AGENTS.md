@@ -26,10 +26,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/04-seed.md` | 목 데이터와 관리자 계정 작업 지시서 (끝남) | 시드에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/05-booking.md` | 공간 찾기와 예약 작업 지시서 (끝남) | 예약에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/06-space-admin.md` | 운영자의 지점·층·공간 관리 작업 지시서 (끝남) | 운영자 공간 관리에서 왜 그렇게 했는지 확인할 때 |
-| `docs/codex/07-speed-and-loading.md` | 조회 속도, 공통 틀, 로딩 상태 작업 지시서 | 그 작업을 받았을 때 |
-| `docs/codex/08-member-screens.md` | 멤버 화면 다시 짜기 작업 지시서 | 그 작업을 받았을 때 |
-| `docs/codex/09-admin-auth-screens.md` | 운영자 화면과 로그인 화면 다듬기 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/07-speed-and-loading.md` | 조회 속도, 공통 틀, 로딩 상태 작업 지시서 (끝남) | 로딩과 속도에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/08-member-screens.md` | 멤버 화면 다시 짜기 작업 지시서 (끝남) | 멤버 화면에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/09-admin-auth-screens.md` | 운영자 화면과 로그인 화면 다듬기 작업 지시서 (끝남) | 그 화면에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/10-photos-and-look.md` | 공간 사진과 전체 인상 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/11-floor-timetable.md` | 층 화면: 날짜 달력, 시간표, 목록과 공간 상세 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/12-calendar-home-branches.md` | 내 예약 달력, 홈, 지점 목록 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/night-run-10-12.md` | 지시서 10–12를 사람 없이 이어서 돌릴 때의 규칙 (질문하지 않기, 하지 않는 것, 멈추는 때, 진행 기록) | 프롬프트가 이 문서를 가리킬 때 |
 | `docs/spec/ui.md` | 화면 구성, 로딩 상태(스켈레톤, 바뀌는 부분만 바꾸기), 조회 속도 예산, 화면별 구성과 문구 | 화면이나 조회 함수를 만질 때 |
+| `docs/spec/ui-2.md` | 화면 구성 2차: 공간 사진, 날짜 달력, 층 시간표, 내 예약 달력, 홈·지점 목록·공간 상세. `ui.md`와 다르면 이 문서가 맞다 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
 | `docs/spec/booking.md` | 지점 → 층 → 공간 → 예약 흐름, 사용자 행동별 데이터, 시간 규칙, 한도 | 공간 목록·예약을 만질 때 |
 | `docs/spec/space-admin.md` | 운영자가 지점·층·공간·이용 대상을 입력하는 규칙 | 운영자 화면을 만질 때 |
@@ -39,8 +44,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/spec/floor-plan.md` | 평면도 JSON 형식과 검증 규칙 | 평면도 스키마·렌더러·편집기를 만질 때 |
 | `docs/spec/design-tokens.md` | 색, 타이포, 간격, shadcn 변수 매핑 | UI를 만질 때 |
 | `docs/design/floor-*.png` | 처음 그린 화면 시안 9장, 다이어그램 4장 | 화면을 만들 때 참고 |
-| `docs/design/ui-*.png` | 지금 만드는 화면의 시안 11장 (홈, 지점, 층, 내 예약, 팀, 로딩, 좁은 화면). `docs/spec/ui.md`와 같이 본다 | 멤버 화면을 만들 때 |
-| `docs/jira-issues.md` | Jira 이슈 80개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
+| `docs/design/ui-*.png` | 07–09의 시안 11장 (홈, 지점, 층, 내 예약, 팀, 로딩, 좁은 화면). `docs/spec/ui.md`와 같이 본다 | 팀 화면과 로딩 상태를 볼 때 |
+| `docs/design/ui2-*.png` | 화면 구성 2차의 시안 7장 (층 시간표, 층 목록과 공간 상세, 날짜 달력, 내 예약 달력, 홈, 지점 목록, 좁은 화면). `docs/spec/ui-2.md`와 같이 본다. 같은 화면이 `ui-*.png`에도 있으면 이쪽이 맞다 | 멤버 화면을 만들 때 |
+| `docs/spec/examples/seed-photos.json`, `public/seed/photos/` | 공간 사진과 지점 대표 사진의 시드와 그림 파일 29개 | 사진을 만질 때 |
+| `docs/jira-issues.md` | Jira 이슈 90개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
 
 ## 기술 스택 (확정)
 
@@ -135,7 +142,8 @@ UI
 - 색은 `docs/spec/design-tokens.md`의 토큰만 쓴다. 컴포넌트에 hex 값을 직접 쓰지 않는다.
 - 색은 의미가 있을 때만 쓴다. 공간 상태(비어 있음, 사용 중, 내 예약, 점검 중, 전용 공간), 초대의 수락 대기, 강조 버튼 외에는 무채색이다.
 - 기본 컴포넌트는 shadcn/ui를 쓴다. 같은 역할의 컴포넌트를 새로 만들지 않는다.
-- 키보드로 모든 동작이 가능해야 하고, 포커스 표시를 없애지 않는다. 기본 컨트롤 높이는 44px이고, 더 작은 컨트롤은 누를 수 있는 영역을 44px로 넓힌다. 예외는 하나다: 공간 상세의 하루 일정에서 빈 칸은 1024px 이상의 패널에서 28px이다 (시트에서는 44px. `docs/spec/ui.md`).
+- 키보드로 모든 동작이 가능해야 하고, 포커스 표시를 없애지 않는다. 기본 컨트롤 높이는 44px이고, 더 작은 컨트롤은 누를 수 있는 영역을 44px로 넓힌다. 예외는 둘이다: 공간 상세의 하루 일정에서 빈 칸의 높이는 1024px 이상의 패널에서 28px이고(시트에서는 44px. `docs/spec/ui.md`), 층 시간표에서 빈 칸의 폭은 1024px 이상에서 34px이다(그보다 좁으면 44px. `docs/spec/ui-2.md`).
+- 사진은 `next/image`로 그리고 대체 글을 넣는다. 사진의 경로는 사이트 안의 경로만 받는다 (`docs/spec/ui-2.md`의 "사진"). 접근할 수 없는 공간의 사진을 내려보내지 않는다.
 - 시간과 숫자에는 `tabular-nums`를 쓴다.
 
 코드
@@ -158,7 +166,7 @@ Drizzle, Neon 드라이버, shadcn/ui, Storybook, Tailwind도 버전에 따라 �
 
 ## 로딩과 속도
 
-자세한 것은 `docs/spec/ui.md`에 있다. 화면이나 조회를 만질 때 언제나 지킨다.
+자세한 것은 `docs/spec/ui.md`에 있다. 화면이나 조회를 만질 때 언제나 지킨다. `docs/spec/ui-2.md`가 더하는 화면에도 똑같이 적용된다.
 
 - `<Suspense>`의 fallback은 그 자리에 올 내용과 같은 틀의 스켈레톤이다. 글자 한 줄짜리 fallback을 만들지 않는다.
 - 독립된 영역은 각자의 `<Suspense>`에서 따로 읽는다. 한 영역이 다른 영역의 조회를 기다리지 않는다.
