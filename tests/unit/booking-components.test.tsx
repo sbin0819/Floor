@@ -229,23 +229,37 @@ describe("navigation, lists and cancellation", () => {
       "aria-current",
     );
   });
-  it("stores the selected branch before navigating", async () => {
+  it("keeps navigation read-only and stores a default only through the separate button", async () => {
     const data = spaceDayFixture();
     display(
       <BranchList
         branches={[
-          { ...data.branch, isDefault: true, todayHours: data.openHours, accessibleFloorCount: 1, freeSpaceCount: 1, operatingState: getOperatingState(new Date(data.now), data.branch.timezone, data.branch.openHours) },
+          {
+            ...data.branch,
+            isDefault: false,
+            todayHours: data.openHours,
+            accessibleFloorCount: 1,
+            freeSpaceCount: 1,
+            operatingState: getOperatingState(
+              new Date(data.now),
+              data.branch.timezone,
+              data.branch.openHours,
+            ),
+          },
         ]}
       />,
     );
+    const link = screen.getByRole("link", { name: /가상 지점/ });
+    expect(link).toHaveAttribute("href", "/branches/branch");
+    expect(link.querySelector("button")).toBeNull();
+    expect(setDefaultBranch).not.toHaveBeenCalled();
     await userEvent.click(
-      screen.getByRole("button", { name: "가상 지점 선택" }),
+      screen.getByRole("button", { name: "가상 지점 기본 지점으로 설정" }),
     );
-    await waitFor(() =>
-      expect(navigation.push).toHaveBeenCalledWith("/branches/branch"),
-    );
+    await waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
+    expect(navigation.push).not.toHaveBeenCalled();
     expect(setDefaultBranch).toHaveBeenCalledWith({ branchId: "branch" });
-    expect(screen.getByText("기본 지점")).toBeVisible();
+    expect(screen.getByText("층 1개")).toBeVisible();
   });
   it("shows a restricted badge without rendering a space link and handles empty floors", () => {
     const data = floorDayFixture();

@@ -23,6 +23,7 @@ import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
 import { getRoleSettings, getSpaceForAccess, withTransaction } from "@/lib/dal";
 import { getBranch } from "@/lib/dal/branches";
+import { fillBookingDefaultBranch } from "@/lib/dal/booking-default-branch";
 import {
   insertBooking,
   listSpaceBlocks,
@@ -142,7 +143,7 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
               ).length
             )
               throw new ActionError("SPACE_BLOCKED");
-            return insertBooking(
+            const created = await insertBooking(
               {
                 spaceId: space.id,
                 userId: session.userId,
@@ -153,6 +154,12 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
               },
               transaction,
             );
+            await fillBookingDefaultBranch(
+              session.userId,
+              branch.id,
+              transaction,
+            );
+            return created;
           }, db);
           await publishBookingChange(space.floor.id, space.id, dependencies);
           return { bookingId: booking.id };
