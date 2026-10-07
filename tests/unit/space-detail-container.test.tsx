@@ -217,7 +217,7 @@ describe("single responsive space detail", () => {
     );
     const sheet = await screen.findByRole("dialog", { name: "공간 상세" });
     expect(sheet).toHaveAttribute("data-side", "bottom");
-    expect(sheet).toHaveClass("max-h-[85dvh]", "h-[85dvh]");
+    expect(sheet).toHaveClass("max-h-[85dvh]", "data-[side=bottom]:h-[85dvh]");
     expect(screen.getAllByTestId("single-detail")).toHaveLength(1);
     expect(
       document.querySelector('[data-space-detail-layout="panel"]'),

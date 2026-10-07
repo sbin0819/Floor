@@ -62,7 +62,7 @@ export function SpaceDetailContainer({
         side="bottom"
         showCloseButton={navigation?.detailPending ?? false}
         aria-describedby={undefined}
-        className="h-[85dvh] max-h-[85dvh] gap-0 overflow-hidden rounded-t-xl"
+        className="max-h-[85dvh] gap-0 overflow-hidden rounded-t-xl data-[side=bottom]:h-[85dvh]"
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           navigation?.restoreSpaceTrigger();

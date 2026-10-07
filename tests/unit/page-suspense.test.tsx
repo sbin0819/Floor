@@ -26,6 +26,7 @@ vi.mock("@/features/teams/queries", () => ({
   getTeamStartData: vi.fn(),
 }));
 vi.mock("@/features/admin/queries", () => ({ getOperatorHome: vi.fn() }));
+vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
 vi.mock("@/features/teams/components/team-home", () => ({
   TeamHome: () => null,
 }));
