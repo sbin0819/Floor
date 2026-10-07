@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type Ref } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +30,11 @@ export const accessLabels = {
 export function AccessEditor({
   data,
   space,
+  headingRef,
 }: {
   data: AdminFloorData;
   space?: AdminSpace;
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   const id = useId();
   const router = useRouter();
@@ -112,7 +114,13 @@ export function AccessEditor({
         );
       }}
     >
-      <h2 className="font-semibold">{space ? "공간" : "층"} 이용 대상</h2>
+      <h2
+        ref={headingRef}
+        tabIndex={headingRef ? -1 : undefined}
+        className="font-semibold focus-visible:rounded focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        {space ? "공간" : "층"} 이용 대상
+      </h2>
       {!data.permissions.editAccess && (
         <p className="text-muted-foreground">
           읽기 전용이에요. 이용 대상을 고칠 권한이 없어요

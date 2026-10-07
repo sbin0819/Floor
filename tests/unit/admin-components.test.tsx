@@ -332,7 +332,8 @@ describe("space table", () => {
     await userEvent.click(
       screen.getByRole("switch", { name: "보관된 공간 보기" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "고치기" }));
+    await userEvent.click(screen.getByRole("button", { name: "회의실 A 동작" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "고치기" }));
     expect(screen.getByLabelText("공간 이름")).toBeEnabled();
     await userEvent.click(
       screen.getByRole("button", { name: "공간 정보 저장" }),
@@ -355,7 +356,8 @@ describe("space table", () => {
     await userEvent.click(
       screen.getByRole("switch", { name: "보관된 공간 보기" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "되살리기" }));
+    await userEvent.click(screen.getByRole("button", { name: "회의실 A 동작" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "되살리기" }));
     expect(
       await screen.findByText("이 층에 같은 이름의 공간이 있어요"),
     ).toBeVisible();
@@ -369,7 +371,8 @@ describe("space table", () => {
       screen.getByRole("switch", { name: "보관된 공간 보기" }),
     );
     expect(screen.getByText("보관됨")).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: "되살리기" }));
+    await userEvent.click(screen.getByRole("button", { name: "회의실 A 동작" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "되살리기" }));
     await waitFor(() =>
       expect(restoreSpace).toHaveBeenCalledWith({ spaceId: adminIds.space }),
     );
@@ -380,7 +383,8 @@ describe("space table", () => {
       code: "SPACE_IN_USE",
     });
     display(<SpaceTable data={adminFloorFixture()} />);
-    await userEvent.click(screen.getByRole("button", { name: "보관" }));
+    await userEvent.click(screen.getByRole("button", { name: "회의실 A 동작" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "보관" }));
     expect(archiveSpace).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog");
     await userEvent.click(
@@ -398,15 +402,13 @@ describe("space table", () => {
       name: "회의실 B",
     });
     display(<SpaceTable data={data} />);
-    await userEvent.click(
-      screen.getAllByRole("button", { name: "고치기" })[0]!,
-    );
+    await userEvent.click(screen.getByRole("button", { name: "회의실 A 동작" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "고치기" }));
     await userEvent.clear(screen.getByLabelText("공간 이름"));
     await userEvent.type(screen.getByLabelText("공간 이름"), "남기지 않음");
     await userEvent.click(screen.getByRole("button", { name: "닫기" }));
-    await userEvent.click(
-      screen.getAllByRole("button", { name: "고치기" })[1]!,
-    );
+    await userEvent.click(screen.getByRole("button", { name: "회의실 B 동작" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "고치기" }));
     expect(screen.getByLabelText("공간 이름")).toHaveValue("회의실 B");
   });
 });
