@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { tstzrange } from "../range";
 import { createdAt, id } from "./common";
 import { bookingStatus } from "./enums";
@@ -23,12 +30,20 @@ export const bookings = pgTable(
     during: tstzrange("during").notNull(),
     title: text("title"),
     status: bookingStatus("status").notNull().default("confirmed"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
     createdAt: createdAt(),
   },
   (table) => [
     check(
       "bookings_during_valid",
       sql`NOT isempty(${table.during}) AND NOT lower_inf(${table.during}) AND NOT upper_inf(${table.during}) AND lower_inc(${table.during}) AND NOT upper_inc(${table.during})`,
+    ),
+    check(
+      "bookings_cancel_consistent",
+      sql`(${table.status} = 'cancelled') = (${table.cancelledAt} IS NOT NULL)`,
     ),
     index("bookings_user_id_idx").on(table.userId),
     index("bookings_team_id_idx").on(table.teamId),

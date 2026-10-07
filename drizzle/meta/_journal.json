@@ -36,6 +36,13 @@
       "when": 1791352575902,
       "tag": "0004_team-join",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791362098103,
+      "tag": "0005_booking-foundation",
+      "breakpoints": true
     }
   ]
 }

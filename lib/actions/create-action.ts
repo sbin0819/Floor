@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { getActionErrorCode } from "@/lib/actions/errors";
-import type { ActionResult } from "@/lib/actions/result";
+import { ActionError, type ActionResult } from "@/lib/actions/result";
 import { getSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
 
@@ -111,7 +111,20 @@ export function createAction<Input, Output>(
     } catch (error) {
       const code = getActionErrorCode(error);
       if (code === "INTERNAL") logError(error);
-      return { ok: false, code };
+      return {
+        ok: false,
+        code,
+        ...(error instanceof ActionError &&
+        code === "LIMIT_EXCEEDED" &&
+        error.details.message
+          ? { message: error.details.message }
+          : {}),
+        ...(error instanceof ActionError &&
+        code === "INVALID_INPUT" &&
+        error.details.fieldErrors
+          ? { fieldErrors: error.details.fieldErrors }
+          : {}),
+      };
     }
   };
 }

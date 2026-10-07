@@ -1,4 +1,7 @@
+import { PGlite } from "@electric-sql/pglite";
+import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { eq, sql } from "drizzle-orm";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
 import {
@@ -117,7 +120,14 @@ describe("database constraints from the real migrations", () => {
 
   it("3. permits a confirmed booking overlapping a cancelled booking", async () => {
     await database.db.insert(bookings).values([
-      { spaceId, userId, during, status: "cancelled" },
+      {
+        spaceId,
+        userId,
+        during,
+        status: "cancelled",
+        cancelledAt: during.start,
+        cancelledBy: userId,
+      },
       { spaceId, userId, during },
     ]);
     expect(await database.db.select().from(bookings)).toHaveLength(2);
@@ -382,6 +392,126 @@ describe("database constraints from the real migrations", () => {
     },
   );
 
+  it.each([
+    { status: "cancelled" as const, cancelledAt: null },
+    { status: "confirmed" as const, cancelledAt: during.start },
+  ])(
+    "15. rejects inconsistent cancellation audit fields: $status",
+    async (audit) => {
+      await expect(
+        database.db
+          .insert(bookings)
+          .values({ spaceId, userId, during, ...audit }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "bookings_cancel_consistent" },
+      });
+    },
+  );
+
+  it("15. permits matching cancellation timestamps and nullable historical actors", async () => {
+    await database.db.insert(bookings).values([
+      { spaceId, userId, during, status: "confirmed" },
+      {
+        spaceId,
+        userId,
+        during,
+        status: "cancelled",
+        cancelledAt: during.start,
+      },
+      {
+        spaceId,
+        userId,
+        during,
+        status: "cancelled",
+        cancelledAt: during.end,
+        cancelledBy: userId,
+      },
+    ]);
+    const rows = await database.db.select().from(bookings);
+    expect(rows).toHaveLength(3);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: "confirmed", cancelledAt: null }),
+        expect.objectContaining({
+          status: "cancelled",
+          cancelledAt: during.start,
+          cancelledBy: null,
+        }),
+        expect.objectContaining({
+          status: "cancelled",
+          cancelledAt: during.end,
+          cancelledBy: userId,
+        }),
+      ]),
+    );
+  });
+
+  it("15. keeps cancellation actors referentially intact", async () => {
+    const actorId = crypto.randomUUID();
+    const input = {
+      spaceId,
+      userId,
+      during,
+      status: "cancelled" as const,
+      cancelledAt: during.start,
+      cancelledBy: actorId,
+    };
+    await expect(
+      database.db.insert(bookings).values(input),
+    ).rejects.toMatchObject({
+      cause: { code: "23503", constraint: "bookings_cancelled_by_users_id_fk" },
+    });
+    await database.db.insert(users).values({
+      id: actorId,
+      email: "canceller@example.test",
+      name: "취소한 사람",
+    });
+    await database.db.insert(bookings).values(input);
+    await expect(
+      database.db.delete(users).where(eq(users.id, actorId)),
+    ).rejects.toMatchObject({
+      cause: { code: "23001", constraint: "bookings_cancelled_by_users_id_fk" },
+    });
+  });
+
+  it("16. clears a user's default branch when the branch is deleted", async () => {
+    const defaultBranchId = crypto.randomUUID();
+    await database.db.insert(branches).values({
+      id: defaultBranchId,
+      name: "기본 지점",
+    });
+    await database.db
+      .update(users)
+      .set({ defaultBranchId })
+      .where(eq(users.id, userId));
+    const [before] = await database.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+    expect(before?.defaultBranchId).toBe(defaultBranchId);
+    await database.db.delete(branches).where(eq(branches.id, defaultBranchId));
+    const [after] = await database.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+    expect(after?.defaultBranchId).toBeNull();
+    expect(after?.id).toBe(userId);
+  });
+
+  it("16. rejects a default branch that does not exist", async () => {
+    await expect(
+      database.db
+        .update(users)
+        .set({ defaultBranchId: crypto.randomUUID() })
+        .where(eq(users.id, userId)),
+    ).rejects.toMatchObject({
+      cause: {
+        code: "23503",
+        constraint: "users_default_branch_id_branches_id_fk",
+      },
+    });
+  });
+
   it("enforces both sides of the floor/published-plan circular reference", async () => {
     await expect(
       database.db
@@ -474,5 +604,82 @@ describe("database constraints from the real migrations", () => {
       "SELECT indexdef FROM pg_indexes WHERE indexname = 'space_blocks_space_id_during_idx'",
     );
     expect(result.rows[0]?.indexdef).toContain("USING gist (space_id, during)");
+  });
+});
+
+describe("booking foundation upgrade", () => {
+  it("backfills legacy cancelled rows before adding the cancellation check", async () => {
+    const client = new PGlite({ extensions: { btree_gist } });
+    try {
+      const migrations = readMigrationFiles({ migrationsFolder: "./drizzle" });
+      const upgradeIndex = migrations.findIndex(({ sql }) =>
+        sql.some((statement) =>
+          statement.includes('ADD CONSTRAINT "bookings_cancel_consistent"'),
+        ),
+      );
+      expect(upgradeIndex).toBeGreaterThan(0);
+      for (const migration of migrations.slice(0, upgradeIndex)) {
+        await client.transaction(async (transaction) => {
+          for (const statement of migration.sql)
+            await transaction.exec(statement);
+        });
+      }
+
+      const userId = crypto.randomUUID();
+      const branchId = crypto.randomUUID();
+      const floorId = crypto.randomUUID();
+      const spaceId = crypto.randomUUID();
+      const createdAt = new Date("2026-10-01T03:04:05Z");
+      await client.query(
+        "INSERT INTO users (id, name, email) VALUES ($1, $2, $3)",
+        [userId, "기존 사용자", "legacy@example.test"],
+      );
+      await client.query("INSERT INTO branches (id, name) VALUES ($1, $2)", [
+        branchId,
+        "기존 지점",
+      ]);
+      await client.query(
+        "INSERT INTO floors (id, branch_id, level, name) VALUES ($1, $2, 7, '7F')",
+        [floorId, branchId],
+      );
+      await client.query(
+        "INSERT INTO spaces (id, floor_id, type, name) VALUES ($1, $2, 'meeting_room', '기존 공간')",
+        [spaceId, floorId],
+      );
+      for (const status of ["cancelled", "confirmed"]) {
+        await client.query(
+          "INSERT INTO bookings (space_id, user_id, during, status, created_at) VALUES ($1, $2, tstzrange($3, $4, '[)'), $5, $6)",
+          [spaceId, userId, during.start, during.end, status, createdAt],
+        );
+      }
+      for (const migration of migrations.slice(upgradeIndex)) {
+        await client.transaction(async (transaction) => {
+          for (const statement of migration.sql)
+            await transaction.exec(statement);
+        });
+      }
+
+      const result = await client.query<{
+        status: string;
+        cancelled_at: Date | null;
+        cancelled_by: string | null;
+      }>(
+        "SELECT status, cancelled_at, cancelled_by FROM bookings ORDER BY status",
+      );
+      expect(result.rows).toEqual([
+        { status: "confirmed", cancelled_at: null, cancelled_by: null },
+        { status: "cancelled", cancelled_at: createdAt, cancelled_by: null },
+      ]);
+      await expect(
+        client.query(
+          "UPDATE bookings SET cancelled_at = NULL WHERE status = 'cancelled'",
+        ),
+      ).rejects.toMatchObject({
+        code: "23514",
+        constraint: "bookings_cancel_consistent",
+      });
+    } finally {
+      await client.close();
+    }
   });
 });

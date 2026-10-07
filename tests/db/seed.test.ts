@@ -155,6 +155,19 @@ describe("transactional development seed", () => {
     const rows = await database.db.select().from(bookings);
     expect(rows.filter(({ status }) => status === "confirmed")).toHaveLength(8);
     expect(rows.filter(({ status }) => status === "cancelled")).toHaveLength(1);
+    for (const fixture of fixtures.bookings) {
+      const actual = rows.find(({ id }) => id === fixture.id)!;
+      if (fixture.status === "cancelled") {
+        const actor = fixtures.users.find(
+          ({ key }) => key === fixture.cancelledByKey,
+        )!;
+        expect(actual.cancelledAt).toEqual(now);
+        expect(actual.cancelledBy).toBe((await user(actor.email)).id);
+      } else {
+        expect(actual.cancelledAt).toBeNull();
+        expect(actual.cancelledBy).toBeNull();
+      }
+    }
     expect(email.messages).toHaveLength(0);
   });
 
@@ -172,6 +185,9 @@ describe("transactional development seed", () => {
         fixture.dayOffset === 0 ? "2026-10-14" : "2026-10-15",
       );
       expect(localTime(actual.during.start, "Asia/Seoul")).toBe(fixture.start);
+      expect(actual.cancelledAt).toEqual(
+        fixture.status === "cancelled" ? later : null,
+      );
     }
   });
 

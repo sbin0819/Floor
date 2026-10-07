@@ -11,6 +11,8 @@ export type ActionErrorCode =
   | "ALREADY_MEMBER"
   | "ALREADY_REQUESTED"
   | "INVITE_INVALID"
+  | "OUTSIDE_HOURS"
+  | "SPACE_IN_USE"
   | "INTERNAL";
 
 export type ActionResult<T> =
@@ -22,8 +24,16 @@ export type ActionResult<T> =
       fieldErrors?: Record<string, string[]>;
     };
 
+export type ActionErrorDetails = {
+  message?: "per_booking" | "per_day" | "days_ahead";
+  fieldErrors?: Record<string, string[]>;
+};
+
 export class ActionError extends Error {
-  constructor(public readonly code: ActionErrorCode) {
+  constructor(
+    public readonly code: ActionErrorCode,
+    public readonly details: ActionErrorDetails = {},
+  ) {
     super(code);
     this.name = "ActionError";
   }

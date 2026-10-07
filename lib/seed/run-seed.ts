@@ -170,11 +170,9 @@ export async function runSeed({
         start,
         end,
         userKey,
-        cancelledByKey: _cancelledByKey,
+        cancelledByKey,
         ...booking
       } of data.bookings) {
-        // 취소 기록 컬럼은 예약 단계에서 추가하고 그때 이 참조를 저장한다.
-        void _cancelledByKey;
         current = `예약 ${booking.id}`;
         const during = {
           start: instant(booking.spaceId, dayOffset, start),
@@ -192,7 +190,16 @@ export async function runSeed({
           continue;
         }
         await seedDal.insertSeedBooking(
-          { ...booking, userId: userId(userKey), during },
+          {
+            ...booking,
+            userId: userId(userKey),
+            during,
+            cancelledAt: booking.status === "cancelled" ? now : null,
+            cancelledBy:
+              booking.status === "cancelled" && cancelledByKey
+                ? userId(cancelledByKey)
+                : null,
+          },
           database,
         );
       }

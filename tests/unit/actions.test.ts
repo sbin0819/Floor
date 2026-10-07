@@ -18,6 +18,67 @@ const session: Session = {
 const dependencies = { getSession: async () => session, logError: vi.fn() };
 
 describe("createAction", () => {
+  it.each(["per_booking", "per_day", "days_ahead"] as const)(
+    "returns a trusted quota reason %s",
+    async (message) => {
+      const action = createAction(
+        {
+          input: z.unknown(),
+          authorize: "none",
+          handler: () => {
+            throw new ActionError("LIMIT_EXCEEDED", { message });
+          },
+        },
+        dependencies,
+      );
+      expect(await action(null)).toEqual({
+        ok: false,
+        code: "LIMIT_EXCEEDED",
+        message,
+      });
+    },
+  );
+
+  it("returns trusted field details but never internal exception details", async () => {
+    const action = (error: unknown) =>
+      createAction(
+        {
+          input: z.unknown(),
+          authorize: "none",
+          handler: () => {
+            throw error;
+          },
+        },
+        dependencies,
+      );
+    expect(
+      await action(
+        new ActionError("INVALID_INPUT", {
+          fieldErrors: { name: ["이미 있는 이름이에요"] },
+        }),
+      )(null),
+    ).toEqual({
+      ok: false,
+      code: "INVALID_INPUT",
+      fieldErrors: { name: ["이미 있는 이름이에요"] },
+    });
+    expect(
+      await action(
+        new ActionError("INTERNAL", {
+          fieldErrors: { name: ["private"] },
+          message: "per_day",
+        }),
+      )(null),
+    ).toEqual({ ok: false, code: "INTERNAL" });
+    expect(
+      await action(
+        Object.assign(new Error("private"), {
+          details: { message: "per_day" },
+        }),
+      )(null),
+    ).toEqual({ ok: false, code: "INTERNAL" });
+  });
+
   it("authenticates, parses, authorizes, and executes in that order", async () => {
     const order: string[] = [];
     const action = createAction(
