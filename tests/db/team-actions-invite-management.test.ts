@@ -86,13 +86,11 @@ describe("team invitation management actions", () => {
       await database.db
         .insert(branchStaff)
         .values({ branchId: actors.branchId, userId: actors.operator.userId });
-      await database.db
-        .insert(roleSettings)
-        .values({
-          branchId: actors.branchId,
-          role: "user",
-          permissions: ["team.manage_members"],
-        });
+      await database.db.insert(roleSettings).values({
+        branchId: actors.branchId,
+        role: "user",
+        permissions: ["team.manage_members"],
+      });
       expect(await actions(actors[actor]).sendTeamInvite(input())).toEqual({
         ok: false,
         code: "FORBIDDEN",
@@ -155,17 +153,15 @@ describe("team invitation management actions", () => {
   });
 
   it("counts expired pending invitations toward fifty but allows replacing one", async () => {
-    await database.db
-      .insert(teamInvites)
-      .values(
-        Array.from({ length: 50 }, (_, index) => ({
-          teamId,
-          createdBy: actors.owner.userId,
-          email: `pending-${index}@example.test`,
-          token: `pending-token-${index}`,
-          expiresAt: new Date(0),
-        })),
-      );
+    await database.db.insert(teamInvites).values(
+      Array.from({ length: 50 }, (_, index) => ({
+        teamId,
+        createdBy: actors.owner.userId,
+        email: `pending-${index}@example.test`,
+        token: `pending-token-${index}`,
+        expiresAt: new Date(0),
+      })),
+    );
     expect(await actions().sendTeamInvite(input())).toEqual({
       ok: false,
       code: "LIMIT_EXCEEDED",

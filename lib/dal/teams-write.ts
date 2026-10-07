@@ -26,6 +26,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { normalizeTeamName } from "@/lib/teams/normalize";
+import { isQueryableInviteToken } from "@/lib/teams/invite-token";
 
 // FK의 KEY SHARE도 잠금에 참여하므로 사용자 전체를 먼저 같은 순서로 잠근다.
 async function lockUsers(userIds: string[], database: DalDatabase) {
@@ -347,6 +348,8 @@ async function respondToInvite(
   response: "accepted" | "declined",
   database?: TransactionDatabase,
 ) {
+  if (!isQueryableInviteToken(input.token))
+    throw new ActionError("INVITE_INVALID");
   return withTransaction(async (transaction) => {
     const [metadata] = await transaction
       .select({

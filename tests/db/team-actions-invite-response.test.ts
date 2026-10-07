@@ -11,6 +11,11 @@ import { eq } from "drizzle-orm";
 import { createInviteResponseActions } from "@/features/teams/invite-response-factory";
 import type { Session } from "@/lib/auth/types";
 import {
+  acceptTeamInvite,
+  declineTeamInvite,
+  getInviteForRecipient,
+} from "@/lib/dal";
+import {
   teamInvites,
   teamJoinRequests,
   teamMembers,
@@ -34,14 +39,12 @@ describe("received team invitation actions", () => {
     actors = await seedTeamActors(database);
     teamId = (await seedTeam(database, actors.owner)).id;
     token = crypto.randomUUID();
-    await database.db
-      .insert(teamInvites)
-      .values({
-        token,
-        teamId,
-        createdBy: actors.owner.userId,
-        email: actors.outsider.email,
-      });
+    await database.db.insert(teamInvites).values({
+      token,
+      teamId,
+      createdBy: actors.owner.userId,
+      email: actors.outsider.email,
+    });
   });
   const actions = (session: Session | null = actors.outsider) =>
     createInviteResponseActions({
@@ -114,6 +117,58 @@ describe("received team invitation actions", () => {
       );
     },
   );
+
+  it.each([
+    { label: "NUL", suffix: "\u0000" },
+    { label: "embedded NUL", suffix: "\u0000suffix" },
+    { label: "line break", suffix: "\n" },
+    { label: "unpaired surrogate", suffix: "\ud800" },
+    { label: "non-ASCII character", suffix: "한" },
+  ])(
+    "returns INVITE_INVALID for a malformed token with $label",
+    async ({ suffix }) => {
+      for (const action of Object.values(actions())) {
+        expect(await action({ token: `${token}${suffix}` })).toEqual({
+          ok: false,
+          code: "INVITE_INVALID",
+        });
+      }
+      expect((await database.db.select().from(teamInvites))[0]).toMatchObject({
+        acceptedAt: null,
+        declinedAt: null,
+      });
+    },
+  );
+
+  it("guards direct DAL reads and both writes before starting token database work", async () => {
+    const select = vi.spyOn(database.db, "select");
+    const transaction = vi.spyOn(database.db, "transaction");
+    try {
+      for (const suffix of ["\u0000", "\u0000suffix", "\n", "\ud800", "한"]) {
+        const invalidToken = `${token}${suffix}`;
+        await expect(
+          getInviteForRecipient(
+            invalidToken,
+            actors.outsider.email,
+            database.db,
+          ),
+        ).resolves.toBeNull();
+        for (const write of [acceptTeamInvite, declineTeamInvite]) {
+          await expect(
+            write(
+              { token: invalidToken, userId: actors.outsider.userId },
+              database.db,
+            ),
+          ).rejects.toMatchObject({ code: "INVITE_INVALID" });
+        }
+      }
+      expect(select).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      select.mockRestore();
+      transaction.mockRestore();
+    }
+  });
 
   it("rejects a different email and does not trust a forged session email", async () => {
     expect(await actions(actors.member).acceptTeamInvite({ token })).toEqual({

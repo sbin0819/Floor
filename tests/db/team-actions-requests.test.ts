@@ -125,13 +125,11 @@ describe("team join request actions", () => {
       await database.db
         .insert(branchStaff)
         .values({ branchId: actors.branchId, userId: actors.operator.userId });
-      await database.db
-        .insert(roleSettings)
-        .values({
-          branchId: actors.branchId,
-          role: "user",
-          permissions: ["team.manage_members"],
-        });
+      await database.db.insert(roleSettings).values({
+        branchId: actors.branchId,
+        role: "user",
+        permissions: ["team.manage_members"],
+      });
       const input = await requestedBy();
       expect(
         await actions(actors[actor]).approveTeamJoinRequest(input),
@@ -220,14 +218,12 @@ describe("team join request actions", () => {
 
   it("accepts the matching pending invite in the approval transaction", async () => {
     const input = await requestedBy();
-    await database.db
-      .insert(teamInvites)
-      .values({
-        teamId,
-        createdBy: actors.owner.userId,
-        email: actors.outsider.email,
-        token: "request-approval-invite",
-      });
+    await database.db.insert(teamInvites).values({
+      teamId,
+      createdBy: actors.owner.userId,
+      email: actors.outsider.email,
+      token: "request-approval-invite",
+    });
     expect((await actions(actors.owner).approveTeamJoinRequest(input)).ok).toBe(
       true,
     );

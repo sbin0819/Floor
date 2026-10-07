@@ -18,16 +18,14 @@ export async function seedTeamActors(database: TestDatabase) {
     unverified: actor("unverified"),
     operator: actor("operator"),
   };
-  await database.db
-    .insert(users)
-    .values(
-      Object.values(actors).map((session) => ({
-        id: session.userId,
-        name: session.name,
-        email: session.email,
-        emailVerified: session !== actors.unverified,
-      })),
-    );
+  await database.db.insert(users).values(
+    Object.values(actors).map((session) => ({
+      id: session.userId,
+      name: session.name,
+      email: session.email,
+      emailVerified: session !== actors.unverified,
+    })),
+  );
   const branchId = crypto.randomUUID();
   await database.db
     .insert(branches)
@@ -52,13 +50,11 @@ export async function seedTeam(
     })
     .returning();
   if (!team) throw new Error("Expected a fixture team.");
-  await database.db
-    .insert(teamMembers)
-    .values({
-      teamId: team.id,
-      userId: owner.userId,
-      role: "admin",
-      title: "팀장",
-    });
+  await database.db.insert(teamMembers).values({
+    teamId: team.id,
+    userId: owner.userId,
+    role: "admin",
+    title: "팀장",
+  });
   return team;
 }

@@ -12,6 +12,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { normalizeTeamName } from "@/lib/teams/normalize";
+import { isQueryableInviteToken } from "@/lib/teams/invite-token";
 
 export function pendingInvite() {
   return and(
@@ -184,6 +185,7 @@ export async function getInviteForRecipient(
   email: string,
   database: DalDatabase = getDb(),
 ) {
+  if (!isQueryableInviteToken(token)) return null;
   const [invite] = await database
     .select(receivedFields)
     .from(teamInvites)

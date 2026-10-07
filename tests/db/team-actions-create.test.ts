@@ -105,6 +105,16 @@ describe("team creation actions", () => {
     expect(await database.db.select().from(teams)).toHaveLength(0);
   });
 
+  it("prioritizes a duplicate team name over the existing five-team limit", async () => {
+    for (let index = 0; index < 5; index++)
+      await seedTeam(database, actors.owner, `가상 팀 ${index}`);
+    expect(await actions().createTeam(input("가상 팀 0"))).toEqual({
+      ok: false,
+      code: "TEAM_NAME_TAKEN",
+    });
+    expect(await database.db.select().from(teams)).toHaveLength(5);
+  });
+
   it("allows an omitted branch when no branches exist", async () => {
     await database.db.delete(branches).where(eq(branches.id, actors.branchId));
     expect(
