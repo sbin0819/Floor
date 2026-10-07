@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createAction } from "@/lib/actions/create-action";
-import { getActionErrorCode } from "@/lib/actions/errors";
+import { getActionErrorCode, getPostgresError } from "@/lib/actions/errors";
 import {
   ActionError,
   type ActionErrorCode,
@@ -271,6 +271,31 @@ describe("createAction", () => {
     });
     expect(logError).toHaveBeenCalledOnce();
   });
+
+  it("never logs raw SQL, invitation tokens, email, or contact details by default", async () => {
+    const output = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const action = createAction(
+        {
+          input: z.string(),
+          authorize: "none",
+          handler: () => {
+            throw new Error(
+              "SQL token=private-invite recipient@example.test 01012345678",
+            );
+          },
+        },
+        { getSession: async () => session },
+      );
+      await expect(action("valid")).resolves.toEqual({
+        ok: false,
+        code: "INTERNAL",
+      });
+      expect(output).toHaveBeenCalledExactlyOnceWith("Server action failed.");
+    } finally {
+      output.mockRestore();
+    }
+  });
 });
 
 describe("getActionErrorCode", () => {
@@ -283,6 +308,10 @@ describe("getActionErrorCode", () => {
     "SPACE_BLOCKED",
     "LIMIT_EXCEEDED",
     "PLAN_INVALID",
+    "TEAM_NAME_TAKEN",
+    "ALREADY_MEMBER",
+    "ALREADY_REQUESTED",
+    "INVITE_INVALID",
     "INTERNAL",
   ])("preserves %s domain errors", (code) => {
     expect(getActionErrorCode(new ActionError(code))).toBe(code);
@@ -305,5 +334,27 @@ describe("getActionErrorCode", () => {
     expect(getActionErrorCode(error)).toBe("INTERNAL");
     expect(getActionErrorCode(null)).toBe("INTERNAL");
     expect(getActionErrorCode("failure")).toBe("INTERNAL");
+  });
+
+  it.each([
+    ["teams_name_unique", "TEAM_NAME_TAKEN"],
+    ["team_join_requests_one_pending", "ALREADY_REQUESTED"],
+    ["team_invites_one_pending", "INTERNAL"],
+    ["unknown", "INTERNAL"],
+  ])(
+    "maps only the allowlisted unique constraint %s",
+    (constraint, expected) => {
+      const error = new Error("sensitive SQL", {
+        cause: { cause: { code: "23505", constraint } },
+      });
+      expect(getActionErrorCode(error)).toBe(expected);
+      expect(getPostgresError(error)).toEqual({ code: "23505", constraint });
+    },
+  );
+  it("does not map constraint names without a matching SQLSTATE", () => {
+    expect(
+      getActionErrorCode({ code: "23503", constraint: "teams_name_unique" }),
+    ).toBe("INTERNAL");
+    expect(getPostgresError(new Error("23505 teams_name_unique"))).toBeNull();
   });
 });

@@ -5,6 +5,13 @@ import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
 import { branches, branchStaff } from "@/lib/db/schema";
 
+export function listBranches(database: DalDatabase = getDb()) {
+  return database
+    .select({ id: branches.id, name: branches.name })
+    .from(branches)
+    .orderBy(asc(branches.name), asc(branches.id));
+}
+
 export async function getOperatorBranches(
   userId: string,
   database: DalDatabase = getDb(),

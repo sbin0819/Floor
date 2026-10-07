@@ -7,6 +7,10 @@ export type ActionErrorCode =
   | "SPACE_BLOCKED"
   | "LIMIT_EXCEEDED"
   | "PLAN_INVALID"
+  | "TEAM_NAME_TAKEN"
+  | "ALREADY_MEMBER"
+  | "ALREADY_REQUESTED"
+  | "INVITE_INVALID"
   | "INTERNAL";
 
 export type ActionResult<T> =

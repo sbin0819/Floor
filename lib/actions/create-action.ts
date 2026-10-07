@@ -46,7 +46,7 @@ export type ActionDependencies = {
 
 const defaultDependencies: ActionDependencies = {
   getSession,
-  logError: (error) => console.error("Server action failed:", error),
+  logError: () => console.error("Server action failed."),
 };
 
 export function createAction<Input, Output>(
