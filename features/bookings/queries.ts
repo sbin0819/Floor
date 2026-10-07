@@ -13,8 +13,8 @@ export async function getHomeFreeSpaces() {
 export async function getHomeBookingLimits() {
   return createBookingQueries().getHomeBookingLimits();
 }
-export async function getBookingDestination() {
-  return createBookingQueries().getBookingDestination();
+export async function getBookingDestination(date?: unknown) {
+  return createBookingQueries().getBookingDestination(date);
 }
 
 export async function getBranchList() {

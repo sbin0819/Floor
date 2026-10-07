@@ -248,7 +248,7 @@ export function createBookingQueries(
       const session = await readSession();
       return (await resolveBookingBranch(session.userId, db))?.id ?? null;
     },
-    async getBookingDestination(): Promise<string> {
+    async getBookingDestination(date?: unknown): Promise<string> {
       const session = await readSession();
       const branch = await resolveBookingBranch(session.userId, db);
       if (!branch) return "/branches";
@@ -259,9 +259,13 @@ export function createBookingQueries(
       const floor = can(context, "floor.view", { branchId: branch.id })
         ? floors.find((floor) => canAccessFloor(context, floor))
         : undefined;
-      return floor
-        ? `/branches/${branch.id}/floors/${floor.id}`
-        : `/branches/${branch.id}`;
+      if (!floor) return `/branches/${branch.id}`;
+      const query =
+        typeof date === "string" &&
+        normalizeBookingDate(date, now(), branch.timezone) === date
+          ? `?date=${date}`
+          : "";
+      return `/branches/${branch.id}/floors/${floor.id}${query}`;
     },
     async getHomeHeader(): Promise<HomeHeaderData> {
       const session = await readSession();
