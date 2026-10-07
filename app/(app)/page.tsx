@@ -9,6 +9,8 @@ import {
   getHomeUpcomingBookings,
   getHomeFreeSpaces,
   getHomeBookingLimits,
+  getHomeWeekBookings,
+  getHomeFrequentSpaces,
 } from "@/features/bookings/queries";
 import {
   HomeHeader,
@@ -17,6 +19,10 @@ import {
   HomeBookingLimits,
   HomeTeams,
 } from "@/features/bookings/components/home-dashboard";
+import {
+  HomeWeekBookings,
+  HomeFrequentSpaces,
+} from "@/features/bookings/components/home-secondary-cards";
 import {
   HomeDashboardSkeleton,
   HomeHeaderSkeleton,
@@ -36,6 +42,12 @@ async function FreeSpaces() {
 }
 async function Limits() {
   return <HomeBookingLimits data={await getHomeBookingLimits()} />;
+}
+async function WeekBookings() {
+  return <HomeWeekBookings data={await getHomeWeekBookings()} />;
+}
+async function FrequentSpaces() {
+  return <HomeFrequentSpaces data={await getHomeFrequentSpaces()} />;
 }
 async function Teams() {
   return <HomeTeams data={await getHomeTeams()} />;
@@ -67,8 +79,14 @@ async function HomeContent() {
           <Suspense fallback={<HomeCardSkeleton rows={4} photo />}>
             <FreeSpaces />
           </Suspense>
+          <Suspense fallback={<HomeCardSkeleton rows={3} photo />}>
+            <FrequentSpaces />
+          </Suspense>
         </div>
         <div className="space-y-6">
+          <Suspense fallback={<HomeCardSkeleton rows={7} />}>
+            <WeekBookings />
+          </Suspense>
           <Suspense fallback={<HomeCardSkeleton rows={1} />}>
             <Limits />
           </Suspense>

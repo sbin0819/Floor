@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import { PageHeading } from "@/components/page-container";
 import { SpacePhoto } from "@/components/photos/space-photo";
-import { Badge } from "@/components/ui/badge";
+import { StatusLine } from "@/components/status-line";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { AvailabilityBar } from "./availability-bar";
@@ -11,17 +11,16 @@ import {
   floorHref,
   formatAvailabilityUntil,
   formatBookingDate,
-  formatBookingTime,
 } from "@/features/bookings/format";
 import type {
   HomeHeaderData,
-  HomeUpcomingBookingsData,
   HomeFreeSpacesData,
   HomeBookingLimitsData,
 } from "@/features/bookings/types";
 import type { HomeTeamsData } from "@/features/teams/types";
 import { addDays, localDate, localTime } from "@/lib/time/zoned";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
+export { HomeNextBooking as HomeUpcomingBookings } from "./home-next-booking";
 
 const linkClass =
   "inline-flex min-h-11 items-center gap-1 rounded-lg text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring";
@@ -49,15 +48,6 @@ function HomeCard({
     </section>
   );
 }
-function BookingLink() {
-  return (
-    <Link href="/booking" className={linkClass}>
-      공간 예약하기
-      <ChevronRight aria-hidden="true" className="size-4" />
-    </Link>
-  );
-}
-
 export function HomeHeader({ data }: { data: HomeHeaderData }) {
   const date = formatBookingDate(
     data.date,
@@ -86,98 +76,6 @@ export function HomeHeader({ data }: { data: HomeHeaderData }) {
         </Button>
       }
     />
-  );
-}
-
-export function HomeUpcomingBookings({
-  data,
-}: {
-  data: HomeUpcomingBookingsData;
-}) {
-  return (
-    <HomeCard
-      title="다가오는 내 예약"
-      action={
-        <Link className={linkClass} href="/bookings">
-          내 예약 모두 보기
-          <ChevronRight aria-hidden="true" className="size-4" />
-        </Link>
-      }
-    >
-      {data.bookings.length ? (
-        <ul className="-mx-5 divide-y divide-border">
-          {data.bookings.map((booking) => {
-            const now = new Date(data.now);
-            const today = localDate(now, booking.timezone);
-            const current =
-              Date.parse(booking.start) <= now.getTime() &&
-              now.getTime() < Date.parse(booking.end);
-            const dateLabel =
-              booking.date === today
-                ? null
-                : `${booking.date === addDays(today, 1) ? "내일 · " : ""}${formatBookingDate(booking.date, booking.timezone)}`;
-            return (
-              <li key={booking.id}>
-                <Link
-                  className={rowClass}
-                  href={floorHref(
-                    booking.branchId,
-                    booking.floorId,
-                    booking.date,
-                    booking.spaceId,
-                  )}
-                >
-                  <SpacePhoto
-                    photo={booking.photo}
-                    type={booking.spaceType}
-                    decorative
-                  />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-wrap items-center gap-3">
-                      {current ? (
-                        <Badge className="bg-status-mine text-status-mine-foreground">
-                          지금 이용 중
-                        </Badge>
-                      ) : (
-                        dateLabel && (
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            {dateLabel}
-                          </span>
-                        )
-                      )}
-                      <span className="font-medium tabular-nums">
-                        {formatBookingTime(
-                          booking.start,
-                          booking.end,
-                          booking.timezone,
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-medium">{booking.spaceName}</span>
-                      <ChevronRight
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-muted-foreground"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {booking.branchName} · {booking.floorName} ·{" "}
-                      {booking.teamName ?? "개인"}
-                      {booking.title && ` · ${booking.title}`}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-muted-foreground">예약이 아직 없어요</p>
-          <BookingLink />
-        </div>
-      )}
-    </HomeCard>
   );
 }
 
@@ -264,6 +162,7 @@ export function HomeFreeSpaces({ data }: { data: HomeFreeSpacesData }) {
                       <SpacePhoto
                         photo={space.photo}
                         type={space.type}
+                        size={{ width: 60, height: 44 }}
                         decorative
                       />
                       <div className="min-w-0 flex-1 space-y-2">
@@ -293,7 +192,7 @@ export function HomeFreeSpaces({ data }: { data: HomeFreeSpacesData }) {
                             showTicks={false}
                           />
                         )}
-                        <p className="text-sm text-status-free-foreground tabular-nums">
+                        <StatusLine kind="free" className="tabular-nums">
                           {formatAvailabilityUntil(
                             space.freeUntil,
                             data.date,
@@ -301,7 +200,7 @@ export function HomeFreeSpaces({ data }: { data: HomeFreeSpacesData }) {
                             { midnightAs24: true },
                           )}{" "}
                           비어 있음
-                        </p>
+                        </StatusLine>
                       </div>
                     </Link>
                   </li>
@@ -351,7 +250,7 @@ export function HomeBookingLimits({
     <HomeCard title="오늘 예약 한도">
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3 tabular-nums">
-          <strong className="font-semibold">
+          <strong className="text-2xl font-bold">
             {minutesLabel(data.remainingMinutes)} 남음
           </strong>
           <div

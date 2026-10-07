@@ -17,6 +17,8 @@ import {
   getHomeUpcomingBookings,
   getHomeFreeSpaces,
   getHomeBookingLimits,
+  getHomeWeekBookings,
+  getHomeFrequentSpaces,
   getBookingDestination,
 } from "@/features/bookings/queries";
 import { getOperatingState } from "@/features/bookings/operating-state";
@@ -26,11 +28,14 @@ import { spaceDayFixture } from "./booking-ui-fixtures";
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("@/features/teams/queries", () => ({ getHomeTeams: vi.fn() }));
 vi.mock("@/features/auth/queries", () => ({ getAccountMenuData: vi.fn() }));
+vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
 vi.mock("@/features/bookings/queries", () => ({
   getHomeHeader: vi.fn(),
   getHomeUpcomingBookings: vi.fn(),
   getHomeFreeSpaces: vi.fn(),
   getHomeBookingLimits: vi.fn(),
+  getHomeWeekBookings: vi.fn(),
+  getHomeFrequentSpaces: vi.fn(),
   getBookingDestination: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
@@ -93,6 +98,14 @@ beforeEach(() => {
     spaces: [],
   });
   vi.mocked(getHomeBookingLimits).mockResolvedValue(null);
+  vi.mocked(getHomeWeekBookings).mockResolvedValue({
+    now: detail.now,
+    today: detail.date,
+    timezone: "Asia/Seoul",
+    openHours: null,
+    days: [],
+  });
+  vi.mocked(getHomeFrequentSpaces).mockResolvedValue({ spaces: [] });
   vi.mocked(getHomeTeams).mockResolvedValue({
     teams: [],
     pendingInviteCount: 2,
@@ -260,7 +273,7 @@ it("does not invent an opening for an entirely closed branch", async () => {
   expect(screen.getByText("운영 예정 시간이 없어요")).toBeVisible();
 });
 
-it("keeps all six server reads in separate Suspense regions after the direct page guard", async () => {
+it("keeps all eight server reads in separate Suspense regions after the direct page guard", async () => {
   const page = await resolvePageContent(Home());
   const boundaries: ReactNode[] = [];
   function visit(node: ReactNode) {
@@ -269,12 +282,14 @@ it("keeps all six server reads in separate Suspense regions after the direct pag
     else Children.forEach(node.props.children, visit);
   }
   visit(page);
-  expect(boundaries).toHaveLength(6);
+  expect(boundaries).toHaveLength(8);
   expect(requirePageSession).toHaveBeenCalledExactlyOnceWith("/");
   expect(getHomeHeader).not.toHaveBeenCalled();
   expect(getHomeUpcomingBookings).not.toHaveBeenCalled();
   expect(getHomeFreeSpaces).not.toHaveBeenCalled();
   expect(getHomeBookingLimits).not.toHaveBeenCalled();
+  expect(getHomeWeekBookings).not.toHaveBeenCalled();
+  expect(getHomeFrequentSpaces).not.toHaveBeenCalled();
   expect(getHomeTeams).not.toHaveBeenCalled();
 });
 

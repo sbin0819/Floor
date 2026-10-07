@@ -161,16 +161,21 @@ describe("photos in existing member screens", () => {
     const data = { now: "2026-10-07T01:10:00Z", upcoming: [booking], past: [] };
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <HomeUpcomingBookings data={{ now: data.now, bookings: [booking] }} />
+        <HomeUpcomingBookings
+          data={{ now: data.now, bookings: [{ ...booking, canCancel: true }] }}
+        />
         <MyBookings data={data} />
       </QueryClientProvider>,
     );
-    const upcoming = screen.getByRole("region", { name: "다가오는 내 예약" });
+    const upcoming = screen.getByRole("region", { name: "다음 예약" });
+    expect(upcoming.querySelector("img")).toHaveAttribute("alt", "");
+    expect(upcoming.querySelector("img")).toHaveAttribute("loading", "eager");
     expect(
-      within(upcoming)
-        .getByRole("link", { name: /회의실 C/ })
-        .querySelector("img"),
-    ).toHaveAttribute("alt", "");
+      within(upcoming).getByRole("link", { name: "일정 보기" }),
+    ).toHaveAttribute(
+      "href",
+      "/branches/branch/floors/floor?date=2026-10-07&space=space",
+    );
     const history = screen.getByRole("main");
     expect(history.querySelector("img")).toHaveAttribute("alt", "");
     expect(history.querySelector("img")).toHaveAttribute("loading", "lazy");
