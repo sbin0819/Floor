@@ -237,6 +237,11 @@
     button[data-booking-slot]::before {
       height: 28px;
     }
+    /* 시간표의 34px 열끼리 확장 클릭 영역이 겹치지 않게 한다. */
+    button[data-floor-timetable-slot]::before {
+      width: 100%;
+      height: 100%;
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     *,
