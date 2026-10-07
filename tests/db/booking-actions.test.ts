@@ -117,6 +117,44 @@ describe("booking creation and default branch actions", () => {
     ]);
   });
 
+  it("canonicalizes uppercase space and team UUIDs before team authorization", async () => {
+    const result = await actions(fixture.member).createBooking(
+      bookingInput(fixture, {
+        spaceId: fixture.restrictedSpaceId.toUpperCase(),
+        teamId: fixture.teamId.toUpperCase(),
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(await database.db.select().from(bookings)).toMatchObject([
+      {
+        userId: fixture.member.userId,
+        teamId: fixture.teamId,
+        spaceId: fixture.restrictedSpaceId,
+      },
+    ]);
+  });
+
+  it.each(["\0제목", "앞\0뒤", "제목\0"])(
+    "rejects NUL in a booking title before any database write: %j",
+    async (title) => {
+      const logError = vi.fn();
+      const publish = vi.fn();
+      expect(
+        await actions(fixture.person, {
+          logError,
+          publisher: { publish },
+        }).createBooking(bookingInput(fixture, { title })),
+      ).toMatchObject({
+        ok: false,
+        code: "INVALID_INPUT",
+        fieldErrors: { title: [expect.any(String)] },
+      });
+      expect(await database.db.select().from(bookings)).toHaveLength(0);
+      expect(logError).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    },
+  );
+
   it("checks the session before invalid input", async () => {
     expect(await actions(null).createBooking({})).toEqual({
       ok: false,
@@ -596,5 +634,22 @@ describe("booking creation and default branch actions", () => {
     expect(
       await actions(null).setDefaultBranch({ branchId: fixture.branchId }),
     ).toEqual({ ok: false, code: "UNAUTHENTICATED" });
+  });
+  it("canonicalizes uppercase default-branch and cancellation UUIDs", async () => {
+    expect(
+      await actions().setDefaultBranch({
+        branchId: fixture.otherBranchId.toUpperCase(),
+      }),
+    ).toEqual({ ok: true, data: { branchId: fixture.otherBranchId } });
+    const booking = await insertFixtureBooking(database, fixture);
+    const cancel = createCancelBookingAction({
+      database: database.db,
+      getSession: async () => fixture.person,
+      now: () => bookingNow,
+    });
+    expect(await cancel({ bookingId: booking.id.toUpperCase() })).toEqual({
+      ok: true,
+      data: { bookingId: booking.id },
+    });
   });
 });

@@ -25,7 +25,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/03-team-join.md` | 일반 회원에서 팀 회원으로 작업 지시서 (끝남) | 팀 가입에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/04-seed.md` | 목 데이터와 관리자 계정 작업 지시서 (끝남) | 시드에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/05-booking.md` | 공간 찾기와 예약 작업 지시서 (끝남) | 예약에서 왜 그렇게 했는지 확인할 때 |
-| `docs/codex/06-space-admin.md` | 운영자의 지점·층·공간 관리 작업 지시서 | 운영자 공간 관리 작업을 받았을 때 |
+| `docs/codex/06-space-admin.md` | 운영자의 지점·층·공간 관리 작업 지시서 (끝남) | 운영자 공간 관리에서 왜 그렇게 했는지 확인할 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
 | `docs/spec/booking.md` | 지점 → 층 → 공간 → 예약 흐름, 사용자 행동별 데이터, 시간 규칙, 한도 | 공간 목록·예약을 만질 때 |
 | `docs/spec/space-admin.md` | 운영자가 지점·층·공간·이용 대상을 입력하는 규칙 | 운영자 화면을 만질 때 |

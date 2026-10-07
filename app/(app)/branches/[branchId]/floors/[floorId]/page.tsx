@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { z } from "zod";
 import { ActionError } from "@/lib/actions/result";
 import { requirePageSession } from "@/lib/auth/session";
 import { localDate } from "@/lib/time/zoned";
@@ -22,12 +23,14 @@ async function FloorContent({ params, searchParams }: Props) {
       throw error;
     },
   );
-  const selected =
-    typeof query.space === "string"
-      ? data.spaces.find(
-          (space) => space.kind === "accessible" && space.id === query.space,
-        )
-      : undefined;
+  const spaceId = z.uuid().safeParse(query.space);
+  const selected = spaceId.success
+    ? data.spaces.find(
+        (space) =>
+          space.kind === "accessible" &&
+          space.id === spaceId.data.toLowerCase(),
+      )
+    : undefined;
   let detail = null;
   if (selected) {
     try {

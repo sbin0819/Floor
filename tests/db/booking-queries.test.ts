@@ -144,6 +144,32 @@ describe("booking query security and DTOs", () => {
     ).toEqual([fixture.floorId, fixture.restrictedFloorId]);
   });
 
+  it("resolves uppercase branch, floor and space UUIDs to identical authorized DTOs", async () => {
+    const query = queries(fixture.member);
+    expect(await query.getBranchFloors(fixture.branchId.toUpperCase())).toEqual(
+      await query.getBranchFloors(fixture.branchId),
+    );
+    expect(
+      await query.getFloorDay(
+        fixture.branchId.toUpperCase(),
+        fixture.restrictedFloorId.toUpperCase(),
+        bookingDate,
+      ),
+    ).toEqual(
+      await query.getFloorDay(
+        fixture.branchId,
+        fixture.restrictedFloorId,
+        bookingDate,
+      ),
+    );
+    expect(
+      await query.getSpaceDay(
+        fixture.restrictedSpaceId.toUpperCase(),
+        bookingDate,
+      ),
+    ).toEqual(await query.getSpaceDay(fixture.restrictedSpaceId, bookingDate));
+  });
+
   it("excludes archived rooms and individual desks but reports a desk area's seat count", async () => {
     const data = await queries().getFloorDay(
       fixture.branchId,

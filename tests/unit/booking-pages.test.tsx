@@ -42,6 +42,10 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
+const selectedSpaceId = "abcdefab-1234-4abc-9def-123456789abc";
+const restrictedSpaceId = "abcdefab-1234-4abc-9def-123456789abd";
+const otherFloorSpaceId = "abcdefab-1234-4abc-9def-123456789abe";
+
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(requirePageSession).mockResolvedValue({
@@ -51,12 +55,18 @@ beforeEach(() => {
   });
   vi.mocked(getBranchList).mockResolvedValue([]);
   const floor = floorDayFixture();
+  floor.spaces = floor.spaces.map((space) => ({
+    ...space,
+    id: space.kind === "accessible" ? selectedSpaceId : restrictedSpaceId,
+  }));
   vi.mocked(getBranchFloors).mockResolvedValue({
     branch: floor.branch,
     floors: floor.floors,
   });
   vi.mocked(getFloorDay).mockResolvedValue(floor);
-  vi.mocked(getSpaceDay).mockResolvedValue(spaceDayFixture());
+  const detail = spaceDayFixture();
+  detail.space.id = selectedSpaceId;
+  vi.mocked(getSpaceDay).mockResolvedValue(detail);
   vi.mocked(getMyBookings).mockResolvedValue({ upcoming: [], past: [] });
 });
 const floorPage = (query: Record<string, string | string[] | undefined> = {}) =>
@@ -130,26 +140,46 @@ describe("booking page guards", () => {
   });
   it("checks the actual floor query before loading a selected accessible space", async () => {
     const result = await resolvePageContent(
-      floorPage({ date: "2026-10-07", space: "space" }),
+      floorPage({ date: "2026-10-07", space: selectedSpaceId }),
     );
     expect(requirePageSession).toHaveBeenCalledWith(
       "/branches/branch/floors/floor",
     );
     expect(getFloorDay).toHaveBeenCalledWith("branch", "floor", "2026-10-07");
-    expect(getSpaceDay).toHaveBeenCalledWith("space", "2026-10-07");
-    expect(result.props.selectedSpaceId).toBe("space");
+    expect(getSpaceDay).toHaveBeenCalledWith(selectedSpaceId, "2026-10-07");
+    expect(result.props.selectedSpaceId).toBe(selectedSpaceId);
   });
-  it.each(["other-floor-space", "restricted", ["space", "other"]])(
-    "does not query an unselected or inaccessible space %j",
-    async (space) => {
-      const result = await resolvePageContent(floorPage({ space }));
-      expect(getSpaceDay).not.toHaveBeenCalled();
-      expect(result.props.selectedSpaceId).toBeUndefined();
-    },
-  );
+  it("canonicalizes an uppercase selected-space UUID before checking the authorized floor list", async () => {
+    const spaceId = "abcdefab-1234-4abc-9def-123456789abc";
+    const data = floorDayFixture();
+    data.spaces = data.spaces.map((space) =>
+      space.kind === "accessible" ? { ...space, id: spaceId } : space,
+    );
+    const detail = spaceDayFixture();
+    detail.space.id = spaceId;
+    vi.mocked(getFloorDay).mockResolvedValue(data);
+    vi.mocked(getSpaceDay).mockResolvedValue(detail);
+    const result = await resolvePageContent(
+      floorPage({ space: spaceId.toUpperCase() }),
+    );
+    expect(getSpaceDay).toHaveBeenCalledExactlyOnceWith(spaceId, data.date);
+    expect(result.props.selectedSpaceId).toBe(spaceId);
+  });
+  it.each([
+    otherFloorSpaceId,
+    restrictedSpaceId,
+    "invalid",
+    [selectedSpaceId, otherFloorSpaceId],
+  ])("does not query an unselected or inaccessible space %j", async (space) => {
+    const result = await resolvePageContent(floorPage({ space }));
+    expect(getSpaceDay).not.toHaveBeenCalled();
+    expect(result.props.selectedSpaceId).toBeUndefined();
+  });
   it("drops a selection that becomes inaccessible between the two queries", async () => {
     vi.mocked(getSpaceDay).mockRejectedValue(new ActionError("NOT_FOUND"));
-    const result = await resolvePageContent(floorPage({ space: "space" }));
+    const result = await resolvePageContent(
+      floorPage({ space: selectedSpaceId }),
+    );
     expect(result.props.selectedSpaceId).toBeUndefined();
   });
   it("turns a missing or inaccessible floor into the same notFound response", async () => {
