@@ -1,0 +1,21 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { hasSessionCookie } from "@/lib/auth/cookies";
+import { safeNext } from "@/lib/auth/safe-next";
+
+export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  if (pathname === "/admin/login" || hasSessionCookie(request.headers))
+    return NextResponse.next();
+  if (pathname === "/admin" || pathname.startsWith("/admin/"))
+    return NextResponse.redirect(new URL("/admin/login", request.url));
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set(
+    "next",
+    safeNext(`${pathname}${search}`, request.nextUrl.origin),
+  );
+  return NextResponse.redirect(loginUrl);
+}
+
+export const config = {
+  matcher: ["/", "/admin/:path*", "/teams/:path*", "/invite/:path*"],
+};
