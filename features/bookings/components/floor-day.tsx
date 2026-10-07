@@ -1,9 +1,9 @@
 "use client";
 
-import { LockKeyhole } from "lucide-react";
 import { useId } from "react";
 import { cn } from "cn";
 import { StatusBadge } from "@/components/status-badge";
+import { SpacePhoto } from "@/components/photos/space-photo";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 import {
   floorHref,
@@ -105,9 +105,11 @@ export function FloorDay({ data }: { data: FloorDayData }) {
                 <li key={space.id}>
                   {space.kind === "restricted" ? (
                     <p className="flex min-h-16 items-center gap-3 bg-muted/40 px-5 py-4 text-sm text-muted-foreground">
-                      <LockKeyhole
-                        className="size-4 shrink-0"
-                        aria-hidden="true"
+                      <SpacePhoto
+                        photo={null}
+                        type={space.type}
+                        restricted
+                        decorative
                       />
                       <span>
                         <span>전용 공간</span>
@@ -137,20 +139,27 @@ export function FloorDay({ data }: { data: FloorDayData }) {
                           : "border-l-transparent hover:bg-muted/50",
                       )}
                     >
-                      <div className="min-w-0 space-y-1">
-                        <h3 className="font-semibold">{space.name}</h3>
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {[
-                            space.capacity === null
-                              ? ""
-                              : `최대 ${space.capacity}인`,
-                            ...space.amenities
-                              .map((key) => amenityLabels[key as AmenityKey])
-                              .filter(Boolean),
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <SpacePhoto
+                          photo={space.photo}
+                          type={space.type}
+                          decorative
+                        />
+                        <div className="min-w-0 space-y-1">
+                          <h3 className="font-semibold">{space.name}</h3>
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            {[
+                              space.capacity === null
+                                ? ""
+                                : `최대 ${space.capacity}인`,
+                              ...space.amenities
+                                .map((key) => amenityLabels[key as AmenityKey])
+                                .filter(Boolean),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        </div>
                       </div>
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">

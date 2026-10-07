@@ -10,11 +10,17 @@ export function HomeHeaderSkeleton() {
     </SkeletonRegion>
   );
 }
-export function HomeCardSkeleton({ rows = 3 }: { rows?: number }) {
+export function HomeCardSkeleton({
+  rows = 3,
+  photo = false,
+}: {
+  rows?: number;
+  photo?: boolean;
+}) {
   return (
     <SkeletonRegion className="space-y-5 rounded-xl border border-border bg-card p-5">
       <Skeleton className="h-6 w-40" />
-      <SkeletonRows count={rows} />
+      <SkeletonRows count={rows} photo={photo} />
     </SkeletonRegion>
   );
 }
@@ -24,8 +30,8 @@ export function HomeDashboardSkeleton() {
       <SkeletonHeading />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <HomeCardShape rows={3} />
-          <HomeCardShape rows={4} />
+          <HomeCardShape rows={3} photo />
+          <HomeCardShape rows={4} photo />
         </div>
         <div className="space-y-6">
           <HomeCardShape rows={1} />
@@ -35,14 +41,20 @@ export function HomeDashboardSkeleton() {
     </SkeletonRegion>
   );
 }
-function HomeCardShape({ rows }: { rows: number }) {
+function HomeCardShape({
+  rows,
+  photo = false,
+}: {
+  rows: number;
+  photo?: boolean;
+}) {
   return (
     <div
       aria-hidden="true"
       className="space-y-5 rounded-xl border border-border bg-card p-5"
     >
       <Skeleton className="h-6 w-40" />
-      <SkeletonRows count={rows} />
+      <SkeletonRows count={rows} photo={photo} />
     </div>
   );
 }

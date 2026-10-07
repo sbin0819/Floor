@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { PageContainer, PageHeading } from "@/components/page-container";
+import { SpacePhoto } from "@/components/photos/space-photo";
 import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,36 +73,43 @@ function BookingList({
                   key={booking.id}
                   className="flex flex-wrap items-center justify-between gap-4 p-5 has-[[data-cancelling=true]]:opacity-50"
                 >
-                  <div className="min-w-0 space-y-2">
-                    <p className="font-medium tabular-nums">
-                      {formatBookingTime(
-                        booking.start,
-                        booking.end,
-                        booking.timezone,
-                      )}
-                    </p>
-                    <p className="font-medium">
-                      {upcoming ? (
-                        <Link
-                          className="inline-flex min-h-11 items-center rounded-lg underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
-                          href={floorHref(
-                            booking.branchId,
-                            booking.floorId,
-                            booking.date,
-                            booking.spaceId,
-                          )}
-                        >
-                          {booking.spaceName}
-                        </Link>
-                      ) : (
-                        booking.spaceName
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {booking.branchName} · {booking.floorName} ·{" "}
-                      {booking.teamName ?? "개인"}
-                      {booking.title && ` · ${booking.title}`}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <SpacePhoto
+                      photo={booking.photo}
+                      type={booking.spaceType}
+                      decorative
+                    />
+                    <div className="min-w-0 space-y-2">
+                      <p className="font-medium tabular-nums">
+                        {formatBookingTime(
+                          booking.start,
+                          booking.end,
+                          booking.timezone,
+                        )}
+                      </p>
+                      <p className="font-medium">
+                        {upcoming ? (
+                          <Link
+                            className="inline-flex min-h-11 items-center rounded-lg underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                            href={floorHref(
+                              booking.branchId,
+                              booking.floorId,
+                              booking.date,
+                              booking.spaceId,
+                            )}
+                          >
+                            {booking.spaceName}
+                          </Link>
+                        ) : (
+                          booking.spaceName
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {booking.branchName} · {booking.floorName} ·{" "}
+                        {booking.teamName ?? "개인"}
+                        {booking.title && ` · ${booking.title}`}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     {status && (
@@ -186,7 +194,7 @@ export function MyBookings({
       </SegmentedLinks>
       {pending ? (
         <SkeletonRegion>
-          <SkeletonRows count={3} action />
+          <SkeletonRows count={3} action photo />
         </SkeletonRegion>
       ) : (
         <BookingList

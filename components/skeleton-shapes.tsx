@@ -32,9 +32,11 @@ export function SkeletonFields({
 export function SkeletonRows({
   count = 3,
   action = false,
+  photo = false,
 }: {
   count?: number;
   action?: boolean;
+  photo?: boolean;
 }) {
   return (
     <div className="divide-y divide-border rounded-xl border border-border bg-card">
@@ -44,6 +46,12 @@ export function SkeletonRows({
           data-slot="skeleton-row"
           className="flex min-h-24 items-center justify-between gap-4 p-5"
         >
+          {photo && (
+            <Skeleton
+              data-slot="skeleton-photo"
+              className="h-12 w-16 shrink-0 rounded-lg"
+            />
+          )}
           <div className="min-w-0 flex-1 space-y-3">
             <Skeleton className="h-5 w-40 max-w-full" />
             <Skeleton className="h-4 w-64 max-w-full" />

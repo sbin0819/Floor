@@ -10,7 +10,10 @@ function FloorNavigationShape() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-4">
-        <Skeleton className="h-11 w-32" />
+        <div className="flex h-11 items-center gap-3 rounded-lg border border-border px-4">
+          <Skeleton data-slot="skeleton-photo" className="h-6 w-8" />
+          <Skeleton className="h-5 w-20" />
+        </div>
         <Skeleton className="h-5 w-48" />
       </div>
       <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -42,9 +45,15 @@ function FloorSpaceListShape() {
             data-slot="skeleton-row"
             className="grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.8fr)] sm:items-center sm:gap-5"
           >
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="h-4 w-48 max-w-full" />
+            <div className="flex min-w-0 items-center gap-3">
+              <Skeleton
+                data-slot="skeleton-photo"
+                className="h-12 w-16 shrink-0 rounded-lg"
+              />
+              <div className="min-w-0 space-y-2">
+                <Skeleton className="h-5 w-32 max-w-full" />
+                <Skeleton className="h-4 w-48 max-w-full" />
+              </div>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between gap-4">
@@ -53,7 +62,7 @@ function FloorSpaceListShape() {
               </div>
               <Skeleton
                 data-slot="skeleton-availability"
-                className="h-2 w-full rounded-full"
+                className="h-3 w-full rounded-full"
               />
               <div className="flex justify-between">
                 <Skeleton className="h-3 w-5" />
@@ -101,7 +110,11 @@ export function FloorPageSkeleton() {
 
 export function SpaceDetailSkeleton() {
   return (
-    <SkeletonRegion className="space-y-6 rounded-xl border border-border bg-card p-5">
+    <SkeletonRegion className="space-y-6 overflow-hidden rounded-xl border border-border bg-card p-5 pt-0">
+      <Skeleton
+        data-slot="skeleton-photo"
+        className="-mx-5 h-[120px] rounded-none"
+      />
       <SkeletonHeading />
       <div className="flex gap-2">
         {[0, 1, 2].map((key) => (
@@ -125,7 +138,14 @@ export function BranchListSkeleton() {
       <SkeletonHeading />
       <div className="grid gap-4 sm:grid-cols-2">
         {[0, 1].map((key) => (
-          <div key={key} className="space-y-5 rounded-xl border bg-card p-5">
+          <div
+            key={key}
+            className="space-y-5 overflow-hidden rounded-xl border bg-card p-5 pt-0"
+          >
+            <Skeleton
+              data-slot="skeleton-photo"
+              className="-mx-5 aspect-[16/6] rounded-none"
+            />
             <SkeletonHeading compact />
             <Skeleton className="h-5 w-40" />
             <Skeleton className="h-11 w-28" />
@@ -157,7 +177,7 @@ export function MyBookingsSkeleton() {
         <Skeleton className="h-11 w-28" />
       </div>
       <Skeleton className="h-5 w-36" />
-      <SkeletonRows count={3} action />
+      <SkeletonRows count={3} action photo />
     </SkeletonRegion>
   );
 }

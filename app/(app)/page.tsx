@@ -61,10 +61,10 @@ async function HomeContent() {
       </Suspense>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <Suspense fallback={<HomeCardSkeleton />}>
+          <Suspense fallback={<HomeCardSkeleton photo />}>
             <Upcoming />
           </Suspense>
-          <Suspense fallback={<HomeCardSkeleton rows={4} />}>
+          <Suspense fallback={<HomeCardSkeleton rows={4} photo />}>
             <FreeSpaces />
           </Suspense>
         </div>

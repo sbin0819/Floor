@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import { PageHeading } from "@/components/page-container";
+import { SpacePhoto } from "@/components/photos/space-photo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -25,7 +26,7 @@ import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 const linkClass =
   "inline-flex min-h-11 items-center gap-1 rounded-lg text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring";
 const rowClass =
-  "block space-y-2 rounded-lg p-5 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring";
+  "flex items-start gap-3 rounded-lg p-5 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring";
 
 function HomeCard({
   title,
@@ -108,7 +109,9 @@ export function HomeUpcomingBookings({
           {data.bookings.map((booking) => {
             const now = new Date(data.now);
             const today = localDate(now, booking.timezone);
-            const current = Date.parse(booking.start) <= now.getTime() && now.getTime() < Date.parse(booking.end);
+            const current =
+              Date.parse(booking.start) <= now.getTime() &&
+              now.getTime() < Date.parse(booking.end);
             const dateLabel =
               booking.date === today
                 ? null
@@ -124,38 +127,45 @@ export function HomeUpcomingBookings({
                     booking.spaceId,
                   )}
                 >
-                  <div className="flex flex-wrap items-center gap-3">
-                    {current ? (
-                      <Badge className="bg-status-mine text-status-mine-foreground">
-                        지금 이용 중
-                      </Badge>
-                    ) : (
-                      dateLabel && (
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          {dateLabel}
-                        </span>
-                      )
-                    )}
-                    <span className="font-medium tabular-nums">
-                      {formatBookingTime(
-                        booking.start,
-                        booking.end,
-                        booking.timezone,
+                  <SpacePhoto
+                    photo={booking.photo}
+                    type={booking.spaceType}
+                    decorative
+                  />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {current ? (
+                        <Badge className="bg-status-mine text-status-mine-foreground">
+                          지금 이용 중
+                        </Badge>
+                      ) : (
+                        dateLabel && (
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {dateLabel}
+                          </span>
+                        )
                       )}
-                    </span>
+                      <span className="font-medium tabular-nums">
+                        {formatBookingTime(
+                          booking.start,
+                          booking.end,
+                          booking.timezone,
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">{booking.spaceName}</span>
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-muted-foreground"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {booking.branchName} · {booking.floorName} ·{" "}
+                      {booking.teamName ?? "개인"}
+                      {booking.title && ` · ${booking.title}`}
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{booking.spaceName}</span>
-                    <ChevronRight
-                      aria-hidden="true"
-                      className="size-4 shrink-0 text-muted-foreground"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {booking.branchName} · {booking.floorName} ·{" "}
-                    {booking.teamName ?? "개인"}
-                    {booking.title && ` · ${booking.title}`}
-                  </p>
                 </Link>
               </li>
             );
@@ -251,41 +261,48 @@ export function HomeFreeSpaces({ data }: { data: HomeFreeSpacesData }) {
                         space.id,
                       )}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium">{space.name}</span>
-                        <ChevronRight
-                          aria-hidden="true"
-                          className="size-4 text-muted-foreground"
-                        />
+                      <SpacePhoto
+                        photo={space.photo}
+                        type={space.type}
+                        decorative
+                      />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium">{space.name}</span>
+                          <ChevronRight
+                            aria-hidden="true"
+                            className="size-4 text-muted-foreground"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {space.floor.name}
+                          {space.capacity !== null &&
+                            ` · 최대 ${space.capacity}인`}
+                          {space.amenities
+                            .map(
+                              (key) => ` · ${amenityLabels[key as AmenityKey]}`,
+                            )
+                            .join("")}
+                        </p>
+                        {data.operatingState?.window && (
+                          <AvailabilityBar
+                            intervals={space.intervals}
+                            window={data.operatingState.window}
+                            now={data.now}
+                            timeZone={branch.timezone}
+                            showTicks={false}
+                          />
+                        )}
+                        <p className="text-sm text-status-free-foreground tabular-nums">
+                          {formatAvailabilityUntil(
+                            space.freeUntil,
+                            data.date,
+                            branch.timezone,
+                            { midnightAs24: true },
+                          )}{" "}
+                          비어 있음
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground tabular-nums">
-                        {space.floor.name}
-                        {space.capacity !== null &&
-                          ` · 최대 ${space.capacity}인`}
-                        {space.amenities
-                          .map(
-                            (key) => ` · ${amenityLabels[key as AmenityKey]}`,
-                          )
-                          .join("")}
-                      </p>
-                      {data.operatingState?.window && (
-                        <AvailabilityBar
-                          intervals={space.intervals}
-                          window={data.operatingState.window}
-                          now={data.now}
-                          timeZone={branch.timezone}
-                          showTicks={false}
-                        />
-                      )}
-                      <p className="text-sm text-status-free-foreground tabular-nums">
-                        {formatAvailabilityUntil(
-                          space.freeUntil,
-                          data.date,
-                          branch.timezone,
-                          { midnightAs24: true },
-                        )}{" "}
-                        비어 있음
-                      </p>
                     </Link>
                   </li>
                 ))}

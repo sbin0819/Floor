@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Building2, ChevronRight, LoaderCircle, Star } from "lucide-react";
 import { LinkPending } from "@/components/link-pending";
+import { SpacePhoto } from "@/components/photos/space-photo";
 import { PageContainer, PageHeading } from "@/components/page-container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +61,19 @@ export function BranchList({ branches }: { branches: BranchListItem[] }) {
               className="relative block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               <LinkPending />
-              <Card className={branch.isDefault ? "border-primary" : undefined}>
+              <Card
+                className={branch.isDefault ? "border-primary pt-0" : "pt-0"}
+              >
+                <div className="aspect-[16/6]">
+                  <SpacePhoto
+                    photo={branch.cover}
+                    type="branch"
+                    size="fill"
+                    sizes="(max-width: 639px) calc(100vw - 32px), (max-width: 879px) 50vw, 408px"
+                    decorative
+                    className="rounded-none"
+                  />
+                </div>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="text-xl font-semibold">{branch.name}</h2>

@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PageContainer } from "@/components/page-container";
+import { SpacePhoto } from "@/components/photos/space-photo";
 import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
 import { getBookingDateWindow } from "@/features/bookings/date";
 import { floorHref, formatBookingDate } from "@/features/bookings/format";
@@ -77,6 +78,12 @@ export function BranchNavigation({ data }: { data: BranchNavigationData }) {
               className="gap-3 text-lg font-semibold"
               aria-label={`${data.branch.name} · 지점 바꾸기`}
             >
+              <SpacePhoto
+                photo={data.branch.cover}
+                type="branch"
+                size={{ width: 32, height: 24 }}
+                decorative
+              />
               {data.branch.name}
               <ChevronDown
                 aria-hidden="true"
