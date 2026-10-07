@@ -2,7 +2,7 @@
 
 공유오피스 멤버가 평면도에서 공간을 찾아 예약하고, 예약에 붙은 채팅과 영상 통화로 대화하는 서비스예요.
 
-현재는 기본 셋업과 가입·로그인까지 구현했어요. Better Auth를 직접 운영하고, Google·GitHub·이메일 비밀번호 로그인, 이메일 인증과 비밀번호 재설정, 운영자 계정 생성 CLI를 제공해요. 로그인한 홈에는 인사말만, 운영자 홈에는 운영하는 지점 이름만 보여줘요. 팀 기능, 평면도 렌더러, 예약·채팅·영상 화면, 시드, 실제 메일·실시간 서비스 연결은 아직 없어요. 별도 API 서버나 배포는 만들지 않아요.
+현재는 기본 셋업, 가입·로그인과 팀 회원으로 전환하는 흐름까지 구현했어요. Better Auth로 Google·GitHub·이메일 비밀번호 로그인, 이메일 인증과 비밀번호 재설정을 제공하고, 운영자 계정 생성 CLI도 있어요. 일반 회원은 팀을 만들거나 이메일 초대를 수락하거나 가입 요청을 승인받아 팀원이 될 수 있어요. 팀 역할 변경·내보내기·탈퇴, 공유 초대 링크, 팀 전환 레일, 평면도 렌더러, 예약·채팅·영상 화면, 시드, 실제 메일·실시간 서비스 연결은 아직 없어요. 별도 API 서버나 배포는 만들지 않아요.
 
 ## 시작하기
 
@@ -45,7 +45,7 @@ pnpm test:e2e
 
 ```text
 app/(auth)/              로그인·가입·인증·재설정·운영자 로그인
-app/(app)/               로그인한 홈, 정적인 머리글과 Suspense
+app/(app)/               로그인한 홈·팀 전환·팀 상세·개인 초대, 정적인 머리글과 Suspense
 app/admin/               운영자 홈, 정적인 레이아웃과 Suspense
 app/api/auth/[...all]/   Better Auth Route Handler
 app/                     루트 레이아웃, 전역 Provider와 스타일
@@ -53,12 +53,14 @@ components/ui/           shadcn Nova + Radix 기본 컴포넌트
 components/              StatusBadge, 로그아웃 등 공용 컴포넌트와 스토리
 features/auth/           인증 양식·입력 스키마·고정 오류 문구
 features/admin/          세션과 운영 권한을 확인하는 queries
+features/teams/          팀 액션·조회·공유 입력 스키마·양식·팀원 목록
 lib/actions/             ActionResult, ActionError, createAction, 오류 변환
 lib/auth/                Better Auth, 세션 가드, safeNext, 운영자 생성
-lib/email/               EmailSender, 콘솔·메모리 구현, 네 종류의 메일 문구
+lib/email/               EmailSender, 콘솔·메모리 구현, 인증·팀 초대 메일 문구
 lib/db/                  Neon 클라이언트, Drizzle 스키마, tstzrange 타입
 lib/dal/                 DB 접근 함수와 withTransaction
 lib/permissions/         권한 키·기본값, can(), canAccess(), 세션 기반 로더
+lib/teams/               팀 이름과 검색어의 순수 정규화
 lib/realtime/            이벤트·채널 인터페이스, noop·메모리 구현
 lib/floor-plan/          순수 문서 타입, strict Zod 스키마, PlanIssue
 lib/env.ts               환경 변수 검증
@@ -93,7 +95,7 @@ Better Auth를 직접 부르는 곳은 `lib/auth/*`와 인증 Route Handler로 �
 | `requirePageSession(next)` | `(app)`의 모든 페이지용. 세션이 없으면 `/login?next=…`                                           |
 | `requireOperatorPage()`    | `admin`의 모든 페이지용. 비로그인은 `/admin/login`, 비운영자는 `/admin/login?error=not_operator` |
 
-현재 페이지 가드는 `app/(app)/page.tsx`와 `app/admin/page.tsx`에 있어요. `features/admin/queries.ts`도 독립적으로 세션과 운영 지점을 확인해요. `proxy.ts`는 쿠키 유무만 보고 일찍 안내하는 편의 기능이며 쿠키 유효성을 검증하지 않아요. 오래된 쿠키만으로 `/login`에서 내보내지 않고, 로그인·가입 페이지가 실제 세션을 확인해요. 인증·재설정 화면은 로그인한 상태로도 열려요.
+홈·팀 전환·팀 상세·개인 초대·운영자 페이지가 각각 가드를 호출해요. `features/admin/queries.ts`와 `features/teams/queries.ts`도 독립적으로 세션·소속·권한을 확인해요. `proxy.ts`는 쿠키 유무만 보고 일찍 안내하는 편의 기능이며 쿠키 유효성을 검증하지 않아요. 오래된 쿠키만으로 `/login`에서 내보내지 않고, 로그인·가입 페이지가 실제 세션을 확인해요. 인증·재설정 화면은 로그인한 상태로도 열려요.
 
 로그인 뒤 목적지는 `safeNext()`를 통과한 같은 사이트의 경로만 사용해요. 외부 주소, 역슬래시·제어 문자, 인증 API, 로그인 화면으로 되돌아가는 목적지는 `/`로 바꿔요. 이메일 인증 후에는 목적지와 무관하게 `/login?verified=1`로 이동하며 자동 로그인하지 않아요. `<Suspense>` 안의 `redirect()`는 틀이 먼저 전송되면 HTTP 200으로 처리될 수 있어요.
 
@@ -144,7 +146,7 @@ const result = await action({ title: "팀 회의" });
 
 실제 기능에서는 `loadPermissionContext(session, branchId)`로 서버에서 소속·권한을 읽고 `can()`과 `canAccess()`를 적용해요. `handler`의 DB 작업은 DAL로 구현하고 여러 쓰기는 `withTransaction()`으로 묶어요. 클라이언트가 보낸 사용자 id·역할·소유자는 신뢰하지 않아요. 액션을 내보내는 기능 파일에만 `"use server"`를 붙이고 래퍼 파일에는 붙이지 않아요.
 
-결과는 `{ ok: true, data }` 또는 `{ ok: false, code, fieldErrors? }`예요. `ActionError`는 지정한 코드를 반환하고, Drizzle 오류의 `cause` 사슬에 있는 SQLSTATE `23P01`은 `BOOKING_CONFLICT`로 변환해요. 그 밖의 오류는 서버에만 기록하고 `INTERNAL`을 반환해요. 코드 목록은 [서버 명세](docs/spec/server.md)에 있어요.
+결과는 `{ ok: true, data }` 또는 `{ ok: false, code, fieldErrors? }`예요. `ActionError`는 지정한 코드를 반환하고, Drizzle 오류의 `cause` 사슬에 있는 SQLSTATE `23P01`은 `BOOKING_CONFLICT`로 변환해요. `23505`는 제약 이름으로 팀 이름 중복(`TEAM_NAME_TAKEN`)과 대기 요청 중복(`ALREADY_REQUESTED`)을 구분해요. 나머지는 `INTERNAL`과 고정 서버 로그만 남겨요. 오류 객체·SQL·입력·토큰을 로그로 출력하지 않아요. 코드 목록은 [서버 명세](docs/spec/server.md)에 있어요.
 
 ## 디자인 토큰
 
@@ -189,7 +191,7 @@ const result = await action({ title: "팀 회의" });
 pnpm db:migrate
 ```
 
-Drizzle 설정은 `db:migrate`를 실행할 때만 `.env.local`을 읽어요. 순서는 `0000_enable-btree-gist.sql` → `0001_initial-schema.sql` → `0002_bookings-exclusion.sql` → `0003_auth-foundation.sql`이에요. 기존 마이그레이션은 유지하고 마지막 파일에서 `users`의 인증 필드와 `auth_sessions`, `auth_accounts`, `auth_verifications`를 추가해요. `btree_gist`와 예약 EXCLUDE 제약은 그대로 유지하며 애플리케이션의 사전 검사로 대신하지 않아요.
+Drizzle 설정은 `db:migrate`를 실행할 때만 `.env.local`을 읽어요. 순서는 `0000_enable-btree-gist.sql` → `0001_initial-schema.sql` → `0002_bookings-exclusion.sql` → `0003_auth-foundation.sql` → `0004_team-join.sql`이에요. `0003`은 기존 사용자에 인증 필드와 인증 테이블을 추가하고, `0004`는 팀 정보·초대 처리 상태·가입 요청을 추가해요. 이미 적용한 파일과 기존 PK 이름은 유지해요. `btree_gist`와 예약 EXCLUDE 제약도 그대로 유지하며 애플리케이션의 사전 검사로 대신하지 않아요.
 
 이어서 필요한 OAuth 앱을 등록하고, 아래 운영자 CLI로 운영 계정을 준비한 뒤 `pnpm dev`를 실행해요. 일반 회원은 `/signup`, 운영자는 `/admin/login`에서 시작해요. Neon은 PostgreSQL 저장소로 사용하며 별도의 Neon Auth 서비스는 연결하지 않아요. `.env*` 중 커밋하는 파일은 `.env.example`뿐이에요.
 
@@ -279,6 +281,23 @@ pnpm admin:create --email ops@example.com --branch "가상 지점" --reset-passw
 
 완료 후 `/admin/login`에서 이메일·비밀번호로 로그인해 `/admin`의 운영 지점 목록을 확인해요. `/admin/login`은 안내용 입구이고 실제 경계는 페이지·queries의 서버 검사예요. 운영자가 아닌 로그인 상태에서는 자동 로그아웃하지 않고 홈으로 가거나 명시적으로 다른 계정으로 로그인할 수 있어요.
 
+## 팀 회원으로 전환
+
+홈(`/`)에서 내 팀 목록 또는 팀 회원으로 전환하는 카드를 볼 수 있어요. `/teams/start`는 받은 초대, 새 팀 만들기, 팀 검색·가입 요청 순서예요. 검색은 NFC·공백 정규화 후 2–40자이며, 이름과 주 이용 지점만 최대 10개 보여줘요. `%`, `_`, `\`는 검색 연산자가 아닌 문자로 취급해요.
+
+- 새 팀을 만들면 생성자가 관리자가 돼요. 주 이용 지점은 지점이 있을 때 필수이고 권한 범위를 바꾸지 않아요. 관리자 팀은 회원당 최대 5개예요.
+- 가입 요청은 회원당 대기 10개까지 보낼 수 있어요. 본인은 취소하고 대상 팀 관리자는 승인·거절할 수 있어요.
+- 관리자는 `/teams/[teamId]`에서 이메일 초대를 만들거나 취소해요. 7일짜리 개인 초대이며, 팀당 미처리 50개까지예요. 만료됐지만 미처리인 초대도 한도와 관리자 목록에 포함해요. 같은 이메일로 다시 초대하면 이전 초대를 취소하고 새로 만들어요.
+- 수신자는 받은 초대 목록이나 `/invite/[token]`에서 수락·거절해요. 인증된 이메일이 일치해야 해요. 다른 수신자·만료·처리 완료·잘못된 토큰은 모두 같은 안내를 보여줘요.
+
+팀원이 아닌 사람에게 팀 상세는 존재하지 않는 팀과 동일하게 처리해요. 일반 팀원 조회는 관리자 연락처·보낸 초대·가입 요청을 읽지 않아요. 관리자 응답에도 초대 토큰은 포함하지 않아요. 승인과 수락은 기존 관리자 역할을 보존하고, 같은 팀의 대기 요청·초대를 한 트랜잭션에서 함께 정리해요.
+
+초대 메일은 DB 커밋 뒤 보내요. 개발 모드에서는 기존 콘솔 메일로 확인하고, 메일을 보낼 수 없는 환경에서도 초대 등록은 허용해요. 발송 실패가 초대를 취소하지 않으며, 수신자는 로그인 후 받은 초대 목록에서 확인할 수 있어요. 화면은 등록 성공만 안내하고 메일 전송 성공을 단정하지 않아요. 요청 실패 로그에는 메일 본문·주소·초대 토큰을 넣지 않아요.
+
+화면 쓰기는 TanStack Query mutation으로 실행하며 공통 실행 잠금과 동일 scope로 중복·병렬 제출을 막아요. 성공 뒤 서버 목록을 새로 읽고 멤버십을 낙관적으로 변경하지 않아요. 관련 사용자 UUID 오름차순 → 팀 행 → 조건부 상태 변경 순서로 잠그고, 한도 초과나 중간 실패는 전체 트랜잭션을 되돌려요.
+
+기존 Neon과 OAuth 설정을 사용한다면 `pnpm db:migrate`로 새 마이그레이션을 적용한 다음, 서로 다른 인증된 계정 두 개로 **팀 생성 → 초대 → 수락 → 다른 팀 가입 요청 → 승인**을 확인해요. 이번 로컬 검사는 실제 DB나 메일 서비스에 접근하지 않아요.
+
 ## 검사와 CI
 
 ```sh
@@ -291,6 +310,8 @@ pnpm test:e2e
 DB 테스트는 메모리 PGlite에 실제 SQL 마이그레이션을 적용해요. 예약 EXCLUDE·경계·부분 유니크·참조 제약, DAL 트랜잭션, 인증 세션·계정의 사용자 삭제 연쇄와 제공자 계정 유니크 제약을 확인해요. 권한 기본값·역할 합집합·접근 교집합, 액션 순서·오류 변환, 평면도 스키마, 실시간 메모리 구현도 검사해요.
 
 인증 통합 테스트는 PGlite와 메모리 메일로 가입→인증→로그인→로그아웃, 중복 가입 응답, 계정 선점 방지, 재설정 후 기존 세션 폐기, 운영자 생성과 비밀번호 재발급을 검사해요. 소셜 경로는 테스트 제공자의 토큰 검증·사용자 정보를 대체해 외부 왕복 없이 확인해요. UI 테스트는 입력 오류·접근성 연결·중복 제출·메일 불가 안내·60초 대기·오류 문구를 확인해요.
+
+팀 테스트도 실제 마이그레이션을 적용한 PGlite와 메모리 메일을 사용해요. 제약 11–14, 팀 생성·가입 요청·초대, 권한·한도·만료, 중복 처리·교차 정리·기존 역할 보존, 롤백, 응답의 민감 필드와 관리자 전용 조회 분리를 검사해요. SQL 기록으로 잠금 순서와 pending 조건이 있는 `UPDATE … RETURNING`을 확인해요. PGlite는 단일 연결이므로 실제 PostgreSQL 다중 세션의 교착 상태까지 검증하는 것은 아니에요. 팀 화면은 컴포넌트 테스트를 추가하고 기존 E2E는 회귀 검사로 유지해요.
 
 Playwright는 가짜 비밀 키와 실제 연결할 수 없는 DB 주소로 production 서버를 띄워 비로그인 홈의 로그인 안내, 안전한 `next`, 메일 불가 안내, 운영자 로그인과 키보드 이동을 검사해요. 이 검사는 실제 가입·로그인이나 OAuth 왕복 검증이 아니에요. Storybook은 docs 애드온만 사용하므로 단위 테스트와 독립적이에요.
 
