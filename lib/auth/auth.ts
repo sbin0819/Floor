@@ -252,8 +252,8 @@ export function createAuth(options: AuthOptions) {
 
 export type AuthInstance = ReturnType<typeof createAuth>;
 
-// 운영자 명령의 외부 트랜잭션에만 연결되는 capability이며 HTTP API는 노출하지 않는다.
-export async function createOperatorAuth({
+// 계정 준비 명령의 외부 트랜잭션에만 연결되며 HTTP API는 노출하지 않는다.
+export async function createProvisioningAuth({
   db,
   auth,
 }: {
@@ -261,7 +261,7 @@ export async function createOperatorAuth({
   auth: AuthInstance;
 }) {
   const context = await auth.$context;
-  const operator = betterAuth({
+  const provisioning = betterAuth({
     baseURL: auth.options.baseURL,
     secret: context.secret,
     database: drizzleAdapter(db, {
@@ -273,7 +273,7 @@ export async function createOperatorAuth({
     user: { fields: { image: "avatarUrl" } },
     logger,
   });
-  const { internalAdapter } = await operator.$context;
+  const { internalAdapter } = await provisioning.$context;
   return {
     hashPassword: context.password.hash,
     async createVerifiedUser(input: { email: string; name: string }) {

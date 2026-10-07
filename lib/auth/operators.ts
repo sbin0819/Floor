@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import {
-  createOperatorAuth,
+  createProvisioningAuth,
   getAuth,
   type AuthInstance,
 } from "@/lib/auth/auth";
@@ -52,7 +52,7 @@ export async function createOperator(
       if (existingUser && !existingUser.emailVerified && !values.resetPassword)
         throw new OperatorError("UNVERIFIED_ACCOUNT");
 
-      const provisioning = await createOperatorAuth({ db: database, auth });
+      const provisioning = await createProvisioningAuth({ db: database, auth });
       const providers = existingUser
         ? await provisioning.listProviders(existingUser.id)
         : [];

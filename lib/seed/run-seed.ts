@@ -1,0 +1,231 @@
+import { ZodError } from "zod";
+import { getPostgresError } from "@/lib/actions/errors";
+import {
+  createProvisioningAuth,
+  getAuth,
+  type AuthInstance,
+} from "@/lib/auth/auth";
+import {
+  getUserByEmail,
+  withTransaction,
+  type TransactionDatabase,
+} from "@/lib/dal";
+import * as seedDal from "@/lib/dal/seed";
+import { loadSeedData } from "@/lib/seed/data";
+import { SeedError } from "@/lib/seed/errors";
+import { getOperatingDate } from "@/lib/time/open-hours";
+import { zonedDateTime } from "@/lib/time/zoned";
+
+export type SeedResult = {
+  counts: Record<string, number>;
+  skippedBookings: number;
+  accounts: string[];
+};
+
+export async function runSeed({
+  db,
+  auth,
+  now,
+  resetPasswords,
+}: {
+  db?: TransactionDatabase;
+  auth?: AuthInstance;
+  now: Date;
+  resetPasswords: boolean;
+}): Promise<SeedResult> {
+  if (!Number.isFinite(now.getTime()))
+    throw new SeedError("시드 기준 시각이 올바르지 않아요.");
+  let current = "시드 데이터";
+  try {
+    const data = loadSeedData();
+    const instance = auth ?? getAuth();
+    return await withTransaction(async (database) => {
+      const provisioning = await createProvisioningAuth({
+        db: database,
+        auth: instance,
+      });
+      const userIds = new Map<string, string>();
+      for (const account of data.users) {
+        current = `계정 ${account.email}`;
+        const existing = await getUserByEmail(account.email, database);
+        if (existing && !existing.emailVerified && !resetPasswords)
+          throw new SeedError(
+            `${current}: 인증되지 않은 기존 계정이에요. 명시적인 --reset-passwords가 필요해요.`,
+          );
+        const user =
+          existing ?? (await provisioning.createVerifiedUser(account));
+        userIds.set(account.key, user.id);
+        if (!existing || resetPasswords) {
+          await provisioning.setPassword(
+            user.id,
+            await provisioning.hashPassword(account.password),
+          );
+          if (existing) {
+            await provisioning.revokeSessions(user.id);
+            await provisioning.verifyEmail(user.id);
+          }
+        }
+      }
+      const userId = (key: string) => {
+        const id = userIds.get(key);
+        if (!id) throw new SeedError("시드 계정 참조를 찾을 수 없어요.");
+        return id;
+      };
+      for (const branch of data.branches) {
+        current = `지점 ${branch.id}`;
+        await seedDal.upsertSeedBranch(branch, database);
+      }
+      for (const floor of data.floors) {
+        current = `층 ${floor.id}`;
+        await seedDal.upsertSeedFloor(floor, database);
+      }
+      for (const space of [...data.spaces].sort(
+        (a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId)),
+      )) {
+        current = `공간 ${space.id}`;
+        await seedDal.upsertSeedSpace(
+          { ...space, archivedAt: null, bookingRules: {} },
+          database,
+        );
+      }
+      for (const { createdByKey, ...team } of data.teams) {
+        current = `팀 ${team.id}`;
+        await seedDal.upsertSeedTeam(
+          { ...team, createdBy: userId(createdByKey) },
+          database,
+        );
+      }
+      for (const { userKey, ...member } of data.teamMembers)
+        await seedDal.upsertSeedMember(
+          { ...member, userId: userId(userKey) },
+          database,
+        );
+      for (const { userKey, ...staff } of data.branchStaff)
+        await seedDal.upsertSeedStaff(
+          { ...staff, userId: userId(userKey) },
+          database,
+        );
+      current = "허용 팀";
+      await seedDal.replaceSeedGrants(
+        data.floors.map(({ id }) => id),
+        data.spaces.map(({ id }) => id),
+        data.accessGrants,
+        database,
+      );
+      let plans = 0;
+      for (const { createdByKey, ...plan } of data.floorPlans) {
+        current = `평면도 ${plan.id}`;
+        if (
+          await seedDal.putSeedPlan(
+            { ...plan, createdBy: userId(createdByKey), publishedAt: now },
+            database,
+          )
+        )
+          plans++;
+      }
+      const branches = new Map(
+        data.branches.map((branch) => [branch.id, branch]),
+      );
+      const floors = new Map(data.floors.map((floor) => [floor.id, floor]));
+      const spaces = new Map(data.spaces.map((space) => [space.id, space]));
+      const instant = (spaceId: string, offset: number, time: string) => {
+        const branch = branches.get(
+          floors.get(spaces.get(spaceId)!.floorId)!.branchId,
+        )!;
+        return zonedDateTime(
+          getOperatingDate(now, branch.timezone, branch.openHours, offset),
+          time,
+          branch.timezone,
+        );
+      };
+      await seedDal.clearSeedSchedule(
+        data.bookings.map(({ id }) => id),
+        data.spaceBlocks.map(({ id }) => id),
+        database,
+      );
+      for (const {
+        startDayOffset,
+        endDayOffset,
+        start,
+        end,
+        createdByKey,
+        ...block
+      } of data.spaceBlocks) {
+        current = `점검 ${block.id}`;
+        await seedDal.insertSeedBlock(
+          {
+            ...block,
+            createdBy: userId(createdByKey),
+            during: {
+              start: instant(block.spaceId, startDayOffset, start),
+              end: instant(block.spaceId, endDayOffset, end),
+            },
+          },
+          database,
+        );
+      }
+      let skippedBookings = 0;
+      for (const {
+        dayOffset,
+        start,
+        end,
+        userKey,
+        cancelledByKey: _cancelledByKey,
+        ...booking
+      } of data.bookings) {
+        // 취소 기록 컬럼은 예약 단계에서 추가하고 그때 이 참조를 저장한다.
+        void _cancelledByKey;
+        current = `예약 ${booking.id}`;
+        const during = {
+          start: instant(booking.spaceId, dayOffset, start),
+          end: instant(booking.spaceId, dayOffset, end),
+        };
+        if (
+          booking.status === "confirmed" &&
+          (await seedDal.hasSeedBookingOverlap(
+            booking.spaceId,
+            during,
+            database,
+          ))
+        ) {
+          skippedBookings++;
+          continue;
+        }
+        await seedDal.insertSeedBooking(
+          { ...booking, userId: userId(userKey), during },
+          database,
+        );
+      }
+      return {
+        counts: {
+          users: data.users.length,
+          branches: data.branches.length,
+          floors: data.floors.length,
+          spaces: data.spaces.length,
+          teams: data.teams.length,
+          teamMembers: data.teamMembers.length,
+          branchStaff: data.branchStaff.length,
+          accessGrants: data.accessGrants.length,
+          floorPlans: plans,
+          bookings: data.bookings.length - skippedBookings,
+          spaceBlocks: data.spaceBlocks.length,
+        },
+        skippedBookings,
+        accounts: data.users.map(({ email }) => email),
+      };
+    }, db);
+  } catch (error) {
+    if (error instanceof SeedError) throw error;
+    if (error instanceof ZodError)
+      throw new SeedError(
+        `시드 데이터 검증 실패: ${error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`,
+      );
+    if (getPostgresError(error)?.code === "23505")
+      throw new SeedError(
+        `${current}: 다른 행이 같은 고유 값을 사용하고 있어요. 시드를 되돌렸어요.`,
+      );
+    throw new SeedError(
+      `${current}: 시드를 완료하지 못했어요. 모든 시드 변경을 되돌렸어요.`,
+    );
+  }
+}
