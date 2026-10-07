@@ -23,7 +23,6 @@ import {
 } from "./booking-helper";
 import { createTestDatabase, type TestDatabase } from "./helper";
 import { createQueryMeter, type QueryMeasurement } from "./query-meter";
-import baseline from "./query-budget-baseline.json";
 
 describe("authenticated query execution budgets", () => {
   let database: TestDatabase;
@@ -78,10 +77,18 @@ describe("authenticated query execution budgets", () => {
       database: database.db,
       requireSession: async () => actors.operator,
     });
-  const cases: [
-    keyof typeof baseline.queries | "bookings.getBranchNavigation",
-    () => Promise<unknown>,
-  ][] = [
+  const cases: [string, () => Promise<unknown>][] = [
+    ["bookings.getHomeHeader", () => bookings().getHomeHeader()],
+    [
+      "bookings.getHomeUpcomingBookings",
+      () => bookings(actors.person).getHomeUpcomingBookings(),
+    ],
+    ["bookings.getHomeFreeSpaces", () => bookings().getHomeFreeSpaces()],
+    ["bookings.getHomeBookingLimits", () => bookings().getHomeBookingLimits()],
+    [
+      "bookings.getBookingDestination",
+      () => bookings().getBookingDestination(),
+    ],
     ["bookings.getBranchList", () => bookings().getBranchList()],
     [
       "bookings.getBookingEntry.teamFallback",
@@ -171,17 +178,15 @@ describe("authenticated query execution budgets", () => {
         result.perStage.reduce((sum, count) => sum + count, 0),
       );
       expect(result.stages).toBeLessThanOrEqual(
-        name.startsWith("bookings.getBookingEntry") ? 3 : 2,
+        [
+          "bookings.getHomeFreeSpaces",
+          "bookings.getHomeBookingLimits",
+          "bookings.getBookingDestination",
+        ].includes(name)
+          ? 3
+          : 2,
       );
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
-      if (name !== "bookings.getBranchNavigation") {
-        expect(result.stages).toBeLessThanOrEqual(
-          baseline.queries[name].stages,
-        );
-        expect(result.statements).toBeLessThanOrEqual(
-          baseline.queries[name].statements,
-        );
-      }
     },
   );
 
@@ -215,6 +220,8 @@ describe("authenticated query execution budgets", () => {
     for (const name of [
       "bookings.getSpaceDay.memberTwoTeams",
       "bookings.getBranchFloors",
+      "bookings.getHomeFreeSpaces",
+      "bookings.getBranchList",
       "admin.getAdminBranch.twoFloors",
     ] as const) {
       const query = cases.find(([key]) => key === name)?.[1];

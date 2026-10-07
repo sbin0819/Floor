@@ -1,22 +1,38 @@
 import "server-only";
 
-import { and, asc, count, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { cache } from "react";
 
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
 import { accessGrants, floors, spaces } from "@/lib/db/schema";
 
-async function readFloorSpaceAccess(
-  floorId: string,
+async function readSpaceAccess(
+  filter: SQL | undefined,
   database: DalDatabase = getDb(),
 ) {
   const rows = await database
     .select({
-      space: { id: spaces.id, type: spaces.type, access: spaces.access },
+      space: {
+        id: spaces.id,
+        floorId: spaces.floorId,
+        type: spaces.type,
+        access: spaces.access,
+      },
       teamId: accessGrants.teamId,
     })
     .from(spaces)
+    .innerJoin(floors, eq(floors.id, spaces.floorId))
     .leftJoin(
       accessGrants,
       and(
@@ -24,13 +40,7 @@ async function readFloorSpaceAccess(
         eq(accessGrants.targetId, spaces.id),
       ),
     )
-    .where(
-      and(
-        eq(spaces.floorId, floorId),
-        isNull(spaces.archivedAt),
-        ne(spaces.type, "desk"),
-      ),
-    )
+    .where(and(filter, isNull(spaces.archivedAt), ne(spaces.type, "desk")))
     .orderBy(asc(spaces.id), asc(accessGrants.teamId));
   const grouped = new Map<
     string,
@@ -45,6 +55,37 @@ async function readFloorSpaceAccess(
     if (teamId !== null) result.allowedTeamIds.push(teamId);
   }
   return [...grouped.values()];
+}
+
+async function readFloorSpaceAccess(floorId: string, database?: DalDatabase) {
+  return (await readSpaceAccess(eq(spaces.floorId, floorId), database)).map(
+    ({ id, type, access, allowedTeamIds }) => ({
+      id,
+      type,
+      access,
+      allowedTeamIds,
+    }),
+  );
+}
+async function readBranchSpaceAccess(branchId: string, database?: DalDatabase) {
+  return readSpaceAccess(eq(floors.branchId, branchId), database);
+}
+const cachedBranchSpaceAccess = cache((branchId: string) =>
+  readBranchSpaceAccess(branchId),
+);
+const cachedAllSpaceAccess = cache(() => readSpaceAccess(undefined));
+export function listBranchSpaceAccess(
+  branchId: string,
+  database?: DalDatabase,
+) {
+  return database === undefined
+    ? cachedBranchSpaceAccess(branchId)
+    : readBranchSpaceAccess(branchId, database);
+}
+export function listAllSpaceAccess(database?: DalDatabase) {
+  return database === undefined
+    ? cachedAllSpaceAccess()
+    : readSpaceAccess(undefined, database);
 }
 
 const cachedFloorSpaceAccess = cache((floorId: string) =>

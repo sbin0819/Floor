@@ -654,6 +654,18 @@ describe("booking query security and DTOs", () => {
       openHours: {},
       isDefault: true,
       todayHours: { open: "09:00", close: "22:00" },
+      accessibleFloorCount: 1,
+      freeSpaceCount: 1,
+      operatingState: {
+        status: "open",
+        date: bookingDate,
+        hours: { open: "09:00", close: "22:00" },
+        window: {
+          start: "2026-10-07T00:00:00.000Z",
+          end: "2026-10-07T13:00:00.000Z",
+        },
+        nextOpening: null,
+      },
     });
     expect(list[1]?.isDefault).toBe(false);
   });

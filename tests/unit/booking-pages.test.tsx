@@ -73,7 +73,11 @@ beforeEach(() => {
   const detail = spaceDayFixture();
   detail.space.id = selectedSpaceId;
   vi.mocked(getSpaceDay).mockResolvedValue(detail);
-  vi.mocked(getMyBookings).mockResolvedValue({ upcoming: [], past: [] });
+  vi.mocked(getMyBookings).mockResolvedValue({
+    upcoming: [],
+    past: [],
+    now: "2026-10-07T01:10:00.000Z",
+  });
 });
 const floorPage = (query: Record<string, string | string[] | undefined> = {}) =>
   FloorPage({

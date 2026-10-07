@@ -1,5 +1,10 @@
 import type { DayOpenHours, OpenHours } from "@/lib/time/open-hours";
 import type { RoleLimits } from "@/lib/permissions/types";
+import type {
+  AvailabilityInterval,
+  AvailabilitySummary,
+} from "@/features/bookings/availability";
+import type { OperatingState } from "@/features/bookings/operating-state";
 
 export type SpaceType =
   "meeting_room" | "seminar" | "phone_booth" | "desk_area" | "desk" | "lounge";
@@ -21,6 +26,9 @@ export type FloorSummary = {
 export type BranchListItem = BranchDetails & {
   isDefault: boolean;
   todayHours: DayOpenHours | null;
+  accessibleFloorCount: number;
+  freeSpaceCount: number | null;
+  operatingState: OperatingState;
 };
 export type BranchFloorsData = {
   branch: BranchDetails;
@@ -48,12 +56,19 @@ export type RestrictedSpace = {
   id: string;
   type: SpaceType;
 };
+export type FloorVisibleSpace = VisibleSpace & {
+  intervals: AvailabilityInterval[];
+  summary: AvailabilitySummary | null;
+};
 export type FloorDayData = BranchFloorsData & {
   floor: FloorSummary;
   date: string;
   isToday: boolean;
   openHours: DayOpenHours | null;
-  spaces: (VisibleSpace | RestrictedSpace)[];
+  now: string;
+  operatingState: OperatingState;
+  groups: { type: SpaceType; totalCount: number; freeCount: number | null }[];
+  spaces: (FloorVisibleSpace | RestrictedSpace)[];
 };
 export type DayBooking = {
   id: string;
@@ -99,4 +114,45 @@ export type MyBooking = {
   spaceId: string;
   spaceName: string;
 };
-export type MyBookingsData = { upcoming: MyBooking[]; past: MyBooking[] };
+export type MyBookingsData = {
+  now: string;
+  upcoming: MyBooking[];
+  past: MyBooking[];
+};
+
+export type HomeHeaderData = {
+  name: string;
+  now: string;
+  date: string;
+  branch: BranchDetails | null;
+  operatingState: OperatingState | null;
+};
+export type HomeUpcomingBookingsData = { now: string; bookings: MyBooking[] };
+export type HomeFreeSpace = {
+  id: string;
+  name: string;
+  type: SpaceType;
+  capacity: number | null;
+  amenities: string[];
+  floor: FloorSummary;
+  intervals: AvailabilityInterval[];
+  freeUntil: string;
+};
+export type HomeFreeSpacesData = {
+  state: "no_branch" | "no_floors" | "outside_hours" | "ready";
+  branch: BranchDetails | null;
+  now: string;
+  date: string;
+  operatingState: OperatingState | null;
+  totalCount: number;
+  freeCount: number;
+  spaces: HomeFreeSpace[];
+};
+export type HomeBookingLimitsData = {
+  branch: { id: string; name: string };
+  now: string;
+  date: string;
+  limitMinutes: number;
+  usedMinutes: number;
+  remainingMinutes: number;
+};

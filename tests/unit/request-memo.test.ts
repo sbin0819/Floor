@@ -6,11 +6,20 @@ import {
   listBranchDetails,
   listBranches,
   listFloorsWithAccess,
+  listAllFloorsWithAccess,
 } from "@/lib/dal/branches";
 import type { DalDatabase } from "@/lib/dal/database";
-import { getRoleSettings } from "@/lib/dal/role-settings";
+import { getAllRoleSettings, getRoleSettings } from "@/lib/dal/role-settings";
 import { getMemberships } from "@/lib/dal/users";
-import { listFloorSpaceAccess } from "@/lib/dal/spaces";
+import {
+  listAllSpaceAccess,
+  listBranchSpaceAccess,
+  listFloorSpaceAccess,
+} from "@/lib/dal/spaces";
+import {
+  listBranchCards,
+  resolveBookingBranch,
+} from "@/lib/dal/booking-discovery";
 import {
   loadPermissionContext,
   loadPermissionData,
@@ -65,6 +74,56 @@ const settings = {
   limits: { maxDaysAhead: 3 },
 };
 const cases = [
+  {
+    name: "booking branch selection",
+    read: (db?: DalDatabase) => resolveBookingBranch(userId, db),
+    rows: [[{ branch }]],
+    keys: [userId],
+  },
+  {
+    name: "branch cards",
+    read: (db?: DalDatabase) => listBranchCards(userId, db),
+    rows: [[{ branch, isDefault: true }]],
+    keys: [userId],
+  },
+  {
+    name: "all role permissions",
+    read: (db?: DalDatabase) => getAllRoleSettings(db),
+    rows: [[{ ...settings, branchId }]],
+    keys: [],
+  },
+  {
+    name: "all floor access",
+    read: (db?: DalDatabase) => listAllFloorsWithAccess(db),
+    rows: [[{ floor, teamId: "team-a" }]],
+    keys: [],
+  },
+  {
+    name: "branch space access",
+    read: (db?: DalDatabase) => listBranchSpaceAccess(branchId, db),
+    rows: [
+      [
+        {
+          space: { id: "space-a", floorId, type: "meeting_room", access: null },
+          teamId: null,
+        },
+      ],
+    ],
+    keys: [branchId],
+  },
+  {
+    name: "all space access",
+    read: (db?: DalDatabase) => listAllSpaceAccess(db),
+    rows: [
+      [
+        {
+          space: { id: "space-a", floorId, type: "meeting_room", access: null },
+          teamId: null,
+        },
+      ],
+    ],
+    keys: [],
+  },
   {
     name: "memberships",
     read: (db?: DalDatabase) => getMemberships(userId, db),

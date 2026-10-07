@@ -1,5 +1,21 @@
 import { createBookingQueries } from "@/features/bookings/query-factory";
 
+export async function getHomeHeader() {
+  return createBookingQueries().getHomeHeader();
+}
+export async function getHomeUpcomingBookings() {
+  return createBookingQueries().getHomeUpcomingBookings();
+}
+export async function getHomeFreeSpaces() {
+  return createBookingQueries().getHomeFreeSpaces();
+}
+export async function getHomeBookingLimits() {
+  return createBookingQueries().getHomeBookingLimits();
+}
+export async function getBookingDestination() {
+  return createBookingQueries().getBookingDestination();
+}
+
 export async function getBranchList() {
   return createBookingQueries().getBranchList();
 }

@@ -20,6 +20,7 @@ import {
 } from "@/features/bookings/actions";
 import type { ActionResult } from "@/lib/actions/result";
 import { floorDayFixture, spaceDayFixture } from "./booking-ui-fixtures";
+import { getOperatingState } from "@/features/bookings/operating-state";
 
 const navigation = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -233,7 +234,7 @@ describe("navigation, lists and cancellation", () => {
     display(
       <BranchList
         branches={[
-          { ...data.branch, isDefault: true, todayHours: data.openHours },
+          { ...data.branch, isDefault: true, todayHours: data.openHours, accessibleFloorCount: 1, freeSpaceCount: 1, operatingState: getOperatingState(new Date(data.now), data.branch.timezone, data.branch.openHours) },
         ]}
       />,
     );

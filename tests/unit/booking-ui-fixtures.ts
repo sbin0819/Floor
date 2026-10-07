@@ -1,4 +1,5 @@
 import type { FloorDayData, SpaceDayData } from "@/features/bookings/types";
+import { getOperatingState } from "@/features/bookings/operating-state";
 
 export function spaceDayFixture(): SpaceDayData {
   return {
@@ -68,8 +69,19 @@ export function floorDayFixture(): FloorDayData {
     date: data.date,
     isToday: true,
     openHours: data.openHours,
+    now: data.now,
+    operatingState: getOperatingState(
+      new Date(data.now),
+      data.branch.timezone,
+      data.branch.openHours,
+    ),
+    groups: [{ type: "meeting_room", totalCount: 2, freeCount: 1 }],
     spaces: [
-      data.space,
+      {
+        ...data.space,
+        intervals: [],
+        summary: { status: "free", until: data.bookings[0]!.start },
+      },
       { kind: "restricted", id: "restricted", type: "meeting_room" },
     ],
   };

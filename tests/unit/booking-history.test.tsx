@@ -23,7 +23,7 @@ beforeEach(() => {
     email: "member@example.test",
     name: "가상 회원",
   });
-  vi.mocked(getMyBookings).mockResolvedValue({ upcoming: [], past: [] });
+  vi.mocked(getMyBookings).mockResolvedValue({ upcoming: [], past: [], now: "2026-10-07T01:10:00.000Z" });
   vi.mocked(cancelBooking).mockResolvedValue({
     ok: true,
     data: { bookingId: "booking" },
@@ -53,7 +53,7 @@ it("does not query booking history after its own session guard rejects", async (
 });
 
 it("shows the empty state in each history section", () => {
-  render(<MyBookings data={{ upcoming: [], past: [] }} />);
+  render(<MyBookings data={{ upcoming: [], past: [], now: "2026-10-07T01:10:00.000Z" }} />);
   expect(screen.getAllByText("예약이 아직 없어요")).toHaveLength(2);
 });
 
@@ -79,6 +79,7 @@ it("shows upcoming links, plain past entries and a confirmation before cancellat
     <QueryClientProvider client={new QueryClient()}>
       <MyBookings
         data={{
+          now: "2026-10-07T01:10:00.000Z",
           upcoming: [booking],
           past: [{ ...booking, id: "past", status: "cancelled" }],
         }}

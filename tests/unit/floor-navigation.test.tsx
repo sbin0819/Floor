@@ -58,8 +58,14 @@ function page(
   const detail = spaceDayFixture();
   const query = new URLSearchParams(navigation.query);
   list.spaces = [
-    { ...detail.space, id: spaceId },
-    { ...detail.space, id: otherSpaceId, name: "회의실 D" },
+    { ...detail.space, id: spaceId, intervals: [], summary: null },
+    {
+      ...detail.space,
+      id: otherSpaceId,
+      name: "회의실 D",
+      intervals: [],
+      summary: null,
+    },
   ];
   detail.space.id = actualSpaceId ?? spaceId;
   detail.space.name = actualSpaceId === otherSpaceId ? "회의실 D" : "회의실 C";
@@ -161,7 +167,7 @@ describe("floor optimistic navigation", () => {
     const navigate = vi.fn<NavigateAction>(() => response.promise);
     render(page(navigate, spaceId));
     await act(async () => {
-      fireEvent.click(screen.getByRole("link", { name: "다음 날" }));
+      fireEvent.click(screen.getByRole("link", { name: "10월 8일 목요일" }));
     });
     expect(navigate).toHaveBeenCalledExactlyOnceWith(
       `/branches/branch/floors/floor?date=2026-10-08&space=${spaceId}`,
@@ -169,11 +175,11 @@ describe("floor optimistic navigation", () => {
     );
     expect(region("list").getByRole("status")).toBeVisible();
     expect(region("detail").getByRole("status")).toBeVisible();
-    expect(screen.getByRole("link", { name: "이전 날" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /^오늘 ·/ })).toHaveAttribute(
       "href",
       `/branches/branch/floors/floor?date=${today}&space=${spaceId}`,
     );
-    expect(screen.getByRole("link", { name: "오늘" })).not.toHaveAttribute(
+    expect(screen.getByRole("link", { name: /^오늘 ·/ })).not.toHaveAttribute(
       "aria-current",
     );
     await finish(response);
@@ -211,7 +217,7 @@ describe("floor optimistic navigation", () => {
     const response = deferred();
     render(page(() => response.promise));
     await act(async () => {
-      fireEvent.click(screen.getByRole("link", { name: "다음 날" }));
+      fireEvent.click(screen.getByRole("link", { name: "10월 8일 목요일" }));
     });
     expect(region("list").getByRole("status")).toBeVisible();
     expect(region("detail").queryByRole("status")).not.toBeInTheDocument();
@@ -306,7 +312,7 @@ describe("floor optimistic navigation", () => {
       expect(
         region("detail").getByRole("heading", { name: "공간을 골라 주세요" }),
       ).toBeVisible();
-      expect(screen.getByRole("link", { name: "오늘" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: /^오늘 ·/ })).toHaveAttribute(
         "aria-current",
         "date",
       );

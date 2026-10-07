@@ -221,6 +221,23 @@ function locatedBookings(database: DalDatabase) {
     .leftJoin(teams, eq(teams.id, bookings.teamId));
 }
 
+export async function listMyUpcomingBookings(
+  userId: string,
+  now: Date,
+  database: DalDatabase = getDb(),
+) {
+  return locatedBookings(database)
+    .where(
+      and(
+        eq(bookings.userId, userId),
+        eq(bookings.status, "confirmed"),
+        sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
+      ),
+    )
+    .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id))
+    .limit(3);
+}
+
 export async function getBookingWithLocation(
   bookingId: string,
   database: DalDatabase = getDb(),

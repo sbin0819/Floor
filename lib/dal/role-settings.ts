@@ -52,3 +52,25 @@ export function getRoleSettings(
     ? cachedRoleSettings(branchId)
     : readRoleSettings(branchId, database);
 }
+
+async function readAllRoleSettings(database: DalDatabase = getDb()) {
+  const rows = await database
+    .select({
+      branchId: roleSettings.branchId,
+      role: roleSettings.role,
+      permissions: roleSettings.permissions,
+    })
+    .from(roleSettings);
+  const result: Record<string, Partial<Record<Role, PermissionKey[]>>> = {};
+  for (const row of rows) {
+    const branch = (result[row.branchId] ??= {});
+    branch[row.role] = row.permissions.filter(isPermissionKey);
+  }
+  return result;
+}
+const cachedAllRoleSettings = cache(() => readAllRoleSettings());
+export function getAllRoleSettings(database?: DalDatabase) {
+  return database === undefined
+    ? cachedAllRoleSettings()
+    : readAllRoleSettings(database);
+}

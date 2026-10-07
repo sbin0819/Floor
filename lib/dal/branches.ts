@@ -111,6 +111,24 @@ const cachedFloorsWithAccess = cache((branchId: string) =>
   readFloorsWithAccess(branchId),
 );
 
+async function readAllFloorsWithAccess(database: DalDatabase = getDb()) {
+  return groupFloorAccess(
+    await floorAccessQuery(database).orderBy(
+      asc(floors.branchId),
+      asc(floors.sortOrder),
+      asc(floors.level),
+      asc(floors.id),
+      asc(accessGrants.teamId),
+    ),
+  );
+}
+const cachedAllFloorsWithAccess = cache(() => readAllFloorsWithAccess());
+export function listAllFloorsWithAccess(database?: DalDatabase) {
+  return database === undefined
+    ? cachedAllFloorsWithAccess()
+    : readAllFloorsWithAccess(database);
+}
+
 export function listFloorsWithAccess(branchId: string, database?: DalDatabase) {
   return database === undefined
     ? cachedFloorsWithAccess(branchId)
