@@ -26,6 +26,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/04-seed.md` | 목 데이터와 관리자 계정 작업 지시서 (끝남) | 시드에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/05-booking.md` | 공간 찾기와 예약 작업 지시서 (끝남) | 예약에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/06-space-admin.md` | 운영자의 지점·층·공간 관리 작업 지시서 (끝남) | 운영자 공간 관리에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/07-speed-and-loading.md` | 조회 속도, 공통 틀, 로딩 상태 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/08-member-screens.md` | 멤버 화면 다시 짜기 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/09-admin-auth-screens.md` | 운영자 화면과 로그인 화면 다듬기 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/spec/ui.md` | 화면 구성, 로딩 상태(스켈레톤, 바뀌는 부분만 바꾸기), 조회 속도 예산, 화면별 구성과 문구 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
 | `docs/spec/booking.md` | 지점 → 층 → 공간 → 예약 흐름, 사용자 행동별 데이터, 시간 규칙, 한도 | 공간 목록·예약을 만질 때 |
 | `docs/spec/space-admin.md` | 운영자가 지점·층·공간·이용 대상을 입력하는 규칙 | 운영자 화면을 만질 때 |
@@ -34,8 +38,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/spec/roles-and-access.md` | 역할 4개, 권한 키, 기본값, 층·공간 접근 범위 | 권한·접근 판정을 만질 때 |
 | `docs/spec/floor-plan.md` | 평면도 JSON 형식과 검증 규칙 | 평면도 스키마·렌더러·편집기를 만질 때 |
 | `docs/spec/design-tokens.md` | 색, 타이포, 간격, shadcn 변수 매핑 | UI를 만질 때 |
-| `docs/design/*.png` | 화면 시안 9장, 다이어그램 4장 | 화면을 만들 때 참고 |
-| `docs/jira-issues.md` | Jira 이슈 71개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
+| `docs/design/floor-*.png` | 처음 그린 화면 시안 9장, 다이어그램 4장 | 화면을 만들 때 참고 |
+| `docs/design/ui-*.png` | 지금 만드는 화면의 시안 11장 (홈, 지점, 층, 내 예약, 팀, 로딩, 좁은 화면). `docs/spec/ui.md`와 같이 본다 | 멤버 화면을 만들 때 |
+| `docs/jira-issues.md` | Jira 이슈 80개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
 
 ## 기술 스택 (확정)
 
@@ -130,7 +135,7 @@ UI
 - 색은 `docs/spec/design-tokens.md`의 토큰만 쓴다. 컴포넌트에 hex 값을 직접 쓰지 않는다.
 - 색은 의미가 있을 때만 쓴다. 공간 상태(비어 있음, 사용 중, 내 예약, 점검 중, 전용 공간), 초대의 수락 대기, 강조 버튼 외에는 무채색이다.
 - 기본 컴포넌트는 shadcn/ui를 쓴다. 같은 역할의 컴포넌트를 새로 만들지 않는다.
-- 키보드로 모든 동작이 가능해야 하고, 포커스 표시를 없애지 않는다. 기본 컨트롤 높이는 44px이고, 더 작은 컨트롤은 누를 수 있는 영역을 44px로 넓힌다.
+- 키보드로 모든 동작이 가능해야 하고, 포커스 표시를 없애지 않는다. 기본 컨트롤 높이는 44px이고, 더 작은 컨트롤은 누를 수 있는 영역을 44px로 넓힌다. 예외는 하나다: 공간 상세의 하루 일정에서 빈 칸은 1024px 이상의 패널에서 28px이다 (시트에서는 44px. `docs/spec/ui.md`).
 - 시간과 숫자에는 `tabular-nums`를 쓴다.
 
 코드
@@ -150,6 +155,18 @@ Cache Components는 활성화하고 React Compiler는 비활성으로 둔다. �
 이 파일 맨 위의 `nextjs-agent-rules` 블록은 Next.js가 관리한다. `next dev`가 다시 써 넣으므로 고치거나 지우지 않는다. Next.js 관련 코드를 쓰기 전에 설치된 버전의 문서(`node_modules/next/dist/docs/`)에서 해당 주제를 찾아 읽는다. 기억에 있는 예전 API(예: `next lint`, 동기 `cookies()`/`params`)를 쓰지 않는다.
 
 Drizzle, Neon 드라이버, shadcn/ui, Storybook, Tailwind도 버전에 따라 설정 방법이 다르다. 공식 문서의 현재 안내를 확인하고, 확인할 수 없으면 추측하지 말고 보고에 적는다.
+
+## 로딩과 속도
+
+자세한 것은 `docs/spec/ui.md`에 있다. 화면이나 조회를 만질 때 언제나 지킨다.
+
+- `<Suspense>`의 fallback은 그 자리에 올 내용과 같은 틀의 스켈레톤이다. 글자 한 줄짜리 fallback을 만들지 않는다.
+- 독립된 영역은 각자의 `<Suspense>`에서 따로 읽는다. 한 영역이 다른 영역의 조회를 기다리지 않는다.
+- 주소만 바꾸는 이동(탭, 날짜, 목록의 선택)은 누른 즉시 선택 표시가 바뀌고, 바뀌는 영역만 스켈레톤이 된다. 항목은 `<a href>`로 남긴다.
+- 한 요청 안에서 같은 조회를 두 번 하지 않는다. 세션과 내 소속은 React의 `cache()`로 요청 단위로 한 번만 읽는다. `cache()`는 요청이 끝나면 버려지므로 써도 된다. `use cache`는 여전히 쓰지 않는다.
+- 서로 기다릴 필요가 없는 조회는 `Promise.all`로 같이 보낸다. 조회 함수는 `docs/spec/ui.md`의 단계 예산(대부분 세션 확인 뒤 2단계) 이하여야 하고, `tests/db`의 단계 테스트로 확인한다. 한 단계에 같이 보내는 문장은 6개까지다. 반복문 안에서 조회를 `await`하지 않는다.
+- 속도를 위해 권한 확인을 빼거나, 보여주면 안 되는 값을 읽어 온 뒤 코드나 화면에서 가리지 않는다. 클라이언트 컴포넌트에 넘기는 값은 화면에 쓸 필드만 담는다.
+- 클라이언트 컴포넌트는 렌더링 중에 `new Date()`, `Date.now()`를 부르지 않는다. 오늘과 지금은 서버가 props로 내려준다.
 
 ## 하지 않는 것
 

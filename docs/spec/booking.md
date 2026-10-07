@@ -10,8 +10,9 @@
 
 | # | 사용자 행동 | 주소·호출 | 읽기 | 쓰기 | 서버가 확인하는 것 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 예약하러 들어온다 | 홈의 "공간 예약하기" | `users.default_branch_id`, 내 팀의 `teams.home_branch_id` | – | 로그인 |
-| 2 | 이용할 지점을 고른다 | `/branches` → `setDefaultBranch` | `branches` | `users.default_branch_id` | 로그인, 지점이 있음 |
+| 1 | 예약하러 들어온다 | 홈의 "공간 예약하기", 머리글의 "공간 예약" (`/booking`) | `users.default_branch_id`, 내 팀의 `teams.home_branch_id`, 그 지점의 층 | – | 로그인 |
+| 2 | 이용할 지점을 고른다 | `/branches`의 지점 카드 | `branches`, 층과 공간의 수, 지금의 예약 | – | 로그인 |
+| 2-1 | 기본 지점을 정한다 | `/branches`의 "기본 지점으로 설정" → `setDefaultBranch` | `branches` | `users.default_branch_id` | 로그인, 지점이 있음 |
 | 3 | 층을 고른다 | `/branches/[branchId]`, `/branches/[branchId]/floors/[floorId]` | `branches`, `floors`, `access_grants`, 내 소속(`team_members`, `branch_staff`), `role_settings` | – | `floor.view`, `canAccessFloor()`, 층이 그 지점의 층인지 |
 | 4 | 날짜를 고른다 | 같은 주소의 `?date=` | – | – | 날짜 형식과 범위 |
 | 5 | 공간 목록을 본다 | 같은 주소 | `spaces`, `access_grants`, 그날의 `bookings`, `space_blocks` | – | 공간마다 `canAccess()`. 못 쓰는 공간은 이름과 일정을 내려보내지 않음 |
@@ -27,7 +28,7 @@
 
 - 누구인가: `users` (가입 때)
 - 어디에 속하나: `team_members`, `branch_staff`
-- 주로 어느 지점을 쓰나: `users.default_branch_id` (지점을 고를 때)
+- 주로 어느 지점을 쓰나: `users.default_branch_id` ("기본 지점으로 설정"을 누를 때, 그리고 기본 지점이 없는 채로 처음 예약에 성공할 때)
 
 지금 고른 층, 날짜, 공간은 저장하지 않고 주소에 둔다. 새로고침하거나 주소를 공유해도 같은 화면이 나온다.
 
@@ -38,20 +39,22 @@
 | 주소 | 내용 |
 | --- | --- |
 | `/` | 홈. "공간 예약하기" 카드를 더한다 |
-| `/branches` | 지점 목록. 고르면 기본 지점으로 저장하고 그 지점으로 간다 |
+| `/booking` | 화면이 없다. 내 지점의 첫 층으로 보낸다 (`docs/spec/ui.md`) |
+| `/branches` | 지점 목록. 카드를 누르면 그 지점으로 간다. 기본 지점은 "기본 지점으로 설정"으로 따로 정한다 |
 | `/branches/[branchId]` | 그 지점에서 내가 쓸 수 있는 첫 층으로 보낸다. 쓸 수 있는 층이 없으면 안내를 보여준다 |
 | `/branches/[branchId]/floors/[floorId]` | 공간 목록과 예약. 쿼리 `date`(YYYY-MM-DD), `space`(공간 id) |
 | `/bookings` | 내 예약 |
 
 - 모두 `(app)` 그룹이고 모든 페이지가 `requirePageSession()`을 부른다.
 - 홈의 "공간 예약하기"가 가는 곳: `users.default_branch_id`가 있으면 그 지점, 없으면 내 팀을 이름순으로 봤을 때 `home_branch_id`가 있는 첫 팀의 지점, 그것도 없으면 `/branches`.
-- 머리글의 "공간 예약"은 `/branches`로 간다. 지점 목록은 내 기본 지점을 맨 위에 두고 "기본 지점"이라고 표시한다.
+- 머리글의 "공간 예약"은 `/booking`으로 간다. 지점 목록은 내 기본 지점을 맨 위에 두고 "기본 지점"이라고 표시한다.
+- 기본 지점은 두 가지 때에 저장된다: 지점 목록에서 "기본 지점으로 설정"을 누를 때, 그리고 기본 지점이 없는 사용자가 예약에 성공했을 때(그 예약의 지점으로). 지점 카드를 누르는 것만으로는 바뀌지 않는다.
 - 층 화면은 주소의 `branchId`를 믿지 않는다. 층 행에서 지점을 읽고, 주소의 `branchId`와 다르면 `notFound()`다. 권한과 운영 시간은 층 행에서 읽은 지점으로 판정한다.
-- `proxy.ts`의 보호 경로에 `/branches`와 `/bookings`를 더한다.
+- `proxy.ts`의 보호 경로에 `/branches`, `/bookings`, `/booking`을 더한다.
 - 없는 지점·층이거나 접근할 수 없는 층이면 `notFound()`. 층이 있는지 드러내지 않는다.
 - `date`가 없거나 형식이 틀리거나 범위 밖이면 오늘로 본다. 범위는 지점 시간대의 오늘부터 60일 뒤까지다.
 - `space`가 그 층의 공간이 아니거나 내가 쓸 수 없는 공간이면 고르지 않은 것으로 본다.
-- 머리글에 "홈", "공간 예약", "내 예약" 링크를 둔다.
+- 머리글에 "홈", "공간 예약", "내 예약", "팀" 링크를 둔다.
 
 ## 시간 규칙
 
@@ -158,7 +161,7 @@ data: { bookingId: string }
 6. 시간 규칙. 이 순서로 본다: 30분 칸에 맞지 않거나 끝이 시작보다 앞이거나 같음 → 하루를 넘김 → 이미 지난 시간 (여기까지 `INVALID_INPUT`) → 쉬는 날 → 운영 시간 밖 (이 둘은 `OUTSIDE_HOURS`).
 7. 트랜잭션을 연다. 공간 행을 `FOR SHARE`로 잠그고 다시 본다 (운영자의 보관과 동시에 일어나는 경우). 보관됐으면 `NOT_FOUND`, 예약 불가로 바뀌었으면 `INVALID_INPUT`. 한도의 기준이 되는 행을 `FOR UPDATE`로 잠근다 (개인 예약은 내 `users` 행, 팀 예약은 그 `teams` 행). 그날의 합계를 세고, 넘으면 `LIMIT_EXCEEDED`.
 8. 겹치는 점검(`space_blocks`)이 있으면 `SPACE_BLOCKED`.
-9. `bookings`에 넣는다. 겹치는 예약이 있으면 DB가 `23P01`을 내고 래퍼가 `BOOKING_CONFLICT`로 바꾼다. 겹침을 사전 조회로 판정하지 않는다.
+9. `bookings`에 넣는다. 겹치는 예약이 있으면 DB가 `23P01`을 내고 래퍼가 `BOOKING_CONFLICT`로 바꾼다. 겹침을 사전 조회로 판정하지 않는다. 같은 트랜잭션에서, 예약한 사람의 기본 지점이 비어 있으면 이 지점으로 채운다 (`UPDATE users SET default_branch_id = … WHERE id = … AND default_branch_id IS NULL` 한 문장). 이미 있으면 건드리지 않는다.
 10. 커밋 뒤 `RealtimePublisher`로 `floor:{floorId}` 채널에 `{ type: 'booking.changed', spaceId }`를 발행한다. 발행이 실패해도 예약은 성공이고 실패는 로그에 남긴다.
 
 ### cancelBooking
@@ -185,6 +188,7 @@ data: { branchId: string }
 
 - 로그인만 필요하다 (`authorize: 'none'`). 없는 지점이면 `NOT_FOUND`.
 - `users.default_branch_id`를 바꾼다.
+- 지점 목록의 "기본 지점으로 설정" 버튼이 부른다. 지점 카드를 눌러 이동할 때는 부르지 않는다.
 
 ## 조회
 
@@ -204,6 +208,8 @@ data: { branchId: string }
 - 하루의 예약을 읽을 때는 범위 겹침(`during && tstzrange(시작, 끝)`)으로 읽는다.
 
 ## 화면
+
+화면의 구성과 로딩 상태는 `docs/spec/ui.md`가 정하고, 이 절과 다르면 `docs/spec/ui.md`가 맞다. 이 절에는 첫 구현(지시서 05)의 기준이 남아 있다. 동작 규칙(무엇을 고를 수 있나, 무엇이 보이나, 실패했을 때의 문구)은 그대로 유효하다.
 
 `docs/design/floor-main.png`의 오른쪽 패널(공간 이름, 편의 시설, 오늘 일정, "개인으로 / 팀으로", 한도 안내, "예약하기")이 공간 상세의 기준이다. 가운데 평면도 자리에 공간 목록이 온다. 시안의 지점 선택, 층 탭, 날짜도 같은 자리에 둔다. 왼쪽의 팀 레일, 메시지, 알림, 검색, "평면도 / 리스트" 전환, "참석자 채팅방 함께 만들기"는 만들지 않는다.
 

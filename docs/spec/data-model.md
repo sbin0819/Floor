@@ -48,7 +48,7 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | name | text | not null |
 | avatar_url | text | null 허용. Better Auth의 `image`에 해당 |
 | updated_at | timestamptz | not null, 기본값 now() |
-| default_branch_id | uuid | null 허용, FK → branches, on delete set null. 주로 쓰는 지점. 지점을 고를 때 바뀐다 (`docs/spec/booking.md`) |
+| default_branch_id | uuid | null 허용, FK → branches, on delete set null. 주로 쓰는 지점. "기본 지점으로 설정"을 누를 때 바뀌고, 비어 있는 채로 처음 예약에 성공하면 그 지점으로 채워진다 (`docs/spec/booking.md`) |
 
 - 셋업 때 있던 `auth_id` 컬럼은 없앤다.
 - `default_branch_id`는 Better Auth가 쓰지 않는 컬럼이다. Better Auth의 필드로 등록하지 않고 `lib/dal`로만 읽고 쓴다.
