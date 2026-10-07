@@ -5,6 +5,7 @@ describe("environment", () => {
   it("allows absent database and authentication settings for builds", () => {
     const env = parseEnv({});
     expect(env.DATABASE_URL).toBeUndefined();
+    expect(env.SEED_ALLOW_HOST).toBeUndefined();
     expect(env.AUTH_SECRET).toBeUndefined();
     expect(env.NEXT_PUBLIC_APP_URL).toBe("http://localhost:3000");
   });
@@ -12,6 +13,7 @@ describe("environment", () => {
     expect(
       parseEnv({
         DATABASE_URL: "",
+        SEED_ALLOW_HOST: "",
         AUTH_SECRET: "",
         NEXT_PUBLIC_APP_URL: "",
         GOOGLE_CLIENT_ID: "",
@@ -19,6 +21,7 @@ describe("environment", () => {
       }),
     ).toMatchObject({
       DATABASE_URL: undefined,
+      SEED_ALLOW_HOST: undefined,
       AUTH_SECRET: undefined,
       NEXT_PUBLIC_APP_URL: "http://localhost:3000",
       GOOGLE_CLIENT_ID: undefined,
@@ -54,6 +57,14 @@ describe("environment", () => {
   });
   it("rejects an invalid application URL", () => {
     expect(() => parseEnv({ NEXT_PUBLIC_APP_URL: "not-a-url" })).toThrow();
+  });
+  it("preserves the exact optional seed hostname for the CLI allowlist", () => {
+    expect(
+      parseEnv({ SEED_ALLOW_HOST: "dev-db.example.test" }).SEED_ALLOW_HOST,
+    ).toBe("dev-db.example.test");
+    expect(
+      parseEnv({ SEED_ALLOW_HOST: " DEV-DB.example.test " }).SEED_ALLOW_HOST,
+    ).toBe(" DEV-DB.example.test ");
   });
   it("accepts supplied database and app URLs", () => {
     expect(

@@ -13,6 +13,7 @@
     "format": "prettier --write .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --conditions=react-server --import=tsx --env-file-if-exists=.env.local scripts/seed.ts",
     "admin:create": "node --conditions=react-server --import=tsx --env-file-if-exists=.env.local scripts/admin-create.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
