@@ -1,0 +1,363 @@
+{
+  "branch": {
+    "id": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+    "name": "강남점",
+    "timezone": "Asia/Seoul"
+  },
+  "floor": {
+    "id": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+    "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+    "level": 7,
+    "name": "7F",
+    "access": "everyone"
+  },
+  "teams": [
+    {
+      "id": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "name": "디자인팀"
+    },
+    {
+      "id": "1647b59d-2deb-503a-8442-8a4b8de7811b",
+      "name": "그로스팀"
+    }
+  ],
+  "accessGrants": [
+    {
+      "targetType": "space",
+      "targetId": "400527fa-3c66-5cd4-a627-bf65ffb0dee2",
+      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b"
+    }
+  ],
+  "spaces": [
+    {
+      "id": "400527fa-3c66-5cd4-a627-bf65ffb0dee2",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 A",
+      "capacity": 8,
+      "bookable": true,
+      "access": "teams"
+    },
+    {
+      "id": "bf9a611a-92eb-5825-9188-5ef9b191ca91",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 B",
+      "capacity": 6,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "0495a219-c757-56ae-abda-4e212be70e5c",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 C",
+      "capacity": 8,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "975b3531-6fdb-526d-b1ee-f364384b14db",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 1",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "b242f462-f1bf-5b6d-b1b0-8055297d9dd1",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 2",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "desk_area",
+      "name": "오픈 데스크",
+      "capacity": 24,
+      "bookable": false,
+      "access": null
+    },
+    {
+      "id": "dbe95225-e73b-5014-a8c2-1347496bda7b",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "lounge",
+      "name": "라운지",
+      "capacity": null,
+      "bookable": false,
+      "access": null
+    },
+    {
+      "id": "11bdd550-2a39-52d2-874b-9b00599172ca",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "seminar",
+      "name": "세미나룸",
+      "capacity": 20,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "62719efa-1f4a-5896-85ab-1dc1e1bbcfb8",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 D",
+      "capacity": 6,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "1847d48a-b886-5731-a3db-8d43a48bb745",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-01",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "62324832-b7f1-55f1-892d-9541c0ddfb42",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-02",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "c5a379bc-9278-57a7-b7ad-def988b95902",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-03",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "7e53bd04-c6aa-5222-a339-0f2ea3ec0ba6",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-04",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "8bdc2d1d-9ba5-5844-925c-672fe80ab7c9",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-05",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "cdbfac24-9a42-52ef-b2ad-24e319717ad4",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-06",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "18ef6794-5351-5e38-a5ec-04ae6a033d13",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-07",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "48073cdd-325b-5507-90d4-526e06e5a2ae",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-08",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "819a7e27-14a6-522f-8a83-ef79e1621207",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-09",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "37b2a08f-5932-5885-bbe6-e12037d75e37",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-10",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "e794e40e-cae6-5d93-8a86-566cd52f8e72",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-11",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "17344f6d-672f-5cad-b437-3386184b2542",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-12",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "c1ca65fb-ef78-5aba-b072-9e659c54a35b",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-13",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "e6be7b1f-d0fb-5337-9b82-c67e6ecb7686",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-14",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "c71aa02b-d84e-5361-827e-7c800312baf0",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-15",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "7df5622f-596f-5f92-94b2-c7a14e70ace9",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-16",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "d2a39e85-df22-5ec2-8f0c-35a5469cc0c1",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-17",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "4fceb773-9aa6-5a76-89b3-5f6ddd507e42",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-18",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "9ad9d783-09f1-57b8-aff4-d7602fd7a327",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-19",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "18c4004e-3976-5667-b555-42efd0a19f09",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-20",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "d52dada2-e230-53ed-b8e7-665ab5d194c5",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-21",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "5af017ef-1e27-5117-be96-8622f7cd5df0",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-22",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "d2446fcb-7000-5715-b9ea-aa3b189eb09f",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-23",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    },
+    {
+      "id": "db485e83-08b8-5fc5-95aa-1205a70d5a22",
+      "floorId": "225d7bd9-81c5-507d-a4f0-d45dcc366144",
+      "parentId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "type": "desk",
+      "name": "A-24",
+      "capacity": 1,
+      "bookable": true,
+      "access": null
+    }
+  ]
+}
