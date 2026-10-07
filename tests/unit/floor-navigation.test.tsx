@@ -33,6 +33,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/features/bookings/components/booking-form", () => ({
   BookingForm: () => <p>예약 양식</p>,
 }));
+vi.mock("@/features/bookings/components/floor-view", () => ({
+  useFloorView: () => ({ view: "list", effectiveView: "list" }),
+}));
 
 const spaceId = "abcdefab-1234-4abc-9def-123456789abc";
 const otherSpaceId = "abcdefab-1234-4abc-9def-123456789abd";

@@ -25,6 +25,9 @@ vi.mock("next/navigation", () => ({
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   useSearchParams: () => new URLSearchParams("date=2026-10-07"),
 }));
+vi.mock("@/features/bookings/components/floor-view", () => ({
+  useFloorView: () => ({ effectiveView: "list" }),
+}));
 vi.mock("@/features/bookings/actions", () => ({
   setDefaultBranch: vi.fn(),
   cancelBooking: vi.fn(),

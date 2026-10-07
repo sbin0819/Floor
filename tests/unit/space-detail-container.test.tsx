@@ -33,6 +33,9 @@ const navigation = vi.hoisted(() => ({
   query: "date=2026-10-07",
   router: { push: vi.fn(), replace: vi.fn() },
 }));
+vi.mock("@/features/bookings/components/floor-view", () => ({
+  useFloorView: () => ({ effectiveView: "list" }),
+}));
 vi.mock("next/navigation", () => ({
   useParams: () => ({
     branchId: navigation.branchId,

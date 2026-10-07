@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from "react";
 import { LoaderCircle, Plus } from "lucide-react";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,7 +75,15 @@ function TimeSelect({
   );
 }
 
-export function BookingForm({ data }: { data: SpaceDayData }) {
+export function BookingForm({
+  data,
+  variant = "panel",
+  onBooked,
+}: {
+  data: SpaceDayData;
+  variant?: "panel" | "strip";
+  onBooked?: () => void;
+}) {
   const id = useId();
   const workspace = useFloorSelection();
   const [localRange, setLocalRange] = useState<{
@@ -119,6 +128,7 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
     onSuccess: () => {
       setRange(null);
       setTitle("");
+      onBooked?.();
     },
   });
   const disabled =
@@ -148,40 +158,48 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
     : "";
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div
-        data-booking-scroll="true"
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
-      >
-        <BookingTimeline
-          slots={slots}
-          bookings={data.bookings}
-          blocks={data.blocks}
-          timeZone={data.branch.timezone}
-          now={data.now}
-          date={data.date}
-          start={selectedStart}
-          end={selectedEnd}
-          disabled={disabled}
-          renderCancel={(bookingId) => (
-            <CancelBookingButton bookingId={bookingId} />
-          )}
-          onSelect={(value) => {
-            const selection = selectBookingSlot(
-              slots,
-              selectedStart && selectedEnd
-                ? { start: selectedStart, end: selectedEnd }
-                : null,
-              value,
-            );
-            if (selection) {
-              setRange(selection);
-            }
-          }}
-        />
-      </div>
+      {variant === "panel" && (
+        <div
+          data-booking-scroll="true"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
+        >
+          <BookingTimeline
+            slots={slots}
+            bookings={data.bookings}
+            blocks={data.blocks}
+            timeZone={data.branch.timezone}
+            now={data.now}
+            date={data.date}
+            start={selectedStart}
+            end={selectedEnd}
+            disabled={disabled}
+            renderCancel={(bookingId) => (
+              <CancelBookingButton bookingId={bookingId} />
+            )}
+            onSelect={(value) => {
+              const selection = selectBookingSlot(
+                slots,
+                selectedStart && selectedEnd
+                  ? { start: selectedStart, end: selectedEnd }
+                  : null,
+                value,
+              );
+              if (selection) {
+                setRange(selection);
+              }
+            }}
+          />
+        </div>
+      )}
       <form
         aria-label="예약 양식"
-        className="shrink-0 space-y-2 border-t border-border bg-card p-4"
+        data-booking-variant={variant}
+        className={cn(
+          "shrink-0 bg-card",
+          variant === "panel"
+            ? "space-y-2 border-t border-border p-4"
+            : "grid min-w-0 grid-cols-2 items-end gap-3 lg:flex lg:flex-wrap",
+        )}
         onSubmit={(event) => {
           event.preventDefault();
           if (!actor || !selectedStart || !selectedEnd || disabled) return;
@@ -206,31 +224,41 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
           </p>
         ) : (
           <>
-            <p
-              aria-live="polite"
-              aria-atomic="true"
-              className="flex flex-wrap items-center justify-between gap-1 text-sm font-semibold tabular-nums"
-            >
-              {selectedStart && selectedEnd ? (
-                <>
-                  <span>
-                    {summaryDate} ·{" "}
-                    {formatBookingTime(
-                      selectedStart,
-                      selectedEnd,
-                      data.branch.timezone,
-                    )}
-                  </span>
-                  <span className="font-normal text-muted-foreground">
-                    {duration >= 60 ? `${Math.floor(duration / 60)}시간` : ""}
-                    {duration % 60 ? ` ${duration % 60}분` : ""}
-                  </span>
-                </>
-              ) : (
-                "시간을 골라 주세요"
+            {(variant === "panel" || !selectedStart || !selectedEnd) && (
+              <p
+                aria-live="polite"
+                aria-atomic="true"
+                className={cn(
+                  "flex flex-wrap items-center justify-between gap-1 text-sm font-semibold tabular-nums",
+                  variant === "strip" && "col-span-2 basis-full",
+                )}
+              >
+                {selectedStart && selectedEnd ? (
+                  <>
+                    <span>
+                      {summaryDate} ·{" "}
+                      {formatBookingTime(
+                        selectedStart,
+                        selectedEnd,
+                        data.branch.timezone,
+                      )}
+                    </span>
+                    <span className="font-normal text-muted-foreground">
+                      {duration >= 60 ? `${Math.floor(duration / 60)}시간` : ""}
+                      {duration % 60 ? ` ${duration % 60}분` : ""}
+                    </span>
+                  </>
+                ) : (
+                  "시간을 골라 주세요"
+                )}
+              </p>
+            )}
+            <div
+              className={cn(
+                "grid grid-cols-2 gap-3",
+                variant === "strip" && "col-span-2 min-w-56 lg:flex-1",
               )}
-            </p>
-            <div className="grid grid-cols-2 gap-3">
+            >
               <TimeSelect
                 id={`${id}-start`}
                 label="시작"
@@ -254,7 +282,9 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
               />
             </div>
             {data.hasTeams && (
-              <div className="space-y-2">
+              <div
+                className={cn("space-y-2", variant === "strip" && "min-w-32")}
+              >
                 <Label htmlFor={`${id}-actor`}>예약 방식</Label>
                 <Select
                   value={actor?.teamId ?? "personal"}
@@ -281,7 +311,12 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
               </div>
             )}
             {actor && (
-              <p className="text-xs text-muted-foreground tabular-nums">
+              <p
+                className={cn(
+                  "text-xs text-muted-foreground tabular-nums",
+                  variant === "strip" && "order-last col-span-2 basis-full",
+                )}
+              >
                 {actor.teamId === null ? "개인" : "팀"} 예약은{" "}
                 {actor.limits.maxMinutesPerDay === null
                   ? "하루 한도가 없어요"
@@ -291,28 +326,39 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
               </p>
             )}
             {overLimit && (
-              <p aria-live="polite" className="text-xs text-muted-foreground">
+              <p
+                aria-live="polite"
+                className={cn(
+                  "text-xs text-muted-foreground",
+                  variant === "strip" && "order-last col-span-2 basis-full",
+                )}
+              >
                 선택한 시간이 예약 한도를 넘어요. 시간을 줄이거나 예약할 때
                 확인해 주세요
               </p>
             )}
             {!actor && <p>이 공간을 예약할 권한이 없어요</p>}
-            <Button
-              type="button"
-              variant="ghost"
-              className="px-0 text-xs text-primary"
-              disabled={disabled}
-              aria-expanded={showTitle}
-              aria-controls={`${id}-title-region`}
-              onClick={() => setShowTitle((value) => !value)}
-            >
-              <Plus aria-hidden="true" className="size-4" />{" "}
-              {showTitle ? "제목 접기" : "제목 추가"}
-            </Button>
+            {variant === "panel" && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="px-0 text-xs text-primary"
+                disabled={disabled}
+                aria-expanded={showTitle}
+                aria-controls={`${id}-title-region`}
+                onClick={() => setShowTitle((value) => !value)}
+              >
+                <Plus aria-hidden="true" className="size-4" />{" "}
+                {showTitle ? "제목 접기" : "제목 추가"}
+              </Button>
+            )}
             <div
               id={`${id}-title-region`}
-              hidden={!showTitle}
-              className="space-y-2"
+              hidden={variant === "panel" && !showTitle}
+              className={cn(
+                "space-y-2",
+                variant === "strip" && "min-w-32 flex-1",
+              )}
             >
               <Label htmlFor={`${id}-title`}>제목 (선택)</Label>
               <Input
@@ -337,7 +383,9 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
             </div>
             <Button
               type="submit"
-              className="w-full"
+              className={
+                variant === "panel" ? "w-full" : "col-span-2 lg:w-auto"
+              }
               disabled={disabled || !selectedStart || !selectedEnd}
             >
               {mutation.pending && (
@@ -353,7 +401,10 @@ export function BookingForm({ data }: { data: SpaceDayData }) {
         <p
           role="status"
           aria-live="polite"
-          className="text-sm text-destructive empty:hidden"
+          className={cn(
+            "text-sm text-destructive empty:hidden",
+            variant === "strip" && "order-last col-span-2 basis-full",
+          )}
         >
           {mutation.message}
         </p>

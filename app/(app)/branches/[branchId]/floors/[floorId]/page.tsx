@@ -22,10 +22,8 @@ import {
   FloorListRegion,
   FloorDetailRegion,
 } from "@/features/bookings/components/floor-regions";
-import {
-  FloorPageSkeleton,
-  SpaceDetailSkeleton,
-} from "@/features/bookings/components/booking-skeletons";
+import { FloorPageSkeleton } from "@/features/bookings/components/booking-skeletons";
+import { SpaceDetailLoading } from "@/features/bookings/components/space-detail-loading";
 import { PageContainer } from "@/components/page-container";
 import { FloorViewsSkeleton } from "@/features/bookings/components/floor-view-skeleton";
 
@@ -114,7 +112,7 @@ async function FloorContent({ params, searchParams }: Props) {
           key={`${floorId}:${spaceId}:${dateKey}`}
           fallback={
             <SpaceDetailContainer>
-              {spaceId ? <SpaceDetailSkeleton /> : <EmptySpaceSelection />}
+              {spaceId ? <SpaceDetailLoading /> : <EmptySpaceSelection />}
             </SpaceDetailContainer>
           }
         >

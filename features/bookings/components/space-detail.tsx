@@ -1,3 +1,5 @@
+"use client";
+
 import { StatusBadge } from "@/components/status-badge";
 import { PhotoGallery } from "@/components/photos/photo-gallery";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +10,23 @@ import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 import type { SpaceDayData } from "@/features/bookings/types";
 import { BookingForm } from "./booking-form";
 import { FloorNavigationLink } from "./floor-navigation-link";
+import { useFloorView } from "./floor-view";
+import { useWideScreen } from "./use-wide-screen";
+import { useFloorSelection } from "./branch-workspace";
 
 export function SpaceDetail({ data }: { data: SpaceDayData }) {
+  const { effectiveView } = useFloorView();
+  const wide = useWideScreen();
+  const workspace = useFloorSelection();
+  if (wide && effectiveView === "timeline")
+    return (
+      <BookingForm
+        key={`${data.space.id}:${data.date}`}
+        data={data}
+        variant="strip"
+        onBooked={() => workspace?.closeAfterBooking(data.space.id, data.date)}
+      />
+    );
   return (
     <section
       aria-label="공간 상세"

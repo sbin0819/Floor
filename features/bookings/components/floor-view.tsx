@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { List, Table2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { shouldInterceptNavigation } from "@/components/optimistic-navigation";
 import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
 import {
@@ -91,8 +92,14 @@ export function FloorViewControl({ className }: { className?: string }) {
   );
 }
 export function FloorScreenLayout({ children }: { children: ReactNode }) {
+  const { view } = useFloorView();
   return (
-    <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+    <div
+      className={cn(
+        "grid min-w-0 items-start gap-6",
+        view === "list" && "lg:grid-cols-[minmax(0,1fr)_420px]",
+      )}
+    >
       {children}
     </div>
   );

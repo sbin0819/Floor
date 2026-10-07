@@ -30,6 +30,7 @@ const navigation = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation,
   usePathname: () => navigation.pathname,
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/features/bookings/actions", () => ({
   createBooking: vi.fn(),
@@ -227,6 +228,195 @@ describe("booking form", () => {
     );
     expect(screen.getByRole("button", { name: "예약하기" })).toBeDisabled();
   });
+});
+
+describe("booking strip", () => {
+  async function selectStart(time = "10:00") {
+    await userEvent.click(screen.getByRole("combobox", { name: "시작" }));
+    await userEvent.click(screen.getByRole("option", { name: time }));
+  }
+
+  it("has accessible inputs without another timeline and cannot submit before selection", async () => {
+    const view = display(
+      <BookingForm data={spaceDayFixture()} variant="strip" />,
+    );
+    expect(screen.getByText("시간을 골라 주세요")).toBeVisible();
+    expect(screen.getByRole("button", { name: "예약하기" })).toBeDisabled();
+    expect(screen.getByLabelText("끝")).toBeDisabled();
+    expect(
+      screen.queryByRole("combobox", { name: "예약 방식" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "제목 (선택)" }),
+    ).toHaveAttribute("maxLength", "60");
+    expect(
+      screen.queryByRole("button", { name: "제목 추가" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    expect(view.container.querySelector("[data-booking-scroll]")).toBeNull();
+    await userEvent.tab();
+    expect(screen.getByLabelText("시작")).toHaveFocus();
+    fireEvent.submit(screen.getByRole("form", { name: "예약 양식" }));
+    expect(createBooking).not.toHaveBeenCalled();
+  });
+
+  it("keeps contiguous selection, payload, pending lock and success callback", async () => {
+    let finish!: (result: ActionResult<{ bookingId: string }>) => void;
+    vi.mocked(createBooking).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const onBooked = vi.fn();
+    display(
+      <BookingForm
+        data={spaceDayFixture()}
+        variant="strip"
+        onBooked={onBooked}
+      />,
+    );
+    await selectStart();
+    expect(screen.getByLabelText("끝")).toHaveTextContent("11:00");
+    expect(screen.queryByText("시간을 골라 주세요")).not.toBeInTheDocument();
+    await userEvent.type(
+      screen.getByLabelText("제목 (선택)"),
+      "예약 줄 테스트",
+    );
+    const form = screen.getByRole("form", { name: "예약 양식" });
+    act(() => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+    await waitFor(() => expect(createBooking).toHaveBeenCalledTimes(1));
+    expect(createBooking).toHaveBeenCalledWith({
+      spaceId: "space",
+      start: "2026-10-07T01:00:00.000Z",
+      end: "2026-10-07T02:00:00.000Z",
+      teamId: null,
+      title: "예약 줄 테스트",
+    });
+    expect(
+      screen.getByRole("button", { name: "예약하고 있어요" }),
+    ).toBeDisabled();
+    expect(screen.getByLabelText("시작")).toBeDisabled();
+    expect(screen.getByLabelText("제목 (선택)")).toBeDisabled();
+    expect(onBooked).not.toHaveBeenCalled();
+    await act(async () => finish({ ok: true, data: { bookingId: "created" } }));
+    await waitFor(() => expect(onBooked).toHaveBeenCalledOnce());
+    expect(navigation.refresh).toHaveBeenCalledOnce();
+    expect(screen.getByText("시간을 골라 주세요")).toBeVisible();
+    expect(screen.getByRole("button", { name: "예약하기" })).toBeDisabled();
+    expect(screen.getByLabelText("제목 (선택)")).toHaveValue("");
+  });
+
+  it("preserves selected times and title when the same form switches layout", async () => {
+    const data = spaceDayFixture();
+    const client = new QueryClient();
+    const view = render(
+      <QueryClientProvider client={client}>
+        <BookingForm data={data} />
+      </QueryClientProvider>,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "제목 추가" }));
+    await userEvent.type(screen.getByLabelText("제목 (선택)"), "유지할 제목");
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <BookingForm data={data} variant="strip" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByLabelText("시작")).toHaveTextContent("10:00");
+    expect(screen.getByLabelText("끝")).toHaveTextContent("11:00");
+    expect(screen.getByLabelText("제목 (선택)")).toHaveValue("유지할 제목");
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <BookingForm data={data} />
+      </QueryClientProvider>,
+    );
+    expect(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("제목 (선택)")).toHaveValue("유지할 제목");
+  });
+
+  it("offers only permitted actors and keeps limit guidance without client-side rejection", async () => {
+    const data = spaceDayFixture();
+    data.hasTeams = true;
+    data.actors = [{ ...data.actors[0]!, teamId: "team", name: "가상 팀으로" }];
+    data.bookings = [];
+    data.blocks = [];
+    display(<BookingForm data={data} variant="strip" />);
+    await userEvent.click(screen.getByRole("combobox", { name: "예약 방식" }));
+    expect(screen.getByRole("option", { name: "가상 팀으로" })).toBeVisible();
+    expect(
+      screen.queryByRole("option", { name: "개인으로" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("option", { name: "가상 팀으로" }));
+    await selectStart();
+    await userEvent.click(screen.getByLabelText("끝"));
+    await userEvent.click(screen.getByRole("option", { name: "14:00" }));
+    expect(screen.getByText(/선택한 시간이 예약 한도를 넘어요/)).toBeVisible();
+    expect(screen.getByText(/팀 예약은 하루 2시간까지/)).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
+    await waitFor(() =>
+      expect(createBooking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          teamId: "team",
+          end: "2026-10-07T05:00:00.000Z",
+        }),
+      ),
+    );
+  });
+
+  it.each([
+    [
+      { ok: false, code: "BOOKING_CONFLICT" },
+      "방금 다른 예약이 들어왔어요. 시간을 다시 골라 주세요",
+      true,
+    ],
+    [{ ok: false, code: "SPACE_BLOCKED" }, "점검 중인 시간이에요", true],
+    [{ ok: false, code: "OUTSIDE_HOURS" }, "운영 시간이 아니에요", false],
+    [
+      { ok: false, code: "LIMIT_EXCEEDED", message: "per_booking" },
+      "한 번에 2시간까지 예약할 수 있어요",
+      false,
+    ],
+    [
+      { ok: false, code: "LIMIT_EXCEEDED", message: "per_day" },
+      "오늘 예약할 수 있는 시간을 다 썼어요",
+      false,
+    ],
+    [
+      { ok: false, code: "LIMIT_EXCEEDED", message: "days_ahead" },
+      "7일 뒤까지만 예약할 수 있어요",
+      false,
+    ],
+  ] as const)(
+    "retains server failure and refresh behavior %j",
+    async (result, message, refresh) => {
+      vi.mocked(createBooking).mockResolvedValue(result);
+      const onBooked = vi.fn();
+      display(
+        <BookingForm
+          data={spaceDayFixture()}
+          variant="strip"
+          onBooked={onBooked}
+        />,
+      );
+      await selectStart();
+      await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent(message),
+      );
+      expect(navigation.refresh).toHaveBeenCalledTimes(refresh ? 1 : 0);
+      expect(onBooked).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("시작")).toHaveTextContent("10:00");
+    },
+  );
 });
 
 describe("navigation, lists and cancellation", () => {

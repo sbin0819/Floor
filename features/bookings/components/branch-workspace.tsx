@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import type { FloorDayData } from "@/features/bookings/types";
 import {
   useOptimisticNavigation,
   type NavigateAction,
@@ -30,6 +31,9 @@ import {
 } from "@/features/bookings/floor-selection";
 
 type SelectionContext = {
+  floorData: FloorDayData | null;
+  registerFloor: (data: FloorDayData) => () => void;
+  closeAfterBooking: (spaceId: string, date: string) => void;
   selection: FloorBookingSelection | null;
   changeRange: (spaceId: string, range: BookingSelection | null) => void;
   selectSlot: (input: {
@@ -185,6 +189,33 @@ export function BranchWorkspace({
     [floorId, date, selectedSpaceId],
   );
   const navigation = useOptimisticNavigation(base, navigateAction ?? route);
+  const [registeredFloor, setRegisteredFloor] = useState<{
+    data: FloorDayData;
+    registration: symbol;
+  } | null>(null);
+  const registerFloor = useCallback(
+    (data: FloorDayData) => {
+      if (
+        data.branch.id !== branchId ||
+        data.floor.id !== floorId ||
+        (date && data.date !== date)
+      )
+        return () => {};
+      const registration = Symbol();
+      setRegisteredFloor({ data, registration });
+      return () =>
+        setRegisteredFloor((current) =>
+          current?.registration === registration ? null : current,
+        );
+    },
+    [branchId, floorId, date],
+  );
+  const floorData =
+    registeredFloor?.data.branch.id === branchId &&
+    registeredFloor.data.floor.id === navigation.value.floorId &&
+    registeredFloor.data.date === navigation.value.date
+      ? registeredFloor.data
+      : null;
   const rangeScope = `${branchId}|${floorId}|${date}|${requested ?? ""}`;
   const [lastRangeScope, setLastRangeScope] = useState(rangeScope);
   const [range, setRange] = useState<{
@@ -213,6 +244,30 @@ export function BranchWorkspace({
       changeLocation(next, href, options);
     },
     [locationKey, changeLocation, navigation.value],
+  );
+  const currentNavigation = useRef({ location: navigation.value, change });
+  useEffect(() => {
+    currentNavigation.current = { location: navigation.value, change };
+  }, [navigation.value, change]);
+  const closeAfterBooking = useCallback(
+    (spaceId: string, bookedDate: string) => {
+      const current = currentNavigation.current;
+      // 늦게 끝난 이전 예약은 새 공간이나 날짜의 상세를 닫지 않는다.
+      if (
+        current.location.spaceId !== spaceId ||
+        current.location.date !== bookedDate
+      )
+        return;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("space");
+      current.change(
+        { ...current.location, spaceId: null },
+        `${url.pathname}${url.search}${url.hash}`,
+        { replace: true },
+      );
+      restoreSpaceTrigger();
+    },
+    [restoreSpaceTrigger],
   );
   const changeRange = useCallback<SelectionContext["changeRange"]>(
     (spaceId, next) => {
@@ -264,6 +319,9 @@ export function BranchWorkspace({
     (detailChanged && navigation.value.spaceId === null);
   const value = useMemo(
     () => ({
+      floorData,
+      registerFloor,
+      closeAfterBooking,
       selection: bookingSelection,
       changeRange,
       selectSlot,
@@ -279,6 +337,9 @@ export function BranchWorkspace({
       restoreSpaceTrigger,
     }),
     [
+      floorData,
+      registerFloor,
+      closeAfterBooking,
       bookingSelection,
       changeRange,
       selectSlot,

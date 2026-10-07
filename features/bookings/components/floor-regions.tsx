@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { SpaceDetailSkeleton } from "./booking-skeletons";
+import { SpaceDetailLoading } from "./space-detail-loading";
 import { useFloorSelection } from "./branch-workspace";
 import { FloorViewsSkeleton } from "./floor-view-skeleton";
 
@@ -33,7 +33,7 @@ export function FloorDetailRegion({ children }: { children: ReactNode }) {
       {cleared ? (
         <EmptySpaceSelection />
       ) : pending ? (
-        <SpaceDetailSkeleton />
+        <SpaceDetailLoading />
       ) : null}
       <div hidden={pending || cleared} className="min-h-0 flex-1">
         {children}

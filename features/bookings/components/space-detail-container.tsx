@@ -1,11 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { floorHref } from "@/features/bookings/format";
 import { useFloorSelection } from "./branch-workspace";
 import { useWideScreen, type MatchMedia } from "./use-wide-screen";
+import { useFloorView } from "./floor-view";
+import { BookingStrip } from "./booking-strip";
 
 export function SpaceDetailContainer({
   children,
@@ -17,6 +19,10 @@ export function SpaceDetailContainer({
   const wide = useWideScreen(matchMedia);
   const navigation = useFloorSelection();
   const params = useParams<{ branchId: string }>();
+  const search = useSearchParams();
+  const { effectiveView } = useFloorView();
+  if (wide && effectiveView === "timeline")
+    return <BookingStrip>{children}</BookingStrip>;
   if (wide)
     return (
       <div
@@ -38,7 +44,13 @@ export function SpaceDetailContainer({
         const location = { ...navigation.location, spaceId: null };
         navigation.change(
           location,
-          floorHref(params.branchId, location.floorId, location.date),
+          floorHref(
+            params.branchId,
+            location.floorId,
+            location.date,
+            undefined,
+            search.get("view") ?? undefined,
+          ),
           { replace: true },
         );
       }}

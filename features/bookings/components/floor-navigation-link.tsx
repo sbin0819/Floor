@@ -41,6 +41,12 @@ export function FloorNavigationLink({
           );
         }
         navigation.change(location, destination, { replace });
+        if (
+          location.spaceId === null &&
+          location.floorId === navigation.location.floorId &&
+          location.date === navigation.location.date
+        )
+          navigation.restoreSpaceTrigger();
       }}
     />
   );
