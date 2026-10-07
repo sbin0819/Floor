@@ -5,6 +5,7 @@ import type {
   AvailabilitySummary,
 } from "@/features/bookings/availability";
 import type { OperatingState } from "@/features/bookings/operating-state";
+import type { Photo } from "@/lib/photos/schema";
 
 export type SpaceType =
   "meeting_room" | "seminar" | "phone_booth" | "desk_area" | "desk" | "lounge";
@@ -16,6 +17,7 @@ export type BranchDetails = {
   address: string | null;
   timezone: string;
   openHours: OpenHours;
+  cover: Photo | null;
 };
 export type FloorSummary = {
   id: string;
@@ -27,6 +29,7 @@ export type BranchListItem = BranchDetails & {
   isDefault: boolean;
   todayHours: DayOpenHours | null;
   accessibleFloorCount: number;
+  bookableSpaceCount: number;
   freeSpaceCount: number | null;
   operatingState: OperatingState;
 };
@@ -45,6 +48,7 @@ export type VisibleSpace = {
   type: SpaceType;
   name: string;
   capacity: number | null;
+  photo: Photo | null;
   amenities: string[];
   bookable: boolean;
   deskCount: number;
@@ -87,6 +91,7 @@ export type BookingActor = {
 };
 export type SpaceDayData = {
   space: VisibleSpace;
+  photos: Photo[];
   branch: BranchDetails;
   floor: FloorSummary;
   date: string;
@@ -113,6 +118,8 @@ export type MyBooking = {
   floorName: string;
   spaceId: string;
   spaceName: string;
+  spaceType: SpaceType;
+  photo: Photo | null;
 };
 export type MyBookingsData = {
   now: string;
@@ -133,6 +140,7 @@ export type HomeFreeSpace = {
   name: string;
   type: SpaceType;
   capacity: number | null;
+  photo: Photo | null;
   amenities: string[];
   floor: FloorSummary;
   intervals: AvailabilityInterval[];

@@ -95,6 +95,8 @@ it("shows upcoming links, plain past entries and a confirmation before cancellat
     floorName: "7F",
     spaceId: "space",
     spaceName: "회의실 C",
+    spaceType: "meeting_room" as const,
+    photo: null,
   };
   const client = new QueryClient();
   const data = {

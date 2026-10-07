@@ -286,6 +286,7 @@ describe("booking query security and DTOs", () => {
     expect(data).toEqual({
       branch: {
         id: fixture.branchId,
+        cover: null,
         name: "강남점",
         address: "가상로 7",
         timezone: "Asia/Seoul",
@@ -648,6 +649,8 @@ describe("booking query security and DTOs", () => {
     const list = await queries().getBranchList();
     expect(list[0]).toEqual({
       id: fixture.otherBranchId,
+      cover: null,
+      bookableSpaceCount: 1,
       name: "서초점",
       address: "가상로 8",
       timezone: "Asia/Seoul",

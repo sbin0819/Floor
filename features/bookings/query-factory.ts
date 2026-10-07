@@ -88,12 +88,21 @@ const validId = (id: string) => {
   if (!z.uuid().safeParse(id).success) throw new ActionError("NOT_FOUND");
   return id.toLowerCase();
 };
-const branchDto = (branch: BranchDetails): BranchDetails => ({
+const branchDto = (
+  branch: Omit<BranchDetails, "cover"> & {
+    coverPhotoPath: string | null;
+    coverPhotoAlt: string | null;
+  },
+): BranchDetails => ({
   id: branch.id,
   name: branch.name,
   address: branch.address,
   timezone: branch.timezone,
   openHours: branch.openHours,
+  cover:
+    branch.coverPhotoPath !== null && branch.coverPhotoAlt !== null
+      ? { path: branch.coverPhotoPath, alt: branch.coverPhotoAlt }
+      : null,
 });
 const floorDto = (floor: FloorSummary): FloorSummary => ({
   id: floor.id,
@@ -119,6 +128,8 @@ const myBookingDto = (
   floorName: row.floor.name,
   spaceId: row.space.id,
   spaceName: row.space.name,
+  spaceType: row.space.type,
+  photo: row.photo,
 });
 const order: SpaceType[] = [
   "meeting_room",
@@ -208,6 +219,9 @@ export function createBookingQueries(
             operatingState,
             todayHours: operatingState.hours,
             accessibleFloorCount: branchFloors.length,
+            bookableSpaceCount: flags.filter(
+              (space) => floorIds.has(space.floorId) && space.bookable,
+            ).length,
             freeSpaceCount:
               operatingState.status === "open"
                 ? flags.filter(
@@ -339,6 +353,7 @@ export function createBookingQueries(
           name: space.name,
           type: space.type,
           capacity: space.capacity,
+          photo: space.photo,
           amenities: space.amenities,
           floor: floorDto(floor),
           intervals: buildAvailabilityIntervals(input),
@@ -480,6 +495,7 @@ export function createBookingQueries(
           type: space.type,
           name: space.name,
           capacity: space.capacity,
+          photo: space.photo,
           amenities: space.amenities,
           bookable: space.bookable,
           deskCount:
@@ -619,12 +635,14 @@ export function createBookingQueries(
         openHours: getOpenHours(branch.openHours, date),
         actors,
         hasTeams: context.teams.length > 0,
+        photos: space.photos,
         space: {
           kind: "accessible",
           id: space.id,
           type: space.type,
           name: space.name,
           capacity: space.capacity,
+          photo: space.photo,
           amenities: space.amenities,
           bookable: space.bookable,
           deskCount: desks[0]?.count ?? 0,

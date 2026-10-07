@@ -5,17 +5,20 @@ import {
   asc,
   count,
   eq,
+  getTableColumns,
   inArray,
   isNull,
   ne,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { cache } from "react";
 
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
-import { accessGrants, floors, spaces } from "@/lib/db/schema";
+import { accessGrants, floors, spaces, spacePhotos } from "@/lib/db/schema";
+import type { Photo } from "@/lib/photos/schema";
 
 async function readSpaceAccess(
   filter: SQL | undefined,
@@ -104,8 +107,15 @@ export async function getSpacesByIds(
 ) {
   if (spaceIds.length === 0) return [];
   return database
-    .select()
+    .select({
+      ...getTableColumns(spaces),
+      photo: sql<Photo | null>`(json_agg(json_build_object('path', ${spacePhotos.path}, 'alt', ${spacePhotos.alt})) filter (where ${spacePhotos.sortOrder} = 0)) -> 0`,
+      photos: sql<
+        Photo[]
+      >`coalesce(json_agg(json_build_object('path', ${spacePhotos.path}, 'alt', ${spacePhotos.alt}) order by ${spacePhotos.sortOrder}) filter (where ${spacePhotos.id} is not null), '[]'::json)`,
+    })
     .from(spaces)
+    .leftJoin(spacePhotos, eq(spacePhotos.spaceId, spaces.id))
     .where(
       and(
         inArray(spaces.id, spaceIds),
@@ -113,6 +123,7 @@ export async function getSpacesByIds(
         ne(spaces.type, "desk"),
       ),
     )
+    .groupBy(spaces.id)
     .orderBy(asc(spaces.name), asc(spaces.id));
 }
 

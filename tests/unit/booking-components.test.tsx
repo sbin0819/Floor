@@ -251,6 +251,7 @@ describe("navigation, lists and cancellation", () => {
             todayHours: data.openHours,
             accessibleFloorCount: 1,
             freeSpaceCount: 1,
+            bookableSpaceCount: 1,
             operatingState: getOperatingState(
               new Date(data.now),
               data.branch.timezone,

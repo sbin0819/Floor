@@ -22,7 +22,7 @@ export type OperatorBranchCardsData = {
 export type TeamOption = { id: string; name: string };
 export type AdminPermissions = { manageSpaces: boolean; editAccess: boolean };
 export type AdminBranchData = {
-  branch: BranchDetails;
+  branch: Omit<BranchDetails, "cover">;
   floors: (FloorSummary & { access: AccessScope; spaceCount: number })[];
   permissions: AdminPermissions;
 };
@@ -40,7 +40,7 @@ export type AdminSpace = {
   deskCount: number;
 };
 export type AdminFloorData = {
-  branch: BranchDetails;
+  branch: Omit<BranchDetails, "cover">;
   floor: FloorSummary & { access: AccessScope; allowedTeams: TeamOption[] };
   spaces: AdminSpace[];
   permissions: AdminPermissions;

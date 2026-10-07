@@ -19,6 +19,7 @@ import {
   branches,
   floors,
   spaceBlocks,
+  spacePhotos,
   spaces,
   teamMembers,
   teams,
@@ -212,9 +213,14 @@ function locatedBookings(database: DalDatabase) {
       branch: branches,
       userName: users.name,
       teamName: teams.name,
+      photo: { path: spacePhotos.path, alt: spacePhotos.alt },
     })
     .from(bookings)
     .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .leftJoin(
+      spacePhotos,
+      and(eq(spacePhotos.spaceId, spaces.id), eq(spacePhotos.sortOrder, 0)),
+    )
     .innerJoin(floors, eq(floors.id, spaces.floorId))
     .innerJoin(branches, eq(branches.id, floors.branchId))
     .innerJoin(users, eq(users.id, bookings.userId))
@@ -242,7 +248,22 @@ export async function getBookingWithLocation(
   bookingId: string,
   database: DalDatabase = getDb(),
 ) {
-  const [row] = await locatedBookings(database)
+  // 취소 권한을 확인하기 위한 조회에는 사진을 읽지 않는다.
+  const [row] = await database
+    .select({
+      booking: bookings,
+      space: spaces,
+      floor: floors,
+      branch: branches,
+      userName: users.name,
+      teamName: teams.name,
+    })
+    .from(bookings)
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .innerJoin(floors, eq(floors.id, spaces.floorId))
+    .innerJoin(branches, eq(branches.id, floors.branchId))
+    .innerJoin(users, eq(users.id, bookings.userId))
+    .leftJoin(teams, eq(teams.id, bookings.teamId))
     .where(eq(bookings.id, bookingId))
     .limit(1);
   return row ?? null;

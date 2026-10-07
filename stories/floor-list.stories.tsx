@@ -15,6 +15,7 @@ const branch = {
   address: null,
   timezone: "Asia/Seoul",
   openHours: { wed: { open: "08:00", close: "22:00" } },
+  cover: null,
 };
 const floor = { id: "floor", name: "7F", level: 7, sortOrder: 1 };
 const base: FloorVisibleSpace = {
@@ -28,6 +29,10 @@ const base: FloorVisibleSpace = {
   deskCount: 0,
   bookingCount: 2,
   status: "free",
+  photo: {
+    path: "/seed/photos/meeting-small-sage.webp",
+    alt: "회의실 B 테이블과 화이트보드",
+  },
   summary: { status: "free", until: "2026-10-07T22:00:00+09:00" },
   intervals: [
     {

@@ -178,6 +178,7 @@ it("uses the resolved branch in both the header and free-space card, including a
       {
         id: detail.space.id,
         name: detail.space.name,
+        photo: null,
         type: detail.space.type,
         capacity: 6,
         amenities: ["monitor"],

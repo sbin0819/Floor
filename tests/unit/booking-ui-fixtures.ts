@@ -9,6 +9,7 @@ export function spaceDayFixture(): SpaceDayData {
       address: "가상 주소",
       timezone: "Asia/Seoul",
       openHours: { wed: { open: "09:00", close: "14:00" } },
+      cover: null,
     },
     floor: { id: "floor", name: "7F", level: 7, sortOrder: 1 },
     space: {
@@ -22,8 +23,10 @@ export function spaceDayFixture(): SpaceDayData {
       deskCount: 0,
       bookingCount: 1,
       status: "free",
+      photo: null,
     },
     date: "2026-10-07",
+    photos: [],
     now: "2026-10-07T01:10:00.000Z",
     openHours: { open: "09:00", close: "14:00" },
     bookings: [

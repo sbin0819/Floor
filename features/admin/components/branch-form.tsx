@@ -14,7 +14,7 @@ export function BranchForm({
   branch,
   canManage,
 }: {
-  branch: BranchDetails;
+  branch: Omit<BranchDetails, "cover">;
   canManage: boolean;
 }) {
   const id = useId();

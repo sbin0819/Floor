@@ -35,6 +35,7 @@ function fixture(extra: Partial<BranchListItem> = {}): BranchListItem {
     operatingState: open,
     accessibleFloorCount: 2,
     freeSpaceCount: 3,
+    bookableSpaceCount: 4,
     ...extra,
   };
 }
