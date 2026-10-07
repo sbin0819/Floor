@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { AdminFloorData } from "@/features/admin/types";
+import { AdminBreadcrumb } from "./admin-breadcrumb";
 import { FloorForm } from "./floor-form";
 import { SpaceTable } from "./space-table";
 import { AccessEditor } from "./access-editor";
@@ -7,12 +7,7 @@ import { AccessEditor } from "./access-editor";
 export function FloorDetail({ data }: { data: AdminFloorData }) {
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-6 lg:p-8">
-      <Link
-        href={`/admin/branches/${data.branch.id}`}
-        className="inline-flex min-h-11 items-center text-muted-foreground"
-      >
-        {data.branch.name}
-      </Link>
+      <AdminBreadcrumb branch={data.branch} floor={data.floor} />
       <h1 className="text-2xl font-semibold">{data.floor.name} 관리</h1>
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="space-y-4 rounded-xl border bg-card p-5">

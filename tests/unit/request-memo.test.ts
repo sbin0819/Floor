@@ -9,6 +9,7 @@ import {
   listAllFloorsWithAccess,
 } from "@/lib/dal/branches";
 import type { DalDatabase } from "@/lib/dal/database";
+import { listOperatorBranchSummaries } from "@/lib/dal/admin-home";
 import { getAllRoleSettings, getRoleSettings } from "@/lib/dal/role-settings";
 import { getMemberships } from "@/lib/dal/users";
 import {
@@ -50,6 +51,7 @@ function fakeDatabase() {
       leftJoin: () => query,
       where: () => query,
       orderBy: () => query,
+      groupBy: () => query,
       limit: () => query,
       then: result.then.bind(result),
     };
@@ -74,6 +76,12 @@ const settings = {
   limits: { maxDaysAhead: 3 },
 };
 const cases = [
+  {
+    name: "operator branch summaries",
+    read: (db?: DalDatabase) => listOperatorBranchSummaries(userId, db),
+    rows: [[{ ...branch, floorCount: 1, spaceCount: 2 }]],
+    keys: [userId],
+  },
   {
     name: "booking branch selection",
     read: (db?: DalDatabase) => resolveBookingBranch(userId, db),

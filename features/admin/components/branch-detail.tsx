@@ -2,17 +2,13 @@ import Link from "next/link";
 import type { AdminBranchData } from "@/features/admin/types";
 import { BranchForm } from "./branch-form";
 import { AddFloorDialog } from "./floor-form";
+import { AdminBreadcrumb } from "./admin-breadcrumb";
 
 const accessLabels = { everyone: "모두", teams: "지정한 팀", closed: "닫힘" };
 export function BranchDetail({ data }: { data: AdminBranchData }) {
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6 lg:p-8">
-      <Link
-        href="/admin"
-        className="inline-flex min-h-11 items-center text-muted-foreground"
-      >
-        운영 지점
-      </Link>
+      <AdminBreadcrumb branch={data.branch} />
       <h1 className="text-2xl font-semibold">{data.branch.name}</h1>
       <BranchForm
         key={data.branch.id}

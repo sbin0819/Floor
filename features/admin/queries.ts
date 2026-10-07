@@ -6,6 +6,9 @@ import { createAdminQueries } from "./query-factory";
 export async function getAdminBranch(branchId: string) {
   return createAdminQueries().getAdminBranch(branchId);
 }
+export async function getOperatorBranchCards() {
+  return createAdminQueries().getOperatorBranchCards();
+}
 export async function getAdminFloor(
   branchId: string,
   floorId: string,

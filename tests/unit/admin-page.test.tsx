@@ -3,11 +3,18 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { redirect } from "next/navigation";
 import AdminHome from "@/app/admin/page";
 import { requireOperatorPage } from "@/lib/auth/session";
-import { getOperatorHome } from "@/features/admin/queries";
+import {
+  getOperatorBranchCards,
+  getOperatorHome,
+} from "@/features/admin/queries";
+import { getOperatingState } from "@/features/bookings/operating-state";
 import { resolvePageContent } from "./page-test-utils";
 
 vi.mock("@/lib/auth/session", () => ({ requireOperatorPage: vi.fn() }));
-vi.mock("@/features/admin/queries", () => ({ getOperatorHome: vi.fn() }));
+vi.mock("@/features/admin/queries", () => ({
+  getOperatorHome: vi.fn(),
+  getOperatorBranchCards: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
@@ -23,6 +30,23 @@ const session = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(requireOperatorPage).mockResolvedValue(session);
+  vi.mocked(getOperatorBranchCards).mockResolvedValue({
+    now: "2026-10-07T03:00:00.000Z",
+    branches: [
+      {
+        id: "branch",
+        name: "가상점",
+        address: "가상로 1",
+        floorCount: 2,
+        spaceCount: 8,
+        operatingState: getOperatingState(
+          new Date("2026-10-07T03:00:00Z"),
+          "Asia/Seoul",
+          {},
+        ),
+      },
+    ],
+  });
 });
 
 it("checks operator access before rendering assigned branches", async () => {
@@ -39,9 +63,14 @@ it("checks operator access before rendering assigned branches", async () => {
     vi.mocked(requireOperatorPage).mock.invocationCallOrder[0],
   ).toBeLessThan(vi.mocked(getOperatorHome).mock.invocationCallOrder[0]!);
   expect(screen.getByRole("heading", { name: "운영자 화면" })).toBeVisible();
-  expect(screen.getByRole("link", { name: "가상점" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: /가상점/ })).toHaveAttribute(
     "href",
     "/admin/branches/branch",
+  );
+  expect(screen.getByText("층 2개 · 공간 8곳")).toBeVisible();
+  expect(screen.getByRole("navigation", { name: "경로" })).toBeVisible();
+  expect(vi.mocked(getOperatorHome).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(getOperatorBranchCards).mock.invocationCallOrder[0]!,
   );
 });
 
@@ -54,6 +83,7 @@ it("redirects to the sole assigned branch", async () => {
     "REDIRECT:/admin/branches/branch",
   );
   expect(redirect).toHaveBeenCalledWith("/admin/branches/branch");
+  expect(getOperatorBranchCards).not.toHaveBeenCalled();
 });
 
 it("does not read operator data when the page guard redirects", async () => {
@@ -62,4 +92,5 @@ it("does not read operator data when the page guard redirects", async () => {
     "LOGIN_REDIRECT",
   );
   expect(getOperatorHome).not.toHaveBeenCalled();
+  expect(getOperatorBranchCards).not.toHaveBeenCalled();
 });

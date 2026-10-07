@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { getOperatingState } from "@/features/bookings/operating-state";
+import { readBookingNow } from "@/features/bookings/request-clock";
 import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
@@ -8,9 +10,11 @@ import {
   getTeamsByIds,
   listAdminSpaceDetails,
 } from "@/lib/dal/admin";
+import { listOperatorBranchSummaries } from "@/lib/dal/admin-home";
 import {
   getBranch,
   getFloorWithAccess,
+  getOperatorBranches,
   listFloorsWithAccess,
 } from "@/lib/dal/branches";
 import { searchTeams } from "@/lib/dal/teams-read";
@@ -23,11 +27,13 @@ import type {
   AdminFloorData,
   AdminPermissions,
   AdminSpace,
+  OperatorBranchCardsData,
 } from "./types";
 
 export type AdminQueryDependencies = {
   database?: DalDatabase;
   requireSession?: () => Promise<Session>;
+  now?: () => Date;
 };
 function validId(value: string): string {
   if (!z.uuid().safeParse(value).success) throw new ActionError("NOT_FOUND");
@@ -66,6 +72,26 @@ export function createAdminQueries(dependencies: AdminQueryDependencies = {}) {
     };
   }
   return {
+    async getOperatorBranchCards(): Promise<OperatorBranchCardsData> {
+      const session = await readSession();
+      const assigned = await getOperatorBranches(session.userId, db);
+      if (assigned.length === 0) throw new ActionError("FORBIDDEN");
+      const now = dependencies.now?.() ?? readBookingNow(db !== undefined);
+      // 집계에도 담당자를 JOIN해, 앞선 권한 확인 후 담당이 해제돼도 노출하지 않는다.
+      const rows = await listOperatorBranchSummaries(session.userId, db);
+      if (rows.length === 0) throw new ActionError("FORBIDDEN");
+      return {
+        now: now.toISOString(),
+        branches: rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          address: row.address,
+          floorCount: row.floorCount,
+          spaceCount: row.spaceCount,
+          operatingState: getOperatingState(now, row.timezone, row.openHours),
+        })),
+      };
+    },
     async getAdminBranch(branchId: string): Promise<AdminBranchData> {
       const session = await readSession();
       const data = await checkedBranch(session, validId(branchId));

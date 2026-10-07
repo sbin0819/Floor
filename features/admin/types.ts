@@ -4,6 +4,20 @@ import type {
   SpaceType,
 } from "@/features/bookings/types";
 import type { AccessScope } from "@/lib/permissions/types";
+import type { OperatingState } from "@/features/bookings/operating-state";
+
+export type OperatorBranchCard = {
+  id: string;
+  name: string;
+  address: string | null;
+  floorCount: number;
+  spaceCount: number;
+  operatingState: OperatingState;
+};
+export type OperatorBranchCardsData = {
+  now: string;
+  branches: OperatorBranchCard[];
+};
 
 export type TeamOption = { id: string; name: string };
 export type AdminPermissions = { manageSpaces: boolean; editAccess: boolean };
