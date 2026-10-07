@@ -24,6 +24,9 @@ import { floorDayFixture, spaceDayFixture } from "./booking-ui-fixtures";
 import { resolvePageContent } from "./page-test-utils";
 
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => ({ value: "list" }) }),
+}));
 vi.mock("@/features/bookings/queries", () => ({
   getBranchList: vi.fn(),
   getBranchFloors: vi.fn(),
@@ -41,6 +44,7 @@ vi.mock("@/features/bookings/components/my-bookings", () => ({
   MyBookings: () => null,
 }));
 vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("view=list"),
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   notFound: () => {
     throw new Error("NOT_FOUND");
@@ -301,6 +305,13 @@ describe("booking page guards", () => {
     expect(first.detail.key).not.toBe(space.detail.key);
     expect(first.list.key).not.toBe(date.list.key);
     expect(first.detail.key).not.toBe(date.detail.key);
+    const view = await floorRegions({
+      date: "2026-10-07",
+      space: selectedSpaceId,
+      view: "timeline",
+    });
+    expect(view.list.key).toBe(first.list.key);
+    expect(view.detail.key).toBe(first.detail.key);
   });
   it.each(["branches", "branch", "floor"] as const)(
     "does not query %s after its session guard rejects",

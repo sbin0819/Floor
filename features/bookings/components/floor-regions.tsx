@@ -1,11 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  FloorSpaceListSkeleton,
-  SpaceDetailSkeleton,
-} from "./booking-skeletons";
+import { SpaceDetailSkeleton } from "./booking-skeletons";
 import { useFloorSelection } from "./branch-workspace";
+import { FloorViewsSkeleton } from "./floor-view-skeleton";
 
 export function EmptySpaceSelection() {
   return (
@@ -20,7 +18,7 @@ export function FloorListRegion({ children }: { children: ReactNode }) {
   const pending = useFloorSelection()?.listPending ?? false;
   return (
     <div className="min-h-0">
-      {pending && <FloorSpaceListSkeleton />}
+      {pending && <FloorViewsSkeleton />}
       <div hidden={pending}>{children}</div>
     </div>
   );

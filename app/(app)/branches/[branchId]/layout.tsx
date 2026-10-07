@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { ActionError } from "@/lib/actions/result";
 import { getBranchNavigation } from "@/features/bookings/queries";
@@ -10,6 +11,11 @@ import {
   FloorPageSkeleton,
 } from "@/features/bookings/components/booking-skeletons";
 import { PageContainer } from "@/components/page-container";
+import {
+  FloorViewProvider,
+  FloorViewControl,
+} from "@/features/bookings/components/floor-view";
+import { resolveFloorView } from "@/features/bookings/floor-view";
 
 function NavigationFallback() {
   return (
@@ -31,8 +37,30 @@ async function NavigationContent({
   });
   return (
     <Suspense fallback={<NavigationFallback />}>
-      <BranchNavigation data={data} />
+      <BranchNavigation data={data} viewControl={<FloorViewControl />} />
     </Suspense>
+  );
+}
+async function BranchRequestLayout({
+  params,
+  children,
+}: {
+  params: Promise<{ branchId: string }>;
+  children: ReactNode;
+}) {
+  const cookieView = resolveFloorView(
+    undefined,
+    (await cookies()).get("floor_view")?.value,
+  );
+  return (
+    <FloorViewProvider cookieView={cookieView}>
+      <BranchWorkspace>
+        <Suspense fallback={<NavigationFallback />}>
+          <NavigationContent params={params} />
+        </Suspense>
+        {children}
+      </BranchWorkspace>
+    </FloorViewProvider>
   );
 }
 export default function BranchLayout({
@@ -44,12 +72,7 @@ export default function BranchLayout({
 }) {
   return (
     <Suspense fallback={<FloorPageSkeleton />}>
-      <BranchWorkspace>
-        <Suspense fallback={<NavigationFallback />}>
-          <NavigationContent params={params} />
-        </Suspense>
-        {children}
-      </BranchWorkspace>
+      <BranchRequestLayout params={params}>{children}</BranchRequestLayout>
     </Suspense>
   );
 }

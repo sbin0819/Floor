@@ -8,12 +8,14 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BranchLayout from "@/app/(app)/branches/[branchId]/layout";
 import { getSession } from "@/lib/auth/session";
+import { cookies } from "next/headers";
 import { getBranchNavigation } from "@/features/bookings/queries";
 import { ActionError } from "@/lib/actions/result";
 import { floorDayFixture } from "./booking-ui-fixtures";
 import { resolvePageContent } from "./page-test-utils";
 
 vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }));
+vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 vi.mock("@/features/bookings/queries", () => ({
   getBranchNavigation: vi.fn(),
 }));
@@ -28,6 +30,9 @@ vi.mock("@/features/bookings/components/branch-navigation", () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(cookies).mockResolvedValue({
+    get: () => ({ name: "floor_view", value: "list" }),
+  } as Awaited<ReturnType<typeof cookies>>);
   vi.mocked(getSession).mockResolvedValue({
     userId: "member",
     name: "회원",
@@ -44,12 +49,13 @@ beforeEach(() => {
   });
 });
 
-function navigationBoundary() {
+async function navigationBoundary() {
   const shell = BranchLayout({
     params: Promise.resolve({ branchId: "branch" }),
     children: <p>페이지</p>,
   });
-  const workspace = shell.props.children;
+  const provider = await resolvePageContent(shell);
+  const workspace = provider.props.children;
   if (!isValidElement<{ children: ReactNode }>(workspace))
     throw new Error("Missing workspace");
   const [navigation, child] = Children.toArray(workspace.props.children);
@@ -59,22 +65,29 @@ function navigationBoundary() {
 }
 
 describe("independent branch layout navigation", () => {
-  it("returns navigation and page siblings without starting session or navigation reads", () => {
-    const { shell, child } = navigationBoundary();
+  it("returns navigation and page siblings without starting session or navigation reads", async () => {
+    const shell = BranchLayout({
+      params: Promise.resolve({ branchId: "branch" }),
+      children: <p>페이지</p>,
+    });
+    expect(cookies).not.toHaveBeenCalled();
     render(shell.props.fallback);
     expect(screen.getByRole("status")).toHaveTextContent("불러오고 있어요.");
+    const { child } = await navigationBoundary();
     expect(isValidElement(child)).toBe(true);
     expect(getSession).not.toHaveBeenCalled();
     expect(getBranchNavigation).not.toHaveBeenCalled();
   });
   it("renders only a skeleton for an anonymous viewer and leaves redirection to the page", async () => {
     vi.mocked(getSession).mockResolvedValue(null);
-    render(await resolvePageContent(navigationBoundary().navigation));
+    render(await resolvePageContent((await navigationBoundary()).navigation));
     expect(screen.getByRole("status")).toHaveTextContent("불러오고 있어요.");
     expect(getBranchNavigation).not.toHaveBeenCalled();
   });
   it("loads the separately authenticated navigation query for a signed-in viewer", async () => {
-    const result = await resolvePageContent(navigationBoundary().navigation);
+    const result = await resolvePageContent(
+      (await navigationBoundary()).navigation,
+    );
     expect(getBranchNavigation).toHaveBeenCalledExactlyOnceWith("branch");
     expect(isValidElement(result.props.children)).toBe(true);
   });
@@ -83,12 +96,12 @@ describe("independent branch layout navigation", () => {
       new ActionError("NOT_FOUND"),
     );
     await expect(
-      resolvePageContent(navigationBoundary().navigation),
+      resolvePageContent((await navigationBoundary()).navigation),
     ).rejects.toThrow("NOT_FOUND");
     const failure = new ActionError("INTERNAL");
     vi.mocked(getBranchNavigation).mockRejectedValueOnce(failure);
     await expect(
-      resolvePageContent(navigationBoundary().navigation),
+      resolvePageContent((await navigationBoundary()).navigation),
     ).rejects.toBe(failure);
   });
 });

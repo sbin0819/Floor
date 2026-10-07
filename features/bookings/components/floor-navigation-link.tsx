@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { ComponentProps } from "react";
 import { shouldInterceptNavigation } from "@/components/optimistic-navigation";
 import type { FloorLocation } from "@/features/bookings/floor-selection";
@@ -16,10 +17,16 @@ export function FloorNavigationLink({
   location: FloorLocation;
 }) {
   const navigation = useFloorSelection();
+  const search = useSearchParams();
+  const view = search.get("view");
+  const target = new URL(href, "http://floor.local");
+  if (view && !target.searchParams.has("view"))
+    target.searchParams.set("view", view);
+  const destination = `${target.pathname}${target.search}${target.hash}`;
   return (
     <Link
       {...props}
-      href={href}
+      href={destination}
       replace={replace}
       onClick={(event) => {
         if (!navigation || !shouldInterceptNavigation(event)) return;
@@ -33,7 +40,7 @@ export function FloorNavigationLink({
             location.spaceId,
           );
         }
-        navigation.change(location, href, { replace });
+        navigation.change(location, destination, { replace });
       }}
     />
   );
