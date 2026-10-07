@@ -1,0 +1,264 @@
+import { eq, sql } from "drizzle-orm";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import photoFile from "@/docs/spec/examples/seed-photos.json";
+import { createAuth, type AuthInstance } from "@/lib/auth/auth";
+import * as seedDal from "@/lib/dal/seed";
+import { branches, floors, spacePhotos, spaces, users } from "@/lib/db/schema";
+import { createMemoryEmailSender } from "@/lib/email/memory";
+import { loadSeedData } from "@/lib/seed/data";
+import * as photoLoader from "@/lib/seed/photos";
+import { runSeed } from "@/lib/seed/run-seed";
+import { createTestDatabase, type TestDatabase } from "./helper";
+
+const now = new Date("2026-10-07T03:00:00Z");
+const data = loadSeedData();
+describe("transactional photo seeding", () => {
+  let database: TestDatabase;
+  let auth: AuthInstance;
+  beforeAll(async () => {
+    database = await createTestDatabase();
+    auth = createAuth({
+      db: database.db,
+      email: createMemoryEmailSender(),
+      secret: "photo-seed-tests-secret-with-at-least-32-bytes",
+      baseUrl: "http://localhost:3000",
+      rateLimit: { enabled: false },
+    });
+  });
+  afterAll(async () => {
+    await database?.client.close();
+  });
+  afterEach(() => vi.restoreAllMocks());
+  beforeEach(async () => {
+    await database.db.execute(
+      sql`TRUNCATE users, branches, auth_verifications CASCADE`,
+    );
+  });
+  const seed = () =>
+    runSeed({ db: database.db, auth, now, resetPasswords: false });
+  const photos = () =>
+    database.db
+      .select()
+      .from(spacePhotos)
+      .orderBy(spacePhotos.spaceId, spacePhotos.sortOrder);
+  const covers = () =>
+    database.db
+      .select({
+        id: branches.id,
+        path: branches.coverPhotoPath,
+        alt: branches.coverPhotoAlt,
+      })
+      .from(branches)
+      .orderBy(branches.id);
+
+  it("writes 41 ordered photos and two covers, retaining identical rows on rerun", async () => {
+    expect((await seed()).counts).toMatchObject({
+      spacePhotos: 41,
+      branchCovers: 2,
+    });
+    const firstPhotos = await photos();
+    const firstCovers = await covers();
+    expect(firstPhotos).toHaveLength(41);
+    expect(firstCovers).toHaveLength(2);
+    expect(
+      firstCovers.every(({ path, alt }) => path !== null && alt !== null),
+    ).toBe(true);
+    expect(new Set(firstPhotos.map(({ spaceId }) => spaceId)).size).toBe(21);
+    for (const { spaceId } of photoFile.spacePhotos) {
+      const group = firstPhotos.filter((photo) => photo.spaceId === spaceId);
+      expect(group.map(({ sortOrder }) => sortOrder)).toEqual(
+        group.map((_, index) => index),
+      );
+    }
+    for (const space of data.spaces.filter(
+      ({ name, type }) =>
+        name === "리뷰룸" || name === "폰부스 S-1" || type === "desk",
+    ))
+      expect(firstPhotos.some(({ spaceId }) => spaceId === space.id)).toBe(
+        false,
+      );
+    await seed();
+    expect(await photos()).toEqual(firstPhotos);
+    expect(await covers()).toEqual(firstCovers);
+  });
+
+  it("replaces changed photos, removes omitted seed groups/covers, and preserves non-seed photos/covers", async () => {
+    await seed();
+    const foreignBranchId = crypto.randomUUID();
+    const foreignFloorId = crypto.randomUUID();
+    const foreignSpaceId = crypto.randomUUID();
+    await database.db
+      .insert(branches)
+      .values({
+        id: foreignBranchId,
+        name: "시드 밖 지점",
+        coverPhotoPath: "/seed/photos/foreign.webp",
+        coverPhotoAlt: "기존 사진",
+      });
+    await database.db
+      .insert(floors)
+      .values({
+        id: foreignFloorId,
+        branchId: foreignBranchId,
+        level: 1,
+        name: "1F",
+      });
+    await database.db
+      .insert(spaces)
+      .values({
+        id: foreignSpaceId,
+        floorId: foreignFloorId,
+        name: "시드 밖 공간",
+        type: "meeting_room",
+      });
+    const [foreignPhoto] = await database.db
+      .insert(spacePhotos)
+      .values({
+        spaceId: foreignSpaceId,
+        path: "/seed/photos/foreign.webp",
+        alt: "기존 공간 사진",
+        sortOrder: 0,
+      })
+      .returning();
+    const firstGroup = photoFile.spacePhotos[0]!;
+    const updatedGroup = photoFile.spacePhotos[1]!;
+    const changed = structuredClone(photoFile);
+    changed.spacePhotos = changed.spacePhotos.filter(
+      ({ spaceId }) => spaceId !== firstGroup.spaceId,
+    );
+    changed.spacePhotos[0]!.photos = [
+      { path: "/seed/photos/replacement.webp", alt: "바뀐 대표 사진" },
+    ];
+    changed.branchCovers = changed.branchCovers.slice(1);
+    vi.spyOn(photoLoader, "loadSeedPhotos").mockReturnValue(
+      photoLoader.parseSeedPhotos(changed, data),
+    );
+    const result = await seed();
+    expect(result.counts).toMatchObject({ spacePhotos: 37, branchCovers: 1 });
+    const rows = await photos();
+    expect(
+      rows.filter(({ spaceId }) => spaceId === firstGroup.spaceId),
+    ).toEqual([]);
+    expect(
+      rows.filter(({ spaceId }) => spaceId === updatedGroup.spaceId),
+    ).toMatchObject([
+      {
+        path: "/seed/photos/replacement.webp",
+        alt: "바뀐 대표 사진",
+        sortOrder: 0,
+      },
+    ]);
+    expect(rows.find(({ spaceId }) => spaceId === foreignSpaceId)).toEqual(
+      foreignPhoto,
+    );
+    expect(
+      (await covers()).find(
+        ({ id }) => id === photoFile.branchCovers[0]!.branchId,
+      ),
+    ).toMatchObject({ path: null, alt: null });
+    expect((await covers()).find(({ id }) => id === foreignBranchId)).toEqual({
+      id: foreignBranchId,
+      path: "/seed/photos/foreign.webp",
+      alt: "기존 사진",
+    });
+  });
+
+  it("removes stale photos from seed spaces absent from the photo source", async () => {
+    await seed();
+    const room = data.spaces.find(({ name }) => name === "리뷰룸")!;
+    await database.db
+      .insert(spacePhotos)
+      .values({
+        spaceId: room.id,
+        path: "/seed/photos/stale.webp",
+        alt: "남은 사진",
+        sortOrder: 0,
+      });
+    await seed();
+    expect(
+      (await photos()).filter(({ spaceId }) => spaceId === room.id),
+    ).toEqual([]);
+    expect(await photos()).toHaveLength(41);
+  });
+
+  it("clears all seed-owned photos and covers when the photo file is empty", async () => {
+    await seed();
+    vi.spyOn(photoLoader, "loadSeedPhotos").mockReturnValue({
+      branchCovers: [],
+      spacePhotos: [],
+    });
+    expect((await seed()).counts).toMatchObject({
+      spacePhotos: 0,
+      branchCovers: 0,
+    });
+    expect(await photos()).toEqual([]);
+    expect(
+      (await covers()).every(({ path, alt }) => path === null && alt === null),
+    ).toBe(true);
+  });
+
+  it("rolls photo synchronization back with all original seed data after a later failure", async () => {
+    await seed();
+    const first = (await photos())[0]!;
+    await database.db
+      .update(spacePhotos)
+      .set({ path: "/seed/photos/original.webp", alt: "이전 사진" })
+      .where(eq(spacePhotos.id, first.id));
+    const branch = data.branches[0]!;
+    await database.db
+      .update(branches)
+      .set({
+        name: "보존할 이름",
+        coverPhotoPath: "/seed/photos/original-cover.webp",
+        coverPhotoAlt: "이전 대표 사진",
+      })
+      .where(eq(branches.id, branch.id));
+    const beforePhotos = await photos();
+    const beforeBranches = await database.db
+      .select()
+      .from(branches)
+      .orderBy(branches.id);
+    const beforeUsers = await database.db
+      .select()
+      .from(users)
+      .orderBy(users.id);
+    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+      new Error("simulated late seed failure"),
+    );
+    await expect(seed()).rejects.toThrow("모든 시드 변경을 되돌렸어요.");
+    expect(await photos()).toEqual(beforePhotos);
+    expect(
+      await database.db.select().from(branches).orderBy(branches.id),
+    ).toEqual(beforeBranches);
+    expect(await database.db.select().from(users).orderBy(users.id)).toEqual(
+      beforeUsers,
+    );
+  });
+
+  it("validates photo references before initializing auth or changing data", async () => {
+    vi.spyOn(photoLoader, "loadSeedPhotos").mockImplementation(() =>
+      photoLoader.parseSeedPhotos(
+        {
+          ...photoFile,
+          branchCovers: [
+            { ...photoFile.branchCovers[0]!, branchId: crypto.randomUUID() },
+          ],
+        },
+        data,
+      ),
+    );
+    await expect(seed()).rejects.toThrow("시드 데이터 검증 실패");
+    expect(await database.db.select().from(users)).toEqual([]);
+    expect(await database.db.select().from(branches)).toEqual([]);
+    expect(await photos()).toEqual([]);
+  });
+});

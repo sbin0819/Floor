@@ -16,6 +16,7 @@ import {
   floorPlans,
   floors,
   spaceBlocks,
+  spacePhotos,
   spaces,
   teamMembers,
   teams,
@@ -42,6 +43,8 @@ const expectedCounts = {
   floorPlans: 1,
   bookings: 9,
   spaceBlocks: 1,
+  spacePhotos: 41,
+  branchCovers: 2,
 };
 
 describe("transactional development seed", () => {
@@ -82,12 +85,18 @@ describe("transactional development seed", () => {
         floorPlans,
         bookings,
         spaceBlocks,
+        spacePhotos,
       }).map(async ([name, table]) => [
         name,
         (await database.db.select().from(table)).length,
       ]),
     );
-    return Object.fromEntries(entries);
+    return {
+      ...Object.fromEntries(entries),
+      branchCovers: (await database.db.select().from(branches)).filter(
+        ({ coverPhotoPath }) => coverPhotoPath !== null,
+      ).length,
+    };
   }
   async function user(email: string) {
     const [row] = await database.db

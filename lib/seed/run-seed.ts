@@ -11,8 +11,13 @@ import {
   type TransactionDatabase,
 } from "@/lib/dal";
 import * as seedDal from "@/lib/dal/seed";
+import {
+  syncSeedBranchCovers,
+  syncSeedSpacePhotos,
+} from "@/lib/dal/seed-photos";
 import { loadSeedData } from "@/lib/seed/data";
 import { SeedError } from "@/lib/seed/errors";
+import { loadSeedPhotos } from "@/lib/seed/photos";
 import { getOperatingDate } from "@/lib/time/open-hours";
 import { zonedDateTime } from "@/lib/time/zoned";
 
@@ -38,6 +43,7 @@ export async function runSeed({
   let current = "시드 데이터";
   try {
     const data = loadSeedData();
+    const photos = loadSeedPhotos(data);
     const instance = auth ?? getAuth();
     return await withTransaction(async (database) => {
       const provisioning = await createProvisioningAuth({
@@ -95,6 +101,17 @@ export async function runSeed({
           database,
         );
       }
+      current = "공간과 지점 사진";
+      await syncSeedSpacePhotos(
+        data.spaces.map(({ id }) => id),
+        photos.spacePhotos,
+        database,
+      );
+      await syncSeedBranchCovers(
+        data.branches.map(({ id }) => id),
+        photos.branchCovers,
+        database,
+      );
       for (const { userKey, ...member } of data.teamMembers)
         await seedDal.upsertSeedMember(
           { ...member, userId: userId(userKey) },
@@ -216,6 +233,8 @@ export async function runSeed({
           floorPlans: plans,
           bookings: data.bookings.length - skippedBookings,
           spaceBlocks: data.spaceBlocks.length,
+          spacePhotos: photos.spacePhotos.length,
+          branchCovers: photos.branchCovers.length,
         },
         skippedBookings,
         accounts: data.users.map(({ email }) => email),
