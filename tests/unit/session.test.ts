@@ -68,6 +68,12 @@ describe("Better Auth session boundary", () => {
       headers: await mocks.headers(),
     });
   });
+  it("reads again with the same result outside a React server render", async () => {
+    const first = await getSession();
+    expect(await getSession()).toEqual(first);
+    expect(mocks.readSession).toHaveBeenCalledTimes(2);
+    expect(mocks.headers).toHaveBeenCalledTimes(2);
+  });
   it("recognizes the secure production cookie", async () => {
     mocks.headers.mockResolvedValue(
       new Headers({ cookie: "__Secure-better-auth.session_token=test-token" }),

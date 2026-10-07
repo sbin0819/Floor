@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import type { Session } from "@/lib/auth/types";
 import {
   getMemberships,
@@ -10,20 +11,25 @@ import {
 import { roles } from "@/lib/permissions/keys";
 import type { PermissionContext } from "@/lib/permissions/types";
 
-export async function loadPermissionContext(
-  session: Session,
+export type PermissionData = {
+  context: PermissionContext;
+  settings: RoleSettings;
+};
+
+async function readPermissionData(
+  userId: string,
   branchId?: string,
   database?: DalDatabase,
-): Promise<PermissionContext> {
+): Promise<PermissionData> {
   const [memberships, settings] = await Promise.all([
-    getMemberships(session.userId, database),
+    getMemberships(userId, database),
     branchId
       ? getRoleSettings(branchId, database)
       : Promise.resolve<RoleSettings>({}),
   ]);
 
   const context: PermissionContext = {
-    userId: session.userId,
+    userId,
     ...memberships,
     roleSettings: {},
   };
@@ -35,5 +41,28 @@ export async function loadPermissionContext(
     }
     context.roleSettings[branchId] = branchSettings;
   }
-  return context;
+  return { context, settings };
+}
+
+const cachedPermissionData = cache((userId: string, branchId?: string) =>
+  readPermissionData(userId, branchId),
+);
+
+export function loadPermissionData(
+  session: Session,
+  branchId?: string,
+  database?: DalDatabase,
+): Promise<PermissionData> {
+  // 주입된 DB는 트랜잭션 안의 최신 상태를 읽어야 하므로 요청 메모를 거치지 않는다.
+  return database === undefined
+    ? cachedPermissionData(session.userId, branchId)
+    : readPermissionData(session.userId, branchId, database);
+}
+
+export async function loadPermissionContext(
+  session: Session,
+  branchId?: string,
+  database?: DalDatabase,
+): Promise<PermissionContext> {
+  return (await loadPermissionData(session, branchId, database)).context;
 }

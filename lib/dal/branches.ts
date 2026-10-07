@@ -1,27 +1,41 @@
 import "server-only";
 
 import { and, asc, eq, inArray } from "drizzle-orm";
+import { cache } from "react";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
 import { accessGrants, branches, branchStaff, floors } from "@/lib/db/schema";
 
-export function listBranchDetails(database: DalDatabase = getDb()) {
+async function readBranchDetails(database: DalDatabase = getDb()) {
   return database
     .select()
     .from(branches)
     .orderBy(asc(branches.name), asc(branches.id));
 }
 
-export async function getBranch(
-  branchId: string,
-  database: DalDatabase = getDb(),
-) {
+const cachedBranchDetails = cache(() => readBranchDetails());
+
+export function listBranchDetails(database?: DalDatabase) {
+  return database === undefined
+    ? cachedBranchDetails()
+    : readBranchDetails(database);
+}
+
+async function readBranch(branchId: string, database: DalDatabase = getDb()) {
   const [branch] = await database
     .select()
     .from(branches)
     .where(eq(branches.id, branchId))
     .limit(1);
   return branch ?? null;
+}
+
+const cachedBranch = cache((branchId: string) => readBranch(branchId));
+
+export function getBranch(branchId: string, database?: DalDatabase) {
+  return database === undefined
+    ? cachedBranch(branchId)
+    : readBranch(branchId, database);
 }
 
 async function floorGrants(floorIds: string[], database: DalDatabase) {
@@ -38,7 +52,7 @@ async function floorGrants(floorIds: string[], database: DalDatabase) {
     .orderBy(asc(accessGrants.teamId));
 }
 
-export async function getFloorWithAccess(
+async function readFloorWithAccess(
   floorId: string,
   database: DalDatabase = getDb(),
 ) {
@@ -52,7 +66,17 @@ export async function getFloorWithAccess(
   return { ...floor, allowedTeamIds: grants.map((grant) => grant.teamId) };
 }
 
-export async function listFloorsWithAccess(
+const cachedFloorWithAccess = cache((floorId: string) =>
+  readFloorWithAccess(floorId),
+);
+
+export function getFloorWithAccess(floorId: string, database?: DalDatabase) {
+  return database === undefined
+    ? cachedFloorWithAccess(floorId)
+    : readFloorWithAccess(floorId, database);
+}
+
+async function readFloorsWithAccess(
   branchId: string,
   database: DalDatabase = getDb(),
 ) {
@@ -73,14 +97,30 @@ export async function listFloorsWithAccess(
   }));
 }
 
-export function listBranches(database: DalDatabase = getDb()) {
+const cachedFloorsWithAccess = cache((branchId: string) =>
+  readFloorsWithAccess(branchId),
+);
+
+export function listFloorsWithAccess(branchId: string, database?: DalDatabase) {
+  return database === undefined
+    ? cachedFloorsWithAccess(branchId)
+    : readFloorsWithAccess(branchId, database);
+}
+
+async function readBranches(database: DalDatabase = getDb()) {
   return database
     .select({ id: branches.id, name: branches.name })
     .from(branches)
     .orderBy(asc(branches.name), asc(branches.id));
 }
 
-export async function getOperatorBranches(
+const cachedBranches = cache(() => readBranches());
+
+export function listBranches(database?: DalDatabase) {
+  return database === undefined ? cachedBranches() : readBranches(database);
+}
+
+async function readOperatorBranches(
   userId: string,
   database: DalDatabase = getDb(),
 ): Promise<{ id: string; name: string }[]> {
@@ -90,6 +130,19 @@ export async function getOperatorBranches(
     .innerJoin(branches, eq(branchStaff.branchId, branches.id))
     .where(eq(branchStaff.userId, userId))
     .orderBy(asc(branches.name), asc(branches.id));
+}
+
+const cachedOperatorBranches = cache((userId: string) =>
+  readOperatorBranches(userId),
+);
+
+export function getOperatorBranches(
+  userId: string,
+  database?: DalDatabase,
+): Promise<{ id: string; name: string }[]> {
+  return database === undefined
+    ? cachedOperatorBranches(userId)
+    : readOperatorBranches(userId, database);
 }
 
 export async function getBranchesByName(

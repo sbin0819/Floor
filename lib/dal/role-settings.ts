@@ -1,6 +1,7 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
+import { cache } from "react";
 
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
@@ -16,7 +17,7 @@ export type RoleSettings = Partial<
   Record<Role, { permissions: PermissionKey[]; limits: Partial<RoleLimits> }>
 >;
 
-export async function getRoleSettings(
+async function readRoleSettings(
   branchId: string,
   database: DalDatabase = getDb(),
 ): Promise<RoleSettings> {
@@ -37,4 +38,17 @@ export async function getRoleSettings(
     };
   }
   return settings;
+}
+
+const cachedRoleSettings = cache((branchId: string) =>
+  readRoleSettings(branchId),
+);
+
+export function getRoleSettings(
+  branchId: string,
+  database?: DalDatabase,
+): Promise<RoleSettings> {
+  return database === undefined
+    ? cachedRoleSettings(branchId)
+    : readRoleSettings(branchId, database);
 }

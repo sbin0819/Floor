@@ -1,6 +1,7 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
+import { cache } from "react";
 
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
@@ -27,7 +28,7 @@ export async function getUserByEmail(
   return user ?? null;
 }
 
-export async function getMemberships(
+async function readMemberships(
   userId: string,
   database: DalDatabase = getDb(),
 ) {
@@ -42,4 +43,12 @@ export async function getMemberships(
       .where(eq(branchStaff.userId, userId)),
   ]);
   return { teams, staffBranchIds: staff.map(({ branchId }) => branchId) };
+}
+
+const cachedMemberships = cache((userId: string) => readMemberships(userId));
+
+export function getMemberships(userId: string, database?: DalDatabase) {
+  return database === undefined
+    ? cachedMemberships(userId)
+    : readMemberships(userId, database);
 }

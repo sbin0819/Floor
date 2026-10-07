@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ActionError } from "@/lib/actions/result";
@@ -11,7 +12,7 @@ import { getOperatorBranches } from "@/lib/dal";
 
 export type { Session } from "@/lib/auth/types";
 
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async (): Promise<Session | null> => {
   const requestHeaders = await headers();
   if (!hasSessionCookie(requestHeaders)) return null;
   const session = await getAuth().api.getSession({ headers: requestHeaders });
@@ -22,7 +23,7 @@ export async function getSession(): Promise<Session | null> {
         name: session.user.name,
       }
     : null;
-}
+});
 
 export async function requireSession(): Promise<Session> {
   const session = await getSession();
