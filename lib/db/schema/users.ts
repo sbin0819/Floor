@@ -1,11 +1,15 @@
-import { pgTable, text } from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { createdAt, id } from "./common";
 
 export const users = pgTable("users", {
   id: id(),
-  authId: text("auth_id").unique(),
   email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
   createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
