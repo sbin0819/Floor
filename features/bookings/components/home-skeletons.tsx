@@ -1,6 +1,12 @@
 import { SkeletonRegion } from "@/components/skeleton-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonHeading, SkeletonRows } from "@/components/skeleton-shapes";
+import {
+  HomeNextBookingShape,
+  HomeWeekBookingsShape,
+  HomeFrequentSpacesShape,
+  HomeFreeSpacesShape,
+} from "./home-card-skeletons";
 
 export function HomeHeaderSkeleton() {
   return (
@@ -30,10 +36,12 @@ export function HomeDashboardSkeleton() {
       <SkeletonHeading />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <HomeCardShape rows={3} photo />
-          <HomeCardShape rows={4} photo />
+          <HomeNextBookingShape />
+          <HomeFreeSpacesShape />
+          <HomeFrequentSpacesShape />
         </div>
         <div className="space-y-6">
+          <HomeWeekBookingsShape />
           <HomeCardShape rows={1} />
           <HomeCardShape rows={2} />
         </div>

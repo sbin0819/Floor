@@ -181,21 +181,63 @@ export function SpaceDetailSkeleton() {
 
 export function BranchListSkeleton() {
   return (
-    <SkeletonRegion width="standard" className="space-y-6">
+    <SkeletonRegion width="branches" className="space-y-6">
       <SkeletonHeading />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         {[0, 1].map((key) => (
           <div
             key={key}
-            className="space-y-5 overflow-hidden rounded-xl border bg-card p-5 pt-0"
+            data-slot="skeleton-branch-card"
+            className="flex flex-col gap-5 overflow-hidden rounded-xl border border-border bg-card shadow-card"
           >
-            <Skeleton
-              data-slot="skeleton-photo"
-              className="-mx-5 aspect-[16/6] rounded-none"
-            />
-            <SkeletonHeading compact />
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-11 w-28" />
+            <div className="relative aspect-[16/6]">
+              <Skeleton
+                data-slot="skeleton-photo"
+                className="absolute inset-0 rounded-none"
+              />
+              <div className="absolute inset-x-3 top-3 flex justify-between gap-2">
+                <Skeleton className="h-8 w-40 rounded-full" />
+                <Skeleton className="h-8 w-24 rounded-full" />
+              </div>
+            </div>
+            <div className="space-y-5 px-5">
+              <div className="space-y-2">
+                <Skeleton className="h-7 w-32" />
+                <Skeleton className="h-5 w-64 max-w-full" />
+              </div>
+              <div
+                data-slot="skeleton-branch-counts"
+                className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border"
+              >
+                {[0, 1, 2].map((column) => (
+                  <div key={column} className="min-w-0 space-y-1 px-3 py-3">
+                    <Skeleton className="h-7 w-12 max-w-full" />
+                    <Skeleton className="h-4 w-24 max-w-full" />
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-16" />
+                <div
+                  data-slot="skeleton-branch-hours"
+                  className="grid grid-cols-7 gap-1"
+                >
+                  {Array.from({ length: 7 }, (_, day) => (
+                    <div
+                      key={day}
+                      className="min-w-0 space-y-1 rounded-lg bg-muted px-1 py-2"
+                    >
+                      <Skeleton className="mx-auto h-4 w-4" />
+                      <Skeleton className="mx-auto h-4 w-8 max-w-full" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-auto flex min-h-[76px] flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/50 px-5 py-3">
+              <Skeleton className="h-11 w-40" />
+              <Skeleton className="h-5 w-24" />
+            </div>
           </div>
         ))}
       </div>

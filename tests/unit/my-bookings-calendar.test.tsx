@@ -14,6 +14,11 @@ import BookingsPage from "@/app/(app)/bookings/page";
 import { cancelBooking } from "@/features/bookings/actions";
 import { normalizeMyBookingsMonth } from "@/features/bookings/calendar";
 import { MyBookingsCalendar } from "@/features/bookings/components/my-bookings-calendar";
+import { MyBookingCalendarDay } from "@/features/bookings/components/my-bookings-calendar";
+import {
+  MyBookingsCalendarBodySkeleton,
+  MyBookingsCalendarSkeleton,
+} from "@/features/bookings/components/my-bookings-calendar-skeleton";
 import { getMyBookings, getMyBookingsMonth } from "@/features/bookings/queries";
 import type {
   MyCalendarBooking,
@@ -366,4 +371,87 @@ it("reuses confirmation and refresh without hiding the calendar", async () => {
   expect(cancelBooking).toHaveBeenCalledWith({ bookingId: booking.id });
   expect(screen.getByRole("grid")).toBe(grid);
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+it.each([0, 1, 2, 3, 4])(
+  "SSR includes %i mobile reservation dots, capped at three, and a count",
+  (count) => {
+    const bookings = Array.from({ length: count }, (_, index) => ({
+      ...booking,
+      id: String(index),
+    }));
+    const content = (
+      <MyBookingCalendarDay
+        day={{ date: "2026-10-08", day: 8, weekday: "thu", inMonth: true }}
+        bookings={bookings}
+        now={now}
+        today="2026-10-08"
+      />
+    );
+    const html = renderToString(content);
+    expect(html).toContain('data-slot="calendar-booking-dots"');
+    expect(html).toContain('data-slot="calendar-booking-chips"');
+    const { container } = render(content);
+    const dots = container.querySelector('[data-slot="calendar-booking-dots"]');
+    expect(dots).toHaveClass("md:hidden");
+    expect(dots?.querySelectorAll('[aria-hidden="true"]')).toHaveLength(
+      Math.min(count, 3),
+    );
+    expect(dots?.querySelector(".sr-only")).toHaveTextContent(
+      `예약 ${count}건`,
+    );
+    expect(
+      container.querySelector('[data-slot="calendar-booking-chips"]'),
+    ).toHaveClass("hidden", "md:block");
+  },
+);
+
+it("uses the same 44px mobile day links and roving focus with the selected panel below", () => {
+  render(element(data([booking])));
+  const grid = screen.getByRole("grid");
+  const links = within(grid).getAllByRole("link");
+  for (const link of links)
+    expect(link).toHaveClass("h-11", "md:h-auto", "md:min-h-28");
+  expect(links.filter((link) => link.tabIndex === 0)).toHaveLength(1);
+  const panel = screen.getByRole("region", { name: "선택한 날짜 예약" });
+  expect(panel.parentElement).toHaveClass("lg:grid-cols-[minmax(0,1fr)_340px]");
+  expect(panel.previousElementSibling).toBe(grid);
+  expect(within(grid).queryByRole("button")).not.toBeInTheDocument();
+});
+
+it.each([
+  ["2026-10", 35],
+  ["2026-08", 42],
+])(
+  "matches the %s month skeleton geometry and keeps one loading announcement",
+  (month, count) => {
+    const content = <MyBookingsCalendarBodySkeleton month={month as string} />;
+    expect(renderToString(content)).toContain("md:h-28");
+    const { container } = render(content);
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    const days = container.querySelectorAll(
+      '[data-slot="skeleton-calendar-day"]',
+    );
+    expect(days).toHaveLength(count as number);
+    for (const day of days) expect(day).toHaveClass("h-11", "md:h-28");
+    expect(
+      container.querySelector('[data-slot="skeleton-calendar-weekdays"]')
+        ?.children,
+    ).toHaveLength(7);
+    expect(container.firstElementChild).toHaveClass(
+      "lg:grid-cols-[minmax(0,1fr)_340px]",
+    );
+    expect(
+      container.querySelector('[data-slot="skeleton-calendar-panel"]'),
+    ).toBe(container.firstElementChild?.lastElementChild);
+  },
+);
+
+it("renders a wide calendar page skeleton without interactive placeholders", () => {
+  const { container } = render(<MyBookingsCalendarSkeleton />);
+  expect(container.firstElementChild).toHaveClass("max-w-[1184px]");
+  expect(screen.getAllByRole("status")).toHaveLength(1);
+  expect(screen.getByRole("heading", { name: "내 예약" })).toBeVisible();
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
 });

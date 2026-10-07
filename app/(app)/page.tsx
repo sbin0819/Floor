@@ -30,6 +30,12 @@ import {
 } from "@/features/bookings/components/home-skeletons";
 import { SkeletonRegion } from "@/components/skeleton-region";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  HomeNextBookingSkeleton,
+  HomeWeekBookingsSkeleton,
+  HomeFrequentSpacesSkeleton,
+  HomeFreeSpacesSkeleton,
+} from "@/features/bookings/components/home-card-skeletons";
 
 async function Header() {
   return <HomeHeader data={await getHomeHeader()} />;
@@ -73,18 +79,18 @@ async function HomeContent() {
       </Suspense>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <Suspense fallback={<HomeCardSkeleton photo />}>
+          <Suspense fallback={<HomeNextBookingSkeleton />}>
             <Upcoming />
           </Suspense>
-          <Suspense fallback={<HomeCardSkeleton rows={4} photo />}>
+          <Suspense fallback={<HomeFreeSpacesSkeleton />}>
             <FreeSpaces />
           </Suspense>
-          <Suspense fallback={<HomeCardSkeleton rows={3} photo />}>
+          <Suspense fallback={<HomeFrequentSpacesSkeleton />}>
             <FrequentSpaces />
           </Suspense>
         </div>
         <div className="space-y-6">
-          <Suspense fallback={<HomeCardSkeleton rows={7} />}>
+          <Suspense fallback={<HomeWeekBookingsSkeleton />}>
             <WeekBookings />
           </Suspense>
           <Suspense fallback={<HomeCardSkeleton rows={1} />}>

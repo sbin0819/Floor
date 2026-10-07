@@ -65,7 +65,10 @@ export function MyBookingCalendarDay({
       >
         {day.day}
       </span>
-      <span className="mt-1 block space-y-1">
+      <span
+        data-slot="calendar-booking-chips"
+        className="mt-1 hidden space-y-1 md:block"
+      >
         {bookings.slice(0, 2).map((booking) => (
           <BookingChip key={booking.id} kind={bookingChipKind(booking, now)}>
             {
@@ -83,6 +86,26 @@ export function MyBookingCalendarDay({
             +{bookings.length - 2}건 더
           </span>
         )}
+      </span>
+      <span
+        data-slot="calendar-booking-dots"
+        className="mt-1 flex h-1 items-center justify-center gap-1 md:hidden"
+      >
+        {bookings.slice(0, 3).map((booking) => (
+          <span
+            key={booking.id}
+            aria-hidden="true"
+            className={cn(
+              "size-1 shrink-0 rounded-full",
+              bookingChipKind(booking, now) === "past"
+                ? "bg-muted-foreground"
+                : bookingChipKind(booking, now) === "ongoing"
+                  ? "bg-primary"
+                  : "bg-primary/40",
+            )}
+          />
+        ))}
+        <span className="sr-only">예약 {bookings.length}건</span>
       </span>
     </>
   );
@@ -363,7 +386,7 @@ export function MyBookingsCalendar({
         </nav>
       </div>
       {pending ? (
-        <MyBookingsCalendarBodySkeleton />
+        <MyBookingsCalendarBodySkeleton month={visible.month} />
       ) : (
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <MonthGrid
@@ -386,7 +409,7 @@ export function MyBookingsCalendar({
             renderDay={(day) => {
               if (!day.inMonth)
                 return (
-                  <span className="block min-h-28 p-2 text-sm text-muted-foreground opacity-40">
+                  <span className="flex h-11 items-center justify-center p-1 text-sm text-muted-foreground opacity-40 md:block md:h-auto md:min-h-28 md:p-2">
                     {day.day}
                   </span>
                 );
@@ -402,7 +425,7 @@ export function MyBookingsCalendar({
                   aria-current={selectedDay === day.date ? "date" : undefined}
                   tabIndex={focusDay === day.date ? 0 : -1}
                   className={cn(
-                    "block min-h-28 p-2 focus-visible:relative focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                    "flex h-11 flex-col items-center px-2 py-1 focus-visible:relative focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:block md:h-auto md:min-h-28 md:p-2",
                     selectedDay === day.date &&
                       "bg-accent ring-1 ring-primary ring-inset",
                   )}
