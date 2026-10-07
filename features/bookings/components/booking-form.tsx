@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { LoaderCircle, Plus } from "lucide-react";
+import { ChevronDown, LoaderCircle } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ function TimeSelect({
   disabled,
   onChange,
   options,
+  error,
 }: {
   id: string;
   label: string;
@@ -42,9 +43,10 @@ function TimeSelect({
   disabled: boolean;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
+  error?: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <Label htmlFor={id}>{label}</Label>
       <Select
         value={value}
@@ -54,7 +56,12 @@ function TimeSelect({
         }}
         disabled={disabled}
       >
-        <SelectTrigger id={id} className="min-h-11 w-full tabular-nums">
+        <SelectTrigger
+          id={id}
+          className="min-h-11 w-full tabular-nums"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
+        >
           <SelectValue placeholder={`${label} 시각 선택`}>
             {options.find((option) => option.value === value)?.label}
           </SelectValue>
@@ -71,6 +78,11 @@ function TimeSelect({
           ))}
         </SelectContent>
       </Select>
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -102,7 +114,7 @@ export function BookingForm({
     else setLocalRange(next);
   };
   const [title, setTitle] = useState("");
-  const [showTitle, setShowTitle] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [actorId, setActorId] = useState(data.actors[0]?.teamId ?? "personal");
   const slots = useMemo(() => selectableSlots(data), [data]);
   const selectedStart = slots.some(
@@ -112,6 +124,7 @@ export function BookingForm({
     : "";
   const ends = selectableEnds(slots, selectedStart);
   const selectedEnd = ends.some((slot) => slot.end === end) ? end : "";
+  const selected = Boolean(selectedStart && selectedEnd);
   const actor =
     data.actors.find(({ teamId }) => (teamId ?? "personal") === actorId) ??
     data.actors[0];
@@ -128,40 +141,194 @@ export function BookingForm({
     onSuccess: () => {
       setRange(null);
       setTitle("");
+      setExpanded(false);
       onBooked?.();
     },
   });
+  const [previousErrors, setPreviousErrors] = useState(mutation.fieldErrors);
+  if (previousErrors !== mutation.fieldErrors) {
+    setPreviousErrors(mutation.fieldErrors);
+    if (
+      ["start", "end", "title"].some((key) => mutation.fieldErrors[key]?.length)
+    )
+      setExpanded(true);
+  }
   const disabled =
     mutation.pending || !data.openHours || !data.space.bookable || !actor;
-  const selectStart = (value: string) => {
-    setRange({ start: value, end: suggestedEnd(slots, value) });
-  };
-  const duration =
-    selectedStart && selectedEnd
-      ? (Date.parse(selectedEnd) - Date.parse(selectedStart)) / 60_000
-      : 0;
+  const duration = selected
+    ? (Date.parse(selectedEnd) - Date.parse(selectedStart)) / 60_000
+    : 0;
   const overLimit =
     actor &&
     duration > 0 &&
     ((actor.limits.maxMinutesPerBooking !== null &&
       duration > actor.limits.maxMinutesPerBooking) ||
       (actor.remainingMinutes !== null && duration > actor.remainingMinutes));
-  const summaryDate = selectedStart
-    ? new Intl.DateTimeFormat("ko-KR", {
-        timeZone: data.branch.timezone,
-        month: "long",
-        day: "numeric",
-        weekday: "short",
-      })
-        .format(new Date(selectedStart))
-        .replace(/[()]/g, "")
-    : "";
+  const summaryDate = isToday
+    ? "오늘"
+    : selectedStart
+      ? new Intl.DateTimeFormat("ko-KR", {
+          timeZone: data.branch.timezone,
+          month: "long",
+          day: "numeric",
+          weekday: "short",
+        })
+          .format(new Date(selectedStart))
+          .replace(/[()]/g, "")
+      : "";
+  const summary = (
+    <p
+      aria-live="polite"
+      aria-atomic="true"
+      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums"
+    >
+      {selected ? (
+        <>
+          <span>
+            {summaryDate} ·{" "}
+            {formatBookingTime(
+              selectedStart,
+              selectedEnd,
+              data.branch.timezone,
+            )}
+          </span>
+          <span className="font-normal text-muted-foreground">
+            {duration >= 60 ? `${Math.floor(duration / 60)}시간` : ""}
+            {duration % 60 ? ` ${duration % 60}분` : ""}
+          </span>
+        </>
+      ) : (
+        "시간을 골라 주세요"
+      )}
+    </p>
+  );
+  const times = (
+    <div
+      className={cn(
+        "grid grid-cols-2 gap-3",
+        variant === "strip" && "col-span-2 min-w-56 lg:flex-1",
+      )}
+    >
+      <TimeSelect
+        id={`${id}-start`}
+        label="시작"
+        value={selectedStart}
+        disabled={disabled}
+        onChange={(value) =>
+          setRange({ start: value, end: suggestedEnd(slots, value) })
+        }
+        options={slots
+          .filter((slot) => slot.state === "free")
+          .map((slot) => ({ value: slot.start, label: slot.label }))}
+        error={mutation.fieldErrors.start?.[0]}
+      />
+      <TimeSelect
+        id={`${id}-end`}
+        label="끝"
+        value={selectedEnd}
+        disabled={disabled || !selectedStart}
+        onChange={(value) => setRange({ start, end: value })}
+        options={ends.map((slot) => ({
+          value: slot.end,
+          label: slot.endLabel,
+        }))}
+        error={mutation.fieldErrors.end?.[0]}
+      />
+    </div>
+  );
+  const titleInput = (
+    <div className={cn("space-y-1", variant === "strip" && "min-w-32 flex-1")}>
+      <Label htmlFor={`${id}-title`}>제목 (선택)</Label>
+      <Input
+        id={`${id}-title`}
+        value={title}
+        maxLength={60}
+        disabled={disabled}
+        aria-invalid={Boolean(mutation.fieldErrors.title)}
+        aria-describedby={
+          mutation.fieldErrors.title ? `${id}-title-error` : undefined
+        }
+        onChange={(event) => setTitle(event.target.value)}
+      />
+      {mutation.fieldErrors.title && (
+        <p id={`${id}-title-error`} className="text-xs text-destructive">
+          {mutation.fieldErrors.title[0]}
+        </p>
+      )}
+    </div>
+  );
+  const actorInput = data.hasTeams && (
+    <div
+      className={cn(
+        variant === "strip" ? "min-w-32 space-y-1" : "min-w-0 flex-1",
+      )}
+    >
+      <Label
+        htmlFor={`${id}-actor`}
+        className={variant === "panel" ? "sr-only" : undefined}
+      >
+        예약 방식
+      </Label>
+      <Select
+        value={actor?.teamId ?? "personal"}
+        onValueChange={setActorId}
+        disabled={disabled}
+      >
+        <SelectTrigger id={`${id}-actor`} className="min-h-11 w-full">
+          <SelectValue placeholder="예약 방식 선택">{actor?.name}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {data.actors.map((item) => (
+            <SelectItem
+              className="min-h-11"
+              key={item.teamId ?? "personal"}
+              value={item.teamId ?? "personal"}
+            >
+              {item.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+  const submitButton = (
+    <Button
+      type="submit"
+      className={
+        variant === "panel" ? "min-w-0 flex-1" : "col-span-2 lg:w-auto"
+      }
+      disabled={disabled || !selected}
+    >
+      {mutation.pending && (
+        <LoaderCircle
+          aria-hidden="true"
+          className="animate-spin motion-reduce:animate-none"
+        />
+      )}
+      {mutation.pending ? "예약하고 있어요" : "예약하기"}
+    </Button>
+  );
+  const limit = actor && (
+    <p
+      className={cn(
+        "text-xs text-muted-foreground tabular-nums",
+        variant === "strip" && "order-last col-span-2 basis-full",
+      )}
+    >
+      {actor.teamId === null ? "개인" : "팀"} 예약은{" "}
+      {actor.limits.maxMinutesPerDay === null
+        ? "하루 한도가 없어요"
+        : `하루 ${actor.limits.maxMinutesPerDay / 60}시간까지`}
+      {actor.remainingMinutes !== null &&
+        ` · ${isToday ? "오늘" : "이 날"} ${actor.remainingMinutes / 60}시간 남음`}
+    </p>
+  );
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {variant === "panel" && (
         <div
           data-booking-scroll="true"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
+          className="min-h-[280px] flex-1 overflow-y-auto overscroll-contain p-3"
         >
           <BookingTimeline
             slots={slots}
@@ -179,14 +346,10 @@ export function BookingForm({
             onSelect={(value) => {
               const selection = selectBookingSlot(
                 slots,
-                selectedStart && selectedEnd
-                  ? { start: selectedStart, end: selectedEnd }
-                  : null,
+                selected ? { start: selectedStart, end: selectedEnd } : null,
                 value,
               );
-              if (selection) {
-                setRange(selection);
-              }
+              if (selection) setRange(selection);
             }}
           />
         </div>
@@ -197,7 +360,7 @@ export function BookingForm({
         className={cn(
           "shrink-0 bg-card",
           variant === "panel"
-            ? "space-y-2 border-t border-border p-4"
+            ? "space-y-1 border-t border-border p-3"
             : "grid min-w-0 grid-cols-2 items-end gap-3 lg:flex lg:flex-wrap",
         )}
         onSubmit={(event) => {
@@ -212,7 +375,6 @@ export function BookingForm({
           });
         }}
       >
-        {!data.openHours && <p>쉬는 날이에요. 다른 날짜를 골라 주세요</p>}
         {!data.space.bookable ? (
           <p>
             예약 없이 이용해요
@@ -224,107 +386,57 @@ export function BookingForm({
           </p>
         ) : (
           <>
-            {(variant === "panel" || !selectedStart || !selectedEnd) && (
-              <p
-                aria-live="polite"
-                aria-atomic="true"
-                className={cn(
-                  "flex flex-wrap items-center justify-between gap-1 text-sm font-semibold tabular-nums",
-                  variant === "strip" && "col-span-2 basis-full",
-                )}
-              >
-                {selectedStart && selectedEnd ? (
+            {variant === "panel" ? (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-x-2">
+                  {summary}
+                  {selected && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-1 text-xs text-primary"
+                      disabled={disabled}
+                      aria-expanded={expanded}
+                      aria-controls={`${id}-details`}
+                      onClick={() => setExpanded((value) => !value)}
+                    >
+                      시간·제목 바꾸기
+                      <ChevronDown
+                        aria-hidden="true"
+                        className={cn("size-3", expanded && "rotate-180")}
+                      />
+                    </Button>
+                  )}
+                </div>
+                {selected && (
                   <>
-                    <span>
-                      {summaryDate} ·{" "}
-                      {formatBookingTime(
-                        selectedStart,
-                        selectedEnd,
-                        data.branch.timezone,
-                      )}
-                    </span>
-                    <span className="font-normal text-muted-foreground">
-                      {duration >= 60 ? `${Math.floor(duration / 60)}시간` : ""}
-                      {duration % 60 ? ` ${duration % 60}분` : ""}
-                    </span>
+                    <div
+                      id={`${id}-details`}
+                      hidden={!expanded}
+                      className="space-y-2 pb-2"
+                    >
+                      {times}
+                      {titleInput}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {actorInput}
+                      {submitButton}
+                    </div>
                   </>
-                ) : (
-                  "시간을 골라 주세요"
                 )}
-              </p>
-            )}
-            <div
-              className={cn(
-                "grid grid-cols-2 gap-3",
-                variant === "strip" && "col-span-2 min-w-56 lg:flex-1",
-              )}
-            >
-              <TimeSelect
-                id={`${id}-start`}
-                label="시작"
-                value={selectedStart}
-                disabled={disabled}
-                onChange={selectStart}
-                options={slots
-                  .filter((slot) => slot.state === "free")
-                  .map((slot) => ({ value: slot.start, label: slot.label }))}
-              />
-              <TimeSelect
-                id={`${id}-end`}
-                label="끝"
-                value={selectedEnd}
-                disabled={disabled || !selectedStart}
-                onChange={(value) => setRange({ start, end: value })}
-                options={ends.map((slot) => ({
-                  value: slot.end,
-                  label: slot.endLabel,
-                }))}
-              />
-            </div>
-            {data.hasTeams && (
-              <div
-                className={cn("space-y-2", variant === "strip" && "min-w-32")}
-              >
-                <Label htmlFor={`${id}-actor`}>예약 방식</Label>
-                <Select
-                  value={actor?.teamId ?? "personal"}
-                  onValueChange={setActorId}
-                  disabled={disabled}
-                >
-                  <SelectTrigger id={`${id}-actor`} className="min-h-11 w-full">
-                    <SelectValue placeholder="예약 방식 선택">
-                      {actor?.name}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {data.actors.map((item) => (
-                      <SelectItem
-                        className="min-h-11"
-                        key={item.teamId ?? "personal"}
-                        value={item.teamId ?? "personal"}
-                      >
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {actor && (
-              <p
-                className={cn(
-                  "text-xs text-muted-foreground tabular-nums",
-                  variant === "strip" && "order-last col-span-2 basis-full",
+              </>
+            ) : (
+              <>
+                {!selected && (
+                  <div className="col-span-2 basis-full">{summary}</div>
                 )}
-              >
-                {actor.teamId === null ? "개인" : "팀"} 예약은{" "}
-                {actor.limits.maxMinutesPerDay === null
-                  ? "하루 한도가 없어요"
-                  : `하루 ${actor.limits.maxMinutesPerDay / 60}시간까지`}
-                {actor.remainingMinutes !== null &&
-                  ` · ${isToday ? "오늘" : "이 날"} ${actor.remainingMinutes / 60}시간 남음`}
-              </p>
+                {times}
+                {actorInput}
+                {titleInput}
+                {submitButton}
+              </>
             )}
+            {limit}
             {overLimit && (
               <p
                 aria-live="polite"
@@ -338,64 +450,6 @@ export function BookingForm({
               </p>
             )}
             {!actor && <p>이 공간을 예약할 권한이 없어요</p>}
-            {variant === "panel" && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="px-0 text-xs text-primary"
-                disabled={disabled}
-                aria-expanded={showTitle}
-                aria-controls={`${id}-title-region`}
-                onClick={() => setShowTitle((value) => !value)}
-              >
-                <Plus aria-hidden="true" className="size-4" />{" "}
-                {showTitle ? "제목 접기" : "제목 추가"}
-              </Button>
-            )}
-            <div
-              id={`${id}-title-region`}
-              hidden={variant === "panel" && !showTitle}
-              className={cn(
-                "space-y-2",
-                variant === "strip" && "min-w-32 flex-1",
-              )}
-            >
-              <Label htmlFor={`${id}-title`}>제목 (선택)</Label>
-              <Input
-                id={`${id}-title`}
-                value={title}
-                maxLength={60}
-                disabled={disabled}
-                aria-invalid={Boolean(mutation.fieldErrors.title)}
-                aria-describedby={
-                  mutation.fieldErrors.title ? `${id}-title-error` : undefined
-                }
-                onChange={(event) => setTitle(event.target.value)}
-              />
-              {mutation.fieldErrors.title && (
-                <p
-                  id={`${id}-title-error`}
-                  className="text-sm text-destructive"
-                >
-                  {mutation.fieldErrors.title[0]}
-                </p>
-              )}
-            </div>
-            <Button
-              type="submit"
-              className={
-                variant === "panel" ? "w-full" : "col-span-2 lg:w-auto"
-              }
-              disabled={disabled || !selectedStart || !selectedEnd}
-            >
-              {mutation.pending && (
-                <LoaderCircle
-                  aria-hidden="true"
-                  className="animate-spin motion-reduce:animate-none"
-                />
-              )}
-              {mutation.pending ? "예약하고 있어요" : "예약하기"}
-            </Button>
           </>
         )}
         <p

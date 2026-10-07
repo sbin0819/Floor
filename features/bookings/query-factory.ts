@@ -520,22 +520,23 @@ export function createBookingQueries(
             space.bookable && isToday
               ? getAvailabilitySummary(availability)
               : null,
-          status: isToday
-            ? getSpaceStatus({
-                accessible: true,
-                now: current,
-                userId: session.userId,
-                teamIds: context.teams.map(({ teamId }) => teamId),
-                bookings: schedule.map((booking) => ({
-                  ...booking.during,
-                  userId: booking.userId,
-                  teamId: booking.teamId,
-                })),
-                blocks: blocks
-                  .filter(({ spaceId }) => spaceId === space.id)
-                  .map(({ during }) => during),
-              })
-            : null,
+          status:
+            isToday && operatingState.status === "open"
+              ? getSpaceStatus({
+                  accessible: true,
+                  now: current,
+                  userId: session.userId,
+                  teamIds: context.teams.map(({ teamId }) => teamId),
+                  bookings: schedule.map((booking) => ({
+                    ...booking.during,
+                    userId: booking.userId,
+                    teamId: booking.teamId,
+                  })),
+                  blocks: blocks
+                    .filter(({ spaceId }) => spaceId === space.id)
+                    .map(({ during }) => during),
+                })
+              : null,
         });
       }
       summaries.sort(
@@ -639,6 +640,11 @@ export function createBookingQueries(
       const mine = (booking: { userId: string; teamId: string | null }) =>
         booking.userId === session.userId ||
         context.teams.some(({ teamId }) => teamId === booking.teamId);
+      const operatingState = getOperatingState(
+        current,
+        branch.timezone,
+        branch.openHours,
+      );
       return {
         branch,
         floor: floorDto(floor),
@@ -660,7 +666,8 @@ export function createBookingQueries(
           deskCount: desks[0]?.count ?? 0,
           bookingCount: bookings.length,
           status:
-            date === localDate(current, branch.timezone)
+            date === localDate(current, branch.timezone) &&
+            operatingState.status === "open"
               ? getSpaceStatus({
                   accessible: true,
                   now: current,

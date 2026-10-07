@@ -63,7 +63,7 @@ function bookingFixture(): MyBooking {
 }
 
 describe("photos in existing member screens", () => {
-  it("adds a 64 by 48 decorative photo without changing the space link, and no image for restricted rows", () => {
+  it("adds a responsive 72 by 54 decorative photo without changing the space link, and no image for restricted rows", () => {
     const data = floorDayFixture();
     const space = data.spaces[0]!;
     if (space.kind !== "accessible")
@@ -76,11 +76,16 @@ describe("photos in existing member screens", () => {
       "/branches/branch/floors/floor?date=2026-10-07&space=space",
     );
     expect(link.querySelector("img")).toHaveAttribute("alt", "");
-    expect(link.querySelector("img")).toHaveAttribute("sizes", "64px");
-    expect(link.querySelector('[data-slot="space-photo"]')).toHaveStyle({
-      width: "64px",
-      height: "48px",
-    });
+    expect(link.querySelector("img")).toHaveAttribute(
+      "sizes",
+      "(min-width: 768px) 72px, 56px",
+    );
+    expect(link.querySelector('[data-slot="space-photo"]')).toHaveClass(
+      "h-11",
+      "w-14",
+      "md:h-[54px]",
+      "md:w-[72px]",
+    );
     const restricted = screen.getByText("전용 공간").closest("li");
     expect(restricted?.querySelector("img, a, button")).toBeNull();
     expect(
@@ -88,12 +93,13 @@ describe("photos in existing member screens", () => {
     ).toHaveClass("bg-status-maintenance-hatch");
   });
 
-  it("places a 120px gallery above the unchanged detail and keeps its named close action", () => {
+  it("places a responsive 160px gallery above the detail and keeps its named close action", () => {
     const data = spaceDayFixture();
     data.photos = [photo];
     render(<SpaceDetail data={data} />);
     expect(screen.getByRole("group", { name: "회의실 C 사진" })).toHaveClass(
-      "h-[120px]",
+      "h-[160px]",
+      "[@media(max-height:759px)]:h-[120px]",
     );
     expect(screen.getByRole("img", { name: photo.alt })).toHaveAttribute(
       "loading",

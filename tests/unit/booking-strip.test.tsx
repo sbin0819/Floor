@@ -394,6 +394,9 @@ describe("shared floor timetable booking strip", () => {
     expect(range()).toEqual({ spaceId: first, start, end });
     view.receive(detailFixture());
     await finish(pending);
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "시간·제목 바꾸기" }),
+    );
     expect(
       within(sheet).getByRole("combobox", { name: "시작" }),
     ).toHaveTextContent("10:00");

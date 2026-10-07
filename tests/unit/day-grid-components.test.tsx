@@ -79,6 +79,11 @@ describe("day grid and synchronized form", () => {
     expect(buttons[2]).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByLabelText("시작")).toHaveTextContent("10:30");
     await userEvent.tab();
+    expect(
+      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+    ).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    await userEvent.tab();
     expect(screen.getByLabelText("시작")).toHaveFocus();
   });
 
@@ -160,11 +165,13 @@ describe("day grid and synchronized form", () => {
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
     expect(
-      screen
-        .getByText("10월 7일 수 · 10:00–11:00")
-        .closest('[aria-live="polite"]'),
+      screen.getByText("오늘 · 10:00–11:00").closest('[aria-live="polite"]'),
     ).toHaveTextContent("1시간");
     expect(screen.getByText("새 예약")).toHaveTextContent("10:00–11:00");
+    const edit = screen.getByRole("button", { name: "시간·제목 바꾸기" });
+    expect(edit).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(edit);
+    expect(edit).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(screen.getByLabelText("끝"));
     await userEvent.click(screen.getByRole("option", { name: "10:30" }));
     expect(
@@ -176,8 +183,12 @@ describe("day grid and synchronized form", () => {
     expect(
       screen.getByRole("button", { name: "12:30, 비어 있음" }),
     ).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(screen.getByRole("button", { name: "제목 추가" }));
     expect(screen.getByRole("textbox", { name: "제목 (선택)" })).toBeVisible();
+    await userEvent.click(edit);
+    expect(edit).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("textbox", { name: "제목 (선택)" }),
+    ).not.toBeInTheDocument();
     const form = screen.getByRole("form", { name: "예약 양식" });
     expect(form).toHaveClass("shrink-0");
     expect(
@@ -185,6 +196,8 @@ describe("day grid and synchronized form", () => {
     ).toBe(false);
     expect(view.container.querySelector("[data-booking-scroll]")).toHaveClass(
       "overflow-y-auto",
+      "min-h-[280px]",
+      "flex-1",
     );
   });
 
@@ -223,7 +236,7 @@ describe("day grid and synchronized form", () => {
     for (const variant of variants) {
       const view = display(variant);
       const submit = screen.queryByRole("button", { name: "예약하기" });
-      if (variant.space.bookable) expect(submit).toBeDisabled();
+      if (variant.space.bookable) expect(submit).toBeNull();
       else {
         expect(submit).toBeNull();
         expect(screen.getByText(/좌석 4석/)).toBeVisible();
@@ -232,6 +245,7 @@ describe("day grid and synchronized form", () => {
         "button",
       ))
         expect(button).toBeDisabled();
+      fireEvent.submit(screen.getByRole("form", { name: "예약 양식" }));
       view.unmount();
     }
     expect(createBooking).not.toHaveBeenCalled();

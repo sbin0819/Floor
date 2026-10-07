@@ -74,16 +74,29 @@ function display(children: ReactNode) {
 describe("booking form", () => {
   it("requires a time selection, hides an actor selector for users without teams and connects labels", async () => {
     display(<BookingForm data={spaceDayFixture()} />);
-    expect(screen.getByRole("button", { name: "예약하기" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "예약하기" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("combobox", { name: "예약 방식" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("시작")).toHaveAttribute("role", "combobox");
-    expect(screen.getByLabelText("끝")).toBeDisabled();
+    expect(
+      screen.queryByRole("combobox", { name: "시작" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "끝" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("textbox", { name: "제목 (선택)" }),
     ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "제목 추가" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+    );
+    expect(screen.getByLabelText("시작")).toHaveAttribute("role", "combobox");
+    expect(screen.getByLabelText("끝")).toBeEnabled();
     expect(screen.getByLabelText("제목 (선택)")).toHaveAttribute(
       "maxLength",
       "60",
@@ -104,6 +117,12 @@ describe("booking form", () => {
 
   it("omits unavailable times from the actual start select", async () => {
     display(<BookingForm data={spaceDayFixture()} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+    );
     await userEvent.click(screen.getByRole("combobox", { name: "시작" }));
     expect(screen.getByRole("option", { name: "10:00" })).toBeVisible();
     expect(
@@ -122,6 +141,9 @@ describe("booking form", () => {
     data.hasTeams = true;
     data.actors = [{ ...data.actors[0]!, teamId: "team", name: "가상 팀으로" }];
     display(<BookingForm data={data} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    );
     await userEvent.click(screen.getByRole("combobox", { name: "예약 방식" }));
     expect(screen.getByRole("option", { name: "가상 팀으로" })).toBeVisible();
     expect(
@@ -141,13 +163,15 @@ describe("booking form", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
+    await userEvent.click(
+      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+    );
     expect(screen.getByRole("combobox", { name: "시작" })).toHaveTextContent(
       "10:00",
     );
     expect(screen.getByRole("combobox", { name: "끝" })).toHaveTextContent(
       "11:00",
     );
-    await userEvent.click(screen.getByRole("button", { name: "제목 추가" }));
     await userEvent.type(screen.getByLabelText("제목 (선택)"), "테스트 회의");
     const form = view.container.querySelector("form")!;
     act(() => {
@@ -169,7 +193,21 @@ describe("booking form", () => {
       finish({ ok: true, data: { bookingId: "new-booking" } }),
     );
     await waitFor(() => expect(navigation.refresh).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("button", { name: "예약하기" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "예약하기" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "제목 (선택)" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(
+      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+    );
     expect(screen.getByLabelText("제목 (선택)")).toHaveValue("");
   });
 
@@ -226,7 +264,80 @@ describe("booking form", () => {
         <BookingForm key={`${next.space.id}:${next.date}`} data={next} />
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("button", { name: "예약하기" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "예약하기" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["start", "시작", "시작 시각을 다시 확인해 주세요"],
+    ["end", "끝", "끝 시각을 다시 확인해 주세요"],
+    ["title", "제목 (선택)", "제목을 다시 확인해 주세요"],
+  ])(
+    "opens hidden %s server errors with an accessible field connection",
+    async (key, label, message) => {
+      vi.mocked(createBooking).mockResolvedValue({
+        ok: false,
+        code: "INVALID_INPUT",
+        fieldErrors: { [key]: [message] },
+      });
+      display(<BookingForm data={spaceDayFixture()} />);
+      await userEvent.click(
+        screen.getByRole("button", { name: "10:00, 비어 있음" }),
+      );
+      const edit = screen.getByRole("button", { name: "시간·제목 바꾸기" });
+      expect(edit).toHaveAttribute("aria-expanded", "false");
+      expect(
+        screen.queryByRole("combobox", { name: "시작" }),
+      ).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
+      await waitFor(() =>
+        expect(edit).toHaveAttribute("aria-expanded", "true"),
+      );
+      const field = screen.getByLabelText(label);
+      expect(field).toBeVisible();
+      expect(field).toHaveAttribute("aria-invalid", "true");
+      expect(field).toHaveAttribute(
+        "aria-describedby",
+        screen.getByText(message).id,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "입력한 내용을 확인해 주세요",
+      );
+      expect(navigation.refresh).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("시작")).toHaveTextContent("10:00");
+      await userEvent.click(edit);
+      expect(edit).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
+      await waitFor(() =>
+        expect(edit).toHaveAttribute("aria-expanded", "true"),
+      );
+      expect(createBooking).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("keeps the initial panel to a prompt and limit, then uses compact action rows", async () => {
+    const data = spaceDayFixture();
+    data.hasTeams = true;
+    display(<BookingForm data={data} />);
+    const form = screen.getByRole("form", { name: "예약 양식" });
+    expect(form).toHaveTextContent("시간을 골라 주세요");
+    expect(form).toHaveTextContent(
+      "개인 예약은 하루 2시간까지 · 오늘 1시간 남음",
+    );
+    expect(form.querySelector("button, input")).toBeNull();
+    expect(form).toHaveClass("shrink-0", "p-3", "space-y-1");
+    await userEvent.click(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    );
+    const edit = screen.getByRole("button", { name: "시간·제목 바꾸기" });
+    expect(edit.parentElement).toHaveTextContent("오늘 · 10:00–11:00");
+    expect(edit.parentElement).toHaveTextContent("1시간");
+    const submit = screen.getByRole("button", { name: "예약하기" });
+    expect(submit.parentElement).toContainElement(
+      screen.getByRole("combobox", { name: "예약 방식" }),
+    );
+    expect(submit).toBeEnabled();
   });
 });
 
@@ -321,7 +432,9 @@ describe("booking strip", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "제목 추가" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+    );
     await userEvent.type(screen.getByLabelText("제목 (선택)"), "유지할 제목");
     view.rerender(
       <QueryClientProvider client={client}>

@@ -1,6 +1,5 @@
 "use client";
 
-import { StatusBadge } from "@/components/status-badge";
 import { PhotoGallery } from "@/components/photos/photo-gallery";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,11 +12,17 @@ import { FloorNavigationLink } from "./floor-navigation-link";
 import { useFloorView } from "./floor-view";
 import { useWideScreen } from "./use-wide-screen";
 import { useFloorSelection } from "./branch-workspace";
+import { getSpaceDayStatusLine } from "@/features/bookings/space-status-line";
+import { cn } from "@/lib/utils";
+import { localDate } from "@/lib/time/zoned";
 
 export function SpaceDetail({ data }: { data: SpaceDayData }) {
   const { effectiveView } = useFloorView();
   const wide = useWideScreen();
   const workspace = useFloorSelection();
+  const status = getSpaceDayStatusLine(data);
+  const isToday =
+    data.date === localDate(new Date(data.now), data.branch.timezone);
   if (wide && effectiveView === "timeline")
     return (
       <BookingForm
@@ -30,7 +35,7 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
   return (
     <section
       aria-label="공간 상세"
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
+      className="flex h-full min-h-0 flex-col overflow-y-auto rounded-xl border border-border bg-card"
     >
       <div className="relative shrink-0">
         <PhotoGallery
@@ -38,7 +43,7 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
           name={data.space.name}
           type={data.space.type}
           eager
-          className="h-[120px]"
+          className="h-[160px] [@media(max-height:759px)]:h-[120px]"
           sizes="(max-width: 1023px) 100vw, 420px"
         />
         <Button
@@ -61,16 +66,31 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
           </FloorNavigationLink>
         </Button>
       </div>
-      <header className="shrink-0 space-y-2 border-b border-border p-4">
-        <h2 className="text-xl font-semibold">{data.space.name}</h2>
-        <p className="text-muted-foreground tabular-nums">
-          {data.floor.level}층
-          {data.space.capacity !== null && ` · 최대 ${data.space.capacity}인`}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {data.space.status && <StatusBadge status={data.space.status} />}
+      <header className="shrink-0 space-y-2 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold">{data.space.name}</h2>
+          {isToday && (
+            <Badge
+              className={cn(
+                "border-0",
+                status.kind === "free"
+                  ? "bg-status-free text-status-free-foreground"
+                  : status.kind === "mine"
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-muted text-muted-foreground",
+              )}
+            >
+              {status.label}
+            </Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+          <span>
+            {data.floor.level}층
+            {data.space.capacity !== null && ` · 최대 ${data.space.capacity}인`}
+          </span>
           {data.space.amenities.map((key) => (
-            <Badge key={key} variant="secondary">
+            <Badge key={key} variant="outline" className="text-xs font-normal">
               {amenityLabels[key as AmenityKey]}
             </Badge>
           ))}

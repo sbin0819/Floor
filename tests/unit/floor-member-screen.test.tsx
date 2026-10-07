@@ -4,6 +4,7 @@ import { BranchNavigation } from "@/features/bookings/components/branch-navigati
 import { FloorDay } from "@/features/bookings/components/floor-day";
 import type { AvailabilitySummary } from "@/features/bookings/availability";
 import type { FloorVisibleSpace } from "@/features/bookings/types";
+import { getOperatingState } from "@/features/bookings/operating-state";
 import { floorDayFixture } from "./booking-ui-fixtures";
 
 const navigation = vi.hoisted(() => ({ date: "2026-10-07" }));
@@ -37,32 +38,108 @@ function branchNavigation() {
 
 describe("member floor rows", () => {
   it.each<[AvailabilitySummary, string]>([
-    [{ status: "free", until: "2026-10-07T11:00:00+09:00" }, "11:00까지"],
-    [{ status: "mine", until: "2026-10-07T12:00:00+09:00" }, "12:00까지"],
+    [
+      { status: "free", until: "2026-10-07T11:00:00+09:00" },
+      "11:00까지 비어 있음",
+    ],
+    [
+      { status: "mine", until: "2026-10-07T12:00:00+09:00" },
+      "내 예약 · 12:00까지",
+    ],
     [
       { status: "maintenance", until: "2026-10-08T12:00:00+09:00" },
-      "내일 12:00까지",
+      "점검 중 · 내일 12:00까지",
     ],
     [
       { status: "maintenance", until: "2026-10-09T12:00:00+09:00" },
-      "10월 9일 12:00까지",
+      "점검 중 · 10월 9일 12:00까지",
     ],
     [
       { status: "busy", availableAt: "2026-10-07T13:00:00+09:00" },
       "13:00부터 비어 있음",
     ],
     [{ status: "busy", availableAt: null }, "오늘은 빈 시간이 없어요"],
-    [{ status: "free", until: "2026-10-08T00:00:00+09:00" }, "24:00까지"],
+    [
+      { status: "free", until: "2026-10-08T00:00:00+09:00" },
+      "24:00까지 비어 있음",
+    ],
   ])("shows the current summary %j", (summary, expected) => {
-    render(
+    const { container } = render(
       <FloorDay
         data={{ ...floorDayFixture(), spaces: [{ ...space(), summary }] }}
       />,
     );
     expect(screen.getByText(expected)).toBeVisible();
+    expect(screen.getAllByText(expected)).toHaveLength(1);
+    expect(container.querySelector('[data-slot="badge"]')).toBeNull();
+    expect(screen.queryByText(/^예약 \d+건$/)).not.toBeInTheDocument();
     expect(
       screen.getByRole("img", { name: "예약된 시간이 없어요" }),
     ).toBeVisible();
+  });
+
+  it.each([
+    ["08:59", "09:00에 열어요"],
+    ["14:00", "오늘 영업이 끝났어요"],
+    ["23:30", "오늘 영업이 끝났어요"],
+  ])("never says a space is free outside today's hours (%s)", (time, label) => {
+    const data = floorDayFixture();
+    data.now = `2026-10-07T${time}:00+09:00`;
+    data.operatingState = getOperatingState(
+      new Date(data.now),
+      data.branch.timezone,
+      data.branch.openHours,
+    );
+    const { container } = render(<FloorDay data={data} />);
+    expect(screen.getByText(label)).toBeVisible();
+    expect(screen.queryByText(/비어 있음/)).not.toBeInTheDocument();
+    expect(container.querySelector('[data-slot="status-dot"]')).toBeNull();
+    expect(container.querySelector('[data-slot="badge"]')).toBeNull();
+  });
+
+  it("uses one muted count without a dot when a future day has no reservation", () => {
+    const { container } = render(
+      <FloorDay
+        data={{
+          ...floorDayFixture(),
+          isToday: false,
+          date: "2026-10-08",
+          spaces: [{ ...space(), bookingCount: 0 }],
+        }}
+      />,
+    );
+    expect(screen.getByText("예약 없음")).toBeVisible();
+    expect(container.querySelector('[data-slot="status-dot"]')).toBeNull();
+  });
+
+  it("uses responsive 72 by 54 photos without repeating the adjacent name", () => {
+    const { container } = render(
+      <FloorDay
+        data={{
+          ...floorDayFixture(),
+          spaces: [
+            {
+              ...space(),
+              photo: {
+                path: "/seed/photos/meeting-small-sage.webp",
+                alt: "가상 회의실 사진",
+              },
+            },
+          ],
+        }}
+      />,
+    );
+    const photo = container.querySelector('[data-slot="space-photo"]');
+    expect(photo).toHaveClass("h-11", "w-14", "md:h-[54px]", "md:w-[72px]");
+    expect(photo).toHaveAttribute("aria-hidden", "true");
+    expect(photo?.querySelector("img")).toHaveAttribute("alt", "");
+    expect(photo?.querySelector("img")).toHaveAttribute(
+      "sizes",
+      "(min-width: 768px) 72px, 56px",
+    );
+    expect(screen.getByRole("link", { name: /회의실 C/ })).toHaveClass(
+      "border-l-[3px]",
+    );
   });
 
   it("uses booking counts without a badge or current-time marker on another day", () => {
