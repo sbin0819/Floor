@@ -142,7 +142,42 @@ export type HomeHeaderData = {
   branch: BranchDetails | null;
   operatingState: OperatingState | null;
 };
-export type HomeUpcomingBookingsData = { now: string; bookings: MyBooking[] };
+export type HomeUpcomingBookingsData = {
+  now: string;
+  bookings: MyCalendarBooking[];
+};
+export type HomeWeekBooking = Pick<
+  MyBooking,
+  | "id"
+  | "start"
+  | "end"
+  | "date"
+  | "timezone"
+  | "branchId"
+  | "floorId"
+  | "spaceId"
+  | "spaceName"
+>;
+export type HomeWeekBookingsData = {
+  now: string;
+  today: string;
+  timezone: string;
+  openHours: OpenHours | null;
+  days: { date: string; bookings: HomeWeekBooking[] }[];
+};
+export type HomeFrequentSpace = {
+  id: string;
+  name: string;
+  type: SpaceType;
+  photo: Photo | null;
+  branchId: string;
+  branchName: string;
+  floorId: string;
+  floorName: string;
+  date: string;
+  bookingCount: number;
+};
+export type HomeFrequentSpacesData = { spaces: HomeFrequentSpace[] };
 export type HomeFreeSpace = {
   id: string;
   name: string;

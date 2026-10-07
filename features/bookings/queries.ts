@@ -7,6 +7,12 @@ export async function getHomeHeader() {
 export async function getHomeUpcomingBookings() {
   return createBookingQueries().getHomeUpcomingBookings();
 }
+export async function getHomeWeekBookings() {
+  return createBookingQueries().getHomeWeekBookings();
+}
+export async function getHomeFrequentSpaces() {
+  return createBookingQueries().getHomeFrequentSpaces();
+}
 export async function getHomeFreeSpaces() {
   return createBookingQueries().getHomeFreeSpaces();
 }

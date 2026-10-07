@@ -37,6 +37,8 @@ import type {
   HomeUpcomingBookingsData,
   HomeFreeSpacesData,
   HomeBookingLimitsData,
+  HomeWeekBookingsData,
+  HomeFrequentSpacesData,
   MyBooking,
   MyBookingsData,
   MyBookingsMonthData,
@@ -59,6 +61,12 @@ import {
   resolveBookingBranch,
 } from "@/lib/dal/booking-discovery";
 import { getAllRoleSettings } from "@/lib/dal/role-settings";
+import {
+  getFrequentSpaceCards,
+  listFrequentSpaceAccess,
+  listMySpaceBookingCounts,
+  listMyWeekBookings,
+} from "@/lib/dal/booking-home";
 import { getMemberships } from "@/lib/dal/users";
 import {
   listMyBookings,
@@ -83,7 +91,7 @@ import { canAccess, canAccessFloor } from "@/lib/permissions/can-access";
 import { loadPermissionData } from "@/lib/permissions/context";
 import type { PermissionContext } from "@/lib/permissions/types";
 import { getOpenHours } from "@/lib/time/open-hours";
-import { localDate } from "@/lib/time/zoned";
+import { addDays, localDate } from "@/lib/time/zoned";
 
 export { normalizeBookingDate } from "@/features/bookings/date";
 
@@ -289,7 +297,97 @@ export function createBookingQueries(
         now: current.toISOString(),
         bookings: (
           await listMyUpcomingBookings(session.userId, current, db)
-        ).map(myBookingDto),
+        ).map((row) => ({
+          ...myBookingDto(row),
+          canCancel: row.booking.during.end > current,
+        })),
+      };
+    },
+    async getHomeWeekBookings(): Promise<HomeWeekBookingsData> {
+      const session = await readSession();
+      const current = now();
+      const branch = await resolveBookingBranch(session.userId, db);
+      const timezone = branch?.timezone ?? "Asia/Seoul";
+      const today = localDate(current, timezone);
+      const days: HomeWeekBookingsData["days"] = Array.from(
+        { length: 7 },
+        (_, offset) => ({ date: addDays(today, offset), bookings: [] }),
+      );
+      const byDate = new Map(days.map((day) => [day.date, day.bookings]));
+      const rows = await listMyWeekBookings(
+        {
+          userId: session.userId,
+          start: new Date(`${addDays(today, -1)}T00:00:00.000Z`),
+          end: new Date(`${addDays(today, 8)}T00:00:00.000Z`),
+        },
+        db,
+      );
+      for (const { during, ...booking } of rows) {
+        const date = localDate(during.start, booking.timezone);
+        byDate.get(date)?.push({
+          ...booking,
+          start: during.start.toISOString(),
+          end: during.end.toISOString(),
+          date,
+        });
+      }
+      return {
+        now: current.toISOString(),
+        today,
+        timezone,
+        openHours: branch?.openHours ?? null,
+        days,
+      };
+    },
+    async getHomeFrequentSpaces(): Promise<HomeFrequentSpacesData> {
+      const session = await readSession();
+      const current = now();
+      const [counts, memberships, roleSettings] = await Promise.all([
+        listMySpaceBookingCounts(
+          {
+            userId: session.userId,
+            since: new Date(current.getTime() - 30 * 24 * 60 * 60_000),
+          },
+          db,
+        ),
+        getMemberships(session.userId, db),
+        getAllRoleSettings(db),
+      ]);
+      const context: PermissionContext = {
+        userId: session.userId,
+        ...memberships,
+        roleSettings,
+      };
+      const accessRows = await listFrequentSpaceAccess(
+        counts.map(({ spaceId }) => spaceId),
+        db,
+      );
+      const allowedIds = new Set(
+        accessRows
+          .filter(
+            (space) =>
+              can(context, "floor.view", { branchId: space.floor.branchId }) &&
+              canAccess(context, space),
+          )
+          .map(({ id }) => id),
+      );
+      const selected = counts
+        .filter(({ spaceId }) => allowedIds.has(spaceId))
+        .slice(0, 3);
+      const cards = await getFrequentSpaceCards(
+        selected.map(({ spaceId }) => spaceId),
+        db,
+      );
+      const byId = new Map(cards.map((card) => [card.id, card]));
+      return {
+        spaces: selected.flatMap(({ spaceId, bookingCount }) => {
+          const card = byId.get(spaceId);
+          if (!card) return [];
+          const { timezone, ...space } = card;
+          return [
+            { ...space, bookingCount, date: localDate(current, timezone) },
+          ];
+        }),
       };
     },
     async getHomeFreeSpaces(): Promise<HomeFreeSpacesData> {
