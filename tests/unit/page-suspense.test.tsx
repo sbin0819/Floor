@@ -8,7 +8,7 @@ import InvitePage from "@/app/(app)/invite/[token]/page";
 import AdminHome from "@/app/admin/page";
 import { requireOperatorPage, requirePageSession } from "@/lib/auth/session";
 import {
-  getHomeData,
+  getHomeTeams,
   getInvitePageData,
   getTeamPageData,
   getTeamStartData,
@@ -20,7 +20,7 @@ vi.mock("@/lib/auth/session", () => ({
   requireOperatorPage: vi.fn(),
 }));
 vi.mock("@/features/teams/queries", () => ({
-  getHomeData: vi.fn(),
+  getHomeTeams: vi.fn(),
   getInvitePageData: vi.fn(),
   getTeamPageData: vi.fn(),
   getTeamStartData: vi.fn(),
@@ -91,7 +91,7 @@ describe("protected page-local streaming boundaries", () => {
       expect(searchParams.read).not.toHaveBeenCalled();
       expect(requirePageSession).not.toHaveBeenCalled();
       expect(requireOperatorPage).not.toHaveBeenCalled();
-      expect(getHomeData).not.toHaveBeenCalled();
+      expect(getHomeTeams).not.toHaveBeenCalled();
       expect(getTeamPageData).not.toHaveBeenCalled();
       expect(getTeamStartData).not.toHaveBeenCalled();
       expect(getInvitePageData).not.toHaveBeenCalled();

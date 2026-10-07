@@ -13,6 +13,7 @@ describe("optimistic route protection", () => {
     "/branches",
     "/branches/branch/floors/floor",
     "/bookings",
+    "/booking",
   ])("matches protected route %s", (url) => {
     expect(unstable_doesProxyMatch({ config, nextConfig: {}, url })).toBe(true);
   });

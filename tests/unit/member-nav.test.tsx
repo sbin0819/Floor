@@ -75,7 +75,7 @@ describe("member navigation", () => {
     expect(screen.getAllByRole("link")).toHaveLength(4);
     expect(screen.getByRole("link", { name: "공간 예약" })).toHaveAttribute(
       "href",
-      "/branches",
+      "/booking",
     );
     expect(screen.getByRole("link", { name: "팀" })).toHaveAttribute(
       "href",
@@ -127,7 +127,7 @@ describe("member navigation", () => {
       expect(hint).toHaveClass("absolute", "inset-0", "opacity-100");
     expect(screen.getByRole("link", { name: "공간 예약" })).toHaveAttribute(
       "href",
-      "/branches",
+      "/booking",
     );
   });
 });
