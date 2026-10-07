@@ -1,4 +1,5 @@
 import { createBookingQueries } from "@/features/bookings/query-factory";
+import type { MyBookingsMonthInput } from "@/features/bookings/calendar";
 
 export async function getHomeHeader() {
   return createBookingQueries().getHomeHeader();
@@ -45,4 +46,7 @@ export async function getSpaceDay(
 }
 export async function getMyBookings() {
   return createBookingQueries().getMyBookings();
+}
+export async function getMyBookingsMonth(input: MyBookingsMonthInput = {}) {
+  return createBookingQueries().getMyBookingsMonth(input);
 }

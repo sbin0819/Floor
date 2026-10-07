@@ -274,6 +274,22 @@ export async function listMyBranchBookingDates(
   ].sort();
 }
 
+export async function listMyConfirmedBookingsBetween(
+  { userId, start, end }: { userId: string; start: Date; end: Date },
+  database: DalDatabase = getDb(),
+) {
+  return locatedBookings(database)
+    .where(
+      and(
+        eq(bookings.userId, userId),
+        eq(bookings.status, "confirmed"),
+        sql`lower(${bookings.during}) >= ${start.toISOString()}::timestamptz`,
+        sql`lower(${bookings.during}) < ${end.toISOString()}::timestamptz`,
+      ),
+    )
+    .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id));
+}
+
 export async function getBookingWithLocation(
   bookingId: string,
   database: DalDatabase = getDb(),

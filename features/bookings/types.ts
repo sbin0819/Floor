@@ -6,6 +6,7 @@ import type {
 } from "@/features/bookings/availability";
 import type { OperatingState } from "@/features/bookings/operating-state";
 import type { Photo } from "@/lib/photos/schema";
+import type { MyBookingsMonthSelection } from "@/features/bookings/calendar";
 
 export type SpaceType =
   "meeting_room" | "seminar" | "phone_booth" | "desk_area" | "desk" | "lounge";
@@ -126,6 +127,12 @@ export type MyBookingsData = {
   now: string;
   upcoming: MyBooking[];
   past: MyBooking[];
+};
+export type MyCalendarBooking = MyBooking & { canCancel: boolean };
+export type MyBookingsMonthData = MyBookingsMonthSelection & {
+  now: string;
+  timezone: string;
+  bookings: MyCalendarBooking[];
 };
 
 export type HomeHeaderData = {

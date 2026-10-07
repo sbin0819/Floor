@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  myBookingsMonthReadRange,
+  normalizeMyBookingsMonth,
+  type MyBookingsMonthInput,
+} from "@/features/bookings/calendar";
 import { availableBookingActors } from "@/features/bookings/access";
 import {
   buildAvailabilityIntervals,
@@ -34,6 +39,7 @@ import type {
   HomeBookingLimitsData,
   MyBooking,
   MyBookingsData,
+  MyBookingsMonthData,
   SpaceDayData,
   SpaceType,
 } from "@/features/bookings/types";
@@ -56,6 +62,7 @@ import { getAllRoleSettings } from "@/lib/dal/role-settings";
 import { getMemberships } from "@/lib/dal/users";
 import {
   listMyBookings,
+  listMyConfirmedBookingsBetween,
   listMyBranchBookingDates,
   listMyUpcomingBookings,
   listSpaceBlocks,
@@ -711,6 +718,37 @@ export function createBookingQueries(
         now: current.toISOString(),
         upcoming: rows.upcoming.map(myBookingDto),
         past: rows.past.map(myBookingDto),
+      };
+    },
+    async getMyBookingsMonth(
+      input: MyBookingsMonthInput = {},
+    ): Promise<MyBookingsMonthData> {
+      const session = await readSession();
+      const current = now();
+      const branch = await resolveBookingBranch(session.userId, db);
+      const timezone = branch?.timezone ?? "Asia/Seoul";
+      const selection = normalizeMyBookingsMonth(
+        input,
+        localDate(current, timezone),
+      );
+      const rows = await listMyConfirmedBookingsBetween(
+        {
+          userId: session.userId,
+          ...myBookingsMonthReadRange(selection.month),
+        },
+        db,
+      );
+      return {
+        ...selection,
+        now: current.toISOString(),
+        timezone,
+        bookings: rows
+          .map((row) => ({
+            ...myBookingDto(row),
+            // 소유자·확정 상태를 SQL에서 확인했고 본인 취소는 역할 설정과 무관하다.
+            canCancel: row.booking.during.end > current,
+          }))
+          .filter((booking) => booking.date.slice(0, 7) === selection.month),
       };
     },
   };
