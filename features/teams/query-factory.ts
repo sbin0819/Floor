@@ -114,33 +114,34 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
     async getTeamPageData(teamId: string): Promise<TeamPageData | null> {
       const session = await readSession();
       if (!z.uuid().safeParse(teamId).success) return null;
-      const membership = await getTeamMember(teamId, session.userId, database);
+      const [membership, isManager] = await Promise.all([
+        getTeamMember(teamId, session.userId, database),
+        canManageTeam(session, teamId, database),
+      ]);
       if (!membership) return null;
-      const team = await getTeamById(teamId, database);
+      // 소속과 권한을 먼저 확인해야 관리자 전용 조회가 시작될 수 있다.
+      const [team, memberRows, contact, invites, requests] = await Promise.all([
+        getTeamById(teamId, database),
+        listTeamMembers(teamId, database),
+        isManager ? getTeamContact(teamId, database) : null,
+        isManager ? listSentInvites(teamId, database) : [],
+        isManager ? listTeamJoinRequests(teamId, database) : [],
+      ]);
       if (!team) return null;
-      const members = (await listTeamMembers(team.id, database)).map(
-        (member) => ({
-          id: member.userId,
-          name: member.name,
-          email: member.email,
-          role: member.role,
-          title: member.title,
-        }),
-      );
+      const members = memberRows.map((member) => ({
+        id: member.userId,
+        name: member.name,
+        email: member.email,
+        role: member.role,
+        title: member.title,
+      }));
       const publicData = {
         id: team.id,
         name: team.name,
         memberCount: members.length,
         members,
       };
-      if (!(await canManageTeam(session, team.id, database)))
-        return { ...publicData, role: "member" };
-      // 일반 팀원에게 보이지 않는 값은 조회 자체를 권한 판정 뒤로 미룬다.
-      const [contact, invites, requests] = await Promise.all([
-        getTeamContact(team.id, database),
-        listSentInvites(team.id, database),
-        listTeamJoinRequests(team.id, database),
-      ]);
+      if (!isManager) return { ...publicData, role: "member" };
       return {
         ...publicData,
         role: "admin",

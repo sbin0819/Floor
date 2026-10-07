@@ -68,13 +68,14 @@ describe("booking query security and DTOs", () => {
       () => query.getBranchList(),
       () => query.getBookingEntry(),
       () => query.getBranchFloors("invalid"),
+      () => query.getBranchNavigation("invalid"),
       () => query.getFloorDay("invalid", "invalid"),
-      () => query.getSpaceDay("invalid"),
+      () => query.getSpaceDay(fixture.branchId, fixture.floorId, "invalid"),
       () => query.getMyBookings(),
     ];
     for (const call of calls)
       await expect(call()).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
-    expect(requireSession).toHaveBeenCalledTimes(6);
+    expect(requireSession).toHaveBeenCalledTimes(7);
   });
 
   it("never reads restricted room metadata or schedules and returns only its identity/type", async () => {
@@ -164,10 +165,19 @@ describe("booking query security and DTOs", () => {
     );
     expect(
       await query.getSpaceDay(
+        fixture.branchId,
+        fixture.floorId,
         fixture.restrictedSpaceId.toUpperCase(),
         bookingDate,
       ),
-    ).toEqual(await query.getSpaceDay(fixture.restrictedSpaceId, bookingDate));
+    ).toEqual(
+      await query.getSpaceDay(
+        fixture.branchId,
+        fixture.floorId,
+        fixture.restrictedSpaceId,
+        bookingDate,
+      ),
+    );
   });
 
   it("excludes archived rooms and individual desks but reports a desk area's seat count", async () => {
@@ -196,13 +206,28 @@ describe("booking query security and DTOs", () => {
       ),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
-      queries().getSpaceDay(fixture.restrictedSpaceId, bookingDate),
+      queries().getSpaceDay(
+        fixture.branchId,
+        fixture.floorId,
+        fixture.restrictedSpaceId,
+        bookingDate,
+      ),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
-      queries().getSpaceDay(fixture.archivedSpaceId, bookingDate),
+      queries().getSpaceDay(
+        fixture.branchId,
+        fixture.floorId,
+        fixture.archivedSpaceId,
+        bookingDate,
+      ),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
-      queries().getSpaceDay(fixture.deskId, bookingDate),
+      queries().getSpaceDay(
+        fixture.branchId,
+        fixture.floorId,
+        fixture.deskId,
+        bookingDate,
+      ),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -223,6 +248,65 @@ describe("booking query security and DTOs", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
+  it("rejects forged space parents before reading metadata, schedules or private titles", async () => {
+    const metadata = vi.spyOn(spacesDal, "getSpacesByIds");
+    const schedule = vi.spyOn(bookingDal, "listSpaceBookings");
+    const blocks = vi.spyOn(bookingDal, "listSpaceBlocks");
+    for (const [branchId, floorId, spaceId] of [
+      [fixture.otherBranchId, fixture.floorId, fixture.publicSpaceId],
+      [fixture.branchId, fixture.otherFloorId, fixture.otherSpaceId],
+      [fixture.branchId, fixture.floorId, fixture.restrictedFloorSpaceId],
+      [fixture.branchId, fixture.floorId, fixture.otherSpaceId],
+    ] as const) {
+      await expect(
+        queries(fixture.operator).getSpaceDay(branchId, floorId, spaceId),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    }
+    expect(metadata).not.toHaveBeenCalled();
+    expect(schedule).not.toHaveBeenCalled();
+    expect(blocks).not.toHaveBeenCalled();
+  });
+
+  it("does not select booking titles or actor names to compute floor counts and status", async () => {
+    await insertFixtureBooking(database, fixture, {
+      title: "합계에 필요하지 않은 제목",
+    });
+    const statements = vi.spyOn(database.client, "query");
+    await queries().getFloorDay(fixture.branchId, fixture.floorId, bookingDate);
+    const schedule = statements.mock.calls
+      .map(([query]) => query)
+      .find((query) => query.includes('from "bookings"'));
+    expect(schedule).toBeDefined();
+    expect(schedule).not.toMatch(/"title"|"name"|join "users"|join "teams"/);
+    expect(schedule).toMatch(/"during"/);
+  });
+
+  it("returns only accessible navigation floors and server-owned time in the branch timezone", async () => {
+    const data = await queries().getBranchNavigation(fixture.branchId);
+    expect(data).toEqual({
+      branch: {
+        id: fixture.branchId,
+        name: "강남점",
+        address: "가상로 7",
+        timezone: "Asia/Seoul",
+        openHours: { sun: null },
+      },
+      floors: [{ id: fixture.floorId, name: "7F", level: 7, sortOrder: 1 }],
+      branches: [
+        { id: fixture.branchId, name: "강남점" },
+        { id: fixture.otherBranchId, name: "서초점" },
+      ],
+      today: bookingDate,
+      now: bookingNow.toISOString(),
+    });
+    expect(
+      await queries().getBranchNavigation(fixture.branchId.toUpperCase()),
+    ).toEqual(data);
+    await expect(
+      queries().getBranchNavigation(crypto.randomUUID()),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("returns no floors and hides direct floor/space reads if floor.view is disabled", async () => {
     await database.db.insert(roleSettings).values({
       branchId: fixture.branchId,
@@ -238,7 +322,11 @@ describe("booking query security and DTOs", () => {
       queries().getFloorDay(fixture.branchId, fixture.floorId),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
-      queries().getSpaceDay(fixture.publicSpaceId),
+      queries().getSpaceDay(
+        fixture.branchId,
+        fixture.floorId,
+        fixture.publicSpaceId,
+      ),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -251,7 +339,9 @@ describe("booking query security and DTOs", () => {
       await expect(
         queries().getFloorDay(fixture.branchId, id),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
-      await expect(queries().getSpaceDay(id)).rejects.toMatchObject({
+      await expect(
+        queries().getSpaceDay(fixture.branchId, fixture.floorId, id),
+      ).rejects.toMatchObject({
         code: "NOT_FOUND",
       });
     },
@@ -263,6 +353,8 @@ describe("booking query security and DTOs", () => {
       title: "개인 비공개 제목",
     });
     const data = await queries().getSpaceDay(
+      fixture.branchId,
+      fixture.floorId,
       fixture.publicSpaceId,
       bookingDate,
     );
@@ -286,6 +378,8 @@ describe("booking query security and DTOs", () => {
       title: "그로스팀 전용 제목",
     });
     const member = await queries(fixture.member).getSpaceDay(
+      fixture.branchId,
+      fixture.floorId,
       fixture.publicSpaceId,
       bookingDate,
     );
@@ -299,6 +393,8 @@ describe("booking query security and DTOs", () => {
     expect(
       (
         await queries(fixture.admin).getSpaceDay(
+          fixture.branchId,
+          fixture.floorId,
           fixture.publicSpaceId,
           bookingDate,
         )
@@ -308,6 +404,8 @@ describe("booking query security and DTOs", () => {
       Object.hasOwn(
         (
           await queries(fixture.otherMember).getSpaceDay(
+            fixture.branchId,
+            fixture.floorId,
             fixture.publicSpaceId,
             bookingDate,
           )
@@ -320,16 +418,29 @@ describe("booking query security and DTOs", () => {
   it("reveals an owner's own title and all titles only to the actual branch operator", async () => {
     await insertFixtureBooking(database, fixture, { title: "내 개인 제목" });
     expect(
-      (await queries().getSpaceDay(fixture.publicSpaceId)).bookings[0],
+      (
+        await queries().getSpaceDay(
+          fixture.branchId,
+          fixture.floorId,
+          fixture.publicSpaceId,
+        )
+      ).bookings[0],
     ).toMatchObject({ title: "내 개인 제목", isMine: true, canCancel: true });
     expect(
-      (await queries(fixture.operator).getSpaceDay(fixture.publicSpaceId))
-        .bookings[0],
+      (
+        await queries(fixture.operator).getSpaceDay(
+          fixture.branchId,
+          fixture.floorId,
+          fixture.publicSpaceId,
+        )
+      ).bookings[0],
     ).toMatchObject({ title: "내 개인 제목", canCancel: true });
     expect(
       Object.hasOwn(
         (
           await queries(fixture.otherOperator).getSpaceDay(
+            fixture.branchId,
+            fixture.floorId,
             fixture.publicSpaceId,
           )
         ).bookings[0]!,
@@ -398,6 +509,8 @@ describe("booking query security and DTOs", () => {
       teamId: fixture.teamId,
     });
     const common = await queries(fixture.member).getSpaceDay(
+      fixture.branchId,
+      fixture.floorId,
       fixture.publicSpaceId,
     );
     expect(common.hasTeams).toBe(true);
@@ -418,12 +531,22 @@ describe("booking query security and DTOs", () => {
     });
     expect(
       (
-        await queries(fixture.member).getSpaceDay(fixture.restrictedSpaceId)
+        await queries(fixture.member).getSpaceDay(
+          fixture.branchId,
+          fixture.floorId,
+          fixture.restrictedSpaceId,
+        )
       ).actors.map(({ teamId }) => teamId),
     ).toEqual([fixture.teamId]);
-    expect((await queries().getSpaceDay(fixture.publicSpaceId)).hasTeams).toBe(
-      false,
-    );
+    expect(
+      (
+        await queries().getSpaceDay(
+          fixture.branchId,
+          fixture.floorId,
+          fixture.publicSpaceId,
+        )
+      ).hasTeams,
+    ).toBe(false);
   });
 
   it("selects entry by user default, alphabetical team home branch, or null", async () => {
@@ -447,12 +570,66 @@ describe("booking query security and DTOs", () => {
     );
   });
 
+  it("batches usage totals without mixing personal users, teams, branches, cancelled rows or dates", async () => {
+    await insertFixtureBooking(database, fixture, {
+      userId: fixture.member.userId,
+    });
+    await insertFixtureBooking(database, fixture, {
+      userId: fixture.stranger.userId,
+      during: bookingRange("13:00", "14:00"),
+    });
+    await insertFixtureBooking(database, fixture, {
+      userId: fixture.admin.userId,
+      teamId: fixture.teamId,
+      during: bookingRange("14:00", "15:00"),
+    });
+    await insertFixtureBooking(database, fixture, {
+      userId: fixture.otherMember.userId,
+      teamId: fixture.otherTeamId,
+      during: bookingRange("15:00", "16:00"),
+    });
+    await insertFixtureBooking(database, fixture, {
+      userId: fixture.admin.userId,
+      teamId: fixture.teamId,
+      status: "cancelled",
+      cancelledAt: bookingNow,
+    });
+    await insertFixtureBooking(database, fixture, {
+      spaceId: fixture.otherSpaceId,
+      userId: fixture.admin.userId,
+      teamId: fixture.teamId,
+    });
+    await insertFixtureBooking(database, fixture, {
+      userId: fixture.admin.userId,
+      teamId: fixture.teamId,
+      during: bookingRange("12:00", "13:00", "2026-10-08"),
+    });
+    const data = await queries(fixture.member).getSpaceDay(
+      fixture.branchId,
+      fixture.floorId,
+      fixture.publicSpaceId,
+      bookingDate,
+    );
+    expect(
+      data.actors.map(({ teamId, remainingMinutes }) => ({
+        teamId,
+        remainingMinutes,
+      })),
+    ).toEqual([
+      { teamId: null, remainingMinutes: 60 },
+      { teamId: fixture.teamId, remainingMinutes: 420 },
+      { teamId: fixture.otherTeamId, remainingMinutes: 420 },
+    ]);
+  });
+
   it("keeps a team's actual booking-mode name even without a home branch", async () => {
     await database.db
       .update(teams)
       .set({ homeBranchId: null })
       .where(eq(teams.id, fixture.teamId));
     const data = await queries(fixture.member).getSpaceDay(
+      fixture.branchId,
+      fixture.floorId,
       fixture.publicSpaceId,
     );
     expect(

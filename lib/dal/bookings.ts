@@ -28,12 +28,47 @@ import { addDays, localDate, zonedDateTime } from "@/lib/time/zoned";
 
 export type ScheduleRange = { spaceIds: string[]; during: TimeRange };
 export type BookingActor = { userId: string } | { teamId: string };
+type BookingSummary = Pick<
+  typeof bookings.$inferSelect,
+  "id" | "spaceId" | "userId" | "teamId" | "during"
+>;
+type BookingDetail = typeof bookings.$inferSelect & {
+  userName: string;
+  teamName: string | null;
+};
+
+export function listSpaceBookings(
+  input: ScheduleRange & { summaryOnly: true },
+  database?: DalDatabase,
+): Promise<BookingSummary[]>;
+export function listSpaceBookings(
+  input: ScheduleRange & { summaryOnly?: false },
+  database?: DalDatabase,
+): Promise<BookingDetail[]>;
 
 export async function listSpaceBookings(
-  { spaceIds, during }: ScheduleRange,
+  { spaceIds, during, summaryOnly }: ScheduleRange & { summaryOnly?: boolean },
   database: DalDatabase = getDb(),
 ) {
   if (spaceIds.length === 0) return [];
+  const filter = and(
+    inArray(bookings.spaceId, spaceIds),
+    eq(bookings.status, "confirmed"),
+    sql`${bookings.during} && ${serializeTimeRange(during)}::tstzrange`,
+  );
+  if (summaryOnly) {
+    return database
+      .select({
+        id: bookings.id,
+        spaceId: bookings.spaceId,
+        userId: bookings.userId,
+        teamId: bookings.teamId,
+        during: bookings.during,
+      })
+      .from(bookings)
+      .where(filter)
+      .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id));
+  }
   return database
     .select({
       ...getTableColumns(bookings),
@@ -43,13 +78,7 @@ export async function listSpaceBookings(
     .from(bookings)
     .innerJoin(users, eq(users.id, bookings.userId))
     .leftJoin(teams, eq(teams.id, bookings.teamId))
-    .where(
-      and(
-        inArray(bookings.spaceId, spaceIds),
-        eq(bookings.status, "confirmed"),
-        sql`${bookings.during} && ${serializeTimeRange(during)}::tstzrange`,
-      ),
-    )
+    .where(filter)
     .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id));
 }
 
@@ -100,6 +129,51 @@ export async function sumBookedMinutes(
       ),
     );
   return result?.minutes ?? 0;
+}
+
+export async function sumActorBookedMinutes(
+  {
+    branchId,
+    during,
+    userId,
+    teamIds,
+    includePersonal,
+  }: {
+    branchId: string;
+    during: TimeRange;
+    userId: string;
+    teamIds: string[];
+    includePersonal: boolean;
+  },
+  database: DalDatabase = getDb(),
+) {
+  if (!includePersonal && teamIds.length === 0) return [];
+  return database
+    .select({
+      teamId: bookings.teamId,
+      minutes:
+        sql<string>`sum(extract(epoch from (upper(${bookings.during}) - lower(${bookings.during}))) / 60)`.mapWith(
+          Number,
+        ),
+    })
+    .from(bookings)
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .innerJoin(floors, eq(floors.id, spaces.floorId))
+    .where(
+      and(
+        eq(floors.branchId, branchId),
+        eq(bookings.status, "confirmed"),
+        sql`lower(${bookings.during}) >= ${during.start.toISOString()}::timestamptz`,
+        sql`lower(${bookings.during}) < ${during.end.toISOString()}::timestamptz`,
+        or(
+          includePersonal
+            ? and(eq(bookings.userId, userId), isNull(bookings.teamId))
+            : undefined,
+          teamIds.length ? inArray(bookings.teamId, teamIds) : undefined,
+        ),
+      ),
+    )
+    .groupBy(bookings.teamId);
 }
 
 export async function insertBooking(
@@ -162,14 +236,25 @@ export async function listMyBookings(
   now: Date,
   database: DalDatabase = getDb(),
 ) {
-  const bookedBranches = await database
-    .select({ id: branches.id, timezone: branches.timezone })
-    .from(bookings)
-    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
-    .innerJoin(floors, eq(floors.id, spaces.floorId))
-    .innerJoin(branches, eq(branches.id, floors.branchId))
-    .where(eq(bookings.userId, userId))
-    .groupBy(branches.id, branches.timezone);
+  const [bookedBranches, upcoming] = await Promise.all([
+    database
+      .select({ id: branches.id, timezone: branches.timezone })
+      .from(bookings)
+      .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+      .innerJoin(floors, eq(floors.id, spaces.floorId))
+      .innerJoin(branches, eq(branches.id, floors.branchId))
+      .where(eq(bookings.userId, userId))
+      .groupBy(branches.id, branches.timezone),
+    locatedBookings(database)
+      .where(
+        and(
+          eq(bookings.userId, userId),
+          eq(bookings.status, "confirmed"),
+          sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
+        ),
+      )
+      .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id)),
+  ]);
   const recentAtBranch = bookedBranches.map((branch) => {
     const oldestDate = addDays(localDate(now, branch.timezone), -30);
     const cutoff = zonedDateTime(oldestDate, "00:00", branch.timezone);
@@ -178,15 +263,6 @@ export async function listMyBookings(
       sql`lower(${bookings.during}) >= ${cutoff.toISOString()}::timestamptz`,
     );
   });
-  const upcoming = await locatedBookings(database)
-    .where(
-      and(
-        eq(bookings.userId, userId),
-        eq(bookings.status, "confirmed"),
-        sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
-      ),
-    )
-    .orderBy(asc(sql`lower(${bookings.during})`), asc(bookings.id));
   const past = recentAtBranch.length
     ? await locatedBookings(database)
         .where(

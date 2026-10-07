@@ -26,6 +26,11 @@ export type BranchFloorsData = {
   branch: BranchDetails;
   floors: FloorSummary[];
 };
+export type BranchNavigationData = BranchFloorsData & {
+  branches: { id: string; name: string }[];
+  today: string;
+  now: string;
+};
 export type VisibleSpace = {
   kind: "accessible";
   id: string;

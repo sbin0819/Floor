@@ -13,6 +13,7 @@ import {
   notInArray,
   sql,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
 import {
@@ -207,6 +208,84 @@ export async function countActiveBookings(
       ),
     );
   return row?.value ?? 0;
+}
+
+export function countActiveSpacesByFloor(
+  branchId: string,
+  database: DalDatabase = getDb(),
+) {
+  return database
+    .select({ floorId: spaces.floorId, count: count() })
+    .from(spaces)
+    .innerJoin(floors, eq(spaces.floorId, floors.id))
+    .where(
+      and(
+        eq(floors.branchId, branchId),
+        isNull(spaces.archivedAt),
+        ne(spaces.type, "desk"),
+      ),
+    )
+    .groupBy(spaces.floorId);
+}
+
+export async function listAdminSpaceDetails(
+  floorId: string,
+  database: DalDatabase = getDb(),
+) {
+  const desks = alias(spaces, "admin_desks");
+  const deskCount = database
+    .select({ count: count() })
+    .from(desks)
+    .where(
+      and(
+        eq(desks.parentId, spaces.id),
+        eq(desks.type, "desk"),
+        isNull(desks.archivedAt),
+      ),
+    );
+  const rows = await database
+    .select({
+      space: {
+        id: spaces.id,
+        floorId: spaces.floorId,
+        name: spaces.name,
+        type: spaces.type,
+        capacity: spaces.capacity,
+        bookable: spaces.bookable,
+        amenities: spaces.amenities,
+        access: spaces.access,
+        archivedAt: spaces.archivedAt,
+      },
+      team: { id: teams.id, name: teams.name },
+      deskCount: sql<number>`(${deskCount})`.mapWith(Number),
+    })
+    .from(spaces)
+    .leftJoin(
+      accessGrants,
+      and(
+        eq(accessGrants.targetType, "space"),
+        eq(accessGrants.targetId, spaces.id),
+      ),
+    )
+    .leftJoin(teams, eq(teams.id, accessGrants.teamId))
+    .where(and(eq(spaces.floorId, floorId), ne(spaces.type, "desk")))
+    .orderBy(asc(spaces.name), asc(spaces.id), asc(teams.name), asc(teams.id));
+  const grouped = new Map<
+    string,
+    (typeof rows)[number]["space"] & {
+      allowedTeams: { id: string; name: string }[];
+      deskCount: number;
+    }
+  >();
+  for (const row of rows) {
+    let space = grouped.get(row.space.id);
+    if (!space) {
+      space = { ...row.space, allowedTeams: [], deskCount: row.deskCount };
+      grouped.set(space.id, space);
+    }
+    if (row.team) space.allowedTeams.push(row.team);
+  }
+  return [...grouped.values()];
 }
 
 export async function setFloorAccessRecord(

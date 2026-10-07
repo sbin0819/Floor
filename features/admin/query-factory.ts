@@ -3,13 +3,16 @@ import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
 import type { DalDatabase } from "@/lib/dal";
-import { getTeamsByIds, listAdminSpaces } from "@/lib/dal/admin";
+import {
+  countActiveSpacesByFloor,
+  getTeamsByIds,
+  listAdminSpaceDetails,
+} from "@/lib/dal/admin";
 import {
   getBranch,
   getFloorWithAccess,
   listFloorsWithAccess,
 } from "@/lib/dal/branches";
-import { getDeskCounts } from "@/lib/dal/spaces";
 import { searchTeams } from "@/lib/dal/teams-read";
 import { can } from "@/lib/permissions/can";
 import { loadPermissionContext } from "@/lib/permissions/context";
@@ -44,9 +47,11 @@ export function createAdminQueries(dependencies: AdminQueryDependencies = {}) {
   const db = dependencies.database;
   const readSession = dependencies.requireSession ?? requireSession;
   async function checkedBranch(session: Session, branchId: string) {
-    const branch = await getBranch(branchId, db);
+    const [branch, context] = await Promise.all([
+      getBranch(branchId, db),
+      loadPermissionContext(session, branchId, db),
+    ]);
     if (!branch) throw new ActionError("NOT_FOUND");
-    const context = await loadPermissionContext(session, branch.id, db);
     if (!context.staffBranchIds.includes(branch.id))
       throw new ActionError("NOT_FOUND");
     return {
@@ -64,20 +69,21 @@ export function createAdminQueries(dependencies: AdminQueryDependencies = {}) {
     async getAdminBranch(branchId: string): Promise<AdminBranchData> {
       const session = await readSession();
       const data = await checkedBranch(session, validId(branchId));
-      const floors = await listFloorsWithAccess(data.branch.id, db);
+      const [floors, counts] = await Promise.all([
+        listFloorsWithAccess(data.branch.id, db),
+        countActiveSpacesByFloor(data.branch.id, db),
+      ]);
       return {
         ...data,
-        floors: await Promise.all(
-          floors.map(async (floor) => ({
-            id: floor.id,
-            name: floor.name,
-            level: floor.level,
-            sortOrder: floor.sortOrder,
-            access: floor.access,
-            spaceCount: (await listAdminSpaces({ floorId: floor.id }, db))
-              .length,
-          })),
-        ),
+        floors: floors.map((floor) => ({
+          id: floor.id,
+          name: floor.name,
+          level: floor.level,
+          sortOrder: floor.sortOrder,
+          access: floor.access,
+          spaceCount:
+            counts.find(({ floorId }) => floorId === floor.id)?.count ?? 0,
+        })),
       };
     },
     async getAdminFloor(
@@ -87,52 +93,36 @@ export function createAdminQueries(dependencies: AdminQueryDependencies = {}) {
     ): Promise<AdminFloorData> {
       const session = await readSession();
       const expectedBranch = validId(branchId);
-      const floor = await getFloorWithAccess(validId(floorId), db);
+      const normalizedFloor = validId(floorId);
+      const [floor, data] = await Promise.all([
+        getFloorWithAccess(normalizedFloor, db),
+        checkedBranch(session, expectedBranch),
+      ]);
       if (!floor || floor.branchId !== expectedBranch)
         throw new ActionError("NOT_FOUND");
-      const data = await checkedBranch(session, floor.branchId);
-      const rows = await listAdminSpaces(
-        { floorId: floor.id, includeArchived: true },
-        db,
-      );
-      const ids = [
-        ...new Set([
-          ...floor.allowedTeamIds,
-          ...rows.flatMap(({ allowedTeamIds }) => allowedTeamIds),
-        ]),
-      ];
-      const teams = await getTeamsByIds(ids, db);
-      const desks = await getDeskCounts(
-        rows.map(({ id }) => id),
-        db,
-      );
       const query = normalizeTeamName(
         typeof teamQuery === "string" ? teamQuery : "",
       );
       const valid =
         query.length >= 2 && query.length <= 40 && !query.includes("\0");
-      const spaces: AdminSpace[] = rows.flatMap((row) =>
-        row.type === "desk"
-          ? []
-          : [
-              {
-                id: row.id,
-                floorId: row.floorId,
-                name: row.name,
-                type: row.type,
-                capacity: row.capacity,
-                bookable: row.bookable,
-                amenities: row.amenities,
-                access: row.access,
-                archivedAt: row.archivedAt?.toISOString() ?? null,
-                allowedTeams: teams.filter(({ id }) =>
-                  row.allowedTeamIds.includes(id),
-                ),
-                deskCount:
-                  desks.find(({ parentId }) => parentId === row.id)?.count ?? 0,
-              },
-            ],
-      );
+      const [rows, floorTeams, results] = await Promise.all([
+        listAdminSpaceDetails(floor.id, db),
+        getTeamsByIds(floor.allowedTeamIds, db),
+        valid ? searchTeams(query, db) : [],
+      ]);
+      const spaces: AdminSpace[] = rows.map((row) => ({
+        id: row.id,
+        floorId: row.floorId,
+        name: row.name,
+        type: row.type as AdminSpace["type"],
+        capacity: row.capacity,
+        bookable: row.bookable,
+        amenities: row.amenities,
+        access: row.access,
+        archivedAt: row.archivedAt?.toISOString() ?? null,
+        allowedTeams: row.allowedTeams,
+        deskCount: row.deskCount,
+      }));
       return {
         ...data,
         floor: {
@@ -141,15 +131,13 @@ export function createAdminQueries(dependencies: AdminQueryDependencies = {}) {
           level: floor.level,
           sortOrder: floor.sortOrder,
           access: floor.access,
-          allowedTeams: teams.filter(({ id }) =>
-            floor.allowedTeamIds.includes(id),
-          ),
+          allowedTeams: floorTeams,
         },
         spaces,
         teamSearch: {
           query,
           valid,
-          results: valid ? await searchTeams(query, db) : [],
+          results,
         },
       };
     },

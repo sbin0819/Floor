@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { availableBookingActors } from "@/features/bookings/access";
+import { normalizeBookingDate } from "@/features/bookings/date";
 import {
   bookingLimitRole,
   remainingDailyMinutes,
@@ -15,6 +16,7 @@ import type {
   BranchDetails,
   BranchFloorsData,
   BranchListItem,
+  BranchNavigationData,
   FloorDayData,
   FloorSummary,
   MyBooking,
@@ -25,15 +27,11 @@ import type {
 import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
-import {
-  getRoleSettings,
-  getSpaceForAccess,
-  type DalDatabase,
-} from "@/lib/dal";
+import type { DalDatabase } from "@/lib/dal";
 import {
   getBranch,
-  getFloorWithAccess,
   listBranchDetails,
+  listBranches,
   listFloorsWithAccess,
 } from "@/lib/dal/branches";
 import {
@@ -42,7 +40,7 @@ import {
   listSpaceBlocks,
   listSpaceBookings,
   listUserTeamHomeBranches,
-  sumBookedMinutes,
+  sumActorBookedMinutes,
 } from "@/lib/dal/bookings";
 import {
   getDeskCounts,
@@ -51,9 +49,11 @@ import {
 } from "@/lib/dal/spaces";
 import { can } from "@/lib/permissions/can";
 import { canAccess, canAccessFloor } from "@/lib/permissions/can-access";
-import { loadPermissionContext } from "@/lib/permissions/context";
+import { loadPermissionData } from "@/lib/permissions/context";
 import { getOpenHours } from "@/lib/time/open-hours";
-import { addDays, localDate } from "@/lib/time/zoned";
+import { localDate } from "@/lib/time/zoned";
+
+export { normalizeBookingDate } from "@/features/bookings/date";
 
 export type BookingQueryDependencies = {
   database?: DalDatabase;
@@ -64,23 +64,6 @@ const validId = (id: string) => {
   if (!z.uuid().safeParse(id).success) throw new ActionError("NOT_FOUND");
   return id.toLowerCase();
 };
-export function normalizeBookingDate(
-  value: unknown,
-  now: Date,
-  timeZone: string,
-): string {
-  const today = localDate(now, timeZone);
-  if (typeof value !== "string") return today;
-  try {
-    return addDays(value, 0) === value &&
-      value >= today &&
-      value <= addDays(today, 60)
-      ? value
-      : today;
-  } catch {
-    return today;
-  }
-}
 const branchDto = (branch: BranchDetails): BranchDetails => ({
   id: branch.id,
   name: branch.name,
@@ -110,26 +93,25 @@ export function createBookingQueries(
   const readSession = dependencies.requireSession ?? requireSession;
   const now = dependencies.now ?? (() => new Date());
   async function branchFloors(session: Session, branchId: string) {
-    const branch = await getBranch(validId(branchId), db);
+    const id = validId(branchId);
+    const [branch, rows, { context, settings }] = await Promise.all([
+      getBranch(id, db),
+      listFloorsWithAccess(id, db),
+      loadPermissionData(session, id, db),
+    ]);
     if (!branch) throw new ActionError("NOT_FOUND");
-    const context = await loadPermissionContext(session, branch.id, db);
     const floors = can(context, "floor.view", { branchId: branch.id })
-      ? (await listFloorsWithAccess(branch.id, db))
-          .filter((floor) => canAccessFloor(context, floor))
-          .map(floorDto)
+      ? rows.filter((floor) => canAccessFloor(context, floor)).map(floorDto)
       : [];
-    return { branch: branchDto(branch), floors, context };
+    return { branch: branchDto(branch), floors, context, settings, rows };
   }
-  async function checkedFloor(
-    session: Session,
-    branchId: string,
+  function checkedFloor(
+    data: Awaited<ReturnType<typeof branchFloors>>,
     floorId: string,
   ) {
-    const expectedBranchId = validId(branchId);
-    const floor = await getFloorWithAccess(validId(floorId), db);
-    if (!floor || floor.branchId !== expectedBranchId)
+    const floor = data.rows.find(({ id }) => id === floorId);
+    if (!floor || floor.branchId !== data.branch.id)
       throw new ActionError("NOT_FOUND");
-    const data = await branchFloors(session, floor.branchId);
     if (
       !can(data.context, "floor.view", { branchId: floor.branchId }) ||
       !canAccessFloor(data.context, floor)
@@ -141,8 +123,11 @@ export function createBookingQueries(
     async getBranchList(): Promise<BranchListItem[]> {
       const session = await readSession();
       const current = now();
-      const selected = await getUserDefaultBranch(session.userId, db);
-      return (await listBranchDetails(db))
+      const [selected, branches] = await Promise.all([
+        getUserDefaultBranch(session.userId, db),
+        listBranchDetails(db),
+      ]);
+      return branches
         .map((branch) => ({
           ...branchDto(branch),
           isDefault: branch.id === selected,
@@ -167,6 +152,21 @@ export function createBookingQueries(
       const data = await branchFloors(await readSession(), branchId);
       return { branch: data.branch, floors: data.floors };
     },
+    async getBranchNavigation(branchId: string): Promise<BranchNavigationData> {
+      const session = await readSession();
+      const current = now();
+      const [data, branches] = await Promise.all([
+        branchFloors(session, branchId),
+        listBranches(db),
+      ]);
+      return {
+        branch: data.branch,
+        floors: data.floors,
+        branches,
+        today: localDate(current, data.branch.timezone),
+        now: current.toISOString(),
+      };
+    },
     async getFloorDay(
       branchId: string,
       floorId: string,
@@ -174,27 +174,26 @@ export function createBookingQueries(
     ): Promise<FloorDayData> {
       const session = await readSession();
       const current = now();
-      const { branch, floor, floors, context } = await checkedFloor(
-        session,
-        branchId,
-        floorId,
-      );
+      const id = validId(floorId);
+      const [data, accessRows] = await Promise.all([
+        branchFloors(session, branchId),
+        listFloorSpaceAccess(id, db),
+      ]);
+      const { branch, floor, floors, context } = checkedFloor(data, id);
       const date = normalizeBookingDate(value, current, branch.timezone);
       const during = bookingDayRange(date, branch.timezone);
-      const accessRows = await listFloorSpaceAccess(floor.id, db);
       const allowedIds = accessRows
         .filter((space) => canAccess(context, { ...space, floor }))
         .map(({ id }) => id);
-      const metadata = await getSpacesByIds(allowedIds, db);
-      const bookings = await listSpaceBookings(
-        { spaceIds: allowedIds, during },
-        db,
-      );
-      const blocks = await listSpaceBlocks(
-        { spaceIds: allowedIds, during },
-        db,
-      );
-      const desks = await getDeskCounts(allowedIds, db);
+      const [metadata, bookings, blocks, desks] = await Promise.all([
+        getSpacesByIds(allowedIds, db),
+        listSpaceBookings(
+          { spaceIds: allowedIds, during, summaryOnly: true },
+          db,
+        ),
+        listSpaceBlocks({ spaceIds: allowedIds, during }, db),
+        getDeskCounts(allowedIds, db),
+      ]);
       const isToday = date === localDate(current, branch.timezone);
       const summaries: FloorDayData["spaces"] = [];
       for (const row of accessRows) {
@@ -252,43 +251,54 @@ export function createBookingQueries(
         spaces: summaries,
       };
     },
-    async getSpaceDay(spaceId: string, value?: unknown): Promise<SpaceDayData> {
+    async getSpaceDay(
+      branchId: string,
+      floorId: string,
+      spaceId: string,
+      value?: unknown,
+    ): Promise<SpaceDayData> {
       const session = await readSession();
       const current = now();
-      const space = await getSpaceForAccess(validId(spaceId), db);
-      if (!space || space.archivedAt || space.type === "desk")
+      const id = validId(spaceId);
+      const parentId = validId(floorId);
+      const [data, accessRows] = await Promise.all([
+        branchFloors(session, branchId),
+        listFloorSpaceAccess(parentId, db),
+      ]);
+      const { branch, floor, context, settings } = checkedFloor(data, parentId);
+      const identity = accessRows.find(({ id: candidate }) => candidate === id);
+      if (!identity || !canAccess(context, { ...identity, floor }))
         throw new ActionError("NOT_FOUND");
-      const { branch, floor, context } = await checkedFloor(
-        session,
-        space.floor.branchId,
-        space.floor.id,
-      );
-      if (!canAccess(context, space)) throw new ActionError("NOT_FOUND");
       const date = normalizeBookingDate(value, current, branch.timezone);
       const during = bookingDayRange(date, branch.timezone);
-      const bookings = await listSpaceBookings(
-        { spaceIds: [space.id], during },
-        db,
-      );
-      const blocks = await listSpaceBlocks(
-        { spaceIds: [space.id], during },
-        db,
-      );
-      const settings = await getRoleSettings(branch.id, db);
-      const teams = await listUserTeamHomeBranches(session.userId, db);
-      const actors = [];
-      for (const teamId of availableBookingActors(context, space)) {
+      const actorIds = availableBookingActors(context, { ...identity, floor });
+      const [metadata, bookings, blocks, teams, usage, desks] =
+        await Promise.all([
+          getSpacesByIds([id], db),
+          listSpaceBookings({ spaceIds: [id], during }, db),
+          listSpaceBlocks({ spaceIds: [id], during }, db),
+          listUserTeamHomeBranches(session.userId, db),
+          sumActorBookedMinutes(
+            {
+              branchId: branch.id,
+              during,
+              userId: session.userId,
+              teamIds: actorIds.filter((teamId) => teamId !== null),
+              includePersonal: actorIds.includes(null),
+            },
+            db,
+          ),
+          getDeskCounts([id], db),
+        ]);
+      const space = metadata[0];
+      if (!space || space.floorId !== floor.id)
+        throw new ActionError("NOT_FOUND");
+      const actors = actorIds.map((teamId) => {
         const role = bookingLimitRole(context, branch.id, teamId);
         const limits = resolveBookingLimits(role, settings[role]?.limits);
-        const usedMinutes = await sumBookedMinutes(
-          {
-            branchId: branch.id,
-            during,
-            actor: teamId ? { teamId } : { userId: session.userId },
-          },
-          db,
-        );
-        actors.push({
+        const usedMinutes =
+          usage.find((row) => row.teamId === teamId)?.minutes ?? 0;
+        return {
           teamId,
           name:
             teamId === null
@@ -296,12 +306,11 @@ export function createBookingQueries(
               : `${teams.find(({ id }) => id === teamId)?.name ?? "팀"}으로`,
           limits,
           remainingMinutes: remainingDailyMinutes(limits, usedMinutes),
-        });
-      }
+        };
+      });
       const mine = (booking: { userId: string; teamId: string | null }) =>
         booking.userId === session.userId ||
         context.teams.some(({ teamId }) => teamId === booking.teamId);
-      const desks = await getDeskCounts([space.id], db);
       return {
         branch,
         floor: floorDto(floor),

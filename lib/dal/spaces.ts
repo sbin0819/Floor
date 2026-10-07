@@ -11,8 +11,18 @@ export async function listFloorSpaceAccess(
   database: DalDatabase = getDb(),
 ) {
   const rows = await database
-    .select({ id: spaces.id, type: spaces.type, access: spaces.access })
+    .select({
+      space: { id: spaces.id, type: spaces.type, access: spaces.access },
+      teamId: accessGrants.teamId,
+    })
     .from(spaces)
+    .leftJoin(
+      accessGrants,
+      and(
+        eq(accessGrants.targetType, "space"),
+        eq(accessGrants.targetId, spaces.id),
+      ),
+    )
     .where(
       and(
         eq(spaces.floorId, floorId),
@@ -20,28 +30,20 @@ export async function listFloorSpaceAccess(
         ne(spaces.type, "desk"),
       ),
     )
-    .orderBy(asc(spaces.id));
-  const grants = rows.length
-    ? await database
-        .select({ spaceId: accessGrants.targetId, teamId: accessGrants.teamId })
-        .from(accessGrants)
-        .where(
-          and(
-            eq(accessGrants.targetType, "space"),
-            inArray(
-              accessGrants.targetId,
-              rows.map((row) => row.id),
-            ),
-          ),
-        )
-        .orderBy(asc(accessGrants.teamId))
-    : [];
-  return rows.map((space) => ({
-    ...space,
-    allowedTeamIds: grants
-      .filter((grant) => grant.spaceId === space.id)
-      .map((grant) => grant.teamId),
-  }));
+    .orderBy(asc(spaces.id), asc(accessGrants.teamId));
+  const grouped = new Map<
+    string,
+    (typeof rows)[number]["space"] & { allowedTeamIds: string[] }
+  >();
+  for (const { space, teamId } of rows) {
+    let result = grouped.get(space.id);
+    if (!result) {
+      result = { ...space, allowedTeamIds: [] };
+      grouped.set(space.id, result);
+    }
+    if (teamId !== null) result.allowedTeamIds.push(teamId);
+  }
+  return [...grouped.values()];
 }
 
 export async function getSpacesByIds(

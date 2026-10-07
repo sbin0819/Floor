@@ -37,6 +37,7 @@ function fakeDatabase() {
     const query = {
       from: () => query,
       innerJoin: () => query,
+      leftJoin: () => query,
       where: () => query,
       orderBy: () => query,
       limit: () => query,
@@ -102,13 +103,13 @@ const cases = [
   {
     name: "floor with access",
     read: (db?: DalDatabase) => getFloorWithAccess(floorId, db),
-    rows: [[floor], [{ floorId, teamId: "team-a" }]],
+    rows: [[{ floor, teamId: "team-a" }]],
     keys: [floorId],
   },
   {
     name: "floors with access",
     read: (db?: DalDatabase) => listFloorsWithAccess(branchId, db),
-    rows: [[floor], [{ floorId, teamId: "team-a" }]],
+    rows: [[{ floor, teamId: "team-a" }]],
     keys: [branchId],
   },
 ];

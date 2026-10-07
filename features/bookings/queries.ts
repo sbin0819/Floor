@@ -9,6 +9,9 @@ export async function getBookingEntry() {
 export async function getBranchFloors(branchId: string) {
   return createBookingQueries().getBranchFloors(branchId);
 }
+export async function getBranchNavigation(branchId: string) {
+  return createBookingQueries().getBranchNavigation(branchId);
+}
 export async function getFloorDay(
   branchId: string,
   floorId: string,
@@ -16,8 +19,13 @@ export async function getFloorDay(
 ) {
   return createBookingQueries().getFloorDay(branchId, floorId, date);
 }
-export async function getSpaceDay(spaceId: string, date?: unknown) {
-  return createBookingQueries().getSpaceDay(spaceId, date);
+export async function getSpaceDay(
+  branchId: string,
+  floorId: string,
+  spaceId: string,
+  date?: unknown,
+) {
+  return createBookingQueries().getSpaceDay(branchId, floorId, spaceId, date);
 }
 export async function getMyBookings() {
   return createBookingQueries().getMyBookings();

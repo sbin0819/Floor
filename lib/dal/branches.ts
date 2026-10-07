@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { cache } from "react";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
@@ -38,32 +38,48 @@ export function getBranch(branchId: string, database?: DalDatabase) {
     : readBranch(branchId, database);
 }
 
-async function floorGrants(floorIds: string[], database: DalDatabase) {
-  if (floorIds.length === 0) return [];
+function floorAccessQuery(database: DalDatabase) {
   return database
-    .select({ floorId: accessGrants.targetId, teamId: accessGrants.teamId })
-    .from(accessGrants)
-    .where(
+    .select({ floor: floors, teamId: accessGrants.teamId })
+    .from(floors)
+    .leftJoin(
+      accessGrants,
       and(
         eq(accessGrants.targetType, "floor"),
-        inArray(accessGrants.targetId, floorIds),
+        eq(accessGrants.targetId, floors.id),
       ),
-    )
-    .orderBy(asc(accessGrants.teamId));
+    );
+}
+
+function groupFloorAccess(
+  rows: {
+    floor: typeof floors.$inferSelect;
+    teamId: string | null;
+  }[],
+) {
+  const grouped = new Map<
+    string,
+    typeof floors.$inferSelect & { allowedTeamIds: string[] }
+  >();
+  for (const { floor, teamId } of rows) {
+    let result = grouped.get(floor.id);
+    if (!result) {
+      result = { ...floor, allowedTeamIds: [] };
+      grouped.set(floor.id, result);
+    }
+    if (teamId !== null) result.allowedTeamIds.push(teamId);
+  }
+  return [...grouped.values()];
 }
 
 async function readFloorWithAccess(
   floorId: string,
   database: DalDatabase = getDb(),
 ) {
-  const [floor] = await database
-    .select()
-    .from(floors)
+  const rows = await floorAccessQuery(database)
     .where(eq(floors.id, floorId))
-    .limit(1);
-  if (!floor) return null;
-  const grants = await floorGrants([floor.id], database);
-  return { ...floor, allowedTeamIds: grants.map((grant) => grant.teamId) };
+    .orderBy(asc(accessGrants.teamId));
+  return groupFloorAccess(rows)[0] ?? null;
 }
 
 const cachedFloorWithAccess = cache((floorId: string) =>
@@ -80,21 +96,15 @@ async function readFloorsWithAccess(
   branchId: string,
   database: DalDatabase = getDb(),
 ) {
-  const rows = await database
-    .select()
-    .from(floors)
+  const rows = await floorAccessQuery(database)
     .where(eq(floors.branchId, branchId))
-    .orderBy(asc(floors.sortOrder), asc(floors.level), asc(floors.id));
-  const grants = await floorGrants(
-    rows.map((row) => row.id),
-    database,
-  );
-  return rows.map((floor) => ({
-    ...floor,
-    allowedTeamIds: grants
-      .filter((grant) => grant.floorId === floor.id)
-      .map((grant) => grant.teamId),
-  }));
+    .orderBy(
+      asc(floors.sortOrder),
+      asc(floors.level),
+      asc(floors.id),
+      asc(accessGrants.teamId),
+    );
+  return groupFloorAccess(rows);
 }
 
 const cachedFloorsWithAccess = cache((branchId: string) =>

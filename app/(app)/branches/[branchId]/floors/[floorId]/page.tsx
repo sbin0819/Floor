@@ -34,7 +34,7 @@ async function FloorContent({ params, searchParams }: Props) {
   let detail = null;
   if (selected) {
     try {
-      detail = await getSpaceDay(selected.id, data.date);
+      detail = await getSpaceDay(branchId, floorId, selected.id, data.date);
     } catch (error) {
       if (!(error instanceof ActionError && error.code === "NOT_FOUND"))
         throw error;

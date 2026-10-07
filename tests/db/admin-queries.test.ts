@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -10,6 +11,7 @@ import {
 } from "vitest";
 import { createAdminQueries } from "@/features/admin/query-factory";
 import { ActionError } from "@/lib/actions/result";
+import * as adminDal from "@/lib/dal/admin";
 import type { Session } from "@/lib/auth/types";
 import { roleSettings, teams } from "@/lib/db/schema";
 import { createTestDatabase, type TestDatabase } from "./helper";
@@ -24,6 +26,7 @@ describe("operator administration query boundaries", () => {
   afterAll(async () => {
     await database.client.close();
   });
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(async () => {
     fixture = await seedBookingActors(database);
   });
@@ -52,9 +55,13 @@ describe("operator administration query boundaries", () => {
   it.each(["person", "otherOperator"] as const)(
     "hides another operator's branch and floor from %s",
     async (key) => {
+      const metadata = vi.spyOn(adminDal, "listAdminSpaceDetails");
+      const counts = vi.spyOn(adminDal, "countActiveSpacesByFloor");
       await expect(
         queries(fixture[key]).getAdminBranch(fixture.branchId),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(metadata).not.toHaveBeenCalled();
+      expect(counts).not.toHaveBeenCalled();
       await expect(
         queries(fixture[key]).getAdminFloor(fixture.branchId, fixture.floorId),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });

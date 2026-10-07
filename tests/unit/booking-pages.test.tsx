@@ -146,7 +146,7 @@ describe("booking page guards", () => {
       "/branches/branch/floors/floor",
     );
     expect(getFloorDay).toHaveBeenCalledWith("branch", "floor", "2026-10-07");
-    expect(getSpaceDay).toHaveBeenCalledWith(selectedSpaceId, "2026-10-07");
+    expect(getSpaceDay).toHaveBeenCalledWith("branch", "floor", selectedSpaceId, "2026-10-07");
     expect(result.props.selectedSpaceId).toBe(selectedSpaceId);
   });
   it("canonicalizes an uppercase selected-space UUID before checking the authorized floor list", async () => {
@@ -162,7 +162,7 @@ describe("booking page guards", () => {
     const result = await resolvePageContent(
       floorPage({ space: spaceId.toUpperCase() }),
     );
-    expect(getSpaceDay).toHaveBeenCalledExactlyOnceWith(spaceId, data.date);
+    expect(getSpaceDay).toHaveBeenCalledExactlyOnceWith("branch", "floor", spaceId, data.date);
     expect(result.props.selectedSpaceId).toBe(spaceId);
   });
   it.each([
