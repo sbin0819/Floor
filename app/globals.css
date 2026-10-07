@@ -38,13 +38,19 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-sm: 8px;
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: 12px;
+  --radius-xl: 14px;
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@theme {
+  --shadow-card: 0 1px 2px rgb(28 28 26 / 0.05);
+  --shadow-pop:
+    0 10px 30px rgb(28 28 26 / 0.12), 0 2px 6px rgb(28 28 26 / 0.06);
 }
 
 :root {
@@ -79,7 +85,11 @@
   --border: #e6e5e1;
   --input: #d6d4cd;
   --ring: #3a5bd9;
-  --radius: 8px;
+  --radius: 10px;
+  --booked: #dcdad3;
+  --booked-border: #c6c4bc;
+  --booked-foreground: #4a4945;
+  --booked-strong: #8f8d86;
   --status-free: #e3f4ee;
   --status-free-foreground: #1f6e57;
   --status-free-border: #b5e0d0;
@@ -102,6 +112,10 @@
 }
 
 @theme inline {
+  --color-booked: var(--booked);
+  --color-booked-border: var(--booked-border);
+  --color-booked-foreground: var(--booked-foreground);
+  --color-booked-strong: var(--booked-strong);
   --color-status-free: var(--status-free);
   --color-status-free-foreground: var(--status-free-foreground);
   --color-status-free-border: var(--status-free-border);
@@ -132,7 +146,7 @@
 }
 
 .dark {
-  /* TODO: 상태 색은 다크 시안이 확정될 때 재정의해요. */
+  /* TODO: 상태·예약 색은 다크 시안이 확정될 때 재정의해요. */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
