@@ -4,7 +4,12 @@ export type FloorLocation = {
   floorId: string;
   date: string;
   spaceId: string | null;
+  detail?: boolean;
 };
+
+export function requestedDetail(value: unknown): boolean {
+  return value === "1";
+}
 
 export function requestedSpaceId(value: unknown): string | null {
   const parsed = z.uuid().safeParse(value);

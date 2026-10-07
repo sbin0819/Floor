@@ -26,6 +26,7 @@ import {
 import {
   floorSelectionKey,
   requestedSpaceId,
+  requestedDetail,
   searchValue,
   type FloorLocation,
 } from "@/features/bookings/floor-selection";
@@ -44,6 +45,8 @@ type SelectionContext = {
     trigger?: HTMLElement;
   }) => void;
   selectedSpaceId: string | null;
+  selectionKey: string;
+  selectionResolved: boolean;
   register: (key: string, spaceId: string | null) => () => void;
   registerNavigation: (
     branchId: string,
@@ -107,6 +110,7 @@ export function BranchWorkspace({
     searchValue(search, "space"),
   );
   const requested = requestedSpaceId(searchValue(search, "space"));
+  const detailRequested = requestedDetail(searchValue(search, "detail"));
   const branchId = params.branchId.toLowerCase();
   const trigger = useRef<HTMLElement | null>(null);
   const lastSpace = useRef<string | null>(null);
@@ -161,6 +165,10 @@ export function BranchWorkspace({
     spaceId: string | null;
     registration: symbol;
   } | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<{
+    key: string;
+    spaceId: string;
+  } | null>(null);
   const register = useCallback(
     (key: string, spaceId: string | null) => {
       // Activity가 보존한 이전 상세는 새 주소의 선택을 덮어쓸 수 없다.
@@ -169,6 +177,7 @@ export function BranchWorkspace({
       const registration = Symbol();
       if (spaceId !== null) lastSpace.current = spaceId;
       setSelection({ key, spaceId, registration });
+      setPendingSelection((current) => (current?.key === key ? null : current));
       return () =>
         setSelection((current) =>
           current?.registration === registration ? null : current,
@@ -180,14 +189,27 @@ export function BranchWorkspace({
     selection?.key === locationKey && dismissedKey !== locationKey
       ? selection.spaceId
       : null;
+  const selectionResolved = selection?.key === locationKey;
+  const awaitingSelection =
+    !selectionResolved &&
+    dismissedKey !== locationKey &&
+    pendingSelection?.key === locationKey
+      ? pendingSelection.spaceId
+      : null;
+  const presentedSpaceId = selectedSpaceId ?? awaitingSelection;
   const today = clock?.branchId === branchId ? clock.today : null;
   const date = today
     ? normalizeBookingDateForToday(searchValue(search, "date"), today)
     : "";
   const floorId = params.floorId?.toLowerCase() ?? "";
   const base = useMemo<FloorLocation>(
-    () => ({ floorId, date, spaceId: selectedSpaceId }),
-    [floorId, date, selectedSpaceId],
+    () => ({
+      floorId,
+      date,
+      spaceId: presentedSpaceId,
+      detail: presentedSpaceId !== null && detailRequested,
+    }),
+    [floorId, date, presentedSpaceId, detailRequested],
   );
   const navigation = useOptimisticNavigation(base, navigateAction ?? route);
   const [registeredFloor, setRegisteredFloor] = useState<{
@@ -232,9 +254,30 @@ export function BranchWorkspace({
   const bookingSelection =
     range?.scope === visibleScope ? range.selection : null;
   const changeLocation = navigation.change;
+  const rememberPending = useCallback(
+    (next: FloorLocation, href: string) => {
+      const target = new URL(href, "http://floor.local");
+      setPendingSelection(
+        next.spaceId === null
+          ? null
+          : {
+              key: floorSelectionKey(
+                branchId,
+                next.floorId,
+                searchValue(target.searchParams, "date"),
+                next.spaceId,
+              ),
+              spaceId: next.spaceId,
+            },
+      );
+    },
+    [branchId],
+  );
   const change = useCallback<SelectionContext["change"]>(
     (next, href, options) => {
+      next = { ...next, detail: next.spaceId !== null && next.detail === true };
       setDismissedKey(next.spaceId === null ? locationKey : null);
+      rememberPending(next, href);
       if (
         next.floorId !== navigation.value.floorId ||
         next.date !== navigation.value.date ||
@@ -244,7 +287,7 @@ export function BranchWorkspace({
         setRange(null);
       changeLocation(next, href, options);
     },
-    [locationKey, changeLocation, navigation.value],
+    [locationKey, changeLocation, navigation.value, rememberPending],
   );
   const currentNavigation = useRef({ location: navigation.value, change });
   useEffect(() => {
@@ -256,11 +299,13 @@ export function BranchWorkspace({
       // 늦게 끝난 이전 예약은 새 공간이나 날짜의 상세를 닫지 않는다.
       if (
         current.location.spaceId !== spaceId ||
-        current.location.date !== bookedDate
+        current.location.date !== bookedDate ||
+        current.location.detail
       )
         return;
       const url = new URL(window.location.href);
       url.searchParams.delete("space");
+      url.searchParams.delete("detail");
       current.change(
         { ...current.location, spaceId: null },
         `${url.pathname}${url.search}${url.hash}`,
@@ -297,8 +342,11 @@ export function BranchWorkspace({
       changeRange(spaceId, next);
       if (element) rememberSpaceTrigger(element, spaceId);
       setDismissedKey(null);
-      if (spaceId !== navigation.value.spaceId)
-        changeLocation({ ...navigation.value, spaceId }, href);
+      if (spaceId !== navigation.value.spaceId || navigation.value.detail) {
+        const nextLocation = { ...navigation.value, spaceId, detail: false };
+        rememberPending(nextLocation, href);
+        changeLocation(nextLocation, href);
+      }
     },
     [
       bookingSelection,
@@ -306,6 +354,7 @@ export function BranchWorkspace({
       rememberSpaceTrigger,
       navigation.value,
       changeLocation,
+      rememberPending,
     ],
   );
   const floorChanged = navigation.value.floorId !== base.floorId;
@@ -314,7 +363,9 @@ export function BranchWorkspace({
   const listPending = navigation.isPending && (floorChanged || dateChanged);
   const detailChanged =
     navigation.isPending && (floorChanged || dateChanged || spaceChanged);
-  const detailPending = detailChanged && navigation.value.spaceId !== null;
+  const detailPending =
+    (detailChanged || awaitingSelection !== null) &&
+    navigation.value.spaceId !== null;
   const detailCleared =
     dismissedKey === locationKey ||
     (detailChanged && navigation.value.spaceId === null);
@@ -327,6 +378,8 @@ export function BranchWorkspace({
       changeRange,
       selectSlot,
       selectedSpaceId,
+      selectionKey: locationKey,
+      selectionResolved,
       register,
       registerNavigation,
       location: navigation.value,
@@ -346,6 +399,8 @@ export function BranchWorkspace({
       changeRange,
       selectSlot,
       selectedSpaceId,
+      locationKey,
+      selectionResolved,
       register,
       registerNavigation,
       navigation.value,

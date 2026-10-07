@@ -322,6 +322,7 @@ describe("floor view preference", () => {
       floorId: "floor",
       date: today,
       spaceId: second,
+      detail: false,
     });
     expect(navigate).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("view")).toHaveTextContent("list");

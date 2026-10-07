@@ -41,6 +41,20 @@ function Controls() {
   return (
     <>
       <output data-testid="range">{JSON.stringify(state.selection)}</output>
+      <output data-testid="detail">
+        {String(state.location.detail === true)}
+      </output>
+      <output data-testid="pending">{String(state.detailPending)}</output>
+      <button
+        onClick={() =>
+          state.change(
+            { ...state.location, detail: true },
+            `?date=${today}&space=${first}&detail=1`,
+          )
+        }
+      >
+        상세 열기
+      </button>
       <button
         onClick={() => {
           const clear = state.changeRange;
@@ -139,6 +153,33 @@ const selection = () =>
   } | null;
 
 describe("shared floor booking range", () => {
+  it("preserves the range without a skeleton on detail-only navigation", async () => {
+    let complete = () => {};
+    const pending = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    const view = render(<Frame navigateAction={() => pending} />);
+    fireEvent.click(screen.getByText("첫 칸"));
+    const original = selection();
+    fireEvent.click(screen.getByText("상세 열기"));
+    expect(screen.getByTestId("detail")).toHaveTextContent("true");
+    expect(screen.getByTestId("pending")).toHaveTextContent("false");
+    expect(selection()).toEqual(original);
+    route.query += "&detail=1";
+    view.rerender(<Frame navigateAction={() => pending} />);
+    await act(async () => {
+      complete();
+      await pending;
+    });
+    expect(selection()).toEqual(original);
+    fireEvent.click(screen.getByText("닫기"));
+    expect(screen.getByTestId("detail")).toHaveTextContent("false");
+  });
+  it("ignores detail without a confirmed space", () => {
+    route.query = `date=${today}&detail=1`;
+    render(<Frame />);
+    expect(screen.getByTestId("detail")).toHaveTextContent("false");
+  });
   it("shares slot and select-box changes while preserving the range across a view change", () => {
     const view = render(<Frame />);
     fireEvent.click(screen.getByText("첫 칸"));
