@@ -29,6 +29,13 @@
       "when": 1791350355672,
       "tag": "0003_auth-foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791352575902,
+      "tag": "0004_team-join",
+      "breakpoints": true
     }
   ]
 }

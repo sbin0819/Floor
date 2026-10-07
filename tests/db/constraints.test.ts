@@ -14,6 +14,7 @@ import {
   roleSettings,
   spaces,
   teamInvites,
+  teamJoinRequests,
   teamMembers,
   teams,
   users,
@@ -279,6 +280,107 @@ describe("database constraints from the real migrations", () => {
       ]);
     expect(await database.db.select().from(chatRooms)).toHaveLength(5);
   });
+
+  it("11. rejects team names that differ only by case", async () => {
+    await database.db.insert(teams).values({ name: "Acme", createdBy: userId });
+    await expect(
+      database.db.insert(teams).values({ name: "aCME", createdBy: userId }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "teams_name_unique" },
+    });
+  });
+
+  it.each([0, 1001])("12. rejects headcount %i", async (headcount) => {
+    await expect(
+      database.db
+        .insert(teams)
+        .values({ name: "크기 검사", createdBy: userId, headcount }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "teams_headcount_valid" },
+    });
+  });
+
+  it.each([null, 1, 1000])(
+    "12. permits nullable and boundary headcount %s",
+    async (headcount) => {
+      await expect(
+        database.db
+          .insert(teams)
+          .values({ name: "크기 검사", createdBy: userId, headcount }),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it.each(["revokedAt", "declinedAt", "acceptedAt"] as const)(
+    "13. permits another pending invite only after %s is set",
+    async (field) => {
+      const input = {
+        teamId,
+        email: "invited@example.test",
+        createdBy: userId,
+      };
+      const [invite] = await database.db
+        .insert(teamInvites)
+        .values({ ...input, token: "first-token" })
+        .returning();
+      await expect(
+        database.db
+          .insert(teamInvites)
+          .values({ ...input, token: "second-token" }),
+      ).rejects.toMatchObject({
+        cause: { code: "23505", constraint: "team_invites_one_pending" },
+      });
+      await database.db
+        .update(teamInvites)
+        .set({ [field]: new Date() })
+        .where(eq(teamInvites.id, invite!.id));
+      await expect(
+        database.db
+          .insert(teamInvites)
+          .values({ ...input, token: "second-token" }),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it("13. keeps expired unprocessed invitations unique and permits null-email future link rows", async () => {
+    const input = { teamId, email: "invited@example.test", createdBy: userId };
+    await database.db
+      .insert(teamInvites)
+      .values({ ...input, token: "expired-token", expiresAt: new Date(0) });
+    await expect(
+      database.db
+        .insert(teamInvites)
+        .values({ ...input, token: "fresh-token" }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "team_invites_one_pending" },
+    });
+    await database.db.insert(teamInvites).values([
+      { teamId, createdBy: userId, token: "link-a" },
+      { teamId, createdBy: userId, token: "link-b" },
+    ]);
+  });
+
+  it.each(["rejected", "cancelled", "approved"] as const)(
+    "14. permits another pending request after the previous one is %s",
+    async (status) => {
+      const [request] = await database.db
+        .insert(teamJoinRequests)
+        .values({ teamId, userId })
+        .returning();
+      await expect(
+        database.db.insert(teamJoinRequests).values({ teamId, userId }),
+      ).rejects.toMatchObject({
+        cause: { code: "23505", constraint: "team_join_requests_one_pending" },
+      });
+      await database.db
+        .update(teamJoinRequests)
+        .set({ status })
+        .where(eq(teamJoinRequests.id, request!.id));
+      await expect(
+        database.db.insert(teamJoinRequests).values({ teamId, userId }),
+      ).resolves.toBeDefined();
+    },
+  );
 
   it("enforces both sides of the floor/published-plan circular reference", async () => {
     await expect(

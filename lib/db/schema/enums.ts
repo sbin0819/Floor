@@ -30,6 +30,12 @@ export const chatRoomKind = pgEnum("chat_room_kind", [
 ]);
 export const messageKind = pgEnum("message_kind", ["text", "system"]);
 export const teamRole = pgEnum("team_role", ["admin", "member"]);
+export const joinRequestStatus = pgEnum("join_request_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
 export const appRole = pgEnum("app_role", [
   "user",
   "team_member",
