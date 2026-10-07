@@ -289,3 +289,15 @@ export async function lockBookingActor(
     .for("update");
   return Boolean(team);
 }
+
+export async function lockBookingCanceller(
+  userId: string,
+  database: DalDatabase,
+): Promise<boolean> {
+  const [user] = await database
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .for("key share");
+  return Boolean(user);
+}

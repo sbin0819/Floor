@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { createBookingActions } from "@/features/bookings/create-booking-factory";
+import { createCancelBookingAction } from "@/features/bookings/cancel-booking-factory";
 import type { BookingDependencies } from "@/features/bookings/action-factory";
 import type { Session } from "@/lib/auth/types";
 import * as bookingDal from "@/lib/dal/bookings";
@@ -231,13 +232,11 @@ describe("booking creation and default branch actions", () => {
       .update(spaces)
       .set({ access: "teams" })
       .where(eq(spaces.id, fixture.restrictedFloorSpaceId));
-    await database.db
-      .insert(accessGrants)
-      .values({
-        targetType: "space",
-        targetId: fixture.restrictedFloorSpaceId,
-        teamId: fixture.otherTeamId,
-      });
+    await database.db.insert(accessGrants).values({
+      targetType: "space",
+      targetId: fixture.restrictedFloorSpaceId,
+      teamId: fixture.otherTeamId,
+    });
     for (const teamId of [fixture.teamId, fixture.otherTeamId]) {
       expect(
         await actions(fixture.member).createBooking(
@@ -332,6 +331,59 @@ describe("booking creation and default branch actions", () => {
       .where(eq(bookings.id, first.data.bookingId));
     expect((await action(third)).ok).toBe(true);
   });
+  it("returns daily quota through the real cancellation action and permits a new booking", async () => {
+    const realtime = createMemoryRealtime();
+    const listener = vi.fn();
+    realtime.subscribe(`floor:${fixture.floorId}`, listener);
+    const create = actions(fixture.person, {
+      publisher: realtime,
+    }).createBooking;
+    const cancel = createCancelBookingAction({
+      database: database.db,
+      getSession: async () => fixture.person,
+      now: () => bookingNow,
+      publisher: realtime,
+      logError: vi.fn(),
+    });
+    const first = await create(bookingInput(fixture));
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error("Expected first booking.");
+    expect(
+      (
+        await create(
+          bookingInput(fixture, {
+            start: bookingInstant("13:00"),
+            end: bookingInstant("14:00"),
+          }),
+        )
+      ).ok,
+    ).toBe(true);
+    const next = bookingInput(fixture, {
+      start: bookingInstant("14:00"),
+      end: bookingInstant("14:30"),
+    });
+    expect(await create(next)).toEqual({
+      ok: false,
+      code: "LIMIT_EXCEEDED",
+      message: "per_day",
+    });
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(await cancel({ bookingId: first.data.bookingId })).toEqual({
+      ok: true,
+      data: { bookingId: first.data.bookingId },
+    });
+    expect((await create(next)).ok).toBe(true);
+    const rows = await database.db.select().from(bookings);
+    expect(rows).toHaveLength(3);
+    expect(rows.filter(({ status }) => status === "confirmed")).toHaveLength(2);
+    expect(rows.find(({ id }) => id === first.data.bookingId)).toMatchObject({
+      status: "cancelled",
+      cancelledAt: bookingNow,
+      cancelledBy: fixture.person.userId,
+    });
+    expect(listener).toHaveBeenCalledTimes(4);
+  });
+
   it("does not count another branch, date, person or team in a personal quota", async () => {
     await insertFixtureBooking(database, fixture, {
       spaceId: fixture.otherSpaceId,
@@ -441,13 +493,11 @@ describe("booking creation and default branch actions", () => {
     await insertFixtureBooking(database, fixture, {
       userId: fixture.stranger.userId,
     });
-    await database.db
-      .insert(spaceBlocks)
-      .values({
-        spaceId: fixture.publicSpaceId,
-        during: bookingRange(),
-        createdBy: fixture.operator.userId,
-      });
+    await database.db.insert(spaceBlocks).values({
+      spaceId: fixture.publicSpaceId,
+      during: bookingRange(),
+      createdBy: fixture.operator.userId,
+    });
     expect(
       await actions().createBooking(
         bookingInput(fixture, { end: bookingInstant("14:30") }),

@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/pglite";
 import {
   afterAll,
   beforeAll,
@@ -11,6 +12,7 @@ import {
 import { createCancelBookingAction } from "@/features/bookings/cancel-booking-factory";
 import type { BookingDependencies } from "@/features/bookings/action-factory";
 import type { Session } from "@/lib/auth/types";
+import * as schema from "@/lib/db/schema";
 import { accessGrants, bookings, roleSettings, spaces } from "@/lib/db/schema";
 import { defaultPermissions } from "@/lib/permissions/defaults";
 import { createMemoryRealtime } from "@/lib/realtime/memory";
@@ -76,6 +78,43 @@ describe("booking cancellation action", () => {
       code: "NOT_FOUND",
     });
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks the cancellation actor before the conditional booking update in one transaction", async () => {
+    const row = await insertFixtureBooking(database, fixture);
+    const statements: { query: string; params: unknown[] }[] = [];
+    const logged = drizzle({
+      client: database.client,
+      schema,
+      logger: {
+        logQuery(query, params) {
+          statements.push({ query, params });
+        },
+      },
+    });
+    const transaction = vi.spyOn(logged, "transaction");
+    expect(
+      await cancel(fixture.person, { database: logged })({ bookingId: row.id }),
+    ).toEqual({
+      ok: true,
+      data: { bookingId: row.id },
+    });
+    // PGlite는 SQL 순서만 검증한다. 실제 다중 연결의 교착 재현은 별도로 한다.
+    const actorLock = statements.findIndex(({ query }) =>
+      /from "users".*for key share/u.test(query),
+    );
+    const update = statements.findIndex(({ query }) =>
+      query.startsWith('update "bookings"'),
+    );
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(actorLock).toBeGreaterThanOrEqual(0);
+    expect(update).toBeGreaterThan(actorLock);
+    expect(statements[actorLock]?.params).toContain(fixture.person.userId);
+    expect(statements[update]?.query).toMatch(
+      /where .*"status" = .*upper\("bookings"\."during"\) > .* returning/u,
+    );
+    expect(statements[update]?.params).toContain("confirmed");
+    expect(statements[update]?.params).toContain(bookingNow.toISOString());
   });
 
   it.each([false, true])(
