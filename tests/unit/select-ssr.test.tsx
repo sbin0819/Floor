@@ -14,7 +14,10 @@ import { BookingForm } from "@/features/bookings/components/booking-form";
 import { BranchSelect } from "@/features/teams/components/team-fields";
 import { spaceDayFixture } from "./booking-ui-fixtures";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/features/admin/actions", () => ({
   createSpace: vi.fn(),
   updateSpace: vi.fn(),

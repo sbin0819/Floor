@@ -71,6 +71,7 @@ vi.mock("@/features/bookings/components/floor-view", () => ({
   useFloorView: () => ({
     effectiveView: new URLSearchParams(route.query).get("view") ?? "timeline",
   }),
+  useFloorPeople: () => ({ people: null }),
 }));
 vi.mock("@/features/bookings/components/space-detail", () => ({
   SpaceDetail: ({ data }: { data: SpaceDayData }) => (
