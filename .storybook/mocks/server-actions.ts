@@ -8,7 +8,9 @@ const readOnlyAction: (
 });
 
 export const createBooking = readOnlyAction;
+export const createDeskBooking = readOnlyAction;
 export const cancelBooking = readOnlyAction;
+export const leaveBooking = readOnlyAction;
 export const setDefaultBranch = readOnlyAction;
 
 export const updateBranch = readOnlyAction;

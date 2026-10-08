@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 참석자 검색은 로그인 이동 없이 401로 답해요", async ({
+  request,
+}) => {
+  const response = await request.get("/api/participants/search?q=ab", {
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(401);
+  expect(response.headers()["cache-control"]).toBe("private, no-store");
+  expect(response.headers().location).toBeUndefined();
+});
+
 for (const path of ["/booking", "/teams"]) {
   test(`비로그인 ${path} 접근은 로그인으로 안내해요`, async ({ page }) => {
     await page.goto(path);

@@ -5,6 +5,8 @@ const actionModules = [
   "features/bookings/actions",
   "features/bookings/create-booking-actions",
   "features/bookings/cancel-booking-action",
+  "features/bookings/create-desk-booking-action",
+  "features/bookings/leave-booking-action",
   "features/admin/actions",
   "features/admin/manage-actions",
   "features/admin/access-actions",
