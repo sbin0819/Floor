@@ -9,15 +9,17 @@ import {
   chatSpacePrefs,
   messages,
   teamMembers,
-  teams,
   users,
 } from "@/lib/db/schema";
 import {
   activeSpaceMembership,
+  chatSpaceKindOrder,
+  chatSpaceName,
   loungeAccessFrom,
   readableRoomCondition,
-  readableTeamSpace,
+  readableSpaceCondition,
   sharesChatSpace,
+  spaceAccessFields,
   type SpaceAccessFacts,
 } from "./chat-access";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
@@ -27,10 +29,21 @@ import type { UserStatus } from "@/features/people/status";
 import { blockedBy } from "./people-blocks";
 
 export function listChatNav(userId: string, database: DalDatabase = getDb()) {
+  const access = spaceAccessFields(userId);
   return database
     .select({
       spaceId: sql<string>`${chatSpaces.id}`.as("space_id"),
-      spaceName: sql<string>`${teams.name}`.as("space_name"),
+      spaceName: chatSpaceName.as("space_name"),
+      spaceKind: sql<
+        NonNullable<SpaceAccessFacts["spaceKind"]>
+      >`${access.spaceKind}`.as("space_kind"),
+      iconColor: sql<
+        typeof chatSpaces.$inferSelect.iconColor
+      >`${chatSpaces.iconColor}`.as("icon_color"),
+      teamRole: access.teamRole.as("team_role"),
+      memberRole: access.memberRole.as("member_role"),
+      isStaff: access.isStaff.as("is_staff"),
+      roleSettings: access.roleSettings.as("role_settings"),
       roomId: sql<string | null>`${chatRooms.id}`.as("room_id"),
       roomName: sql<string | null>`${chatRooms.name}`.as("room_name"),
       unread: sql<boolean>`${firstUnreadSequence(userId)} is not null`.as(
@@ -45,8 +58,6 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
       ),
     })
     .from(chatSpaces)
-    .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
-    .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
     .leftJoin(
       chatRooms,
       and(
@@ -69,9 +80,10 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
         eq(chatRoomReads.userId, userId),
       ),
     )
-    .where(readableTeamSpace(userId))
+    .where(readableSpaceCondition(userId))
     .orderBy(
-      asc(teams.name),
+      asc(chatSpaceKindOrder),
+      asc(chatSpaceName),
       asc(chatSpaces.id),
       asc(chatRooms.createdAt),
       asc(chatRooms.id),
@@ -93,6 +105,9 @@ export async function readChatNavigation(
       >`array(select b.blocked_id from user_blocks b where b.blocker_id = ${userId}::uuid order by b.blocked_id)`,
       rows: sql<Row[]>`coalesce((select jsonb_agg(jsonb_build_object(
       'spaceId', nav_rows.space_id, 'spaceName', nav_rows.space_name,
+      'spaceKind', nav_rows.space_kind, 'iconColor', nav_rows.icon_color,
+      'teamRole', nav_rows.team_role, 'memberRole', nav_rows.member_role,
+      'isStaff', nav_rows.is_staff, 'roleSettings', nav_rows.role_settings,
       'roomId', nav_rows.room_id, 'roomName', nav_rows.room_name,
       'unread', nav_rows.unread, 'unreadMentions', nav_rows.unread_mentions,
       'roomMuted', nav_rows.room_muted, 'spaceMuted', nav_rows.space_muted

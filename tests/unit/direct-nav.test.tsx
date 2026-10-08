@@ -735,6 +735,8 @@ describe("direct activity toasts and navigation", () => {
       {
         id: "63000000-0000-4000-8000-000000000001",
         kind: "team",
+        iconColor: "blue",
+        role: "member",
         name: "디자인팀",
         initial: "디",
         unread: false,

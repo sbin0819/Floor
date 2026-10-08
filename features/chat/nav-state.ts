@@ -331,6 +331,9 @@ export function mergeInitialChatNav(client: QueryClient, incoming: ChatNav) {
   const snapshot = state(client);
   if (snapshot.incoming.has(incoming)) return;
   snapshot.incoming.add(incoming);
+  const current = client.getQueryData<ChatNav>(CHAT_NAV_KEY);
+  // 오래 걸린 RSC 응답이 권한 변경 뒤 받은 새 목록을 되돌리지 않게 한다.
+  if (current && Date.parse(incoming.now) < Date.parse(current.now)) return;
   client.setQueryData(CHAT_NAV_KEY, mergeChatNav(client, incoming, null));
 }
 

@@ -156,7 +156,8 @@ export function usePresenceStatuses(
             ),
             sharesSpace,
             // bool sharesSpace만으로는 100개 밖에서만 공유하는지 확인할 수 없다.
-            spaces.length < 100,
+            scope.channels!.filter((channel) => channel.startsWith("space:"))
+              .length < 100,
           )
         : ("unknown" as const),
     ]),

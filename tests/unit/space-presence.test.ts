@@ -37,6 +37,42 @@ function setup(names = ["user:user-a", "space:a", "space:b", "room:one"]) {
 }
 
 describe("authorized space presence on the existing browser connection", () => {
+  it("subscribes to lounge events without reading or publishing its presence", async () => {
+    const { realtime, client, requestToken } = setup();
+    requestToken.mockResolvedValue({
+      ...fakeTokenRequest,
+      capability: JSON.stringify({
+        "user:user-a": ["subscribe"],
+        "space:lounge": ["subscribe"],
+        "space:community": ["subscribe", "presence"],
+      }),
+    });
+    const receive = vi.fn();
+    realtime.subscribeSpaces?.(receive);
+    realtime.setStatusPresence?.({ status: "online", auto: false });
+    realtime.start();
+    await vi.runAllTimersAsync();
+    const lounge = client.channel("space:lounge");
+    expect(lounge.subscribe).toHaveBeenCalledOnce();
+    const event = { type: "space.changed", spaceId: "lounge" } as const;
+    lounge.emit(event);
+    expect(receive).toHaveBeenCalledExactlyOnceWith(event);
+    expect(lounge.presence.get).not.toHaveBeenCalled();
+    expect(lounge.presence.subscribe).not.toHaveBeenCalled();
+    expect(lounge.presence.enter).not.toHaveBeenCalled();
+    expect(lounge.presence.update).not.toHaveBeenCalled();
+    expect(realtime.getScopeSnapshot?.().spaces).not.toHaveProperty(
+      "space:lounge",
+    );
+    expect(
+      client.channel("space:community").presence.enter,
+    ).toHaveBeenCalledOnce();
+    requestToken.mockResolvedValue(token(["user:user-a"]));
+    realtime.reauthorize?.();
+    await vi.runAllTimersAsync();
+    expect(lounge.detach).toHaveBeenCalledOnce();
+    expect(lounge.presence.leave).not.toHaveBeenCalled();
+  });
   it("subscribes to every authorized space and separates status from typing", async () => {
     const { realtime, client, channels } = setup();
     realtime.setStatusPresence?.({ status: "dnd", auto: false });

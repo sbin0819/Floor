@@ -271,7 +271,8 @@ export function createAblyBrowserRealtime({
         if (
           (listeners.has(name) ||
             (name.startsWith("space:") &&
-              authorization?.presenceChannels.has(name))) &&
+              (spaceListeners.size > 0 ||
+                authorization?.presenceChannels.has(name)))) &&
           authorization?.channels.has(name)
         )
           continue;
@@ -299,7 +300,13 @@ export function createAblyBrowserRealtime({
         dirty = true;
         return;
       }
-      for (const name of new Set([...listeners.keys(), ...spaces.channels()])) {
+      const spaceChannels = [...authorization.channels].filter(
+        (name) =>
+          name.startsWith("space:") &&
+          (spaceListeners.size > 0 ||
+            authorization?.presenceChannels.has(name)),
+      );
+      for (const name of new Set([...listeners.keys(), ...spaceChannels])) {
         if (
           bindings.has(name) ||
           failedChannels.has(name) ||
@@ -374,7 +381,11 @@ export function createAblyBrowserRealtime({
     setStatusPresence: spaces.setStatus,
     subscribeSpaces(listener) {
       spaceListeners.add(listener);
-      return () => spaceListeners.delete(listener);
+      schedule();
+      return () => {
+        spaceListeners.delete(listener);
+        schedule();
+      };
     },
     reauthorize() {
       authorizationRevision += 1;

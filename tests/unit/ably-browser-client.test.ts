@@ -317,6 +317,7 @@ describe("Ably SDK bridge", () => {
     { type: "notifications.changed" },
     { type: "room.changed", roomId: "a" },
     { type: "realtime.reauth" },
+    { type: "space.changed", spaceId: "s" },
     { type: "status.changed", status: "online" },
     { type: "status.changed", status: "away" },
     { type: "status.changed", status: "dnd" },

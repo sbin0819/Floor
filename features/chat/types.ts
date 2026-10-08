@@ -188,7 +188,9 @@ export type DirectMessageView = DirectMessageViewBase &
 
 export type ChatSpaceNav = {
   id: string;
-  kind: "team";
+  kind: "team" | "branch" | "community";
+  iconColor: import("./space-schema").SpaceIconColor;
+  role: "member" | "admin" | "owner";
   name: string;
   initial: string;
   unread: boolean;

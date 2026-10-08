@@ -42,10 +42,12 @@ export function ChatMentions({
   userId,
   count,
   refresh,
+  onReauthorize,
 }: {
   userId: string;
   count: number;
   refresh: () => Promise<ChatNav | undefined>;
+  onReauthorize?: () => void;
 }) {
   const client = useQueryClient();
   const router = useRouter();
@@ -276,7 +278,8 @@ export function ChatMentions({
     }
     if (event.type === "realtime.reauth" || event.type === "friend.changed") {
       if (event.type === "realtime.reauth") reauthorize();
-      void refreshRef.current().catch(() => {});
+      if (event.type === "realtime.reauth" && onReauthorize) onReauthorize();
+      else void refreshRef.current().catch(() => {});
       return;
     }
     if (event.type === "room.activity" && event.roomKind === "meeting") {

@@ -7,6 +7,7 @@ import {
   canReadRoom,
   canReadMeeting,
   meetingReadOnlyReason,
+  spaceRoleFrom,
   writableRoom,
 } from "@/lib/dal/chat-access";
 import {
@@ -108,7 +109,9 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         if (!space) {
           space = {
             id: row.spaceId,
-            kind: "team",
+            kind: row.spaceKind,
+            iconColor: row.iconColor,
+            role: spaceRoleFrom(row) ?? "member",
             name: row.spaceName,
             initial: Array.from(row.spaceName)[0] ?? "",
             unread: false,

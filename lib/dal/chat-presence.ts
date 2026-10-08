@@ -1,9 +1,13 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { chatSpaces, teamMembers, teams } from "@/lib/db/schema";
-import { readableTeamSpace } from "./chat-access";
+import { chatSpaces } from "@/lib/db/schema";
+import {
+  chatSpaceKindOrder,
+  chatSpaceName,
+  readableSpaceCondition,
+} from "./chat-access";
 import type { DalDatabase } from "./database";
 
 export function listRealtimeSpaces(
@@ -11,11 +15,9 @@ export function listRealtimeSpaces(
   database: DalDatabase = getDb(),
 ) {
   return database
-    .select({ id: chatSpaces.id })
+    .select({ id: chatSpaces.id, kind: chatSpaces.kind })
     .from(chatSpaces)
-    .innerJoin(teams, eq(teams.id, chatSpaces.teamId))
-    .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
-    .where(readableTeamSpace(userId))
-    .orderBy(asc(teams.name), asc(chatSpaces.id))
+    .where(readableSpaceCondition(userId))
+    .orderBy(asc(chatSpaceKindOrder), asc(chatSpaceName), asc(chatSpaces.id))
     .limit(100);
 }

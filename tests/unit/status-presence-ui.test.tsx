@@ -128,6 +128,31 @@ describe("status presence and revoked room rendering", () => {
     await flush();
     expect(screen.getByLabelText("상대 상태")).toHaveTextContent("unknown");
   });
+  it("counts subscribe-only lounges toward the cap without entering their presence", async () => {
+    const { wrap, token, client } = setup();
+    token.mockResolvedValue({
+      ...fakeTokenRequest,
+      capability: JSON.stringify({
+        "user:me": ["subscribe"],
+        "space:a": ["subscribe", "presence"],
+        ...Object.fromEntries(
+          Array.from({ length: 99 }, (_, i) => [
+            `space:lounge-${i}`,
+            ["subscribe"],
+          ]),
+        ),
+      }),
+    });
+    render(wrap(<Status />));
+    await flush();
+    expect(screen.getByLabelText("상대 상태")).toHaveTextContent("unknown");
+    expect(
+      client.channel("space:lounge-0").presence.enter,
+    ).not.toHaveBeenCalled();
+    expect(
+      client.channel("space:lounge-0").presence.get,
+    ).not.toHaveBeenCalled();
+  });
   it("updates manual status without restarting the activity clock", async () => {
     const { client, wrap } = setup();
     const view = render(wrap(<StatusSync status="online" />));

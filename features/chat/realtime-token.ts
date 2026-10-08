@@ -66,9 +66,13 @@ export function createRealtimeToken(
         if (await canReadRoom(session.userId, roomId, dependencies.database))
           capability[roomChannel(roomId)] = ["subscribe", "presence"];
       }),
-      listRealtimeSpaces(session.userId, dependencies.database).then((spaces) => {
-        for (const { id } of spaces) capability[spaceChannel(id)] = ["subscribe", "presence"];
-      }),
+      listRealtimeSpaces(session.userId, dependencies.database).then(
+        (spaces) => {
+          for (const { id, kind } of spaces)
+            capability[spaceChannel(id)] =
+              kind === "branch" ? ["subscribe"] : ["subscribe", "presence"];
+        },
+      ),
     ]);
     const params: TokenParams = {
       clientId: session.userId,

@@ -14,6 +14,7 @@ import {
   clearRoomUnread,
   reportRoomViewport,
   releaseRoomViewport,
+  mergeInitialChatNav,
 } from "@/features/chat/nav-state";
 import type { ChatNav, ChatSpaceNav } from "@/features/chat/types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
@@ -32,6 +33,7 @@ const mocks = vi.hoisted(() => ({
     void _event;
   },
   toast: vi.fn(),
+  refresh: vi.fn(),
   event: (_event: RealtimeEvent) => {
     void _event;
   },
@@ -43,7 +45,7 @@ vi.mock("@/features/chat/actions", () => ({
 vi.mock("sonner", () => ({ toast: mocks.toast }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: mocks.refresh }),
 }));
 vi.mock("next/link", async (original) => ({
   ...(await original<typeof import("next/link")>()),
@@ -69,6 +71,8 @@ const spaceFixture = (): ChatSpaceNav[] => [
   {
     id: spaceId,
     kind: "team",
+    iconColor: "blue",
+    role: "member",
     name: "디자인팀",
     initial: "디",
     unread: false,
@@ -139,6 +143,60 @@ function setup(read = vi.fn<typeof fetchChatNav>(async () => fixture())) {
   const result = render(node());
   return { ...result, client, read, node };
 }
+describe("space metadata changes", () => {
+  it.each(["change-first", "reauth-first"])(
+    "coalesces %s events and refreshes the current space",
+    async (order) => {
+      const read = vi.fn<typeof fetchChatNav>(async () => ({
+        ...fixture(),
+        spaces: [],
+      }));
+      const { client } = setup(read);
+      act(() => {
+        const change = () => mocks.event({ type: "space.changed", spaceId });
+        const reauth = () => mocks.mention({ type: "realtime.reauth" });
+        if (order === "change-first") {
+          change();
+          reauth();
+        } else {
+          reauth();
+          change();
+        }
+        change();
+      });
+      expect(read).not.toHaveBeenCalled();
+      await advance(250);
+      expect(read).toHaveBeenCalledOnce();
+      expect(mocks.refresh).toHaveBeenCalledOnce();
+      expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)?.spaces).toEqual([]);
+    },
+  );
+  it("refreshes settings for its current space but not a different space or a route left during coalescing", async () => {
+    mocks.pathname = `/s/${spaceId}/settings`;
+    const { read, rerender, node } = setup();
+    act(() => mocks.event({ type: "space.changed", spaceId: secondId }));
+    await advance(250);
+    expect(read).toHaveBeenCalledOnce();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    act(() => mocks.event({ type: "space.changed", spaceId }));
+    mocks.pathname = "/teams";
+    rerender(node());
+    await advance(250);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+  it("does not let late server navigation restore a space removed by a newer snapshot", () => {
+    const client = new QueryClient();
+    const latest = {
+      ...fixture(),
+      now: "2026-10-08T03:01:00.000Z",
+      spaces: [],
+    };
+    client.setQueryData(CHAT_NAV_KEY, latest);
+    mergeInitialChatNav(client, fixture());
+    expect(client.getQueryData(CHAT_NAV_KEY)).toEqual(latest);
+  });
+});
 async function advance(ms: number) {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
@@ -148,6 +206,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   document.title = "Floor";
   mocks.toast.mockReset();
+  mocks.refresh.mockReset();
   mocks.subscribeSpaces.mockClear();
   mocks.pathname = `/s/${spaceId}/${roomId}`;
   Object.defineProperty(document, "visibilityState", {

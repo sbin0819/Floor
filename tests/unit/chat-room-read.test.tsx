@@ -30,6 +30,8 @@ function setup(
         name: "팀",
         initial: "팀",
         kind: "team",
+        iconColor: "blue",
+        role: "member",
         unread: true,
         muted: false,
         unreadMentions: 0,

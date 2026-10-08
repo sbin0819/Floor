@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import {
@@ -24,6 +25,7 @@ import {
   homeUnreadCount,
 } from "../nav-state";
 import type { ChatNav } from "../types";
+import { spaceIconColors } from "../space-schema";
 import { ChatMentions } from "./chat-mentions";
 import { DirectMessageList } from "./direct-message-list";
 import { MeetingList } from "./meeting-list";
@@ -31,7 +33,9 @@ import { MeetingList } from "./meeting-list";
 const spaceSchema = z.array(
   z.object({
     id: z.uuid(),
-    kind: z.literal("team"),
+    kind: z.enum(["team", "branch", "community"]),
+    iconColor: z.enum(spaceIconColors),
+    role: z.enum(["member", "admin", "owner"]),
     name: z.string(),
     initial: z.string(),
     unread: z.boolean(),
@@ -169,6 +173,12 @@ export function ChatNavSync({
   read?: typeof fetchChatNav;
 }) {
   const client = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
   const activity = useNotificationActivity();
   useIncoming(initialData);
   const query = useQuery({
@@ -194,9 +204,35 @@ export function ChatNavSync({
     previousScope.current = scopeKey;
     reauthorize();
   }, [scopeKey, reauthorize]);
+  const changedSpaces = useRef(new Set<string>());
+  const refreshAllSpaces = useRef(false);
+  const spaceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  useEffect(() => () => clearTimeout(spaceTimer.current), []);
+  function refreshSpaces(spaceId?: string) {
+    if (spaceId) changedSpaces.current.add(spaceId);
+    else refreshAllSpaces.current = true;
+    if (spaceTimer.current) return;
+    spaceTimer.current = setTimeout(() => {
+      spaceTimer.current = undefined;
+      const currentSpace = /^\/s\/([^/]+)(?:\/|$)/.exec(
+        pathnameRef.current,
+      )?.[1];
+      const refreshPage =
+        currentSpace &&
+        currentSpace !== "join" &&
+        (refreshAllSpaces.current || changedSpaces.current.has(currentSpace));
+      changedSpaces.current.clear();
+      refreshAllSpaces.current = false;
+      void query.refetch({ cancelRefetch: true });
+      if (refreshPage) router.refresh();
+    }, 250);
+  }
   useRealtimeSpaces((event) => {
     if (event.type === "room.activity")
       applyRoomActivity(client, event, userId);
+    else if (event.type === "space.changed") refreshSpaces(event.spaceId);
   });
   const disconnected = useRef(false);
   useRealtimeLifecycle((event) => {
@@ -227,6 +263,7 @@ export function ChatNavSync({
           ) + homeUnreadCount(query.data)
         }
         refresh={async () => (await refetch({ cancelRefetch: true })).data}
+        onReauthorize={() => refreshSpaces()}
       />
     </>
   );

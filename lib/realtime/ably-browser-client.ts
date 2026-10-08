@@ -54,6 +54,7 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("friend.changed") }),
   z.object({ type: z.literal("notifications.changed") }),
   z.object({ type: z.literal("room.changed"), roomId: z.string() }),
+  z.object({ type: z.literal("space.changed"), spaceId: z.string() }),
   z.object({ type: z.literal("realtime.reauth") }),
   z.object({
     type: z.literal("status.changed"),
