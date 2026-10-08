@@ -12,10 +12,19 @@ import { getOperatorBranches } from "@/lib/dal";
 
 export type { Session } from "@/lib/auth/types";
 
-export const getSession = cache(async (): Promise<Session | null> => {
+const getRawSession = cache(async () => {
   const requestHeaders = await headers();
   if (!hasSessionCookie(requestHeaders)) return null;
-  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  return getAuth().api.getSession({ headers: requestHeaders });
+});
+
+// 인증 경계 안에서만 소비하고 앱의 Session에는 식별자나 토큰을 추가하지 않는다.
+export async function getCurrentSessionId(): Promise<string | null> {
+  return (await getRawSession())?.session.id ?? null;
+}
+
+export const getSession = cache(async (): Promise<Session | null> => {
+  const session = await getRawSession();
   return session
     ? {
         userId: session.user.id,

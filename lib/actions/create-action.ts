@@ -136,6 +136,7 @@ export function createAction<Input, Output>(
             "space_full",
             "call_full",
             "storage_quota",
+            "password_attempts",
           ].includes(error.details.message ?? "")) ||
           (code === "OVER_CAPACITY" &&
             ["attendee_count", "participants"].includes(

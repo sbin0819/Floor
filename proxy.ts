@@ -32,6 +32,6 @@ export const config = {
     "/dm/:path*",
     "/m/:path*",
     "/friends",
-    "/settings",
+    "/settings/:path*",
   ],
 };

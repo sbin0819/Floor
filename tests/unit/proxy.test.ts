@@ -22,6 +22,8 @@ describe("optimistic route protection", () => {
     "/m/11111111-1111-4111-8111-111111111111",
     "/friends",
     "/settings",
+    "/settings/account",
+    "/settings/preferences",
     "/s/11111111-1111-4111-8111-111111111111",
     "/s/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222",
   ])("matches protected route %s", (url) => {
