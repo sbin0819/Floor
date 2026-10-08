@@ -130,6 +130,17 @@ beforeEach(() => {
 });
 
 describe("floor optimistic navigation", () => {
+  it("lets the timetable grid item shrink so horizontal overflow stays inside the timetable", () => {
+    render(
+      <FloorListRegion>
+        <div data-testid="wide-timetable" style={{ minWidth: 1380 }} />
+      </FloorListRegion>,
+    );
+    const gridItem = screen.getByTestId("wide-timetable").parentElement
+      ?.parentElement;
+    expect(gridItem).toHaveClass("min-w-0", "min-h-0");
+  });
+
   it("selects a space before the response and replaces only the detail, then uses server selection", async () => {
     const response = deferred();
     const navigate = vi.fn<NavigateAction>(() => response.promise);

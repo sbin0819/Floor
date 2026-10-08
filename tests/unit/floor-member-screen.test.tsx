@@ -302,15 +302,15 @@ describe("member branch and date controls", () => {
 
   it("updates operating labels from the server clock and selected date", () => {
     const data = branchNavigation();
-    const view = render(<BranchNavigation data={data} />);
-    expect(screen.getByLabelText("선택한 날짜 운영 시간")).toHaveTextContent(
-      "영업 중 · 09:00–14:00",
-    );
-    view.rerender(
+    const view = render(
       <BranchNavigation data={{ ...data, now: "2026-10-07T08:00:00+09:00" }} />,
     );
     expect(screen.getByLabelText("선택한 날짜 운영 시간")).toHaveTextContent(
       "영업 전 · 09:00–14:00",
+    );
+    view.rerender(<BranchNavigation data={data} />);
+    expect(screen.getByLabelText("선택한 날짜 운영 시간")).toHaveTextContent(
+      "영업 중 · 09:00–14:00",
     );
     view.rerender(
       <BranchNavigation data={{ ...data, now: "2026-10-07T15:00:00+09:00" }} />,

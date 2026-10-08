@@ -17,7 +17,7 @@ export function EmptySpaceSelection() {
 export function FloorListRegion({ children }: { children: ReactNode }) {
   const pending = useFloorSelection()?.listPending ?? false;
   return (
-    <div className="min-h-0">
+    <div className="min-h-0 min-w-0">
       {pending && <FloorViewsSkeleton />}
       <div hidden={pending}>{children}</div>
     </div>
