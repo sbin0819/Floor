@@ -1,4 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+vi.mock("@/features/bookings/components/booking-meeting-region", () => ({
+  BookingMeetingRegion: () => null,
+}));
 import {
   act,
   fireEvent,
@@ -42,7 +46,7 @@ beforeEach(() => {
 });
 
 it("streams the history page before checking its own session and querying", async () => {
-  const shell = BookingsPage();
+  const shell = BookingsPage().props.children[0];
   expect(shell.type).toBe(Suspense);
   expect(requirePageSession).not.toHaveBeenCalled();
   expect(getMyBookings).not.toHaveBeenCalled();
@@ -57,9 +61,9 @@ it("streams the history page before checking its own session and querying", asyn
 
 it("does not query booking history after its own session guard rejects", async () => {
   vi.mocked(requirePageSession).mockRejectedValue(new Error("LOGIN_REDIRECT"));
-  await expect(resolvePageContent(BookingsPage())).rejects.toThrow(
-    "LOGIN_REDIRECT",
-  );
+  await expect(
+    resolvePageContent(BookingsPage().props.children[0]),
+  ).rejects.toThrow("LOGIN_REDIRECT");
   expect(getMyBookings).not.toHaveBeenCalled();
 });
 
@@ -180,12 +184,14 @@ it("marks a clicked tab and replaces only the list before the response", async (
 
 it("normalizes unknown tabs and preserves the past path in the page guard", async () => {
   const past = await resolvePageContent(
-    BookingsPage({ searchParams: Promise.resolve({ tab: "past" }) }),
+    BookingsPage({ searchParams: Promise.resolve({ tab: "past" }) }).props
+      .children[0],
   );
   expect(past.props.tab).toBe("past");
   expect(requirePageSession).toHaveBeenCalledWith("/bookings?tab=past");
   const unknown = await resolvePageContent(
-    BookingsPage({ searchParams: Promise.resolve({ tab: "invalid" }) }),
+    BookingsPage({ searchParams: Promise.resolve({ tab: "invalid" }) }).props
+      .children[0],
   );
   expect(unknown.props.tab).toBe("upcoming");
 });

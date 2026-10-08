@@ -61,6 +61,9 @@ vi.mock("@/features/bookings/queries", () => ({
   getMyBookingsMonthStream: vi.fn(),
 }));
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
+vi.mock("@/features/bookings/components/booking-meeting-region", () => ({
+  BookingMeetingRegion: () => null,
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const now = "2026-10-08T01:00:00Z";
 const booking: MyCalendarBooking = {
@@ -156,7 +159,7 @@ it("preserves calendar location in the page guard and waits for it before the qu
         month: "2026-11",
         day: "2026-11-03",
       }),
-    }),
+    }).props.children[0],
   );
   expect(requirePageSession).not.toHaveBeenCalled();
   expect(getMyBookingsMonthStream).not.toHaveBeenCalled();
@@ -179,7 +182,8 @@ it("preserves calendar location in the page guard and waits for it before the qu
 it("does not query the calendar after the page guard rejects", async () => {
   vi.mocked(requirePageSession).mockRejectedValue(new Error("LOGIN_REDIRECT"));
   const content = await resolvePageContent(
-    BookingsPage({ searchParams: Promise.resolve({ view: "calendar" }) }),
+    BookingsPage({ searchParams: Promise.resolve({ view: "calendar" }) }).props
+      .children[0],
   );
   await expect(resolvePageContent(content)).rejects.toThrow("LOGIN_REDIRECT");
   expect(getMyBookingsMonth).not.toHaveBeenCalled();
@@ -546,6 +550,35 @@ function streamed(
     </QueryClientProvider>
   );
 }
+
+it("preserves the selected day, grid DOM and focus when only the meeting query opens or closes", async () => {
+  const response = deferred<MyCalendarBooking[]>();
+  await act(async () => render(streamed(data(), response.promise)));
+  const grid = screen.getByRole("grid");
+  const ninth = screen.getByRole("link", {
+    name: "10월 9일 금요일, 예약을 불러오고 있어요",
+  });
+  fireEvent.click(ninth);
+  ninth.focus();
+  for (const chat of [
+    "&chat=b1111111-1111-4111-8111-111111111111",
+    "&chat=b2222222-2222-4222-8222-222222222222",
+    "",
+  ]) {
+    changeUrl(`/bookings?view=calendar&month=2026-10&day=2026-10-09${chat}`);
+    expect(screen.getByRole("grid")).toBe(grid);
+    expect(ninth).toHaveAttribute("aria-current", "date");
+    expect(ninth).toHaveFocus();
+    expect(
+      screen.getByRole("region", { name: "선택한 날짜 예약" }),
+    ).toHaveTextContent("10월 9일 금요일");
+    expect(screen.queryByText("이 날은 예약이 없어요")).not.toBeInTheDocument();
+  }
+  await act(async () => response.resolve([booking]));
+  expect(screen.getByRole("grid")).toBe(grid);
+  expect(ninth).toHaveAttribute("aria-current", "date");
+  expect(navigation.push).not.toHaveBeenCalled();
+});
 
 it("shows metadata dates before bookings, keeps date links and focus, and resolves the latest selected day only", async () => {
   const response = deferred<MyCalendarBooking[]>();

@@ -94,7 +94,13 @@ describe.each(["list", "calendar"] as const)(
           status,
           cancelledAt: status === "cancelled" ? now : null,
         });
-        const link = screen.getByRole("link", { name: "채팅" });
+        const [wide, link] = screen.getAllByRole("link", { name: "채팅" });
+        expect(wide).toHaveAttribute(
+          "href",
+          `/bookings?view=calendar&month=2026-10&day=2026-10-08&chat=${booking.id}`,
+        );
+        expect(wide).toHaveClass("hidden", "md:inline-flex");
+        expect(link).toHaveClass("md:hidden");
         expect(link).toHaveAttribute("href", `/m/${booking.id}`);
         expect(link).toHaveAttribute("data-chat-link", booking.id);
         expect(

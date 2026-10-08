@@ -46,6 +46,7 @@ import {
 } from "./my-bookings-calendar-day";
 import { SelectedDayPanel } from "./my-bookings-calendar-panel";
 import { MyBookingsCalendarToolbar } from "./my-bookings-calendar-toolbar";
+import { bookingCalendarSearchKey } from "../meeting-navigation";
 
 export { MyBookingCalendarDay } from "./my-bookings-calendar-day";
 
@@ -91,7 +92,7 @@ function CalendarView({
   const parsed = parseCalendarMonth(visible.month);
   const month = buildMonthGrid(parsed.year, parsed.month);
   const source = visible.month === meta.month ? bookings : null;
-  const searchKey = search.toString();
+  const searchKey = bookingCalendarSearchKey(search);
   const requestedDay = search.getAll("day");
   const normalizedDay = normalizeMyBookingsMonth(
     {
