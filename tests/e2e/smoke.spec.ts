@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 팀 설정은 로그인 복귀 주소와 탭을 보존해요", async ({
+  page,
+}) => {
+  const path = "/teams/11111111-1111-4111-8111-111111111111?tab=settings";
+  await page.goto(path);
+  await expect(
+    page.getByRole("heading", { name: "Floor에 로그인", exact: true }),
+  ).toBeVisible();
+  const url = new URL(page.url());
+  expect(url.pathname).toBe("/login");
+  expect(url.searchParams.get("next")).toBe(path);
+});
+
 test("비로그인 계정 설정은 로그인 복귀 주소를 보존해요", async ({ page }) => {
   await page.goto("/settings/account");
   await expect(

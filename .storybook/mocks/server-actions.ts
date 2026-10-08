@@ -72,6 +72,12 @@ export const setFloorAccess = readOnlyAction;
 export const setSpaceAccess = readOnlyAction;
 
 export const createTeam = readOnlyAction;
+export const updateTeam = readOnlyAction;
+export const setMemberRole = readOnlyAction;
+export const setMemberTitle = readOnlyAction;
+export const removeMember = readOnlyAction;
+export const leaveTeam = readOnlyAction;
+export const deleteTeam = readOnlyAction;
 export const requestTeamJoin = readOnlyAction;
 export const cancelTeamJoinRequest = readOnlyAction;
 export const approveTeamJoinRequest = readOnlyAction;
