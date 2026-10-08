@@ -179,13 +179,19 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
             }
             const members =
               room.kind === "dm"
-                ? await listDirectMembers(room.id, transaction)
-                : await listChatMembers(room.teamId!, transaction);
+                ? await listDirectMembers(room.id, transaction, session.userId)
+                : await listChatMembers(
+                    room.teamId!,
+                    transaction,
+                    session.userId,
+                  );
             const names = new Map(
               members.map((member) => [member.id, member.name]),
             );
             const mentions = parsed.userIds.filter(
-              (id) => id !== session.userId && names.has(id),
+              (id) =>
+                id !== session.userId &&
+                members.some((member) => member.id === id && member.canMention),
             );
             const mentionsEveryone =
               parsed.everyone && (room.kind === "dm" || room.role === "admin");
@@ -225,7 +231,10 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
               names,
               recipients: mentionsEveryone
                 ? members
-                    .filter((member) => member.id !== session.userId)
+                    .filter(
+                      (member) =>
+                        member.id !== session.userId && member.canMention,
+                    )
                     .map((member) => member.id)
                 : mentions,
             };

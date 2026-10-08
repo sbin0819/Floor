@@ -36,6 +36,9 @@ export type ActionErrorDetails = {
     | "username_cooldown"
     | "friend_daily"
     | "friend_cooldown"
+    | "report_daily"
+    | "request_daily"
+    | "request_pending"
     | "desk_per_person"
     | "attendee_count"
     | "participants";

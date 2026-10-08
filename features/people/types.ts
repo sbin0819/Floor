@@ -6,8 +6,9 @@ export type UsernameSettings = {
   suggestion: string | null;
 };
 
-export type PersonRelation = "friend" | "outgoing" | "incoming" | "none";
-export type FriendsTab = "all" | "received" | "sent";
+export type PersonRelation =
+  "friend" | "outgoing" | "incoming" | "none" | "blocked";
+export type FriendsTab = "all" | "received" | "sent" | "blocked";
 export type FriendRow = {
   userId: string;
   name: string;
@@ -20,8 +21,9 @@ export type FriendsView = {
   receivedCount: number;
   rows: FriendRow[];
 };
-export type PersonSearchResult = Omit<FriendRow, "directRoomId"> & {
+export type PersonSearchResult = FriendRow & {
   relation: PersonRelation;
+  canDirectMessage: boolean;
 };
 export type PersonProfile = {
   userId: string;

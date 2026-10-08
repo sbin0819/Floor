@@ -4,12 +4,13 @@ import { eq, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
+import { blockedBetween } from "./people-blocks";
 
 export function canOpenDirectMessageCondition(
   me: SQL,
   other: SQL,
 ): SQL<boolean> {
-  return sql<boolean>`(${me} <> ${other} and exists (
+  return sql<boolean>`(${me} <> ${other} and not ${blockedBetween(me, other)} and exists (
     select 1 from users target where target.id = ${other} and target.email_verified
   ) and (
     exists (select 1 from friendships f where f.user_low_id = least(${me}, ${other})

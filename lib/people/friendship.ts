@@ -13,7 +13,10 @@ export function relationOf(
   row: FriendshipState | null,
   me: string,
   now: Date,
+  blocks?: { byMe: boolean; byThem: boolean },
 ): PersonRelation {
+  if (blocks?.byMe) return "blocked";
+  if (blocks?.byThem) return "none";
   if (!row) return "none";
   if (row.status === "accepted") return "friend";
   if (row.status === "pending")

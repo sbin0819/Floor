@@ -10,6 +10,8 @@ import type {
 } from "@/features/people/types";
 import { canOpenDirectMessageCondition } from "./direct-permission";
 import type { DalDatabase } from "./database";
+import { blockedBetween, blockedBy } from "./people-blocks";
+export { blockBetween } from "./people-blocks";
 
 export function sharedTeamCondition(me: string, other: SQL) {
   return sql<boolean>`exists (
@@ -40,6 +42,8 @@ function pair(me: string, other: SQL) {
 }
 function relation(me: string, now: Date) {
   return sql<PersonRelation>`case
+    when ${blockedBy(sql`${me}::uuid`, sql`${users.id}`)} then 'blocked'
+    when ${blockedBy(sql`${users.id}`, sql`${me}::uuid`)} then 'none'
     when ${friendships.status} = 'accepted' then 'friend'
     when ${friendships.requestedBy} = ${me}::uuid and (
       ${friendships.status} = 'pending' or (${friendships.status} = 'declined'
@@ -69,6 +73,11 @@ export function searchPeopleRows(
       username: users.username,
       relation: relation(me, now),
       sharedTeamNames: sharedTeamNames(me, personId),
+      directRoomId: directRoomId(me, personId),
+      canDirectMessage: canOpenDirectMessageCondition(
+        sql`${me}::uuid`,
+        personId,
+      ),
     })
     .from(users)
     .leftJoin(friendships, pair(me, personId))
@@ -81,6 +90,7 @@ export function searchPeopleRows(
           input.query.length >= 2
             ? and(
                 shared,
+                sql`not ${blockedBetween(sql`${me}::uuid`, personId)}`,
                 sql`(${users.name} ilike ${pattern} escape '\\' or ${users.username} ilike ${pattern} escape '\\')`,
               )
             : sql`false`,
@@ -151,6 +161,7 @@ export function listMessageContacts(
       and(
         ne(users.id, me),
         eq(users.emailVerified, true),
+        sql`not ${blockedBetween(sql`${me}::uuid`, personId)}`,
         or(
           eq(friendships.status, "accepted"),
           sharedTeamCondition(me, personId),
@@ -180,7 +191,15 @@ export async function readFriendsList(
     .select({
       receivedCount: sql<number>`(select count(*)::int from friendships f
       where ${me}::uuid in (f.user_low_id, f.user_high_id) and f.status = 'pending' and f.requested_by <> ${me}::uuid)`,
-      rows: sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
+      rows:
+        tab === "blocked"
+          ? sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
+      'userId', peer.id, 'name', peer.name, 'username', peer.username,
+      'sharedTeamNames', ${sharedTeamNames(me, peer)}, 'directRoomId', ${directRoomId(me, peer)}
+    ) order by peer.name, peer.id)
+    from user_blocks blocked join users peer on peer.id = blocked.blocked_id
+    where blocked.blocker_id = ${me}::uuid), '[]'::jsonb)`
+          : sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
       'userId', peer.id, 'name', peer.name, 'username', peer.username,
       'sharedTeamNames', ${sharedTeamNames(me, peer)}, 'directRoomId', ${directRoomId(me, peer)}
     ) order by peer.name, peer.id)

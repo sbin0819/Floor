@@ -126,6 +126,9 @@ export function createAction<Input, Output>(
             "username_cooldown",
             "friend_daily",
             "friend_cooldown",
+            "report_daily",
+            "request_daily",
+            "request_pending",
           ].includes(error.details.message ?? "")) ||
           (code === "OVER_CAPACITY" &&
             ["attendee_count", "participants"].includes(

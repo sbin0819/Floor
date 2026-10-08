@@ -10,6 +10,7 @@ import {
   teams,
   users,
 } from "@/lib/db/schema";
+import { blockedBetween } from "./people-blocks";
 
 export async function listBookingParticipantIds(
   bookingId: string,
@@ -46,6 +47,7 @@ export function getParticipantEligibility(
       id: users.id,
       email: users.email,
       emailVerified: users.emailVerified,
+      blocked: blockedBetween(sql`${ownerId}::uuid`, sql`${users.id}`),
       sharesTeam: sql<boolean>`exists (
       select 1 from team_members candidate_membership
       inner join team_members owner_membership

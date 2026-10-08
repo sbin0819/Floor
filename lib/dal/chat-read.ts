@@ -16,6 +16,7 @@ import { readableRoomCondition, readableTeamSpace } from "./chat-access";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { selectChatMessages } from "./chat-messages";
+import { blockedBy } from "./people-blocks";
 
 export function listChatNav(userId: string, database: DalDatabase = getDb()) {
   return database
@@ -78,12 +79,18 @@ export async function listRecentMessages(
 export function listChatMembers(
   teamId: string,
   database: DalDatabase = getDb(),
+  mentionAuthorId?: string,
 ) {
   return database
     .select({
       id: users.id,
       name: users.name,
       admin: sql<boolean>`${teamMembers.role} = 'admin'`,
+      ...(mentionAuthorId
+        ? {
+            canMention: sql<boolean>`not ${blockedBy(sql`${users.id}`, sql`${mentionAuthorId}::uuid`)}`,
+          }
+        : {}),
     })
     .from(teamMembers)
     .innerJoin(users, eq(teamMembers.userId, users.id))

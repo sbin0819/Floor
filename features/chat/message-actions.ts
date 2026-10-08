@@ -89,13 +89,19 @@ export function createMessageActions(
               throw new ActionError("NOT_FOUND");
             const members =
               currentAccess.room.kind === "dm"
-                ? await listDirectMembers(target.roomId, tx)
-                : await listChatMembers(currentAccess.room.teamId!, tx);
+                ? await listDirectMembers(target.roomId, tx, session.userId)
+                : await listChatMembers(
+                    currentAccess.room.teamId!,
+                    tx,
+                    session.userId,
+                  );
             const names = new Map(
               members.map((member) => [member.id, member.name]),
             );
             const mentions = parsed.userIds.filter(
-              (id) => id !== session.userId && names.has(id),
+              (id) =>
+                id !== session.userId &&
+                members.some((member) => member.id === id && member.canMention),
             );
             const everyone =
               parsed.everyone &&
@@ -122,7 +128,11 @@ export function createMessageActions(
             await writes.removeMessageMentions(original.id, tx);
             await insertMessageMentions(original.id, mentions, now, tx);
             const candidates = (
-              everyone ? members.map((member) => member.id) : mentions
+              everyone
+                ? members
+                    .filter((member) => member.canMention)
+                    .map((member) => member.id)
+                : mentions
             ).filter(
               (id) =>
                 id !== session.userId &&

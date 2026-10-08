@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db/client";
 import { chatRoomReads, chatRooms, chatSpacePrefs } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
 import { readableRoomCondition } from "./chat-access";
+import { blockedBy } from "./people-blocks";
 
 export function roomJoinedAt(userId: string) {
   return sql`case when ${chatRooms.kind} = 'dm' then (
@@ -43,7 +44,8 @@ export function unreadMentionCount(userId: string) {
     and candidate.seq > coalesce(${chatRoomReads.lastReadSeq}, 0)
     and candidate.created_at > ${roomJoinedAt(userId)}
     and candidate.author_id is distinct from ${userId}
-    and candidate.deleted_at is null`;
+    and candidate.deleted_at is null
+    and not ${blockedBy(sql`${userId}::uuid`, sql`candidate.author_id`)}`;
   // 두 인덱스로 후보를 찾고 UNION으로 @모두·개인 멘션이 겹친 메시지를 한 번만 센다.
   return sql<number>`(select count(*)::integer from (
     select candidate.id from messages candidate

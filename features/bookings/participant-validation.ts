@@ -37,12 +37,13 @@ export function assertParticipantEligibility(
     email: string;
     emailVerified: boolean;
     sharesTeam: boolean;
+    blocked: boolean;
   }[],
 ) {
   let guests = 0;
   for (const participant of participants) {
     const user = rows.find(({ id }) => id === participant.userId);
-    if (participant.userId === ownerId || !user?.emailVerified)
+    if (participant.userId === ownerId || !user?.emailVerified || user.blocked)
       invalidParticipants();
     if (!user.sharesTeam) {
       guests++;

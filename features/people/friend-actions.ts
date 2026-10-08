@@ -3,6 +3,7 @@ import { ActionError } from "@/lib/actions/result";
 import { withTransaction, type DalDatabase } from "@/lib/dal/database";
 import * as friends from "@/lib/dal/friends";
 import * as locks from "@/lib/dal/people-write";
+import { blockBetween } from "@/lib/dal/people-blocks";
 import {
   createPersonNotification,
   deleteFriendRequestNotification,
@@ -32,6 +33,10 @@ export function createFriendActions(dependencies: Dependencies = {}) {
       const people = await locks.lockFriendUsers(me, other, tx);
       if (!people.me || !people.other?.emailVerified)
         throw new ActionError("NOT_FOUND");
+      if (operation === "send" || operation === "accept") {
+        const blocks = await blockBetween(me, other, tx);
+        if (blocks.byMe || blocks.byThem) throw new ActionError("FORBIDDEN");
+      }
       let row = await locks.lockFriendPair(me, other, tx);
       const events: RealtimeItem[] = [];
       const changed = (userId: string, notification = false) => {

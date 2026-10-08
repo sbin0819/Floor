@@ -4,6 +4,7 @@ import { and, asc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { teamMembers, teams, users } from "@/lib/db/schema";
 import type { DalDatabase } from "@/lib/dal/database";
+import { blockedBetween } from "./people-blocks";
 
 export async function findParticipants(
   userId: string,
@@ -34,6 +35,7 @@ export async function findParticipants(
       and(
         ne(users.id, userId),
         eq(users.emailVerified, true),
+        sql`not ${blockedBetween(sql`${userId}::uuid`, sql`${users.id}`)}`,
         or(
           and(shared, or(ilike(users.name, like), ilike(users.email, like))),
           sql`lower(${users.email}) = ${query.toLowerCase()}`,

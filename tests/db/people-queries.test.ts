@@ -145,6 +145,8 @@ describe("people query privacy and budgets", () => {
       username: "jihoon.park",
       relation: "none",
       sharedTeamNames: [],
+      directRoomId: null,
+      canDirectMessage: false,
     });
     expect(JSON.stringify(rows)).not.toContain("@example.test");
   });
@@ -214,6 +216,8 @@ describe("people query privacy and budgets", () => {
         "username",
         "relation",
         "sharedTeamNames",
+        "directRoomId",
+        "canDirectMessage",
       ]);
     },
   );

@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
 import { unreadDirectCount, unreadMentionCount } from "./chat-reads";
+import { blockedBy } from "./people-blocks";
 
 export {
   canOpenDirectMessageCondition,
@@ -72,9 +73,19 @@ export async function createDirectRoom(
 export function listDirectMembers(
   roomId: string,
   database: DalDatabase = getDb(),
+  mentionAuthorId?: string,
 ) {
   return database
-    .select({ id: users.id, name: users.name, admin: sql<false>`false` })
+    .select({
+      id: users.id,
+      name: users.name,
+      admin: sql<false>`false`,
+      ...(mentionAuthorId
+        ? {
+            canMention: sql<boolean>`not ${blockedBy(sql`${users.id}`, sql`${mentionAuthorId}::uuid`)}`,
+          }
+        : {}),
+    })
     .from(chatRoomMembers)
     .innerJoin(users, eq(users.id, chatRoomMembers.userId))
     .innerJoin(chatRooms, eq(chatRooms.id, chatRoomMembers.roomId))

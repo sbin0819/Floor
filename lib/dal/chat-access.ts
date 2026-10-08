@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
+import { blockedBetween } from "./people-blocks";
 
 // 같은 JOIN 조건을 조회와 액션·토큰에 사용한다. 운영자 권한은 팀 소속을 대신하지 않는다.
 export function readableTeamSpace(userId: string) {
@@ -69,6 +70,10 @@ export async function canReadRoom(
         from users u where ${chatRooms.kind} = 'dm' and u.id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end
       )`,
       peerActive: sql<boolean>`exists (select 1 from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end and m.status = 'active')`,
+      peerBlocked: blockedBetween(
+        sql`${userId}::uuid`,
+        sql`case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end`,
+      ),
       peerReadSeq:
         sql<number>`coalesce((select r.last_read_seq from chat_room_reads r where r.room_id = ${chatRooms.id} and r.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end), 0)`.mapWith(
           Number,
@@ -121,7 +126,7 @@ export function writableRoom(
   return (
     room.archivedAt === null &&
     (room.kind === "dm"
-      ? room.peerActive
+      ? room.peerActive && !room.peerBlocked
       : !room.adminOnly || room.role === "admin")
   );
 }
@@ -146,6 +151,6 @@ export async function canReactRoom(
     canReact:
       room !== null &&
       room.archivedAt === null &&
-      (room.kind !== "dm" || room.peerActive),
+      (room.kind !== "dm" || (room.peerActive && !room.peerBlocked)),
   };
 }

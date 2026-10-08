@@ -22,6 +22,28 @@ export const respondFriendSchema = personTargetSchema.extend({
 });
 export const peopleSearchSchema = z.string().trim().min(1).max(254);
 
-export function friendsTab(input: unknown): "all" | "received" | "sent" {
-  return input === "received" || input === "sent" ? input : "all";
+const reportFields = {
+  reason: z.enum(["spam", "harassment", "inappropriate", "other"]),
+  detail: z
+    .string()
+    .trim()
+    .refine(
+      (value) => [...value].length <= 500,
+      "설명은 500자까지 쓸 수 있어요.",
+    )
+    .optional()
+    .transform((value) => value || null),
+};
+export const reportUserSchema = personTargetSchema.extend(reportFields);
+export const reportMessageSchema = z.strictObject({
+  messageId: z.uuid().transform((id) => id.toLowerCase()),
+  ...reportFields,
+});
+
+export function friendsTab(
+  input: unknown,
+): "all" | "received" | "sent" | "blocked" {
+  return input === "received" || input === "sent" || input === "blocked"
+    ? input
+    : "all";
 }
