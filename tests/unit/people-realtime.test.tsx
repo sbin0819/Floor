@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   pathname: "/friends",
   refresh: vi.fn(),
   channel: "",
-  receive: (event: { type: string }) => { void event; },
+  receive: (event: { type: string }) => {
+    void event;
+  },
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,

@@ -9,6 +9,12 @@ const readOnlyAction: (
 
 export const createBooking = readOnlyAction;
 export const sendMessage = readOnlyAction;
+export const openDirectMessage = readOnlyAction;
+export const setUsername = readOnlyAction;
+export const sendFriendRequest = readOnlyAction;
+export const respondFriendRequest = readOnlyAction;
+export const cancelFriendRequest = readOnlyAction;
+export const removeFriend = readOnlyAction;
 export const markRoomRead = async (input: { seq: number }) => ({
   ok: true as const,
   data: { lastReadSeq: input.seq },

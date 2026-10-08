@@ -97,7 +97,7 @@ function activity(id = roomId, authorId: string | null = "other") {
     authorId,
   });
 }
-function setup(read = vi.fn(async () => fixture())) {
+function setup(read = vi.fn<typeof fetchChatNav>(async () => fixture())) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -462,5 +462,72 @@ describe("chat unread navigation", () => {
       cache: "no-store",
       credentials: "same-origin",
     });
+  });
+  it("replaces an older in-flight poll when an unknown DM event needs a fresh membership snapshot", async () => {
+    const directId = "44444444-4444-4444-8444-444444444444";
+    let finishOld!: (data: ChatNav) => void;
+    let oldSignal!: AbortSignal;
+    const incoming: ChatNav = {
+      ...fixture(),
+      directMessages: [
+        {
+          roomId: directId,
+          other: {
+            userId: "55555555-5555-4555-8555-555555555555",
+            name: "서연",
+            username: "seoyeon",
+          },
+          lastSeq: 4,
+          lastMessageAt: "2026-10-08T03:00:00Z",
+          unread: true,
+          unreadCount: 1,
+          unreadMentions: 0,
+          muted: false,
+        },
+      ],
+    };
+    const read = vi
+      .fn<typeof fetchChatNav>()
+      .mockImplementationOnce((signal) => {
+        oldSignal = signal;
+        return new Promise<ChatNav>((resolve) => {
+          finishOld = resolve;
+        });
+      })
+      .mockResolvedValueOnce(incoming);
+    const { client } = setup(read);
+    await advance(60_000);
+    expect(read).toHaveBeenCalledOnce();
+    expect(oldSignal.aborted).toBe(false);
+    act(() =>
+      mocks.mention({
+        type: "room.activity",
+        roomKind: "dm",
+        spaceId: null,
+        roomId: directId,
+        seq: 4,
+        authorId: "other",
+        preview: {
+          messageId: "new-direct-message",
+          authorName: "서연",
+          excerpt: "새 DM이에요",
+        },
+      }),
+    );
+    await advance(250);
+    expect(oldSignal.aborted).toBe(true);
+    expect(read).toHaveBeenCalledTimes(2);
+    await advance(251);
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)?.directMessages).toEqual(
+      incoming.directMessages,
+    );
+    expect(mocks.toast).toHaveBeenCalledExactlyOnceWith(
+      "서연",
+      expect.objectContaining({ id: "dm:new-direct-message" }),
+    );
+    await act(async () => finishOld(fixture()));
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)?.directMessages).toEqual(
+      incoming.directMessages,
+    );
   });
 });

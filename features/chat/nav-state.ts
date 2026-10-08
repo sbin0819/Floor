@@ -141,7 +141,11 @@ export function isViewingRoom(
   );
 }
 
-export function hasReadThrough(client: QueryClient, roomId: string, seq: number) {
+export function hasReadThrough(
+  client: QueryClient,
+  roomId: string,
+  seq: number,
+) {
   return (state(client).readThrough.get(roomId) ?? 0) >= seq;
 }
 
@@ -243,7 +247,15 @@ export function mergeChatNav(
       : (snapshot.rooms.get(id) ?? 0) > requestedAt;
   const directMessages = incoming.directMessages.map((room) => {
     const old = existing.get(room.roomId);
-    if (old && protect(room.roomId)) return old;
+    if (old && protect(room.roomId))
+      return {
+        ...room,
+        lastSeq: old.lastSeq,
+        lastMessageAt: old.lastMessageAt,
+        unread: old.unread,
+        unreadCount: old.unreadCount,
+        unreadMentions: old.unreadMentions,
+      };
     if (requestedAt !== null)
       snapshot.rooms.set(room.roomId, ++snapshot.revision);
     return room;

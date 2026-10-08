@@ -10,16 +10,22 @@ export function useDirectPeerRead(
   initialSeq: number,
 ) {
   const [cursor, setCursor] = useState({ roomId, seq: initialSeq });
-  const active = useRef(false);
+  const active = useRef<{ roomId: string; peerId: string | null } | null>(null);
   useEffect(() => {
-    active.current = true;
+    active.current = { roomId, peerId };
     return () => {
-      active.current = false;
+      active.current = null;
     };
   }, [roomId, peerId]);
   const receivePage = useCallback(
     (room: string, seq: number) => {
-      if (!active.current || !peerId || room !== roomId) return;
+      if (
+        !peerId ||
+        room !== roomId ||
+        active.current?.roomId !== roomId ||
+        active.current.peerId !== peerId
+      )
+        return;
       setCursor((previous) => ({
         roomId,
         seq: Math.max(

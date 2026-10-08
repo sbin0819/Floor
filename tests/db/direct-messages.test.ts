@@ -18,7 +18,9 @@ import {
   chatRoomReads,
   chatRooms,
   friendships,
+  messageMentions,
   messages,
+  notifications,
   teamMembers,
   users,
 } from "@/lib/db/schema";
@@ -347,6 +349,109 @@ describe("direct messages", () => {
         },
       },
     ]);
+  });
+
+  it.each([false, true])(
+    "keeps the canonical DM and all side effects unchanged on client-id retries (initial mention: %s)",
+    async (withMention) => {
+      const roomId = await open();
+      const api = actions();
+      const request = {
+        roomId,
+        clientId: crypto.randomUUID(),
+        body: withMention ? `<@${actors.admin.userId}> 원본` : "원본",
+      };
+      const first = await api.sendMessage(request);
+      expect(first).toMatchObject({ ok: true, data: { seq: 1 } });
+      const snapshot = () =>
+        Promise.all([
+          database.db.select().from(chatRooms).where(eq(chatRooms.id, roomId)),
+          database.db.select().from(messages),
+          database.db.select().from(messageMentions),
+          database.db.select().from(notifications),
+          database.db.select().from(chatRoomReads),
+        ]);
+      const before = await snapshot();
+      expect(before[2]).toHaveLength(withMention ? 1 : 0);
+      expect(before[3]).toEqual([]);
+      publisher.publish.mockClear();
+      publisher.publishMany.mockClear();
+
+      expect(
+        await api.sendMessage({
+          ...request,
+          body: `<@everyone> <@${actors.admin.userId}> 다른 본문`,
+        }),
+      ).toEqual(first);
+      expect(await api.sendMessage({ ...request, body: null })).toEqual({
+        ok: false,
+        code: "INVALID_INPUT",
+        fieldErrors: { body: [expect.any(String)] },
+      });
+      expect(await actions(actors.admin).sendMessage(request)).toEqual({
+        ok: false,
+        code: "INVALID_INPUT",
+      });
+      expect(await snapshot()).toEqual(before);
+      expect(publisher.publish).not.toHaveBeenCalled();
+      expect(publisher.publishMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns current edited and deleted DM snapshots on retry without restoring mentions or publishing", async () => {
+    const roomId = await open();
+    const api = actions();
+    const request = {
+      roomId,
+      clientId: crypto.randomUUID(),
+      body: "원본",
+    };
+    const first = await api.sendMessage(request);
+    if (!first.ok) throw new Error("Send failed");
+    const edited = await api.editMessage({
+      messageId: first.data.id,
+      body: `<@${actors.admin.userId}> 수정한 본문`,
+    });
+    expect(edited).toMatchObject({ ok: true, data: { seq: 1 } });
+    const snapshot = () =>
+      Promise.all([
+        database.db.select().from(chatRooms).where(eq(chatRooms.id, roomId)),
+        database.db.select().from(messages),
+        database.db.select().from(messageMentions),
+        database.db.select().from(notifications),
+      ]);
+    const afterEdit = await snapshot();
+    expect(afterEdit[2]).toHaveLength(1);
+    publisher.publish.mockClear();
+    publisher.publishMany.mockClear();
+    expect(await api.sendMessage(request)).toEqual(edited);
+    expect(await snapshot()).toEqual(afterEdit);
+    expect(publisher.publish).not.toHaveBeenCalled();
+    expect(publisher.publishMany).not.toHaveBeenCalled();
+
+    expect(await api.deleteMessage({ messageId: first.data.id })).toEqual({
+      ok: true,
+      data: { id: first.data.id },
+    });
+    const deleted = (await queries().getDirectMessageView(roomId))!
+      .messages[0]!;
+    expect(deleted).toMatchObject({
+      id: first.data.id,
+      seq: 1,
+      body: "",
+      mentions: [],
+      deletedAt: now.toISOString(),
+    });
+    const afterDelete = await snapshot();
+    expect(afterDelete[2]).toEqual([]);
+    publisher.publish.mockClear();
+    publisher.publishMany.mockClear();
+    expect(
+      await api.sendMessage({ ...request, body: "<@everyone> 재전송" }),
+    ).toEqual({ ok: true, data: deleted });
+    expect(await snapshot()).toEqual(afterDelete);
+    expect(publisher.publish).not.toHaveBeenCalled();
+    expect(publisher.publishMany).not.toHaveBeenCalled();
   });
 
   it("excludes empty DMs and counts only other nondeleted messages after joining, capped at 100", async () => {

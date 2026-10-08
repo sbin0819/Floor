@@ -354,10 +354,12 @@ describe("direct read cursor scope", () => {
     expect(result.current.seq).toBe(5);
     rerender({ roomId: "a", initial: 3 });
     expect(result.current.seq).toBe(5);
+    const previousReceive = result.current.receivePage;
     rerender({ roomId: "b", initial: 1 });
     act(() => result.current.receivePage("a", 99));
     expect(result.current.seq).toBe(1);
     act(() => result.current.receivePage("b", 4));
+    act(() => previousReceive("a", 99));
     expect(result.current.seq).toBe(4);
   });
 });

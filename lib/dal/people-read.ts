@@ -112,7 +112,8 @@ export async function readPersonProfile(
       select jsonb_agg(jsonb_build_object('id', s.id, 'name', t.name) order by t.name, s.id)
       from chat_spaces s join teams t on s.team_id = t.id
       join team_members mine on mine.team_id = t.id join team_members theirs on theirs.team_id = t.id
-      where s.kind = 'team' and mine.user_id = ${me}::uuid and theirs.user_id = ${personId}
+      where s.kind = 'team' and s.deleted_at is null
+        and mine.user_id = ${me}::uuid and theirs.user_id = ${personId}
     ), '[]'::jsonb)`,
     })
     .from(users)

@@ -351,19 +351,35 @@ describe("direct navigation cache", () => {
       unreadCount: 1,
     });
   });
-  it.each(["poll", "SSR"] as const)("accepts mute/profile metadata from %s while preserving newer live read fields", (source) => {
-    const client = cache();
-    const revision = chatNavRevision(client);
-    applyDirectActivity(client, activity(), userId, now);
-    applyMention(client, mention());
-    const incoming = fixture([direct({ muted: true, other: { ...direct().other, name: "새 이름", username: "new_name" } })]);
-    if (source === "SSR") mergeInitialChatNav(client, incoming);
-    else client.setQueryData(CHAT_NAV_KEY, mergeChatNav(client, incoming, revision));
-    expect(snapshot(client).directMessages[0]).toEqual({
-      ...incoming.directMessages[0], lastSeq: 4, lastMessageAt: now,
-      unread: true, unreadCount: 1, unreadMentions: 1,
-    });
-  });
+  it.each(["poll", "SSR"] as const)(
+    "accepts mute/profile metadata from %s while preserving newer live read fields",
+    (source) => {
+      const client = cache();
+      const revision = chatNavRevision(client);
+      applyDirectActivity(client, activity(), userId, now);
+      applyMention(client, mention());
+      const incoming = fixture([
+        direct({
+          muted: true,
+          other: { ...direct().other, name: "새 이름", username: "new_name" },
+        }),
+      ]);
+      if (source === "SSR") mergeInitialChatNav(client, incoming);
+      else
+        client.setQueryData(
+          CHAT_NAV_KEY,
+          mergeChatNav(client, incoming, revision),
+        );
+      expect(snapshot(client).directMessages[0]).toEqual({
+        ...incoming.directMessages[0],
+        lastSeq: 4,
+        lastMessageAt: now,
+        unread: true,
+        unreadCount: 1,
+        unreadMentions: 1,
+      });
+    },
+  );
 });
 
 describe("direct activity toasts and navigation", () => {

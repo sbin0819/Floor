@@ -9,6 +9,7 @@ import {
   vi,
 } from "vitest";
 import { createPeopleQueries } from "@/features/people/query-factory";
+import { canReadSpace } from "@/lib/dal/chat-access";
 import { ActionError } from "@/lib/actions/result";
 import { createMemoryRateLimiter } from "@/lib/rate-limit/memory";
 import {
@@ -77,15 +78,13 @@ describe("people query privacy and budgets", () => {
     await database.db
       .insert(teams)
       .values({ id: id(101), name: "가상 팀", createdBy: id(1) });
-    await database.db
-      .insert(teamMembers)
-      .values(
-        [1, 2, 5].map((n) => ({
-          teamId: id(101),
-          userId: id(n),
-          role: "member" as const,
-        })),
-      );
+    await database.db.insert(teamMembers).values(
+      [1, 2, 5].map((n) => ({
+        teamId: id(101),
+        userId: id(n),
+        role: "member" as const,
+      })),
+    );
     await database.db
       .insert(chatSpaces)
       .values({ id: id(102), kind: "team", teamId: id(101) });
@@ -115,26 +114,22 @@ describe("people query privacy and budgets", () => {
       statusChangedAt: changed,
     });
   async function direct(other: number, active = true, withMessage = false) {
-    await database.db
-      .insert(chatRooms)
-      .values({
-        id: id(200 + other),
-        kind: "dm",
-        dmLowUserId: id(1),
-        dmHighUserId: id(other),
-        lastMessageAt: withMessage ? now : null,
-      });
-    await database.db
-      .insert(chatRoomMembers)
-      .values(
-        [1, other].map((n) => ({
-          roomId: id(200 + other),
-          userId: id(n),
-          status: active ? ("active" as const) : ("left" as const),
-          joinedAt: now,
-          statusChangedAt: now,
-        })),
-      );
+    await database.db.insert(chatRooms).values({
+      id: id(200 + other),
+      kind: "dm",
+      dmLowUserId: id(1),
+      dmHighUserId: id(other),
+      lastMessageAt: withMessage ? now : null,
+    });
+    await database.db.insert(chatRoomMembers).values(
+      [1, other].map((n) => ({
+        roomId: id(200 + other),
+        userId: id(n),
+        status: active ? ("active" as const) : ("left" as const),
+        joinedAt: now,
+        statusChangedAt: now,
+      })),
+    );
   }
   it.each([
     "JIHOON.PARK",
@@ -180,26 +175,22 @@ describe("people query privacy and budgets", () => {
     ).toEqual([id(5)]);
   });
   it("orders exact before partial matches and caps at eight without duplicate teams", async () => {
-    await database.db
-      .insert(users)
-      .values(
-        Array.from({ length: 12 }, (_, n) => ({
-          id: id(10 + n),
-          name: `가상 검색 ${n}`,
-          email: `find${n}@example.test`,
-          emailVerified: true,
-          username: `test.find${n}`,
-        })),
-      );
-    await database.db
-      .insert(teamMembers)
-      .values(
-        Array.from({ length: 12 }, (_, n) => ({
-          teamId: id(101),
-          userId: id(10 + n),
-          role: "member" as const,
-        })),
-      );
+    await database.db.insert(users).values(
+      Array.from({ length: 12 }, (_, n) => ({
+        id: id(10 + n),
+        name: `가상 검색 ${n}`,
+        email: `find${n}@example.test`,
+        emailVerified: true,
+        username: `test.find${n}`,
+      })),
+    );
+    await database.db.insert(teamMembers).values(
+      Array.from({ length: 12 }, (_, n) => ({
+        teamId: id(101),
+        userId: id(10 + n),
+        role: "member" as const,
+      })),
+    );
     expect(await queries().searchPeople("검색")).toHaveLength(8);
     const rows = await queries().searchPeople("test.find1");
     expect(rows[0]?.userId).toBe(id(11));
@@ -283,6 +274,17 @@ describe("people query privacy and budgets", () => {
     expect((await queries().getPersonProfile(id(4))).canDirectMessage).toBe(
       false,
     );
+  });
+  it("does not expose a deleted shared space while preserving same-team profile and DM access", async () => {
+    await database.db.update(chatSpaces).set({ deletedAt: now });
+    expect(await canReadSpace(session.userId, id(102), database.db)).toBeNull();
+    const profile = await queries().getPersonProfile(id(2));
+    expect(profile).toMatchObject({
+      userId: id(2),
+      canDirectMessage: true,
+      sharedSpaces: [],
+    });
+    expect(JSON.stringify(profile)).not.toContain(id(102));
   });
   it("returns identical NOT_FOUND for unknown IDs and invalid UUIDs", async () => {
     for (const target of [id(90), "not-a-uuid", null])
@@ -368,14 +370,12 @@ describe("people query privacy and budgets", () => {
     try {
       const before = await measure();
       for (let n = 10; n < 30; n++) {
-        await database.db
-          .insert(users)
-          .values({
-            id: id(n),
-            name: `가상${n}`,
-            email: `extra${n}@example.test`,
-            emailVerified: true,
-          });
+        await database.db.insert(users).values({
+          id: id(n),
+          name: `가상${n}`,
+          email: `extra${n}@example.test`,
+          emailVerified: true,
+        });
         await friend(n, "accepted");
         await direct(n, true, true);
       }

@@ -1,5 +1,24 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 친구 화면은 로그인으로, 사람 찾기는 401로 안내해요", async ({
+  page,
+  request,
+}) => {
+  const response = await request.get("/api/people/search?q=a", {
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(401);
+  expect(response.headers()["cache-control"]).toBe("private, no-store");
+  expect(await response.json()).toEqual({ code: "UNAUTHENTICATED" });
+  await page.goto("/friends");
+  await expect(
+    page.getByRole("heading", { name: "Floor에 로그인", exact: true }),
+  ).toBeVisible();
+  const url = new URL(page.url());
+  expect(url.pathname).toBe("/login");
+  expect(url.searchParams.get("next")).toBe("/friends");
+});
+
 test("비로그인 채팅의 이전 메시지와 목록 API는 401로 답해요", async ({
   request,
 }) => {

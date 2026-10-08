@@ -145,16 +145,14 @@ describe("transactional friend request state machine", () => {
       (_, i) => `73000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     );
     if (!ids.length) return;
-    await database.db
-      .insert(users)
-      .values(
-        ids.map((id, index) => ({
-          id,
-          name: `친구${index}`,
-          email: `friend${index}@example.test`,
-          emailVerified: true,
-        })),
-      );
+    await database.db.insert(users).values(
+      ids.map((id, index) => ({
+        id,
+        name: `친구${index}`,
+        email: `friend${index}@example.test`,
+        emailVerified: true,
+      })),
+    );
     await database.db.insert(friendships).values(
       ids.map((id, index) => ({
         userLowId: me,
@@ -196,7 +194,7 @@ describe("transactional friend request state machine", () => {
     expect(
       queries.find(({ text }) => text.startsWith('insert into "friendships"'))
         ?.text,
-    ).toMatch(/least\(.*greatest\(.*on conflict do nothing/s);
+    ).toMatch(/least\([\s\S]*greatest\([\s\S]*on conflict do nothing/);
   });
 
   it.each(["accepted", "pending", "declined"] as const)(
@@ -319,14 +317,12 @@ describe("transactional friend request state machine", () => {
     expect(await actions().sendFriendRequest({ userId: other })).toMatchObject({
       ok: true,
     });
-    await database.db
-      .insert(users)
-      .values({
-        id: absent,
-        name: "새 친구",
-        email: "last@example.test",
-        emailVerified: true,
-      });
+    await database.db.insert(users).values({
+      id: absent,
+      name: "새 친구",
+      email: "last@example.test",
+      emailVerified: true,
+    });
     delivered.length = 0;
     const previousNotifications = await readNotifications();
     expect(await actions().sendFriendRequest({ userId: absent })).toEqual({
@@ -442,25 +438,21 @@ describe("transactional friend request state machine", () => {
       .insert(chatRooms)
       .values({ kind: "dm", dmLowUserId: other, dmHighUserId: me })
       .returning();
-    await database.db
-      .insert(chatRoomMembers)
-      .values(
-        [me, other].map((userId) => ({
-          roomId: room!.id,
-          userId,
-          status: "active" as const,
-          joinedAt: now,
-          statusChangedAt: now,
-        })),
-      );
-    await database.db
-      .insert(messages)
-      .values({
+    await database.db.insert(chatRoomMembers).values(
+      [me, other].map((userId) => ({
         roomId: room!.id,
-        seq: 1,
-        authorId: me,
-        body: "남아 있는 대화",
-      });
+        userId,
+        status: "active" as const,
+        joinedAt: now,
+        statusChangedAt: now,
+      })),
+    );
+    await database.db.insert(messages).values({
+      roomId: room!.id,
+      seq: 1,
+      authorId: me,
+      body: "남아 있는 대화",
+    });
     expect(await actions().removeFriend({ userId: other })).toEqual({
       ok: true,
       data: { relation: "none" },
@@ -606,7 +598,9 @@ describe("transactional friend request state machine", () => {
     const update = queries.findLast(({ text }) =>
       text.startsWith('update "friendships"'),
     )?.text;
-    expect(update).toMatch(/where.*"status".*"requested_by".*returning/s);
+    expect(update).toMatch(
+      /where[\s\S]*"status"[\s\S]*"requested_by"[\s\S]*returning/,
+    );
     expect(delivered).toEqual([]);
   });
   it("rolls relationship and notification removal back if acceptance notification fails", async () => {

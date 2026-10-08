@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const actionModules = [
   "features/chat/actions",
+  "features/people/actions",
   "features/notifications/actions",
   "features/bookings/actions",
   "features/bookings/create-booking-actions",
