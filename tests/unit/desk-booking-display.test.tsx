@@ -19,6 +19,9 @@ vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
 const now = "2026-10-07T01:10:00.000Z";
 function booking(): MyCalendarBooking {
   return {
+    relation: "owner",
+    invitedByName: null,
+    participantNames: [],
     id: "reservation",
     start: "2026-10-08T00:00:00.000Z",
     end: "2026-10-08T13:00:00.000Z",

@@ -3,6 +3,9 @@ import { MyBookingCalendarDay } from "@/features/bookings/components/my-bookings
 import type { MyCalendarBooking } from "@/features/bookings/types";
 
 const booking: MyCalendarBooking = {
+  relation: "owner",
+  invitedByName: null,
+  participantNames: [],
   id: "booking",
   start: "2026-10-08T05:00:00Z",
   end: "2026-10-08T06:00:00Z",

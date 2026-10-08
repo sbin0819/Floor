@@ -138,6 +138,9 @@ const floorDto = (floor: FloorSummary): FloorSummary => ({
 const myBookingDto = (
   row: Awaited<ReturnType<typeof listMyBookings>>["upcoming"][number],
 ): MyBooking => ({
+  relation: row.isOwner ? "owner" : "invited",
+  invitedByName: row.isOwner ? null : row.userName,
+  participantNames: row.participantNames,
   desk:
     row.space.type === "desk"
       ? {
@@ -170,7 +173,7 @@ const myBookingDto = (
   spaceId: (row.area ?? row.space).id,
   spaceName: (row.area ?? row.space).name,
   spaceType: (row.area ?? row.space).type,
-  photo: row.photo,
+  photo: row.isOwner ? row.photo : null,
 });
 const order: SpaceType[] = [
   "meeting_room",
@@ -266,8 +269,8 @@ export function createBookingQueries(
         rows
           .map((row) => ({
             ...myBookingDto(row),
-            // 소유자·확정 상태를 SQL에서 확인했고 본인 취소는 역할 설정과 무관하다.
-            canCancel: row.booking.during.end > current,
+            // 초대받은 예약은 참석 취소만 가능하고 본인 취소는 역할 설정과 무관하다.
+            canCancel: row.isOwner && row.booking.during.end > current,
           }))
           .filter((booking) => booking.date.slice(0, 7) === selection.month),
       ),
@@ -383,7 +386,7 @@ export function createBookingQueries(
           await listMyUpcomingBookings(session.userId, current, db)
         ).map((row) => ({
           ...myBookingDto(row),
-          canCancel: row.booking.during.end > current,
+          canCancel: row.isOwner && row.booking.during.end > current,
         })),
       };
     },

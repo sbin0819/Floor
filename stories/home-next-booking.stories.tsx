@@ -4,6 +4,9 @@ import { HomeNextBooking } from "@/features/bookings/components/home-next-bookin
 import type { MyCalendarBooking } from "@/features/bookings/types";
 
 const booking: MyCalendarBooking = {
+  relation: "owner",
+  invitedByName: null,
+  participantNames: [],
   id: "booking",
   start: "2026-10-07T06:00:00Z",
   end: "2026-10-07T07:00:00Z",

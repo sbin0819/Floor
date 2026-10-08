@@ -48,6 +48,9 @@ const photo = {
 };
 function bookingFixture(): MyBooking {
   return {
+    relation: "owner",
+    invitedByName: null,
+    participantNames: [],
     desk: null,
     id: "booking",
     start: "2026-10-07T02:00:00Z",

@@ -64,6 +64,9 @@ vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const now = "2026-10-08T01:00:00Z";
 const booking: MyCalendarBooking = {
+  relation: "owner",
+  invitedByName: null,
+  participantNames: [],
   id: "booking",
   start: "2026-10-08T02:00:00Z",
   end: "2026-10-08T03:00:00Z",

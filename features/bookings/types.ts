@@ -144,6 +144,9 @@ export type SpaceDayData = {
   hasTeams: boolean;
 };
 export type MyBooking = {
+  relation: "owner" | "invited";
+  invitedByName: string | null;
+  participantNames: string[];
   desk: { id: string; name: string; part: DeskPart | null } | null;
   id: string;
   start: string;

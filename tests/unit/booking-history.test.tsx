@@ -80,6 +80,9 @@ it.each(["upcoming", "past"] as const)(
 
 it("shows upcoming links, plain past entries and a confirmation before cancellation", async () => {
   const booking = {
+    relation: "owner" as const,
+    invitedByName: null,
+    participantNames: [],
     id: "booking",
     start: "2026-10-07T02:00:00Z",
     end: "2026-10-07T03:00:00Z",

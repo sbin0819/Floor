@@ -28,6 +28,10 @@ import {
   users,
 } from "@/lib/db/schema";
 import { addDays, localDate, zonedDateTime } from "@/lib/time/zoned";
+import {
+  bookingParticipantNames,
+  ownedOrInvitedBooking,
+} from "@/lib/dal/booking-attendance";
 
 export type ScheduleRange = { spaceIds: string[]; during: TimeRange };
 export type BookingActor = { userId: string } | { teamId: string };
@@ -208,7 +212,7 @@ export async function cancelBookingRecord(
   return booking ?? null;
 }
 
-function locatedBookings(database: DalDatabase) {
+function locatedBookings(database: DalDatabase, userId: string) {
   const area = alias(spaces, "booking_desk_area");
   return database
     .select({
@@ -220,6 +224,8 @@ function locatedBookings(database: DalDatabase) {
       userName: users.name,
       teamName: teams.name,
       photo: { path: spacePhotos.path, alt: spacePhotos.alt },
+      isOwner: sql<boolean>`${bookings.userId} = ${userId}`,
+      participantNames: bookingParticipantNames,
     })
     .from(bookings)
     .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
@@ -240,6 +246,7 @@ function locatedBookings(database: DalDatabase) {
           sql`case when ${spaces.type} = 'desk' then ${area.id} else ${spaces.id} end`,
         ),
         eq(spacePhotos.sortOrder, 0),
+        eq(bookings.userId, userId),
       ),
     )
     .innerJoin(floors, eq(floors.id, spaces.floorId))
@@ -253,10 +260,10 @@ export async function listMyUpcomingBookings(
   now: Date,
   database: DalDatabase = getDb(),
 ) {
-  return locatedBookings(database)
+  return locatedBookings(database, userId)
     .where(
       and(
-        eq(bookings.userId, userId),
+        ownedOrInvitedBooking(userId),
         eq(bookings.status, "confirmed"),
         sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
       ),
@@ -299,10 +306,10 @@ export async function listMyConfirmedBookingsBetween(
   { userId, start, end }: { userId: string; start: Date; end: Date },
   database: DalDatabase = getDb(),
 ) {
-  return locatedBookings(database)
+  return locatedBookings(database, userId)
     .where(
       and(
-        eq(bookings.userId, userId),
+        ownedOrInvitedBooking(userId),
         eq(bookings.status, "confirmed"),
         sql`lower(${bookings.during}) >= ${start.toISOString()}::timestamptz`,
         sql`lower(${bookings.during}) < ${end.toISOString()}::timestamptz`,
@@ -348,12 +355,12 @@ export async function listMyBookings(
       .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
       .innerJoin(floors, eq(floors.id, spaces.floorId))
       .innerJoin(branches, eq(branches.id, floors.branchId))
-      .where(eq(bookings.userId, userId))
+      .where(ownedOrInvitedBooking(userId))
       .groupBy(branches.id, branches.timezone),
-    locatedBookings(database)
+    locatedBookings(database, userId)
       .where(
         and(
-          eq(bookings.userId, userId),
+          ownedOrInvitedBooking(userId),
           eq(bookings.status, "confirmed"),
           sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
         ),
@@ -369,10 +376,10 @@ export async function listMyBookings(
     );
   });
   const past = recentAtBranch.length
-    ? await locatedBookings(database)
+    ? await locatedBookings(database, userId)
         .where(
           and(
-            eq(bookings.userId, userId),
+            ownedOrInvitedBooking(userId),
             or(
               eq(bookings.status, "cancelled"),
               sql`upper(${bookings.during}) <= ${now.toISOString()}::timestamptz`,

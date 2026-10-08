@@ -14,6 +14,7 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
+import { ownedOrInvitedBooking } from "@/lib/dal/booking-attendance";
 import {
   accessGrants,
   bookings,
@@ -53,7 +54,7 @@ export async function listMyWeekBookings(
     .innerJoin(branches, eq(branches.id, floors.branchId))
     .where(
       and(
-        eq(bookings.userId, userId),
+        ownedOrInvitedBooking(userId),
         eq(bookings.status, "confirmed"),
         sql`lower(${bookings.during}) >= ${start.toISOString()}::timestamptz`,
         sql`lower(${bookings.during}) < ${end.toISOString()}::timestamptz`,

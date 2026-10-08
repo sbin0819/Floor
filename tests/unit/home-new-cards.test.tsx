@@ -16,6 +16,9 @@ import { addDays } from "@/lib/time/zoned";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
 const booking: MyCalendarBooking = {
+  relation: "owner",
+  invitedByName: null,
+  participantNames: [],
   id: "booking",
   start: "2026-10-07T06:00:00Z",
   end: "2026-10-07T07:00:00Z",
