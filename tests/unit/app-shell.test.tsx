@@ -134,7 +134,11 @@ describe("member app shell frame", () => {
     expect(floor).toHaveAttribute("aria-current", "true");
     expect(floor).toHaveClass("size-11", "bg-primary");
     expect(floor.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
-    expect(rail.querySelector(".w-1")).toHaveClass("left-0", "bg-primary");
+    expect(rail.querySelector(".w-1")).toHaveClass(
+      "left-0",
+      "bg-foreground",
+      "h-7",
+    );
     expect(shell.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
     expect(
       within(

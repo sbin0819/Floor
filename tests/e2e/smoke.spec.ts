@@ -1,5 +1,19 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 채팅의 이전 메시지와 목록 API는 401로 답해요", async ({
+  request,
+}) => {
+  for (const path of [
+    "/api/rooms/11111111-1111-4111-8111-111111111111/messages?after=0",
+    "/api/chat/nav",
+  ]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(401);
+    expect(response.headers()["cache-control"]).toBe("private, no-store");
+    expect(await response.json()).toEqual({ code: "UNAUTHENTICATED" });
+  }
+});
+
 test("비로그인 메시지 화면은 로그인으로, 실시간 토큰은 401로 안내해요", async ({
   page,
   request,

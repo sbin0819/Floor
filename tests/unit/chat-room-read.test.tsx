@@ -165,4 +165,30 @@ describe("room read cursor", () => {
     await act(() => vi.advanceTimersByTimeAsync(1_000));
     expect(mark).toHaveBeenLastCalledWith({ roomId: "room", seq: 7 });
   });
+  it("retries a failed cursor only after leaving and returning to the viewport or visible tab", async () => {
+    const mark = vi
+      .fn<MarkRoomRead>()
+      .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
+      .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
+      .mockResolvedValue({ ok: true, data: { lastReadSeq: 5 } });
+    const result = setup(initial, mark);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(mark).toHaveBeenCalledOnce();
+    result.rerender({ ...initial, visibleSeq: null });
+    result.rerender(initial);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(mark).toHaveBeenCalledTimes(2);
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(mark).toHaveBeenCalledTimes(2);
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(mark).toHaveBeenCalledTimes(3);
+    result.rerender({ ...initial, visibleSeq: null });
+    result.rerender(initial);
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(mark).toHaveBeenCalledTimes(3);
+  });
 });

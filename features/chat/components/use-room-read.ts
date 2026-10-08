@@ -60,11 +60,14 @@ export function useRoomRead({
     cursor.active = true;
     return () => {
       cursor.active = false;
+      cursor.attempted = cursor.known;
     };
   }, [roomId]);
   useEffect(() => {
     const cursor = cursorRef.current;
     cursor.known = Math.max(cursor.known, knownReadSeq ?? 0);
+    // 실패 직후에는 반복하지 않고, 사용자가 다시 보러 왔을 때만 재시도한다.
+    if (!visible || visibleSeq === null) cursor.attempted = cursor.known;
     if (
       !visible ||
       blocked ||
