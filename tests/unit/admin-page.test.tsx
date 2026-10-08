@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { cloneElement } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { redirect } from "next/navigation";
 import AdminHome from "@/app/admin/page";
@@ -57,7 +58,8 @@ it("checks operator access before rendering assigned branches", async () => {
       { id: "branch-2", name: "가상 2호점" },
     ],
   });
-  render(await resolvePageContent(AdminHome()));
+  const page = AdminHome();
+  render(cloneElement(page, {}, await resolvePageContent(page.props.children)));
   expect(requireOperatorPage).toHaveBeenCalledOnce();
   expect(
     vi.mocked(requireOperatorPage).mock.invocationCallOrder[0],
@@ -79,7 +81,7 @@ it("redirects to the sole assigned branch", async () => {
     session,
     branches: [{ id: "branch", name: "가상점" }],
   });
-  await expect(resolvePageContent(AdminHome())).rejects.toThrow(
+  await expect(resolvePageContent(AdminHome().props.children)).rejects.toThrow(
     "REDIRECT:/admin/branches/branch",
   );
   expect(redirect).toHaveBeenCalledWith("/admin/branches/branch");
@@ -88,7 +90,7 @@ it("redirects to the sole assigned branch", async () => {
 
 it("does not read operator data when the page guard redirects", async () => {
   vi.mocked(requireOperatorPage).mockRejectedValue(new Error("LOGIN_REDIRECT"));
-  await expect(resolvePageContent(AdminHome())).rejects.toThrow(
+  await expect(resolvePageContent(AdminHome().props.children)).rejects.toThrow(
     "LOGIN_REDIRECT",
   );
   expect(getOperatorHome).not.toHaveBeenCalled();

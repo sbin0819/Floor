@@ -172,4 +172,46 @@ describe("operator home", () => {
       "sm:grid-cols-2",
     );
   });
+
+  it("renders only non-sensitive fixed branch headings, weekdays and columns before data", () => {
+    render(<AdminBranchSkeleton />);
+    for (const title of ["지점 정보", "운영 시간", "층"])
+      expect(screen.getByRole("heading", { name: title })).toBeVisible();
+    expect(
+      within(screen.getByRole("table", { name: "요일별 운영 시간" }))
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["요일", "쉬는 날", "시작", "끝"]);
+    expect(
+      within(screen.getByRole("table", { name: "요일별 운영 시간" }))
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual([
+      "월요일",
+      "화요일",
+      "수요일",
+      "목요일",
+      "금요일",
+      "토요일",
+      "일요일",
+    ]);
+    expect(
+      within(screen.getByRole("table", { name: "층 목록" }))
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["층 번호", "이름", "이용 대상", "공간 수"]);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText("가상점")).not.toBeInTheDocument();
+  });
+
+  it("renders fixed floor and space columns without names, counts or actions", () => {
+    render(<AdminFloorSkeleton />);
+    for (const title of ["층 정보", "층 이용 대상", "공간"])
+      expect(screen.getByRole("heading", { name: title })).toBeVisible();
+    expect(
+      screen.getAllByRole("columnheader").map((cell) => cell.textContent),
+    ).toEqual(["이름", "정원", "예약 가능", "편의 시설", "이용 대상", "동작"]);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText("7층")).not.toBeInTheDocument();
+  });
 });

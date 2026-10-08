@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,7 @@ import { InviteResponse } from "./invite-response";
 import { CancelJoinRequest } from "./request-controls";
 import { roleLabel, TeamDate, teamLinkClassName } from "./team-display";
 
-export function TeamsHub({ data }: { data: TeamsData }) {
+export function TeamsShell({ children }: { children: ReactNode }) {
   return (
     <PageContainer as="main" className="space-y-8">
       <PageHeading
@@ -23,6 +24,22 @@ export function TeamsHub({ data }: { data: TeamsData }) {
           </Button>
         }
       />
+      {children}
+    </PageContainer>
+  );
+}
+
+export function TeamsHub({ data }: { data: TeamsData }) {
+  return (
+    <TeamsShell>
+      <TeamsHubContent data={data} />
+    </TeamsShell>
+  );
+}
+
+export function TeamsHubContent({ data }: { data: TeamsData }) {
+  return (
+    <>
       {data.invites.length > 0 && (
         <section aria-label="받은 초대" className="space-y-4">
           <h2 className="font-semibold">
@@ -152,6 +169,6 @@ export function TeamsHub({ data }: { data: TeamsData }) {
           </ul>
         </section>
       )}
-    </PageContainer>
+    </>
   );
 }

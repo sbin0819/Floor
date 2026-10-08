@@ -1,6 +1,16 @@
 import { SkeletonRegion } from "@/components/skeleton-region";
 import { SkeletonHeading, SkeletonRows } from "@/components/skeleton-shapes";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { teamLinkClassName } from "./team-display";
 
 export function HomeSkeleton() {
   return (
@@ -40,25 +50,32 @@ export function TeamStartSkeleton() {
 export function TeamDetailSkeleton() {
   return (
     <SkeletonRegion width="standard" className="space-y-6">
+      <Link href="/teams" className={teamLinkClassName}>
+        ‹ 팀
+      </Link>
       <SkeletonHeading />
       <div className="space-y-4 rounded-xl border bg-card p-5">
-        <Skeleton className="h-6 w-28" />
-        <div className="grid grid-cols-4 gap-4 border-b pb-4">
-          {[0, 1, 2, 3].map((key) => (
-            <Skeleton key={key} className="h-4 w-16 max-w-full" />
-          ))}
-        </div>
-        {[0, 1, 2].map((row) => (
-          <div
-            key={row}
-            data-slot="skeleton-row"
-            className="grid min-h-11 grid-cols-4 items-center gap-4"
-          >
-            {[0, 1, 2, 3].map((column) => (
-              <Skeleton key={column} className="h-4 w-full" />
+        <h2 className="font-semibold">팀원 목록</h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {["이름", "이메일", "직함", "역할"].map((label) => (
+                <TableHead key={label}>{label}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {[0, 1, 2].map((row) => (
+              <TableRow key={row} data-slot="skeleton-row" className="h-11">
+                {[0, 1, 2, 3].map((column) => (
+                  <TableCell key={column}>
+                    <Skeleton className="h-4 w-full" />
+                  </TableCell>
+                ))}
+              </TableRow>
             ))}
-          </div>
-        ))}
+          </TableBody>
+        </Table>
       </div>
     </SkeletonRegion>
   );
@@ -84,6 +101,14 @@ export function TeamsSkeleton() {
   return (
     <SkeletonRegion width="standard" className="space-y-8">
       <SkeletonHeading />
+      <TeamsSkeletonRows />
+    </SkeletonRegion>
+  );
+}
+
+function TeamsSkeletonRows() {
+  return (
+    <>
       <div className="space-y-4 rounded-xl border bg-card p-5">
         <SkeletonHeading compact />
         <SkeletonRows count={2} action />
@@ -92,6 +117,14 @@ export function TeamsSkeleton() {
         <SkeletonHeading compact />
         <SkeletonRows count={2} />
       </div>
+    </>
+  );
+}
+
+export function TeamsContentSkeleton() {
+  return (
+    <SkeletonRegion className="space-y-8">
+      <TeamsSkeletonRows />
     </SkeletonRegion>
   );
 }

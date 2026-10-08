@@ -35,7 +35,7 @@ vi.mock("@/features/bookings/queries", () => ({
   getMyBookings: vi.fn(),
 }));
 vi.mock("@/features/bookings/components/branch-list", () => ({
-  BranchList: () => null,
+  BranchListContent: () => null,
 }));
 vi.mock("@/features/bookings/components/space-detail", () => ({
   SpaceDetail: () => null,
@@ -140,7 +140,7 @@ describe("booking page-local streaming", () => {
         },
       );
       const pages = {
-        branches: () => BranchesPage(),
+        branches: () => BranchesPage().props.children,
         branch: () => BranchPage({ params }),
         floor: () => FloorPage({ params, searchParams: Promise.resolve({}) }),
       };
@@ -160,7 +160,7 @@ describe("booking page-local streaming", () => {
 
 describe("booking page guards", () => {
   it("checks the branch-list session before querying", async () => {
-    await resolvePageContent(BranchesPage());
+    await resolvePageContent(BranchesPage().props.children);
     expect(requirePageSession).toHaveBeenCalledWith("/branches");
     expect(
       vi.mocked(requirePageSession).mock.invocationCallOrder[0],
@@ -361,7 +361,7 @@ describe("booking page guards", () => {
         new Error("LOGIN_REDIRECT"),
       );
       const pages = {
-        branches: () => BranchesPage(),
+        branches: () => BranchesPage().props.children,
         branch: () =>
           BranchPage({ params: Promise.resolve({ branchId: "branch" }) }),
         floor: () => floorPage(),

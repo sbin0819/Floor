@@ -2,6 +2,7 @@ import { SkeletonRegion } from "@/components/skeleton-region";
 import { SkeletonHeading, SkeletonRows } from "@/components/skeleton-shapes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FloorTimetableShape } from "./floor-loading-shapes";
+import { BranchListFrame } from "./branch-list-frame";
 
 function FloorNavigationShape() {
   return (
@@ -189,8 +190,15 @@ export function SpaceDetailSkeleton({
 
 export function BranchListSkeleton() {
   return (
-    <SkeletonRegion width="branches" className="space-y-6">
-      <SkeletonHeading />
+    <BranchListFrame>
+      <BranchListContentSkeleton />
+    </BranchListFrame>
+  );
+}
+
+export function BranchListContentSkeleton() {
+  return (
+    <SkeletonRegion className="space-y-6">
       <div className="grid gap-5 lg:grid-cols-2">
         {[0, 1].map((key) => (
           <div

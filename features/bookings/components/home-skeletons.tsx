@@ -1,6 +1,11 @@
 import { SkeletonRegion } from "@/components/skeleton-region";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonHeading, SkeletonRows } from "@/components/skeleton-shapes";
+import {
+  HomeCard,
+  HomeCardLink,
+  HomeDashboardFrame,
+  HomeHeaderFrame,
+} from "./home-frame";
 import {
   HomeNextBookingShape,
   HomeWeekBookingsShape,
@@ -10,59 +15,69 @@ import {
 
 export function HomeHeaderSkeleton() {
   return (
-    <SkeletonRegion className="flex items-center justify-between gap-4">
+    <HomeHeaderFrame>
+      <HomeGreetingSkeleton />
+    </HomeHeaderFrame>
+  );
+}
+export function HomeGreetingSkeleton() {
+  return (
+    <SkeletonRegion>
       <SkeletonHeading />
-      <Skeleton className="h-11 w-36" />
     </SkeletonRegion>
   );
 }
 export function HomeCardSkeleton({
   rows = 3,
   photo = false,
+  title = "오늘 예약 한도",
 }: {
   rows?: number;
   photo?: boolean;
+  title?: string;
 }) {
   return (
-    <SkeletonRegion className="space-y-5 rounded-xl border border-border bg-card p-5">
-      <Skeleton className="h-6 w-40" />
-      <SkeletonRows count={rows} photo={photo} />
-    </SkeletonRegion>
+    <HomeCard
+      title={title}
+      action={
+        title === "내 팀" ? (
+          <HomeCardLink href="/teams">팀 관리</HomeCardLink>
+        ) : undefined
+      }
+    >
+      <SkeletonRegion>
+        <SkeletonRows count={rows} photo={photo} />
+      </SkeletonRegion>
+    </HomeCard>
   );
 }
 export function HomeDashboardSkeleton() {
   return (
-    <SkeletonRegion width="wide" className="space-y-6">
-      <SkeletonHeading />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <HomeNextBookingShape />
-          <HomeFreeSpacesShape />
-          <HomeFrequentSpacesShape />
-        </div>
-        <div className="space-y-6">
-          <HomeWeekBookingsShape />
-          <HomeCardShape rows={1} />
-          <HomeCardShape rows={2} />
-        </div>
-      </div>
+    <SkeletonRegion>
+      <HomeDashboardFrame
+        header={<SkeletonHeading />}
+        primary={
+          <>
+            <HomeNextBookingShape />
+            <HomeFreeSpacesShape />
+            <HomeFrequentSpacesShape />
+          </>
+        }
+        secondary={
+          <>
+            <HomeWeekBookingsShape />
+            <HomeCard title="오늘 예약 한도">
+              <SkeletonRows count={1} />
+            </HomeCard>
+            <HomeCard
+              title="내 팀"
+              action={<HomeCardLink href="/teams">팀 관리</HomeCardLink>}
+            >
+              <SkeletonRows count={2} />
+            </HomeCard>
+          </>
+        }
+      />
     </SkeletonRegion>
-  );
-}
-function HomeCardShape({
-  rows,
-  photo = false,
-}: {
-  rows: number;
-  photo?: boolean;
-}) {
-  return (
-    <div
-      aria-hidden="true"
-      className="space-y-5 rounded-xl border border-border bg-card p-5"
-    >
-      <Skeleton className="h-6 w-40" />
-      <SkeletonRows count={rows} photo={photo} />
-    </div>
   );
 }

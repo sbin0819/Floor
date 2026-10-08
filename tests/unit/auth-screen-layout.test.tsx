@@ -17,6 +17,7 @@ import OperatorLoginPage from "@/app/(auth)/admin/login/page";
 import { MemberAuthFrame } from "@/features/auth/components/member-auth-frame";
 import { AuthField } from "@/features/auth/components/auth-fields";
 import { SignupForm } from "@/features/auth/components/signup-form";
+import { AuthCard } from "@/features/auth/components/auth-card";
 
 const mocks = vi.hoisted(() => ({
   mode: "development",
@@ -42,7 +43,10 @@ beforeEach(() => {
 });
 
 async function resolveContent(page: ReactElement<{ children: ReactNode }>) {
-  const boundary = page.type === MemberAuthFrame ? page.props.children : page;
+  const card = page.type === MemberAuthFrame ? page.props.children : page;
+  if (!isValidElement<{ children: ReactNode }>(card) || card.type !== AuthCard)
+    throw new Error("Expected a static auth card");
+  const boundary = card.props.children;
   if (!isValidElement<SuspenseProps>(boundary) || boundary.type !== Suspense)
     throw new Error("Request content must be inside Suspense");
   const child = boundary.props.children;
@@ -62,11 +66,14 @@ describe("member authentication screen frame", () => {
       ResetPasswordPage(props),
     ]) {
       expect(page.type).toBe(MemberAuthFrame);
+      const card = page.props.children;
+      expect(isValidElement(card) && card.type).toBe(AuthCard);
       expect(
-        isValidElement(page.props.children) && page.props.children.type,
+        isValidElement(card.props.children) && card.props.children.type,
       ).toBe(Suspense);
     }
-    expect(OperatorLoginPage().type).toBe(Suspense);
+    expect(OperatorLoginPage().type).toBe(AuthCard);
+    expect(OperatorLoginPage().props.children.type).toBe(Suspense);
     expect(mocks.connection).not.toHaveBeenCalled();
     expect(mocks.session).not.toHaveBeenCalled();
   });

@@ -159,7 +159,7 @@ describe("team hub and route protection", () => {
       ).pathname,
     ).toBe("/login");
     vi.mocked(getTeamsData).mockResolvedValue(empty);
-    const page = await resolvePageContent(TeamsPage());
+    const page = await resolvePageContent(TeamsPage().props.children);
     expect(requirePageSession).toHaveBeenCalledWith("/teams");
     expect(page.props.data).toBe(empty);
     expect(
@@ -167,7 +167,9 @@ describe("team hub and route protection", () => {
     ).toBeLessThan(vi.mocked(getTeamsData).mock.invocationCallOrder[0]!);
     vi.mocked(requirePageSession).mockRejectedValue(new Error("LOGIN"));
     vi.mocked(getTeamsData).mockClear();
-    await expect(resolvePageContent(TeamsPage())).rejects.toThrow("LOGIN");
+    await expect(
+      resolvePageContent(TeamsPage().props.children),
+    ).rejects.toThrow("LOGIN");
     expect(getTeamsData).not.toHaveBeenCalled();
   });
 });
@@ -181,11 +183,12 @@ describe("three-mode team start", () => {
     "preserves %s in the login return path and renders only the selected step",
     async (mode) => {
       vi.mocked(getTeamStartData).mockResolvedValue(start);
-      const page = await resolvePageContent(
+      const boundary = await resolvePageContent(
         TeamStartPage({
           searchParams: Promise.resolve({ mode, q: "가상 팀" }),
         }),
       );
+      const page = await resolvePageContent(boundary);
       expect(requirePageSession).toHaveBeenCalledWith(
         `/teams/start?${new URLSearchParams({ mode, q: "가상 팀" })}`,
       );
@@ -290,6 +293,43 @@ describe("three-mode team start", () => {
     });
     expect(states).toEqual([false]);
     expect(navigate).not.toHaveBeenCalled();
+  });
+  it("does not treat unqueried invites as an empty result when returning from create to choose", async () => {
+    const response = deferred();
+    const navigate = vi.fn(() => response.promise);
+    const view = renderUi(
+      <TeamStart data={start} mode="create" navigateAction={navigate} />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("link", { name: "‹ 다시 고르기" }));
+    });
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "팀 회원으로 전환",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("불러오고 있어요");
+    expect(screen.getByRole("link", { name: "새 팀 만들기" })).toBeVisible();
+    expect(
+      screen.queryByText(
+        "가상 팀에서 초대가 와 있어요. 수락하면 바로 팀원이 돼요",
+      ),
+    ).not.toBeInTheDocument();
+    view.rerender(
+      <TeamStart
+        data={{ ...start, invites: [{ teamName: "가상 팀" }] }}
+        mode="choose"
+        navigateAction={navigate}
+      />,
+    );
+    await act(async () => {
+      response.resolve();
+      await response.promise;
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "가상 팀에서 초대가 와 있어요. 수락하면 바로 팀원이 돼요",
+      ),
+    ).toBeVisible();
   });
   it("shows all four search states and expands only the eligible request row", async () => {
     const names = ["가입 가능", "이미 소속", "초대 있음", "요청 있음"];

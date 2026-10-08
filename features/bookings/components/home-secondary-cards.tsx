@@ -10,6 +10,7 @@ import type {
 } from "@/features/bookings/types";
 import { getOpenHours } from "@/lib/time/open-hours";
 import { localTime, weekday } from "@/lib/time/zoned";
+import { HomeCard, HomeCardLink } from "./home-frame";
 
 const dayLabels = {
   sun: "일",
@@ -23,77 +24,70 @@ const dayLabels = {
 
 export function HomeWeekBookings({ data }: { data: HomeWeekBookingsData }) {
   return (
-    <section aria-label="이번 주 내 예약">
-      <Card>
-        <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold">이번 주 내 예약</h2>
-          <Link
-            href="/bookings?view=calendar"
-            className="inline-flex min-h-11 items-center rounded-lg text-xs text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+    <HomeCard
+      title="이번 주 내 예약"
+      action={
+        <HomeCardLink href="/bookings?view=calendar">
+          달력으로 보기
+        </HomeCardLink>
+      }
+    >
+      <ul className="space-y-1">
+        {data.days.map(({ date, bookings }) => (
+          <li
+            key={date}
+            className={`flex min-h-11 items-start gap-3 rounded-lg px-2 py-2 ${date === data.today ? "bg-accent" : ""}`}
           >
-            달력으로 보기
-          </Link>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-1">
-            {data.days.map(({ date, bookings }) => (
-              <li
-                key={date}
-                className={`flex min-h-11 items-start gap-3 rounded-lg px-2 py-2 ${date === data.today ? "bg-accent" : ""}`}
+            <time
+              dateTime={date}
+              className="w-16 shrink-0 pt-1 text-xs tabular-nums"
+            >
+              <span className="sr-only">{date.slice(0, 4)}년 </span>
+              {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}{" "}
+              <span
+                className={
+                  date === data.today
+                    ? "font-semibold text-primary"
+                    : "text-muted-foreground"
+                }
               >
-                <time
-                  dateTime={date}
-                  className="w-16 shrink-0 pt-1 text-xs tabular-nums"
-                >
-                  <span className="sr-only">{date.slice(0, 4)}년 </span>
-                  {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}{" "}
-                  <span
-                    className={
-                      date === data.today
-                        ? "font-semibold text-primary"
-                        : "text-muted-foreground"
-                    }
+                {date === data.today ? "오늘" : dayLabels[weekday(date)]}
+              </span>
+            </time>
+            <div className="min-w-0 flex-1 space-y-1">
+              {bookings.length ? (
+                bookings.map((booking) => (
+                  <Link
+                    key={booking.id}
+                    href={floorHref(
+                      booking.branchId,
+                      booking.floorId,
+                      booking.date,
+                      booking.spaceId,
+                    )}
+                    className="flex min-h-11 items-center rounded-md focus-visible:outline-2 focus-visible:outline-ring"
                   >
-                    {date === data.today ? "오늘" : dayLabels[weekday(date)]}
-                  </span>
-                </time>
-                <div className="min-w-0 flex-1 space-y-1">
-                  {bookings.length ? (
-                    bookings.map((booking) => (
-                      <Link
-                        key={booking.id}
-                        href={floorHref(
-                          booking.branchId,
-                          booking.floorId,
-                          booking.date,
-                          booking.spaceId,
-                        )}
-                        className="flex min-h-11 items-center rounded-md focus-visible:outline-2 focus-visible:outline-ring"
-                      >
-                        <BookingChip
-                          kind={bookingChipKind(booking, data.now)}
-                          className="w-full"
-                        >
-                          {localTime(new Date(booking.start), booking.timezone)}{" "}
-                          {booking.spaceName}
-                        </BookingChip>
-                      </Link>
-                    ))
-                  ) : (
-                    <p className="py-1 text-xs text-muted-foreground">
-                      {data.openHours &&
-                      getOpenHours(data.openHours, date) === null
-                        ? "쉬는 날"
-                        : "예약 없음"}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    </section>
+                    <BookingChip
+                      kind={bookingChipKind(booking, data.now)}
+                      className="w-full"
+                    >
+                      {localTime(new Date(booking.start), booking.timezone)}{" "}
+                      {booking.spaceName}
+                    </BookingChip>
+                  </Link>
+                ))
+              ) : (
+                <p className="py-1 text-xs text-muted-foreground">
+                  {data.openHours && getOpenHours(data.openHours, date) === null
+                    ? "쉬는 날"
+                    : "예약 없음"}
+                </p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </HomeCard>
   );
 }
 

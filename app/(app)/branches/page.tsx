@@ -1,17 +1,20 @@
 import { Suspense } from "react";
 import { requirePageSession } from "@/lib/auth/session";
 import { getBranchList } from "@/features/bookings/queries";
-import { BranchList } from "@/features/bookings/components/branch-list";
-import { BranchListSkeleton } from "@/features/bookings/components/booking-skeletons";
+import { BranchListContent } from "@/features/bookings/components/branch-list";
+import { BranchListFrame } from "@/features/bookings/components/branch-list-frame";
+import { BranchListContentSkeleton } from "@/features/bookings/components/booking-skeletons";
 
 async function BranchesContent() {
   await requirePageSession("/branches");
-  return <BranchList branches={await getBranchList()} />;
+  return <BranchListContent branches={await getBranchList()} />;
 }
 export default function BranchesPage() {
   return (
-    <Suspense fallback={<BranchListSkeleton />}>
-      <BranchesContent />
-    </Suspense>
+    <BranchListFrame>
+      <Suspense fallback={<BranchListContentSkeleton />}>
+        <BranchesContent />
+      </Suspense>
+    </BranchListFrame>
   );
 }

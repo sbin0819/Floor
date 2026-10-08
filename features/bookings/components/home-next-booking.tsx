@@ -38,7 +38,7 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
       aria-label="다음 예약"
       className="overflow-hidden rounded-xl border border-border bg-card shadow-card"
     >
-      <h2 className="sr-only">다음 예약</h2>
+      <h2 className="px-5 pt-5 font-semibold">다음 예약</h2>
       <div className="flex flex-col gap-5 p-5 md:flex-row md:items-center">
         <SpacePhoto
           photo={booking.photo}

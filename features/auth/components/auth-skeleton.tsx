@@ -10,6 +10,18 @@ export function AuthSkeleton({
 }: {
   variant?: AuthSkeletonVariant;
 }) {
+  return (
+    <SkeletonRegion className="mx-auto w-full max-w-[400px] space-y-6 rounded-xl border bg-card p-5">
+      <div className="space-y-3">
+        <Skeleton className="h-11 w-12" />
+        <SkeletonHeading />
+      </div>
+      <AuthSkeletonFields variant={variant} />
+    </SkeletonRegion>
+  );
+}
+
+function AuthSkeletonFields({ variant }: { variant: AuthSkeletonVariant }) {
   const social = variant === "login" || variant === "signup";
   const fields =
     variant === "signup"
@@ -18,11 +30,7 @@ export function AuthSkeleton({
         ? 1
         : 2;
   return (
-    <SkeletonRegion className="mx-auto w-full max-w-[400px] space-y-6 rounded-xl border bg-card p-5">
-      <div className="space-y-3">
-        <Skeleton className="h-11 w-12" />
-        <SkeletonHeading />
-      </div>
+    <>
       {social && (
         <div className="space-y-3">
           <Skeleton className="h-11 w-full" />
@@ -33,6 +41,18 @@ export function AuthSkeleton({
       <SkeletonFields count={fields} />
       <Skeleton className="h-11 w-full" />
       <Skeleton className="mx-auto h-5 w-40" />
+    </>
+  );
+}
+
+export function AuthFormSkeleton({
+  variant = "login",
+}: {
+  variant?: AuthSkeletonVariant;
+}) {
+  return (
+    <SkeletonRegion className="space-y-6">
+      <AuthSkeletonFields variant={variant} />
     </SkeletonRegion>
   );
 }

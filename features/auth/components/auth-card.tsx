@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { AuthSkeleton, type AuthSkeletonVariant } from "./auth-skeleton";
 
+export { AuthFormSkeleton } from "./auth-skeleton";
+
 export type AuthPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };

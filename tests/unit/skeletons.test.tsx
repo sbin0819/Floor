@@ -51,11 +51,15 @@ const screens = [
 describe("accessible skeleton regions", () => {
   it.each(screens)(
     "%s has one busy region and one screen-reader announcement",
-    (_, Component) => {
+    (name, Component) => {
       const { container } = render(<Component />);
       const regions = container.querySelectorAll('[aria-busy="true"]');
       expect(regions).toHaveLength(1);
-      expect(container.firstElementChild).toBe(regions[0]);
+      if (name === "branches") {
+        const heading = screen.getByRole("heading", { name: "지점" });
+        expect(heading).toBeVisible();
+        expect(regions[0]).not.toContainElement(heading);
+      } else expect(container.firstElementChild).toBe(regions[0]);
       const status = screen.getAllByRole("status");
       expect(status).toHaveLength(1);
       expect(status[0]).toHaveClass("sr-only");
@@ -69,7 +73,13 @@ describe("accessible skeleton regions", () => {
       }
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+      if (name === "team detail") {
+        expect(screen.getByRole("link", { name: "‹ 팀" })).toHaveAttribute(
+          "href",
+          "/teams",
+        );
+        expect(screen.getAllByRole("link")).toHaveLength(1);
+      } else expect(screen.queryByRole("link")).not.toBeInTheDocument();
     },
   );
 

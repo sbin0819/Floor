@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import {
   AuthCard,
-  AuthLoading,
+  AuthFormSkeleton,
   type AuthPageProps,
 } from "@/features/auth/components/auth-card";
 import { VerifyEmailForm } from "@/features/auth/components/verify-email-form";
@@ -14,22 +14,22 @@ async function VerifyEmailContent({ searchParams }: AuthPageProps) {
   await connection();
   const { email } = await searchParams;
   return (
-    <AuthCard title="메일을 확인해 주세요">
-      <VerifyEmailForm
-        {...getAuthUiOptions()}
-        development={getEnv().NODE_ENV !== "production"}
-        email={typeof email === "string" ? email : undefined}
-      />
-    </AuthCard>
+    <VerifyEmailForm
+      {...getAuthUiOptions()}
+      development={getEnv().NODE_ENV !== "production"}
+      email={typeof email === "string" ? email : undefined}
+    />
   );
 }
 
 export default function VerifyEmailPage(props: AuthPageProps) {
   return (
     <MemberAuthFrame>
-      <Suspense fallback={<AuthLoading variant="email" />}>
-        <VerifyEmailContent {...props} />
-      </Suspense>
+      <AuthCard title="메일을 확인해 주세요">
+        <Suspense fallback={<AuthFormSkeleton variant="email" />}>
+          <VerifyEmailContent {...props} />
+        </Suspense>
+      </AuthCard>
     </MemberAuthFrame>
   );
 }

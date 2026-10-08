@@ -52,7 +52,7 @@ const operatingState = getOperatingState(
 );
 
 async function resolveRegions(node: ReactNode): Promise<ReactNode> {
-  if (!isValidElement<{ children?: ReactNode }>(node)) return node;
+  if (!isValidElement<Record<string, ReactNode>>(node)) return node;
   if (
     typeof node.type === "function" &&
     node.type.constructor.name === "AsyncFunction"
@@ -60,13 +60,17 @@ async function resolveRegions(node: ReactNode): Promise<ReactNode> {
     const component = node.type as (props: object) => Promise<ReactNode>;
     return resolveRegions(await component(node.props));
   }
-  const children = await Promise.all(
-    Children.toArray(node.props.children).map(resolveRegions),
-  );
-  return cloneElement(node, {}, ...children);
+  const slots: Record<string, ReactNode> = {};
+  for (const key of ["children", "header", "primary", "secondary"]) {
+    if (!(key in node.props)) continue;
+    slots[key] = await Promise.all(
+      Children.toArray(node.props[key]).map(resolveRegions),
+    );
+  }
+  return cloneElement(node, slots);
 }
 async function displayHome() {
-  return render(await resolveRegions(await resolvePageContent(Home())));
+  return render(await resolveRegions(Home()));
 }
 
 beforeEach(() => {
@@ -115,6 +119,38 @@ beforeEach(() => {
     email: "member@example.test",
     isOperator: false,
   });
+});
+
+it("shows fixed titles and links before session data and preserves the booking link on arrival", async () => {
+  const page = Home();
+  const pending = cloneElement(page, {
+    header: page.props.header.props.fallback,
+    primary: page.props.primary.props.fallback,
+    secondary: page.props.secondary.props.fallback,
+  });
+  const view = render(pending);
+  for (const name of [
+    "다음 예약",
+    "지금 비어 있는 공간",
+    "자주 쓰는 공간",
+    "이번 주 내 예약",
+    "오늘 예약 한도",
+    "내 팀",
+  ])
+    expect(screen.getByRole("heading", { name })).toBeVisible();
+  const bookingLink = screen.getByRole("link", { name: "공간 예약하기" });
+  bookingLink.focus();
+  expect(requirePageSession).not.toHaveBeenCalled();
+  expect(screen.queryByText("예약 없음")).not.toBeInTheDocument();
+  expect(screen.queryByText("예약이 아직 없어요")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: "운영자 화면" }),
+  ).not.toBeInTheDocument();
+  view.rerender(await resolveRegions(page));
+  expect(screen.getAllByRole("link", { name: "공간 예약하기" })[0]).toBe(
+    bookingLink,
+  );
+  expect(bookingLink).toHaveFocus();
 });
 
 it("checks the page session and greets the member with branch selection, invites and empty next steps", async () => {
@@ -273,17 +309,21 @@ it("does not invent an opening for an entirely closed branch", async () => {
   expect(screen.getByText("운영 예정 시간이 없어요")).toBeVisible();
 });
 
-it("keeps all eight server reads in separate Suspense regions after the direct page guard", async () => {
-  const page = await resolvePageContent(Home());
+it("keeps the static frame outside three guarded regions and eight independent reads", async () => {
+  const page = Home();
+  expect(requirePageSession).not.toHaveBeenCalled();
   const boundaries: ReactNode[] = [];
   function visit(node: ReactNode) {
     if (!isValidElement<{ children?: ReactNode }>(node)) return;
     if (node.type === Suspense) boundaries.push(node);
     else Children.forEach(node.props.children, visit);
   }
-  visit(page);
+  visit(page.props.header);
+  visit(await resolvePageContent(page.props.primary));
+  visit(await resolvePageContent(page.props.secondary));
   expect(boundaries).toHaveLength(8);
-  expect(requirePageSession).toHaveBeenCalledExactlyOnceWith("/");
+  expect(requirePageSession).toHaveBeenCalledTimes(2);
+  expect(requirePageSession).toHaveBeenCalledWith("/");
   expect(getHomeHeader).not.toHaveBeenCalled();
   expect(getHomeUpcomingBookings).not.toHaveBeenCalled();
   expect(getHomeFreeSpaces).not.toHaveBeenCalled();

@@ -47,13 +47,14 @@ describe("team page session guards", () => {
       invites: [],
       search: { query: "가상 팀", results: [] },
     });
-    await resolvePageContent(
+    const modeBoundary = await resolvePageContent(
       TeamStartPage({ searchParams: Promise.resolve({ q: "가상 팀" }) }),
     );
+    await resolvePageContent(modeBoundary);
     expect(requirePageSession).toHaveBeenCalledWith(
       `/teams/start?${new URLSearchParams({ q: "가상 팀" })}`,
     );
-    expect(getTeamStartData).toHaveBeenCalledWith("가상 팀");
+    expect(getTeamStartData).toHaveBeenCalledWith("가상 팀", "choose");
     expect(
       vi.mocked(requirePageSession).mock.invocationCallOrder[0],
     ).toBeLessThan(vi.mocked(getTeamStartData).mock.invocationCallOrder[0]!);

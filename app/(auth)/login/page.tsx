@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import {
   AuthCard,
-  AuthLoading,
+  AuthFormSkeleton,
   type AuthPageProps,
 } from "@/features/auth/components/auth-card";
 import { LoginForm } from "@/features/auth/components/login-form";
@@ -20,25 +20,25 @@ async function LoginContent({ searchParams }: AuthPageProps) {
   if (await getSession()) redirect(next);
   const { providers } = getAuthUiOptions();
   return (
-    <AuthCard
-      title="Floor에 로그인"
-      description="함께 일할 공간을 만나 보세요."
-    >
-      <LoginForm
-        providers={providers}
-        next={next}
-        notice={getLoginNotice(query.error, query.verified)}
-      />
-    </AuthCard>
+    <LoginForm
+      providers={providers}
+      next={next}
+      notice={getLoginNotice(query.error, query.verified)}
+    />
   );
 }
 
 export default function LoginPage(props: AuthPageProps) {
   return (
     <MemberAuthFrame>
-      <Suspense fallback={<AuthLoading />}>
-        <LoginContent {...props} />
-      </Suspense>
+      <AuthCard
+        title="Floor에 로그인"
+        description="함께 일할 공간을 만나 보세요."
+      >
+        <Suspense fallback={<AuthFormSkeleton />}>
+          <LoginContent {...props} />
+        </Suspense>
+      </AuthCard>
     </MemberAuthFrame>
   );
 }

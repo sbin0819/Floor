@@ -1,8 +1,7 @@
-import { Suspense, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AdminNav } from "@/features/admin/components/admin-nav";
-import { AdminNavSkeleton } from "@/features/admin/components/admin-skeletons";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
@@ -18,9 +17,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <span className="text-xs">운영자</span>
         </div>
         <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
-          <Suspense fallback={<AdminNavSkeleton />}>
-            <AdminNav />
-          </Suspense>
+          <AdminNav />
         </div>
         <div className="shrink-0 pb-[env(safe-area-inset-bottom)]">
           <SignOutButton />
