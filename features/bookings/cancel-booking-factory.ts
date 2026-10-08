@@ -27,7 +27,11 @@ export function createCancelBookingAction(
         const row = await getBookingWithLocation(input.bookingId, db);
         if (!row) throw new ActionError("NOT_FOUND");
         const context = await loadPermissionContext(session, row.branch.id, db);
-        const space = await getSpaceForAccess(row.space.id, db);
+        const accessSpaceId =
+          row.space.type === "desk" ? row.space.parentId : row.space.id;
+        const space = accessSpaceId
+          ? await getSpaceForAccess(accessSpaceId, db)
+          : null;
         const owns = row.booking.userId === session.userId;
         const teamMember =
           row.booking.teamId !== null &&
@@ -60,7 +64,10 @@ export function createCancelBookingAction(
           return {
             bookingId: cancelled.id,
             floorId: row.floor.id,
-            spaceId: row.space.id,
+            spaceId:
+              row.space.type === "desk"
+                ? (row.space.parentId ?? row.space.id)
+                : row.space.id,
           };
         }, db);
         await publishBookingChange(

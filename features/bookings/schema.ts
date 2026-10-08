@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { addDays } from "@/lib/time/zoned";
 
 const idSchema = z.uuid().transform((value) => value.toLowerCase());
 
@@ -20,4 +21,16 @@ export const createBookingSchema = z.strictObject({
     .transform((value) => value || null),
 });
 export const cancelBookingSchema = z.strictObject({ bookingId: idSchema });
+export const createDeskBookingSchema = z.strictObject({
+  deskId: idSchema,
+  date: z.string().refine((value) => {
+    try {
+      return addDays(value, 0) === value;
+    } catch {
+      return false;
+    }
+  }, "날짜를 확인해 주세요"),
+  part: z.enum(["am", "pm", "day"]),
+  teamId: idSchema.nullable(),
+});
 export const defaultBranchSchema = z.strictObject({ branchId: idSchema });
