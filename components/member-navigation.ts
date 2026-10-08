@@ -19,3 +19,9 @@ export function activeMemberNav(pathname: string): MemberNavKey | null {
   if (under(pathname, "/teams") || under(pathname, "/invite")) return "teams";
   return null;
 }
+
+export function memberSectionName(pathname: string): string | null {
+  if (under(pathname, "/notifications")) return "알림";
+  const active = activeMemberNav(pathname);
+  return memberNavItems.find((item) => item.key === active)?.label ?? null;
+}
