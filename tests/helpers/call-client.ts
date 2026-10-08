@@ -15,8 +15,16 @@ export const callTarget: CallTarget = {
   name: "회의실",
   href: "/s/space/room-a",
   participants: [
-    { userId: "me", name: "김하은" },
-    { userId: "other", name: "박지훈" },
+    {
+      avatar: { color: "blue" as const, photoUrl: null },
+      userId: "me",
+      name: "김하은",
+    },
+    {
+      avatar: { color: "blue" as const, photoUrl: null },
+      userId: "other",
+      name: "박지훈",
+    },
   ],
 };
 export const joinedCall = (participantId = "participant-a"): JoinedCall => ({

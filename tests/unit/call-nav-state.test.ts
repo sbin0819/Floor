@@ -10,6 +10,8 @@ import type { ChatNav } from "@/features/chat/types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
 const initial = (): ChatNav => ({
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: true,
   calls: [],
@@ -94,6 +96,35 @@ describe("call navigation updates", () => {
       participantCount: 1,
       participants: [],
     });
+  });
+  it("keeps known avatars and hashes new event-only users without changing the event contract", () => {
+    const nav = initial();
+    const avatar = {
+      color: "pink" as const,
+      photoUrl: "https://avatars.githubusercontent.com/u/123",
+    };
+    nav.spaces[0]!.voiceChannels[0]!.participants = [
+      { userId: "member", name: "김서연", avatar },
+    ];
+    const client = clientWith(nav);
+    const event = changed({
+      participants: [
+        { userId: "member", name: "김서연" },
+        { userId: "a", name: "새 사람" },
+      ],
+    });
+    applyCallChanged(client, event);
+    expect(read(client).spaces[0]!.voiceChannels[0]!.participants).toEqual([
+      { userId: "member", name: "김서연", avatar },
+      {
+        userId: "a",
+        name: "새 사람",
+        avatar: { color: "green", photoUrl: null },
+      },
+    ]);
+    expect(event.participants.every((person) => !("avatar" in person))).toBe(
+      true,
+    );
   });
   it("replaces huddle count, deduplicates repeated events and removes ended calls", () => {
     const client = clientWith();

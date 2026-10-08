@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import { avatarColorFor } from "@/lib/avatar";
 import {
   afterAll,
   beforeAll,
@@ -84,7 +85,15 @@ describe("team chat access and queries", () => {
     expect(JSON.stringify(view)).not.toContain("@");
     expect(view!.members).toEqual(
       expect.arrayContaining([
-        { id: actors.admin.userId, name: "관리자", admin: true },
+        {
+          id: actors.admin.userId,
+          name: "관리자",
+          admin: true,
+          avatar: {
+            color: avatarColorFor(actors.admin.userId, null),
+            photoUrl: null,
+          },
+        },
       ]),
     );
   });

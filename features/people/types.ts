@@ -1,3 +1,5 @@
+import type { Avatar } from "@/lib/avatar";
+
 export type UsernameSettings = {
   username: string | null;
   usernameChangedAt: string | null;
@@ -12,6 +14,7 @@ export type FriendsTab = "all" | "received" | "sent" | "blocked" | "requests";
 export type FriendRow = {
   userId: string;
   name: string;
+  avatar: Avatar;
   username: string | null;
   sharedTeamNames: string[];
   directRoomId: string | null;
@@ -29,6 +32,7 @@ export type PersonSearchResult = FriendRow & {
 export type PersonProfile = {
   userId: string;
   name: string;
+  avatar: Avatar;
   username: string | null;
   isMe: boolean;
   relation: PersonRelation | null;
@@ -40,7 +44,12 @@ export type MessageContact = FriendRow & { isFriend: boolean };
 
 export type MessageRequestRow = {
   roomId: string;
-  other: { userId: string; name: string; username: string | null };
+  other: {
+    userId: string;
+    name: string;
+    avatar: Avatar;
+    username: string | null;
+  };
   excerpt: string;
   lastMessageAt: string;
 };

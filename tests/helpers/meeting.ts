@@ -29,9 +29,14 @@ export function meetingView(overrides: Partial<MeetingView> = {}): MeetingView {
       status: "confirmed",
       attendeeCount: 3,
     },
-    user: { id: "c1111111-1111-4111-8111-111111111111", name: "홍유진" },
+    user: {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: "c1111111-1111-4111-8111-111111111111",
+      name: "홍유진",
+    },
     members: [
       {
+        avatar: { color: "blue" as const, photoUrl: null },
         userId: "c1111111-1111-4111-8111-111111111111",
         name: "홍유진",
         username: "host",
@@ -39,6 +44,7 @@ export function meetingView(overrides: Partial<MeetingView> = {}): MeetingView {
         sharesSpace: true,
       },
       {
+        avatar: { color: "blue" as const, photoUrl: null },
         userId: "d1111111-1111-4111-8111-111111111111",
         name: "김민지",
         username: "member",
@@ -48,6 +54,7 @@ export function meetingView(overrides: Partial<MeetingView> = {}): MeetingView {
     ],
     messages: [
       {
+        authorAvatar: { color: "blue" as const, photoUrl: null },
         ...emptyMessageDetails(),
         id: "e1111111-1111-4111-8111-111111111111",
         seq: 1,
@@ -88,6 +95,8 @@ export function meetingNav(overrides: Partial<MeetingNav> = {}): MeetingNav {
 }
 export function meetingChatNav(overrides: Partial<ChatNav> = {}): ChatNav {
   return {
+    chatToasts: true,
+    tabBadge: true,
     filesEnabled: false,
     callsEnabled: false,
     calls: [],

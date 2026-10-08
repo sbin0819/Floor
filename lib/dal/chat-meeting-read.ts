@@ -16,16 +16,19 @@ import { readableRoomCondition } from "./chat-access";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import { sharesChatSpace } from "./group-dm";
 import { blockedBy } from "./people-blocks";
+import { avatarColumns } from "./avatar";
+import { toAvatar } from "@/lib/avatar";
 
-export function listMeetingMembers(
+export async function listMeetingMembers(
   bookingId: string,
   viewerId: string,
   database: DalDatabase = getDb(),
 ) {
-  return database
+  const rows = await database
     .select({
       id: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       username: users.username,
       admin: sql<false>`false`,
       isBooker: sql<boolean>`${users.id} = ${bookings.userId}`,
@@ -45,6 +48,7 @@ export function listMeetingMembers(
       asc(users.name),
       asc(users.id),
     );
+  return rows.map((row) => ({ ...row, avatar: toAvatar(row.avatar) }));
 }
 
 export function listMeetingNav(

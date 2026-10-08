@@ -18,6 +18,7 @@ const data: BookingForEditData = {
     {
       userId: "story-member",
       name: "김하은",
+      avatar: { color: "blue" as const, photoUrl: null },
       sharedTeamNames: ["디자인 팀"],
       maskedEmail: "ha•••@floor.example",
     },

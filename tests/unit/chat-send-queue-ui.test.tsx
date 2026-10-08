@@ -52,7 +52,11 @@ const data: ChannelView = {
     muted: false,
     unreadMentions: 0,
   },
-  user: { id: "me", name: "박지훈" },
+  user: {
+    avatar: { color: "blue" as const, photoUrl: null },
+    id: "me",
+    name: "박지훈",
+  },
   members: [],
   messages: [],
   canWrite: true,
@@ -92,6 +96,7 @@ function createSend() {
   return vi.fn<SendChatMessage>().mockImplementation(async (input) => ({
     ok: true,
     data: {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: input.clientId,
       seq: 1,
@@ -125,6 +130,10 @@ describe("persistent send queue UI", () => {
     );
     const result = render(node(data));
     fireEvent.click(screen.getByText("전송"));
+    expect(
+      client.getQueryData<DisplayMessage[]>(roomMessagesKey(data.room.id))?.[0]
+        ?.authorAvatar,
+    ).toEqual(data.user.avatar);
     result.rerender(node(other));
     expect(screen.getByText("전송 대기")).toBeInTheDocument();
     expect(screen.queryByText("새 메시지")).not.toBeInTheDocument();

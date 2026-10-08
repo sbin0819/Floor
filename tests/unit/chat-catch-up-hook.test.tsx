@@ -37,6 +37,7 @@ vi.mock("@/components/realtime-provider", () => ({
 
 function message(seq: number, extra: Partial<ChatMessage> = {}): ChatMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: `message-${seq}`,
     seq,
@@ -78,7 +79,11 @@ function view(id = "room-a"): ChannelView {
       unreadMentions: 0,
     },
     space: { id: "space-a", name: "디자인팀", muted: false },
-    user: { id: "me", name: "박지훈" },
+    user: {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: "me",
+      name: "박지훈",
+    },
     members: [],
     messages: [message(1)],
     canWrite: true,

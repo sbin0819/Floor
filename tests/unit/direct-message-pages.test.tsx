@@ -18,7 +18,11 @@ const roomData = {
     muted: false,
     unreadMentions: 0,
   },
-  user: { id: "me", name: "나" },
+  user: {
+    id: "me",
+    name: "나",
+    avatar: { color: "blue" as const, photoUrl: null },
+  },
   messages: [],
   lastReadSeq: 0,
   firstUnreadSeq: null,
@@ -59,7 +63,13 @@ describe("direct messages page guards", () => {
       name: null,
       displayName: "그룹 대화",
       members: [
-        { userId: "me", name: "나", username: "me", sharesSpace: true },
+        {
+          avatar: { color: "blue" as const, photoUrl: null },
+          userId: "me",
+          name: "나",
+          username: "me",
+          sharesSpace: true,
+        },
       ],
     };
     vi.mocked(getDirectMessageView).mockResolvedValue(data);
@@ -79,6 +89,7 @@ describe("direct messages page guards", () => {
       request: null,
       blockedByMe: false,
       other: {
+        avatar: { color: "blue" as const, photoUrl: null },
         userId: "other",
         name: "상대",
         username: null,

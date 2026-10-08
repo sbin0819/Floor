@@ -1,3 +1,5 @@
+import type { Avatar } from "@/lib/avatar";
+
 export type TeamRole = "admin" | "member";
 
 export type MyTeam = { id: string; name: string; role: TeamRole };
@@ -52,6 +54,7 @@ export type TeamStartData = {
 export type TeamMember = {
   id: string;
   name: string;
+  avatar: Avatar;
   email: string;
   role: TeamRole;
   title: string | null;
@@ -66,6 +69,7 @@ export type SentInvite = {
 export type PendingJoinRequest = {
   id: string;
   name: string;
+  avatar: Avatar;
   email: string;
   message: string | null;
   createdAt: string;

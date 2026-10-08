@@ -1,11 +1,14 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { ChatNav, DirectMessageNav } from "./types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
+import { avatarColorFor } from "@/lib/avatar";
 
 export const CHAT_NAV_KEY = ["chat", "nav"] as const;
 type NavChanges = {
   revision: number;
   statusRevision: number;
+  preferenceRevision: number;
+  lastPreferences?: Pick<ChatNav, "chatToasts" | "tabBadge">;
   lastStatus?: ChatNav["myStatus"];
   rooms: Map<string, number>;
   calls: Map<string, number>;
@@ -22,6 +25,7 @@ function state(client: QueryClient) {
     value = {
       revision: 0,
       statusRevision: 0,
+      preferenceRevision: 0,
       rooms: new Map(),
       calls: new Map(),
       activitySeq: new Map(),
@@ -173,7 +177,18 @@ export function applyCallChanged(
             : {
                 ...room,
                 participantCount: event.participantCount,
-                participants: space.kind === "branch" ? [] : event.participants,
+                participants:
+                  space.kind === "branch"
+                    ? []
+                    : event.participants.map((person) => ({
+                        ...person,
+                        avatar: room.participants.find(
+                          (known) => known.userId === person.userId,
+                        )?.avatar ?? {
+                          color: avatarColorFor(person.userId, null),
+                          photoUrl: null,
+                        },
+                      })),
               },
         ),
       })),
@@ -360,6 +375,8 @@ export function mergeChatNav(
   }
   if (requestedAt !== null && snapshot.statusRevision <= requestedAt)
     snapshot.lastStatus = undefined;
+  if (requestedAt !== null && snapshot.preferenceRevision <= requestedAt)
+    snapshot.lastPreferences = undefined;
   const protectedCalls = new Set(
     [...snapshot.calls]
       .filter(([, revision]) => requestedAt === null || revision > requestedAt)
@@ -371,6 +388,9 @@ export function mergeChatNav(
   ];
   return {
     ...incoming,
+    ...(requestedAt === null || snapshot.preferenceRevision > requestedAt
+      ? snapshot.lastPreferences
+      : undefined),
     myStatus:
       requestedAt === null || snapshot.statusRevision > requestedAt
         ? (snapshot.lastStatus ?? current?.myStatus ?? incoming.myStatus)
@@ -392,6 +412,20 @@ export function applyMyStatus(
   client.setQueryData<ChatNav>(
     CHAT_NAV_KEY,
     (current) => current && { ...current, myStatus: status },
+  );
+}
+
+export function applyChatPreferences(
+  client: QueryClient,
+  preferences: Pick<ChatNav, "chatToasts" | "tabBadge">,
+) {
+  const snapshot = state(client);
+  const { chatToasts, tabBadge } = preferences;
+  snapshot.lastPreferences = { chatToasts, tabBadge };
+  snapshot.preferenceRevision = ++snapshot.revision;
+  client.setQueryData<ChatNav>(
+    CHAT_NAV_KEY,
+    (current) => current && { ...current, chatToasts, tabBadge },
   );
 }
 

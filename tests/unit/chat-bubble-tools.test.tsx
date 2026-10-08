@@ -20,6 +20,7 @@ const mentionedId = "00000000-0000-4000-8000-000000000009";
 const now = "2026-10-08T03:00:00Z";
 function message(values: Partial<DisplayMessage> = {}): DisplayMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: "m1",
     clientId: null,

@@ -181,6 +181,8 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
                 : "ended",
         })),
         myStatus: navigation.myStatus,
+        chatToasts: navigation.chatToasts,
+        tabBadge: navigation.tabBadge,
         blockedUserIds: navigation.blockedUserIds,
         spaces: [...spaces.values()],
         directMessages: directRows.map((row) => ({
@@ -240,14 +242,15 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           start: new Date(booking.start).toISOString(),
           end: new Date(booking.end).toISOString(),
         },
-        user: { id: session.userId, name: session.name },
+        user: room.viewer,
         members: members.map(
-          ({ id, name, username, isBooker, sharesSpace }) => ({
+          ({ id, name, username, isBooker, sharesSpace, avatar }) => ({
             userId: id,
             name,
             username,
             isBooker,
             sharesSpace,
+            avatar,
           }),
         ),
         messages: messages.map(serializeChatMessage),
@@ -317,7 +320,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           muted: room.roomMuted,
           unreadMentions: room.unreadMentions,
         },
-        user: { id: session.userId, name: session.name },
+        user: room.viewer,
         messages: messages.map(serializeChatMessage),
         members,
         lastReadSeq: room.lastReadSeq,
@@ -368,7 +371,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
               .filter((member) => member.userId !== session.userId)
               .map((member) => member.name),
           ),
-          user: { id: session.userId, name: session.name },
+          user: room.viewer,
           members,
           messages: messages.map(serializeChatMessage),
           lastReadSeq: room.lastReadSeq,
@@ -416,7 +419,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           unreadMentions: room.unreadMentions,
         },
         other: room.peer,
-        user: { id: session.userId, name: session.name },
+        user: room.viewer,
         members,
         messages: messages.map(serializeChatMessage),
         lastReadSeq: room.lastReadSeq,

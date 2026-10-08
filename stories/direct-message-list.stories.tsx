@@ -7,6 +7,7 @@ const rows: DirectMessageNav[] = ["이서연", "최민준", "박지훈"].map(
     kind: "dm",
     roomId: `73000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
     other: {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: `73000000-0000-4000-8000-${String(index + 11).padStart(12, "0")}`,
       name,
       username: ["seoyeon.lee", "minjun.choi", "jihoon.park"][index]!,

@@ -2,6 +2,7 @@
 
 import { useId, useRef, useState, useEffect } from "react";
 import { z } from "zod";
+import { avatarSchema } from "@/lib/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ const responseSchema = z.strictObject({
     z.strictObject({
       userId: z.uuid(),
       name: z.string(),
+      avatar: avatarSchema,
       username: z.string().nullable(),
       sharedTeamNames: z.array(z.string()),
       relation: z.enum(["none", "incoming", "outgoing", "friend", "blocked"]),

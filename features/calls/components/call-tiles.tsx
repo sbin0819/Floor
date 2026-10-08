@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { MicOff } from "lucide-react";
 import { cn } from "cn";
 import type { CallParticipant, MediaTrack } from "../client/types";
+import { UserAvatar } from "@/components/user-avatar";
 
 export function CallVideo({
   track,
@@ -46,12 +47,7 @@ function ParticipantTile({ person }: { person: CallParticipant }) {
       {camera && person.cameraEnabled ? (
         <CallVideo track={camera} label={`${person.name} 영상`} />
       ) : (
-        <span
-          aria-hidden="true"
-          className="flex size-20 items-center justify-center rounded-full bg-card text-3xl font-bold"
-        >
-          {Array.from(person.name)[0] ?? "?"}
-        </span>
+        <UserAvatar name={person.name} avatar={person.avatar} size={72} />
       )}
       <div className="absolute right-2 bottom-2 left-2 flex items-center gap-2 rounded-md bg-card px-2 py-1 text-sm">
         <span className="min-w-0 flex-1 truncate">
@@ -134,12 +130,11 @@ export function CallTiles({
                   person.speaking ? "border-primary" : "border-border",
                 )}
               >
-                <span
-                  aria-hidden="true"
-                  className="flex size-8 items-center justify-center rounded-full bg-muted"
-                >
-                  {Array.from(person.name)[0]}
-                </span>
+                <UserAvatar
+                  name={person.name}
+                  avatar={person.avatar}
+                  size={32}
+                />
                 {person.name}
               </li>
             ))}

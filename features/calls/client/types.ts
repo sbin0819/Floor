@@ -1,5 +1,6 @@
 import type { ActionResult } from "@/lib/actions/result";
 import type { CallKind, CallPerson, JoinedCall, MyCall } from "../types";
+import type { Avatar } from "@/lib/avatar";
 
 export type CallTarget = {
   roomId: string;
@@ -37,6 +38,7 @@ export type CallParticipant = Omit<RoomPerson, "attributes" | "identity"> & {
   participantId: string;
   userId: string;
   name: string;
+  avatar: Avatar;
 };
 export type CallRoomEvent =
   | { type: "media" }

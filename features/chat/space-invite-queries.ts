@@ -13,6 +13,7 @@ import { RateLimitError, type RateLimiter } from "@/lib/rate-limit/memory";
 import { spaceInviteLimiter } from "@/lib/rate-limit/space-invites";
 import type { SpaceIconColor } from "./space-schema";
 import { inviteCodePattern } from "./space-invite-schema";
+import type { Avatar } from "@/lib/avatar";
 
 export type InvitePreview =
   | { state: "invalid" }
@@ -28,6 +29,7 @@ export type SpaceInviteItem = {
   codePrefix: string;
   code?: string;
   createdByName: string;
+  createdByAvatar: Avatar;
   expiresAt: string | null;
   useCount: number;
   maxUses: number | null;
@@ -36,6 +38,7 @@ export type InviteCandidate = {
   userId: string;
   name: string;
   username: string | null;
+  avatar: Avatar;
 };
 type Dependencies = {
   database?: DalDatabase;

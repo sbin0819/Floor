@@ -405,6 +405,7 @@ describe("team detail and invitation layout", () => {
             {
               id: "request",
               name: "가상 요청자",
+              avatar: { color: "blue" as const, photoUrl: null },
               email: "request@example.test",
               message: null,
               createdAt: "2030-01-01T00:00:00Z",

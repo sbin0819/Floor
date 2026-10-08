@@ -69,6 +69,7 @@ const direct = (patch: Partial<DirectNav> = {}): DirectNav => ({
   kind: "dm",
   roomId,
   other: {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: "61000000-0000-4000-8000-000000000002",
     name: "이서연",
     username: "seoyeon",
@@ -82,6 +83,8 @@ const direct = (patch: Partial<DirectNav> = {}): DirectNav => ({
   ...patch,
 });
 const fixture = (rows: DirectMessageNav[] = [direct()]): ChatNav => ({
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: false,
   calls: [],
@@ -402,9 +405,21 @@ describe("direct navigation cache", () => {
         name: null,
         memberCount: 3,
         members: [
-          { userId, name: "나" },
-          { userId: "peer", name: "서연" },
-          { userId: "third", name: "지훈" },
+          {
+            avatar: { color: "blue" as const, photoUrl: null },
+            userId,
+            name: "나",
+          },
+          {
+            avatar: { color: "blue" as const, photoUrl: null },
+            userId: "peer",
+            name: "서연",
+          },
+          {
+            avatar: { color: "blue" as const, photoUrl: null },
+            userId: "third",
+            name: "지훈",
+          },
         ],
         lastSeq: 3,
         lastMessageAt: "2026-10-08T01:00:00.000Z",
@@ -823,7 +838,12 @@ describe("direct message list presentation", () => {
     const rows = Array.from({ length: 11 }, (_, index) =>
       direct({
         roomId: `65000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-        other: { userId, name: `친구${index}`, username: null },
+        other: {
+          userId,
+          name: `친구${index}`,
+          username: null,
+          avatar: { color: "blue", photoUrl: null },
+        },
       }),
     );
     renderNav(fixture(rows));
@@ -844,7 +864,12 @@ describe("direct message list presentation", () => {
         direct({ unread: true, unreadCount: 100 }),
         direct({
           roomId: secondRoom,
-          other: { userId, name: "박지훈", username: null },
+          other: {
+            userId,
+            name: "박지훈",
+            username: null,
+            avatar: { color: "blue", photoUrl: null },
+          },
           unread: true,
           unreadCount: 70,
           unreadMentions: 2,

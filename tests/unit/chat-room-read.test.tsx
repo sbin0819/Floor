@@ -24,6 +24,8 @@ function setup(
 ) {
   const client = new QueryClient();
   client.setQueryData(CHAT_NAV_KEY, {
+    chatToasts: true,
+    tabBadge: true,
     spaces: [
       {
         id: "space",

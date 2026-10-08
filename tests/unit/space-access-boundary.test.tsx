@@ -5,6 +5,8 @@ import { SpaceAccessBoundary } from "@/features/chat/components/space-access-bou
 import { CHAT_NAV_KEY } from "@/features/chat/nav-state";
 import type { ChatNav } from "@/features/chat/types";
 const nav = (ids: string[]): ChatNav => ({
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: false,
   calls: [],

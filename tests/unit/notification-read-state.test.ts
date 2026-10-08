@@ -9,6 +9,7 @@ const item: NotificationItem = {
   id: "first",
   type: "booking_reminder",
   read: false,
+  actorAvatar: null,
   scheduledFor: "2026-10-08T05:50:00Z",
   bookingId: "booking",
   href: "/bookings",

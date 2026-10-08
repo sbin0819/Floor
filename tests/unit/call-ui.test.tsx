@@ -43,7 +43,13 @@ function connectedCall(): NonNullable<CallState["call"]> {
     roomKind: "voice",
     name: "회의실",
     href: "/s/space/voice-room",
-    participants: [{ userId: "me", name: "김하은" }],
+    participants: [
+      {
+        avatar: { color: "blue" as const, photoUrl: null },
+        userId: "me",
+        name: "김하은",
+      },
+    ],
     participantId: "participant-me",
     sessionId: "session",
     kind: "voice",
@@ -55,6 +61,7 @@ function person(
   extra: Partial<CallParticipant> = {},
 ): CallParticipant {
   return {
+    avatar: { color: "blue" as const, photoUrl: null },
     participantId: `participant-${index}`,
     userId: `user-${index}`,
     name: `가상 ${index}`,
@@ -106,8 +113,16 @@ function space(extra: Partial<ChatSpaceNav> = {}): ChatSpaceNav {
         capacity: 10,
         participantCount: 2,
         participants: [
-          { userId: "user-1", name: "김하은" },
-          { userId: "user-2", name: "박지훈" },
+          {
+            avatar: { color: "blue" as const, photoUrl: null },
+            userId: "user-1",
+            name: "김하은",
+          },
+          {
+            avatar: { color: "blue" as const, photoUrl: null },
+            userId: "user-2",
+            name: "박지훈",
+          },
         ],
       },
     ],

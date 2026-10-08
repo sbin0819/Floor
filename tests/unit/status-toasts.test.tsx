@@ -6,6 +6,7 @@ import { ChatMentions } from "@/features/chat/components/chat-mentions";
 import {
   CHAT_NAV_KEY,
   applyMyStatus,
+  applyChatPreferences,
   chatNavRevision,
   mergeChatNav,
   mergeInitialChatNav,
@@ -34,6 +35,8 @@ vi.mock("@/components/realtime-provider", () => ({
   },
 }));
 const nav = (): ChatNav => ({
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: false,
   calls: [],
@@ -47,7 +50,12 @@ const nav = (): ChatNav => ({
     {
       kind: "dm",
       roomId: "room",
-      other: { userId: "peer", name: "가상 상대", username: null },
+      other: {
+        avatar: { color: "blue" as const, photoUrl: null },
+        userId: "peer",
+        name: "가상 상대",
+        username: null,
+      },
       lastSeq: 0,
       lastMessageAt: "2026-10-08T00:00:00Z",
       unread: false,
@@ -86,6 +94,68 @@ const wrap = (client: QueryClient) =>
     );
   };
 describe("manual status suppresses only message toast surfaces", () => {
+  it("protects preference saves from old polls and SSR, then accepts the next server snapshot", () => {
+    const client = new QueryClient();
+    client.setQueryData(CHAT_NAV_KEY, nav());
+    const started = chatNavRevision(client);
+    const settings = {
+      chatToasts: false,
+      tabBadge: false,
+      reminderMinutes: [10],
+    };
+    applyChatPreferences(client, settings);
+    expect(client.getQueryData(CHAT_NAV_KEY)).not.toHaveProperty(
+      "reminderMinutes",
+    );
+    expect(mergeChatNav(client, nav(), started)).toMatchObject({
+      chatToasts: false,
+      tabBadge: false,
+    });
+    mergeInitialChatNav(client, nav());
+    expect(client.getQueryData(CHAT_NAV_KEY)).toMatchObject({
+      chatToasts: false,
+      tabBadge: false,
+    });
+    const next = chatNavRevision(client);
+    expect(mergeChatNav(client, nav(), next)).toMatchObject({
+      chatToasts: true,
+      tabBadge: true,
+    });
+  });
+  it("suppresses a queued toast using the latest preferences while preserving unread counts and removing title badges", async () => {
+    const client = new QueryClient();
+    client.setQueryData(CHAT_NAV_KEY, nav());
+    document.title = "Floor";
+    render(<ChatMentions userId="me" count={3} refresh={async () => nav()} />, {
+      wrapper: wrap(client),
+    });
+    expect(document.title).toBe("(3) Floor");
+    act(() => mocks.receive(event()));
+    act(() =>
+      applyChatPreferences(client, { chatToasts: false, tabBadge: false }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(document.title).toBe("Floor");
+    expect(
+      client.getQueryData<ChatNav>(CHAT_NAV_KEY)?.directMessages[0]
+        ?.unreadCount,
+    ).toBe(1);
+    act(() =>
+      applyChatPreferences(client, { chatToasts: true, tabBadge: true }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(document.title).toBe("(3) Floor");
+    act(() => mocks.receive(event(2)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(mocks.toast).toHaveBeenCalledOnce();
+  });
   it("uses a group display name and author excerpt, but refreshes system activity without a toast", async () => {
     const client = new QueryClient();
     const base = nav().directMessages[0]!;
@@ -98,8 +168,16 @@ describe("manual status suppresses only message toast surfaces", () => {
           name: "가상 프로젝트",
           memberCount: 3,
           members: [
-            { userId: "peer", name: "가상 상대" },
-            { userId: "other", name: "다른 사람" },
+            {
+              userId: "peer",
+              name: "가상 상대",
+              avatar: { color: "blue", photoUrl: null },
+            },
+            {
+              userId: "other",
+              name: "다른 사람",
+              avatar: { color: "green", photoUrl: null },
+            },
           ],
           lastSeq: 0,
           lastMessageAt: base.lastMessageAt,
@@ -213,6 +291,7 @@ describe("manual status suppresses only message toast surfaces", () => {
         {
           id: "notification",
           type: "friend_request",
+          actorAvatar: null,
           data: { actorName: "가상 상대" },
           read: false,
           bookingId: null,

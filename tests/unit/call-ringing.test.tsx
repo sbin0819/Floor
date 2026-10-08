@@ -143,7 +143,13 @@ describe("incoming DM call", () => {
       roomKind: "dm",
       name: "이서연",
       href: "/dm/room",
-      participants: [{ userId: "peer", name: "이서연" }],
+      participants: [
+        {
+          userId: "peer",
+          name: "이서연",
+          avatar: { color: "pink", photoUrl: null },
+        },
+      ],
     });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -330,7 +336,13 @@ describe("outgoing DM waiting", () => {
       roomKind: "dm",
       name: "이서연",
       href: "/dm/room",
-      participants: [{ userId: "peer", name: "이서연" }],
+      participants: [
+        {
+          avatar: { color: "blue" as const, photoUrl: null },
+          userId: "peer",
+          name: "이서연",
+        },
+      ],
       participantId: "p",
       sessionId: "session",
       kind: "huddle",

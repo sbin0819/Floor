@@ -13,6 +13,7 @@ import type { RealtimeEvent } from "@/lib/realtime/types";
 import type { ChatNav } from "../types";
 import { groupDisplayName } from "../group-name";
 import { unreadTitle } from "../unread-title";
+import { useChatMetadata } from "./use-chat-metadata";
 import {
   CHAT_NAV_KEY,
   applyDirectActivity,
@@ -53,6 +54,7 @@ export function ChatMentions({
   const client = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
+  const { tabBadge } = useChatMetadata();
   const reauthorize = useRealtimeReauthorize();
   const pathnameRef = useRef(pathname);
   useEffect(() => {
@@ -75,7 +77,7 @@ export function ChatMentions({
     const apply = () => {
       if (!document.head.querySelector("title")) return;
       const current = document.title;
-      const title = unreadTitle(current, count);
+      const title = unreadTitle(current, tabBadge === false ? 0 : count);
       if (title !== null && current !== title) document.title = title;
     };
     apply();
@@ -99,7 +101,7 @@ export function ChatMentions({
       characterData: true,
     });
     return () => observer.disconnect();
-  }, [count, pathname]);
+  }, [count, pathname, tabBadge]);
   useEffect(() => {
     alive.current = true;
     const pendingBatch = batch.current;
@@ -164,6 +166,7 @@ export function ChatMentions({
     const metadata = client.getQueryData<ChatNav>(CHAT_NAV_KEY);
     return (
       metadata?.myStatus === "dnd" ||
+      metadata?.chatToasts === false ||
       Boolean(
         entry.authorId && metadata?.blockedUserIds?.includes(entry.authorId),
       )

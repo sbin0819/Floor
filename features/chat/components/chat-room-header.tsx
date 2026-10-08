@@ -1,4 +1,6 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
+import type { Avatar } from "@/lib/avatar";
 import type { ReactNode, RefObject } from "react";
 import { Hash, MoreHorizontal, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,7 @@ import { ChatMuteButton } from "./chat-mute-button";
 import type { MessageRequestState } from "./message-request-banner";
 
 export type DirectOther = {
+  avatar: Avatar;
   userId: string;
   name: string;
   username: string | null;
@@ -69,17 +72,17 @@ export function ChatRoomHeader({
     <header className="flex min-h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:px-6">
       {direct ? (
         <>
-          <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-muted font-semibold">
-            <span aria-hidden="true">
-              {Array.from(direct.other.name.trim())[0] ?? "?"}
-            </span>
-            <span className="absolute right-0 bottom-0">
+          <UserAvatar
+            name={direct.other.name}
+            avatar={direct.other.avatar}
+            size={40}
+            status={
               <PersonStatus
                 userId={direct.other.userId}
                 sharesSpace={direct.other.sharesSpace}
               />
-            </span>
-          </span>
+            }
+          />
           <h1 className="min-w-0 truncate text-lg font-bold">
             <PersonCard userId={direct.other.userId} name={direct.other.name}>
               <button

@@ -124,9 +124,7 @@ describe("channel settings controls", () => {
       target: { value: "새 이야기" },
     });
     await user.click(screen.getByRole("switch", { name: "관리자만 쓰기" }));
-    await user.click(
-      screen.getByRole("button", { name: "만들기" }),
-    );
+    await user.click(screen.getByRole("button", { name: "만들기" }));
     await waitFor(() =>
       expect(mocks.create).toHaveBeenCalledExactlyOnceWith({
         spaceId,
@@ -147,9 +145,7 @@ describe("channel settings controls", () => {
       fireEvent.change(screen.getByLabelText("채널 이름"), {
         target: { value: name },
       });
-      expect(
-        screen.getByRole("button", { name: "만들기" }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "만들기" })).toBeDisabled();
       fireEvent.submit(screen.getByLabelText("채널 이름").closest("form")!);
       expect(mocks.create).not.toHaveBeenCalled();
     },
@@ -168,9 +164,7 @@ describe("channel settings controls", () => {
       mount(<ChannelDialog spaceId={spaceId} />);
       await user.click(screen.getByRole("button", { name: "채널 만들기" }));
       await user.type(screen.getByLabelText("채널 이름"), "새 채널");
-      await user.click(
-        screen.getByRole("button", { name: "만들기" }),
-      );
+      await user.click(screen.getByRole("button", { name: "만들기" }));
       expect(await screen.findByRole("alert")).toHaveTextContent(text);
       expect(screen.getByLabelText("채널 이름")).toHaveValue("새 채널");
       expect(screen.getByRole("dialog")).toBeVisible();
@@ -191,9 +185,7 @@ describe("channel settings controls", () => {
     fireEvent.submit(form);
     fireEvent.submit(form);
     await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
-    expect(
-      screen.getByRole("button", { name: "만들기" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "만들기" })).toBeDisabled();
     await act(async () => pending.resolve({ ok: true, data: { roomId } }));
     expect(mocks.create).toHaveBeenCalledOnce();
   });
@@ -459,16 +451,12 @@ describe("channel menu to archive dialog", () => {
     await user.click(trigger);
     await user.click(screen.getByRole("menuitem", { name: "보관" }));
     const dialog = await screen.findByRole("dialog");
-    await user.click(
-      within(dialog).getByRole("button", { name: "보관" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "보관" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
       "이 작업을 할 수 없어요",
     );
     expect(mocks.refresh).not.toHaveBeenCalled();
-    await user.click(
-      within(dialog).getByRole("button", { name: "보관" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "보관" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
@@ -483,6 +471,7 @@ describe("space invitation management", () => {
     foreignCode = "b".repeat(22);
   const rows: SpaceInviteItem[] = [
     {
+      createdByAvatar: { color: "blue" as const, photoUrl: null },
       inviteId: roomId,
       codePrefix: ownCode.slice(0, 6),
       code: ownCode,
@@ -492,6 +481,7 @@ describe("space invitation management", () => {
       maxUses: 10,
     },
     {
+      createdByAvatar: { color: "blue" as const, photoUrl: null },
       inviteId: "33333333-3333-4333-8333-333333333333",
       codePrefix: foreignCode.slice(0, 6),
       createdByName: "이도윤",

@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@/components/account-menu";
@@ -26,7 +32,11 @@ beforeEach(() => {
   mocks.signOut.mockResolvedValue({ error: null });
 });
 
-const profile = { name: "가상 회원", email: "member@example.test" };
+const profile = {
+  name: "가상 회원",
+  email: "member@example.test",
+  avatar: { color: "blue" as const, photoUrl: null },
+};
 async function openAccount(isOperator = false) {
   const user = userEvent.setup();
   render(<AccountMenu {...profile} isOperator={isOperator} />);

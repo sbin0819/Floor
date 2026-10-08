@@ -98,6 +98,8 @@ const spaceFixture = (): ChatSpaceNav[] => [
   },
 ];
 const fixture = (): ChatNav => ({
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: false,
   calls: [],
@@ -111,6 +113,8 @@ const fixture = (): ChatNav => ({
 });
 function mappedFixture(map: (space: ChatSpaceNav) => ChatSpaceNav): ChatNav {
   return {
+    chatToasts: true,
+    tabBadge: true,
     filesEnabled: false,
     callsEnabled: false,
     calls: [],
@@ -647,6 +651,42 @@ describe("chat unread navigation", () => {
       credentials: "same-origin",
     });
   });
+  it("keeps avatar and preference fields when parsing a real navigation response", async () => {
+    const data = fixture();
+    data.chatToasts = false;
+    data.tabBadge = false;
+    const avatar = {
+      color: "teal" as const,
+      photoUrl: "https://avatars.githubusercontent.com/u/1",
+    };
+    data.directMessages = [
+      {
+        kind: "dm",
+        roomId,
+        lastSeq: 1,
+        lastMessageAt: data.now,
+        unread: false,
+        unreadCount: 0,
+        unreadMentions: 0,
+        muted: false,
+        other: { userId: secondId, name: "가상 상대", username: null, avatar },
+      },
+    ];
+    data.spaces[0]!.voiceChannels = [
+      {
+        id: secondId,
+        name: "회의실",
+        capacity: 10,
+        participantCount: 1,
+        participants: [{ userId: secondId, name: "가상 상대", avatar }],
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(data)),
+    );
+    expect(await fetchChatNav(new AbortController().signal)).toEqual(data);
+  });
   it("replaces an older in-flight poll when an unknown DM event needs a fresh membership snapshot", async () => {
     const directId = "44444444-4444-4444-8444-444444444444";
     let finishOld!: (data: ChatNav) => void;
@@ -658,6 +698,7 @@ describe("chat unread navigation", () => {
           kind: "dm",
           roomId: directId,
           other: {
+            avatar: { color: "blue" as const, photoUrl: null },
             userId: "55555555-5555-4555-8555-555555555555",
             name: "서연",
             username: "seoyeon",

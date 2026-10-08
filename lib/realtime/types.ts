@@ -1,3 +1,5 @@
+import type { Avatar } from "@/lib/avatar";
+
 export type RealtimeEvent =
   | {
       type: "room.activity";
@@ -51,6 +53,7 @@ export type RealtimeEvent =
       seq: number;
       authorId: string | null;
       authorName: string | null;
+      authorAvatar: Avatar | null;
       clientId: string | null;
       kind: "text" | "system";
       systemData: SystemMessageData | null;

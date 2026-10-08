@@ -1,4 +1,5 @@
 "use client";
+import { avatarColorFor } from "@/lib/avatar";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -179,7 +180,14 @@ export function CallRinging({
               name: event.callerName,
               href: `/dm/${event.roomId}`,
               participants: [
-                { userId: event.callerId, name: event.callerName },
+                {
+                  userId: event.callerId,
+                  name: event.callerName,
+                  avatar: {
+                    color: avatarColorFor(event.callerId, null),
+                    photoUrl: null,
+                  },
+                },
               ],
             });
           }}

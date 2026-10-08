@@ -1,3 +1,5 @@
+import type { Avatar } from "@/lib/avatar";
+
 export const reactionEmojis = [
   "thumbs_up",
   "heart",
@@ -64,6 +66,7 @@ export type ChatMessage = ChatMessageDetails & {
   authorId: string | null;
   authorName: string | null;
   kind: "text" | "system";
+  authorAvatar: Avatar | null;
   body: string;
   createdAt: string;
   clientId: string | null;
@@ -92,16 +95,23 @@ export type DirectMessageNav = DirectMessageNavBase &
   (
     | {
         kind: "dm";
-        other: { userId: string; name: string; username: string | null };
+        other: {
+          userId: string;
+          name: string;
+          username: string | null;
+          avatar: Avatar;
+        };
       }
     | {
         kind: "group_dm";
         name: string | null;
         memberCount: number;
-        members: { userId: string; name: string }[];
+        members: { userId: string; name: string; avatar: Avatar }[];
       }
   );
 export type ChatNav = {
+  chatToasts: boolean;
+  tabBadge: boolean;
   filesEnabled: boolean;
   callsEnabled: boolean;
   calls: { roomId: string; participantCount: number }[];
@@ -148,11 +158,12 @@ export type MeetingView = {
     status: "confirmed" | "cancelled";
     attendeeCount: number | null;
   };
-  user: { id: string; name: string };
+  user: { id: string; name: string; avatar: Avatar };
   members: {
     userId: string;
     name: string;
     username: string | null;
+    avatar: Avatar;
     isBooker: boolean;
     sharesSpace: boolean;
   }[];
@@ -175,7 +186,7 @@ type DirectMessageViewBase = {
     muted: boolean;
     unreadMentions: number;
   };
-  user: { id: string; name: string };
+  user: { id: string; name: string; avatar: Avatar };
   messages: ChatMessage[];
   lastReadSeq: number | null;
   firstUnreadSeq: number | null;
@@ -194,8 +205,9 @@ export type DirectMessageView = DirectMessageViewBase &
           name: string;
           username: string | null;
           sharesSpace: boolean;
+          avatar: Avatar;
         };
-        members: { id: string; name: string; admin: boolean }[];
+        members: { id: string; name: string; admin: boolean; avatar: Avatar }[];
         peerReadSeq: number;
       }
     | {
@@ -207,6 +219,7 @@ export type DirectMessageView = DirectMessageViewBase &
           name: string;
           username: string | null;
           sharesSpace: boolean;
+          avatar: Avatar;
         }[];
       }
   );
@@ -252,11 +265,12 @@ export type ChannelView = {
     muted: boolean;
     unreadMentions: number;
   };
-  user: { id: string; name: string };
+  user: { id: string; name: string; avatar: Avatar };
   members: {
     id: string;
     name: string;
     admin: boolean;
+    avatar: Avatar;
     sharesSpace?: boolean;
   }[];
   messages: ChatMessage[];

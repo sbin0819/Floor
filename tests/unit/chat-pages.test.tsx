@@ -41,6 +41,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.guard.mockResolvedValue(undefined);
   mocks.nav.mockResolvedValue({
+    chatToasts: true,
+    tabBadge: true,
     spaces: [{ id: spaceId, channels: [{ id: roomId }] }],
     directMessages: [],
     myStatus: "online",
@@ -82,6 +84,8 @@ describe("chat route boundaries", () => {
     "does not reveal an inaccessible space",
     async ({ nav }) => {
       mocks.nav.mockResolvedValue({
+        chatToasts: true,
+        tabBadge: true,
         spaces: nav,
         directMessages: [],
         myStatus: "online",
@@ -154,6 +158,8 @@ describe("chat route boundaries", () => {
   });
   it("guards messages independently and leaves its fixed title outside Suspense", async () => {
     mocks.nav.mockResolvedValue({
+      chatToasts: true,
+      tabBadge: true,
       spaces: [],
       directMessages: [],
       myStatus: "online",

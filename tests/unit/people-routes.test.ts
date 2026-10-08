@@ -28,8 +28,18 @@ describe.each(["search", "profile"] as const)("people %s GET", (kind) => {
   it("enters the request boundary first and returns a private response", async () => {
     const data =
       kind === "search"
-        ? [{ userId: "a", name: "하은" }]
-        : { userId: "a", name: "하은" };
+        ? [
+            {
+              userId: "a",
+              name: "하은",
+              avatar: { color: "blue" as const, photoUrl: null },
+            },
+          ]
+        : {
+            userId: "a",
+            name: "하은",
+            avatar: { color: "blue" as const, photoUrl: null },
+          };
     read.mockResolvedValue(data);
     const result = await request();
     expect(result.status).toBe(200);

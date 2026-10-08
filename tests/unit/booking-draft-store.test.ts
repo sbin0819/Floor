@@ -207,6 +207,7 @@ describe("scoped booking draft store", () => {
       {
         userId: "guest",
         name: "김하은",
+        avatar: { color: "blue" as const, photoUrl: null },
         sharedTeamNames: [],
         maskedEmail: "ha•••@floor.example",
         email: "haneul@floor.example",

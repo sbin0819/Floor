@@ -32,6 +32,7 @@ vi.mock("@/features/chat/space-actions", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 const spaceId = "10000000-0000-4000-8000-000000000001";
 const owner: SpaceMember = {
+  avatar: { color: "blue" as const, photoUrl: null },
   userId: "20000000-0000-4000-8000-000000000001",
   name: "최하은",
   username: "haeun",
@@ -39,6 +40,7 @@ const owner: SpaceMember = {
   sharesSpace: true,
 };
 const admin: SpaceMember = {
+  avatar: { color: "blue" as const, photoUrl: null },
   userId: "20000000-0000-4000-8000-000000000002",
   name: "김민준",
   username: "minjun",
@@ -46,6 +48,7 @@ const admin: SpaceMember = {
   sharesSpace: true,
 };
 const member: SpaceMember = {
+  avatar: { color: "blue" as const, photoUrl: null },
   userId: "20000000-0000-4000-8000-000000000003",
   name: "박서연",
   username: null,
@@ -53,6 +56,7 @@ const member: SpaceMember = {
   sharesSpace: true,
 };
 const removed: SpaceMember = {
+  avatar: { color: "blue" as const, photoUrl: null },
   userId: "20000000-0000-4000-8000-000000000004",
   name: "이도윤",
   username: "doyun",
@@ -325,6 +329,7 @@ describe("space member settings", () => {
       status: 200,
       json: async () => ({
         userId: owner.userId,
+        avatar: owner.avatar,
         name: owner.name,
         username: owner.username,
         isMe: true,

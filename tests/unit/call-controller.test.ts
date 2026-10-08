@@ -246,7 +246,7 @@ describe("one client call lifetime", () => {
     expect(controller.getSnapshot().cameraEnabled).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
-  it("uses only approved roster names and matching participant identity attributes", async () => {
+  it("uses only approved roster names and avatars with matching participant identity attributes", async () => {
     const { controller, room } = setup();
     room.peopleValue.push({
       ...room.peopleValue[0]!,
@@ -268,6 +268,23 @@ describe("one client call lifetime", () => {
       "김하은",
       "박지훈",
     ]);
+    expect(controller.getSnapshot().participants.map((p) => p.avatar)).toEqual(
+      callTarget.participants.map((person) => person.avatar),
+    );
+    const avatar = {
+      color: "pink" as const,
+      photoUrl: "https://avatars.githubusercontent.com/u/123",
+    };
+    controller.updateTarget({
+      ...callTarget,
+      participants: callTarget.participants.map((person) => ({
+        ...person,
+        avatar,
+      })),
+    });
+    expect(
+      controller.getSnapshot().participants.map((person) => person.avatar),
+    ).toEqual([avatar, avatar]);
     controller.updateTarget({ ...callTarget, participants: [] });
     expect(controller.getSnapshot().participants).toEqual([]);
     controller.dispose();

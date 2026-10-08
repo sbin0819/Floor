@@ -18,6 +18,7 @@ import { emptyMessageDetails } from "@/features/chat/types";
 vi.mock("@/features/chat/client", () => ({ fetchRoomMessagesPage: vi.fn() }));
 function message(seq: number): ChatMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: `m-${seq}`,
     seq,

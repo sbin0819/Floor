@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Avatar } from "@/lib/avatar";
 import { isValidTimeZone } from "@/lib/time/zoned";
 
 export const bookingNotificationTypes = [
@@ -167,6 +168,7 @@ export function parseNotificationContent(
 
 export type NotificationItem = NotificationContent & {
   id: string;
+  actorAvatar: Avatar | null;
   read: boolean;
   scheduledFor: string;
   href: string | null;

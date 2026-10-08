@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { avatarColorFor } from "@/lib/avatar";
 import { drizzle } from "drizzle-orm/pglite";
 import {
   afterAll,
@@ -527,12 +528,20 @@ describe("group direct messages", () => {
       members: expect.arrayContaining([
         {
           userId: actors.admin.userId,
+          avatar: {
+            color: avatarColorFor(actors.admin.userId, null),
+            photoUrl: null,
+          },
           name: actors.admin.name,
           username: null,
           sharesSpace: true,
         },
         {
           userId: actors.outsider.userId,
+          avatar: {
+            color: avatarColorFor(actors.outsider.userId, null),
+            photoUrl: null,
+          },
           name: actors.outsider.name,
           username: null,
           sharesSpace: false,

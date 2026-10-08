@@ -10,6 +10,8 @@ beforeEach(() => {
 });
 it("returns the private navigation after the request boundary", async () => {
   mocks.query.mockResolvedValue({
+    chatToasts: true,
+    tabBadge: true,
     spaces: [],
     directMessages: [],
     myStatus: "online",
@@ -20,6 +22,8 @@ it("returns the private navigation after the request boundary", async () => {
   const result = await GET();
   expect(result.status).toBe(200);
   expect(await result.json()).toEqual({
+    chatToasts: true,
+    tabBadge: true,
     spaces: [],
     directMessages: [],
     myStatus: "online",

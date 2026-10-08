@@ -2,7 +2,10 @@ import "server-only";
 
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { chatSpaces } from "@/lib/db/schema";
+import { chatSpaces, users } from "@/lib/db/schema";
+import { alias } from "drizzle-orm/pg-core";
+import { avatarJson } from "./avatar";
+import { toAvatar, type Avatar, type AvatarSource } from "@/lib/avatar";
 import {
   chatSpaceName,
   isSpaceAdmin,
@@ -22,8 +25,11 @@ type MemberRow = {
   role: SpaceRole;
   sharesSpace: boolean;
   status: "active" | "banned";
+  avatar: AvatarSource;
 };
-export type SpaceMember = Omit<MemberRow, "status">;
+export type SpaceMember = Omit<MemberRow, "status" | "avatar"> & {
+  avatar: Avatar;
+};
 
 export async function readSpaceMembers(
   userId: string,
@@ -48,6 +54,7 @@ export async function readSpaceMembers(
       else coalesce((select jsonb_agg(to_jsonb(person) - 'position' order by
         case person.status when 'active' then 0 else 1 end, person.position) from (
         select u.id as "userId", u.name, u.username, member.role, member.status,
+          ${avatarJson(alias(users, "u"))} as avatar,
           ${sharesChatSpace(userId, sql`u.id`)} as "sharesSpace",
           row_number() over (partition by member.status order by
             case member.role when 'owner' then 0 when 'admin' then 1 else 2 end,
@@ -67,7 +74,15 @@ export async function readSpaceMembers(
   if (!space) return null;
   const role = spaceRoleFrom(space);
   if (!role) return null;
-  return { ...space, role };
+  return {
+    ...space,
+    role,
+    people:
+      space.people?.map((person) => ({
+        ...person,
+        avatar: toAvatar(person.avatar),
+      })) ?? null,
+  };
 }
 
 export async function readLoungeMembers(
@@ -88,8 +103,11 @@ export async function readLoungeMembers(
   const currentAccess = spaceAccessFields(userId);
   const [result] = await database
     .select({
-      people: sql<SpaceMember[]>`coalesce((select jsonb_agg(person) from (
+      people: sql<
+        Omit<MemberRow, "status">[]
+      >`coalesce((select jsonb_agg(person) from (
       select u.id as "userId", u.name, u.username,
+        ${avatarJson(alias(users, "u"))} as avatar,
         case when ${admin} then 'admin' else 'member' end as role,
         ${sharesChatSpace(userId, sql`u.id`)} as "sharesSpace"
       from chat_space_members member join users u on u.id = member.user_id
@@ -108,5 +126,10 @@ export async function readLoungeMembers(
         sql`${currentAccess.roleSettings} = ${JSON.stringify(space.roleSettings)}::jsonb`,
       ),
     );
-  return result?.people ?? null;
+  return (
+    result?.people.map((person) => ({
+      ...person,
+      avatar: toAvatar(person.avatar),
+    })) ?? null
+  );
 }

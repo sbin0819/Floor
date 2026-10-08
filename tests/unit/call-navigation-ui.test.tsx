@@ -43,7 +43,13 @@ function nav(): ChatNav {
       name: "음성 회의실",
       capacity: 10,
       participantCount: 1,
-      participants: [{ userId: id(20), name: "김하은" }],
+      participants: [
+        {
+          avatar: { color: "blue" as const, photoUrl: null },
+          userId: id(20),
+          name: "김하은",
+        },
+      ],
     },
   ];
   value.callsEnabled = true;
@@ -125,7 +131,13 @@ describe("safe navigation call targets", () => {
     expect(
       callNavigationTargets(data).find(({ roomKind }) => roomKind === "voice")
         ?.participants,
-    ).toEqual([{ userId: id(20), name: "김하은" }]);
+    ).toEqual([
+      {
+        userId: id(20),
+        name: "김하은",
+        avatar: { color: "blue", photoUrl: null },
+      },
+    ]);
   });
   it("does not synthesize a target from stale myCall or calls records absent from navigation", () => {
     const data = nav();

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avatarSchema } from "@/lib/avatar";
 import type { RoomMessagesPage } from "./types";
 import { reactionEmojis } from "./types";
 import { parseSystemMessageData } from "./system-messages";
@@ -19,6 +20,7 @@ const pageSchema = z.object({
       seq: sequence,
       authorId: z.string().nullable(),
       authorName: z.string().nullable(),
+      authorAvatar: avatarSchema.nullable(),
       kind: z.enum(["text", "system"]),
       systemData: z.unknown().transform(parseSystemMessageData),
       body: z.string(),

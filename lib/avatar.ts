@@ -50,12 +50,14 @@ export const avatarSchema = z.strictObject({
 
 export type Avatar = z.infer<typeof avatarSchema>;
 
-export function toAvatar(user: {
+export type AvatarSource = {
   id: string;
   avatarColor: AvatarColor | null;
   avatarPhoto: boolean;
   avatarUrl: string | null;
-}): Avatar {
+};
+
+export function toAvatar(user: AvatarSource): Avatar {
   return {
     color: avatarColorFor(user.id, user.avatarColor),
     photoUrl:

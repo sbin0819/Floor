@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Avatar } from "@/lib/avatar";
 import { normalizeTeamName } from "@/lib/teams/normalize";
 
 export const MAX_PARTICIPANTS = 20;
@@ -7,6 +8,7 @@ export const MAX_GUEST_PARTICIPANTS = 5;
 export type ParticipantSearchResult = {
   userId: string;
   name: string;
+  avatar: Avatar;
   sharedTeamNames: string[];
   maskedEmail: string;
 };

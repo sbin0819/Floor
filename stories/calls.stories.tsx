@@ -47,6 +47,7 @@ const target: CallTarget = {
   participants: names.map((name, index) => ({
     userId: `story-user-${index}`,
     name,
+    avatar: { color: "blue" as const, photoUrl: null },
   })),
 };
 function imageTrack(source: "camera" | "screen_share"): MediaTrack {
@@ -69,6 +70,7 @@ function person(
   overrides: Partial<CallParticipant> = {},
 ): CallParticipant {
   return {
+    avatar: { color: "blue" as const, photoUrl: null },
     participantId: `story-participant-${index}`,
     userId: `story-user-${index}`,
     name: names[index] ?? "가상 참가자",

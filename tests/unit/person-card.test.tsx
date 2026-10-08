@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PersonCard,
+  PersonProfileContent,
   readPersonProfile,
 } from "@/features/people/components/person-card";
 import { ChannelMembers } from "@/features/chat/components/channel-members";
@@ -36,6 +37,7 @@ const space = "10000000-0000-4000-8000-000000000004";
 const person: PersonProfile = {
   userId: id,
   name: "이서연",
+  avatar: { color: "blue", photoUrl: null },
   username: "seoyeon.lee",
   isMe: false,
   relation: "friend",
@@ -93,6 +95,21 @@ afterEach(() => {
 });
 
 describe("PersonCard", () => {
+  it("renders the profile preview with disabled actions and non-interactive shared spaces", async () => {
+    const { user } = setup(
+      <PersonProfileContent
+        person={{ ...person, isMe: true }}
+        actions={actions}
+        preview
+      />,
+    );
+    expect(screen.getByRole("button", { name: "설정" })).toBeDisabled();
+    expect(screen.getByText("디자인 팀")).toBeVisible();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "설정" }));
+    for (const action of Object.values(actions))
+      expect(action).not.toHaveBeenCalled();
+  });
   it("queries only when opened, shares the 30 second cache, and returns keyboard focus to the trigger", async () => {
     const { read, element } = card();
     const { user, client } = setup(element);
@@ -278,7 +295,11 @@ describe("PersonCard", () => {
       vi.fn(async () => Response.json(person)),
     );
     const { user } = setup(
-      <ChannelMembers members={[{ id, name: person.name, admin: false }]} />,
+      <ChannelMembers
+        members={[
+          { id, name: person.name, avatar: person.avatar, admin: false },
+        ]}
+      />,
     );
     await user.click(screen.getByRole("button", { name: "이서연 프로필" }));
     expect(
@@ -306,6 +327,7 @@ describe("PersonCard", () => {
               seq: 1,
               authorId: id,
               authorName: person.name,
+              authorAvatar: person.avatar,
               body: "안녕하세요",
               kind: "text",
               clientId: null,

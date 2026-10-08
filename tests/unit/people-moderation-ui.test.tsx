@@ -44,6 +44,7 @@ vi.mock("@/components/realtime-provider", () => ({
 const person: PersonProfile = {
   userId: "other",
   name: "박지훈",
+  avatar: { color: "blue" as const, photoUrl: null },
   username: "jihoon",
   isMe: false,
   relation: "none",
@@ -132,7 +133,12 @@ describe("request and block tabs", () => {
         rows={[
           {
             roomId: "room",
-            other: { userId: "other", name: "박지훈", username: "jihoon" },
+            other: {
+              userId: "other",
+              name: "박지훈",
+              avatar: { color: "blue" as const, photoUrl: null },
+              username: "jihoon",
+            },
             excerpt: "안녕하세요",
             lastMessageAt: "2030-01-01T02:50:00Z",
           },
@@ -155,6 +161,7 @@ describe("request and block tabs", () => {
             {
               userId: "other",
               name: "박지훈",
+              avatar: { color: "blue" as const, photoUrl: null },
               username: "jihoon",
               directRoomId: "room",
               sharedTeamNames: [],
@@ -264,10 +271,34 @@ describe("profile and search moderation", () => {
     await setup(
       <ChannelMembers
         members={[
-          { id: "a", name: "가영", admin: false, sharesSpace: false },
-          { id: "b", name: "나영", admin: false, sharesSpace: true },
-          { id: "c", name: "다영", admin: false, sharesSpace: true },
-          { id: "d", name: "라영", admin: false, sharesSpace: true },
+          {
+            id: "a",
+            name: "가영",
+            avatar: person.avatar,
+            admin: false,
+            sharesSpace: false,
+          },
+          {
+            id: "b",
+            name: "나영",
+            avatar: person.avatar,
+            admin: false,
+            sharesSpace: true,
+          },
+          {
+            id: "c",
+            name: "다영",
+            avatar: person.avatar,
+            admin: false,
+            sharesSpace: true,
+          },
+          {
+            id: "d",
+            name: "라영",
+            avatar: person.avatar,
+            admin: false,
+            sharesSpace: true,
+          },
         ]}
       />,
     );

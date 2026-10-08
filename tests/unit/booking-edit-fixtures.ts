@@ -16,6 +16,7 @@ export function bookingEditFixture(): BookingForEditData {
       {
         userId: "existing",
         name: "이서연",
+        avatar: { color: "blue" as const, photoUrl: null },
         sharedTeamNames: [],
         maskedEmail: "se•••@floor.example",
       },

@@ -62,7 +62,11 @@ function snapshot(): CallView {
     startedAt: "2026-10-09T03:00:00.000Z",
     participantCount: 4,
     participants: ["김하은", "박지훈", "이서연", "정유나"].map(
-      (name, index) => ({ userId: `user-${index}`, name }),
+      (name, index) => ({
+        userId: `user-${index}`,
+        name,
+        avatar: { color: "blue" as const, photoUrl: null },
+      }),
     ),
   };
 }
@@ -77,6 +81,7 @@ function active(next = target(), participantId = "participant-me") {
   };
   state.participants = [
     {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: "me",
       participantId,
       name: "김하은",

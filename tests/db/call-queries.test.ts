@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { avatarColorFor } from "@/lib/avatar";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createChatQueries } from "@/features/chat/query-factory";
 import { createCallQueries } from "@/features/calls/query-factory";
@@ -122,7 +123,16 @@ describe("call navigation and room query privacy", () => {
         startedAt: chatNow.toISOString(),
         participantCount: count,
         participants: count
-          ? [{ userId: actors.admin.userId, name: actors.admin.name }]
+          ? [
+              {
+                userId: actors.admin.userId,
+                name: actors.admin.name,
+                avatar: {
+                  color: avatarColorFor(actors.admin.userId, null),
+                  photoUrl: null,
+                },
+              },
+            ]
           : [],
       });
       expect(view!.canCall).toBe(true);

@@ -1,4 +1,5 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -74,10 +75,12 @@ export function VoiceChannelList({
                         key={person.userId}
                         className="flex items-center gap-2 text-sm"
                       >
-                        <span
-                          aria-hidden="true"
+                        <UserAvatar
+                          name={person.name}
+                          avatar={person.avatar}
+                          size={20}
                           className={cn(
-                            "flex size-5 items-center justify-center rounded-full bg-muted text-xs",
+                            "rounded-full",
                             call.call?.roomId === room.id &&
                               call.participants.some(
                                 (active) =>
@@ -86,9 +89,7 @@ export function VoiceChannelList({
                               ) &&
                               "ring-2 ring-primary",
                           )}
-                        >
-                          {Array.from(person.name)[0]}
-                        </span>
+                        />
                         <span className="truncate">{person.name}</span>
                       </li>
                     ))}

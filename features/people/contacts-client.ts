@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avatarSchema } from "@/lib/avatar";
 import type { MessageContact } from "./types";
 
 const contactsSchema = z.array(
@@ -6,6 +7,7 @@ const contactsSchema = z.array(
     .object({
       userId: z.uuid(),
       name: z.string(),
+      avatar: avatarSchema,
       username: z.string().nullable(),
       sharedTeamNames: z.array(z.string()),
       directRoomId: z.uuid().nullable(),

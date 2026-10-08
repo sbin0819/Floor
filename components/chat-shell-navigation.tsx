@@ -14,6 +14,8 @@ async function readNavigation() {
     ? getMyChatNav()
     : {
         filesEnabled: false,
+        chatToasts: true,
+        tabBadge: true,
         callsEnabled: false,
         calls: [],
         myCall: null,

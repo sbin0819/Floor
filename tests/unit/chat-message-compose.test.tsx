@@ -220,6 +220,7 @@ describe("reply, editing, and selected mention composition", () => {
 
 function message(seq: number, values: Partial<ChatMessage> = {}): ChatMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: `m-${seq}`,
     seq,

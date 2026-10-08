@@ -128,7 +128,7 @@ describe("space members privacy and query budget", () => {
       ]);
       expect(result.banned).toEqual([]);
       expect(Object.keys(result.members[0]!).sort()).toEqual(
-        ["userId", "name", "username", "role", "sharesSpace"].sort(),
+        ["userId", "name", "username", "role", "sharesSpace", "avatar"].sort(),
       );
       expect(JSON.stringify(result)).not.toMatch(
         /@|joinedAt|statusChangedAt|roleSettings/,
@@ -169,13 +169,11 @@ describe("space members privacy and query budget", () => {
     expect(result.banned).toEqual([]);
   });
   it("does not borrow an admin role or settings from another team or branch in single-table projections", async () => {
-    await database.db
-      .insert(teamMembers)
-      .values({
-        teamId: actors.otherTeamId,
-        userId: actors.member.userId,
-        role: "admin",
-      });
+    await database.db.insert(teamMembers).values({
+      teamId: actors.otherTeamId,
+      userId: actors.member.userId,
+      role: "admin",
+    });
     expect(
       (await canReadSpace(actors.member.userId, actors.spaceId, database.db))
         ?.role,
@@ -196,13 +194,11 @@ describe("space members privacy and query budget", () => {
     await database.db
       .insert(branchStaff)
       .values({ branchId: other!.id, userId: actors.member.userId });
-    await database.db
-      .insert(roleSettings)
-      .values({
-        branchId: other!.id,
-        role: "user",
-        permissions: ["branch.announce"],
-      });
+    await database.db.insert(roleSettings).values({
+      branchId: other!.id,
+      role: "user",
+      permissions: ["branch.announce"],
+    });
     expect(
       (await canReadSpace(actors.member.userId, loungeId, database.db))?.role,
     ).toBe("member");

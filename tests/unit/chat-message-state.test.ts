@@ -15,6 +15,7 @@ import {
 const now = "2026-10-08T03:00:00Z";
 function message(overrides: Partial<DisplayMessage> = {}): DisplayMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: "message",
     seq: 1,

@@ -20,7 +20,11 @@ beforeEach(() => {
   mocks.signOut.mockResolvedValue({ error: null });
 });
 
-const profile = { name: "가상 회원", email: "member@example.test" };
+const profile = {
+  name: "가상 회원",
+  email: "member@example.test",
+  avatar: { color: "blue" as const, photoUrl: null },
+};
 
 describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
   it.each([false, true])(
@@ -41,7 +45,9 @@ describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
           "truncate",
           "font-semibold",
         );
-        expect(within(trigger).getByText("가")).toHaveClass("size-8");
+        expect(trigger.querySelector("[data-user-avatar]")).toHaveClass(
+          "size-8",
+        );
         expect(trigger.querySelector("svg.lucide")).toHaveClass(
           "lucide-chevrons-up-down",
         );
@@ -82,7 +88,9 @@ describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
     await user.tab();
     await user.keyboard("{Enter}");
     await waitFor(() =>
-      expect(screen.getByRole("menuitemradio", { name: "온라인" })).toHaveFocus(),
+      expect(
+        screen.getByRole("menuitemradio", { name: "온라인" }),
+      ).toHaveFocus(),
     );
     await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}");
     expect(screen.getByRole("menuitem", { name: "설정" })).toHaveFocus();

@@ -86,6 +86,7 @@ const peer = "10000000-0000-4000-8000-000000000002";
 const now = "2030-01-01T03:00:00Z";
 function message(seq: number, authorId = me): ChatMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: `message-${seq}`,
     seq,
@@ -113,15 +114,30 @@ function view(extra: Partial<DmView> = {}): DmView {
       unreadMentions: 0,
     },
     other: {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: peer,
       name: "이서연",
       username: "seoyeon.lee",
       sharesSpace: false,
     },
-    user: { id: me, name: "김하은" },
+    user: {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: me,
+      name: "김하은",
+    },
     members: [
-      { id: me, name: "김하은", admin: false },
-      { id: peer, name: "이서연", admin: false },
+      {
+        avatar: { color: "blue" as const, photoUrl: null },
+        id: me,
+        name: "김하은",
+        admin: false,
+      },
+      {
+        avatar: { color: "blue" as const, photoUrl: null },
+        id: peer,
+        name: "이서연",
+        admin: false,
+      },
     ],
     messages: [message(1, peer), message(2), message(3)],
     lastReadSeq: 3,
@@ -282,6 +298,7 @@ describe("shared direct message screen", () => {
     setup(
       view({
         other: {
+          avatar: { color: "blue", photoUrl: null },
           userId: peer,
           name: "이서연",
           username: null,
@@ -371,6 +388,8 @@ describe("shared direct message screen", () => {
   it("refreshes the nav after a first saved DM but never sends internal room kind to the action", async () => {
     const { user, client, send } = setup(view({ messages: [] }));
     client.setQueryData(CHAT_NAV_KEY, {
+      chatToasts: true,
+      tabBadge: true,
       filesEnabled: false,
       callsEnabled: false,
       calls: [],
@@ -408,6 +427,8 @@ describe("shared direct message screen", () => {
       muted: false,
     };
     client.setQueryData(CHAT_NAV_KEY, {
+      chatToasts: true,
+      tabBadge: true,
       filesEnabled: false,
       callsEnabled: false,
       calls: [],

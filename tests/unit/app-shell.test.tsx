@@ -77,6 +77,7 @@ function frame({ anonymous = false, realAccount = false } = {}) {
         accountCard={
           anonymous ? null : realAccount ? (
             <AccountMenu
+              avatar={{ color: "blue", photoUrl: null }}
               name="가상 회원"
               email="member@example.test"
               isOperator

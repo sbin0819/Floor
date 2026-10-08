@@ -37,6 +37,7 @@ function message(
   values: Partial<DisplayMessage> = {},
 ): DisplayMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: `message-${seq}`,
     seq,

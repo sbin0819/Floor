@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createPeopleQueries } from "@/features/people/query-factory";
+import { avatarColorFor } from "@/lib/avatar";
 import { friendsTab } from "@/features/people/schema";
 import { ActionError } from "@/lib/actions/result";
 import { chatRoomMembers, chatRooms, messages, users } from "@/lib/db/schema";
@@ -21,14 +22,12 @@ describe("private message-request list and count", () => {
   });
   beforeEach(async () => {
     await database.db.execute(sql`truncate users, branches cascade`);
-    await database.db
-      .insert(users)
-      .values({
-        id: me.userId,
-        name: me.name,
-        email: me.email,
-        emailVerified: true,
-      });
+    await database.db.insert(users).values({
+      id: me.userId,
+      name: me.name,
+      email: me.email,
+      emailVerified: true,
+    });
   });
   const queries = () =>
     createPeopleQueries({
@@ -45,26 +44,22 @@ describe("private message-request list and count", () => {
     const userId = id(n + 10);
     const roomId = id(n + 1000);
     const at = new Date(now.getTime() + n * 60_000);
-    await database.db
-      .insert(users)
-      .values({
-        id: userId,
-        name: `가상 사람 ${n}`,
-        email: `private${n}@example.test`,
-        emailVerified: true,
-        username: `person.${n}`,
-      });
-    await database.db
-      .insert(chatRooms)
-      .values({
-        id: roomId,
-        kind,
-        ...(kind === "dm"
-          ? { dmLowUserId: me.userId, dmHighUserId: userId }
-          : {}),
-        lastSeq: hasMessage ? 1 : 0,
-        lastMessageAt: hasMessage ? at : null,
-      });
+    await database.db.insert(users).values({
+      id: userId,
+      name: `가상 사람 ${n}`,
+      email: `private${n}@example.test`,
+      emailVerified: true,
+      username: `person.${n}`,
+    });
+    await database.db.insert(chatRooms).values({
+      id: roomId,
+      kind,
+      ...(kind === "dm"
+        ? { dmLowUserId: me.userId, dmHighUserId: userId }
+        : {}),
+      lastSeq: hasMessage ? 1 : 0,
+      lastMessageAt: hasMessage ? at : null,
+    });
     await database.db.insert(chatRoomMembers).values([
       {
         roomId,
@@ -77,15 +72,13 @@ describe("private message-request list and count", () => {
       { roomId, userId, status: "active", joinedAt: at, statusChangedAt: at },
     ]);
     if (hasMessage)
-      await database.db
-        .insert(messages)
-        .values({
-          roomId,
-          seq: 1,
-          authorId: userId,
-          body: `요청 ${n}`,
-          createdAt: at,
-        });
+      await database.db.insert(messages).values({
+        roomId,
+        seq: 1,
+        authorId: userId,
+        body: `요청 ${n}`,
+        createdAt: at,
+      });
     return { roomId, userId, at };
   }
   it("returns only my requested one-to-one rooms with messages, newest first and exact safe fields", async () => {
@@ -103,6 +96,7 @@ describe("private message-request list and count", () => {
         other: {
           userId,
           name: `가상 사람 ${2 - index}`,
+          avatar: { color: avatarColorFor(userId, null), photoUrl: null },
           username: `person.${2 - index}`,
         },
         excerpt: `요청 ${2 - index}`,
@@ -138,15 +132,13 @@ describe("private message-request list and count", () => {
   });
   it("uses the actual latest message, sanitizes its excerpt and never exposes stored mention ids", async () => {
     const row = await request(1);
-    await database.db
-      .insert(messages)
-      .values({
-        roomId: row.roomId,
-        seq: 2,
-        authorId: row.userId,
-        body: `<@${me.userId}> 안녕하세요 ${"😀".repeat(100)}`,
-        createdAt: now,
-      });
+    await database.db.insert(messages).values({
+      roomId: row.roomId,
+      seq: 2,
+      authorId: row.userId,
+      body: `<@${me.userId}> 안녕하세요 ${"😀".repeat(100)}`,
+      createdAt: now,
+    });
     await database.db
       .update(chatRooms)
       .set({ lastSeq: 2 })

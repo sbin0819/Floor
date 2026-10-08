@@ -1,4 +1,5 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
 
 import {
   useId,
@@ -150,14 +151,14 @@ export function MeetingBookingCard({
           <div className="flex items-center gap-2 pt-1">
             <div className="flex -space-x-2" aria-label="회의 멤버">
               {members.slice(0, 5).map((member) => (
-                <span
+                <UserAvatar
                   key={member.userId}
-                  role="img"
-                  aria-label={member.name}
-                  className="flex size-8 items-center justify-center rounded-full border-2 border-card bg-muted text-xs font-semibold"
-                >
-                  {Array.from(member.name)[0]}
-                </span>
+                  name={member.name}
+                  avatar={member.avatar}
+                  alt={member.name}
+                  size={32}
+                  className="rounded-full ring-2 ring-card"
+                />
               ))}
             </div>
             {members.length > 5 && (
@@ -203,15 +204,17 @@ export function MeetingMembers({
               aria-label={`${member.name} 프로필`}
               className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
             >
-              <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-muted font-medium">
-                <span aria-hidden="true">{Array.from(member.name)[0]}</span>
-                <span className="absolute right-0 bottom-0">
+              <UserAvatar
+                name={member.name}
+                avatar={member.avatar}
+                size={36}
+                status={
                   <PersonStatus
                     userId={member.userId}
                     sharesSpace={member.sharesSpace}
                   />
-                </span>
-              </span>
+                }
+              />
               <span className="truncate text-sm">{member.name}</span>
             </button>
           </PersonCard>

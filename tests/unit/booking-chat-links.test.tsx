@@ -138,6 +138,7 @@ it("uses the same meeting destination in reminder rows and toast actions", () =>
   const reminder: NotificationItem = {
     id: "reminder",
     type: "booking_reminder",
+    actorAvatar: null,
     bookingId: booking.id,
     read: false,
     scheduledFor: "2026-10-08T02:59:00.000Z",

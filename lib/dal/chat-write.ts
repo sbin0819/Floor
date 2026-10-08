@@ -250,6 +250,7 @@ export async function insertSystemMessage(
     seq: room.seq,
     authorId: null,
     authorName: null,
+    authorAvatar: null,
     clientId: null,
     kind: "system",
     body: systemMessageText(data),

@@ -5,6 +5,8 @@ import { getDb } from "@/lib/db/client";
 import { teamMembers, teams, users } from "@/lib/db/schema";
 import type { DalDatabase } from "@/lib/dal/database";
 import { blockedBetween } from "./people-blocks";
+import { avatarColumns } from "./avatar";
+import { toAvatar } from "@/lib/avatar";
 
 export async function findParticipants(
   userId: string,
@@ -17,10 +19,11 @@ export async function findParticipants(
     where mine.user_id = ${userId} and theirs.user_id = ${users.id}
   )`;
   const like = `%${query.replace(/[\\%_]/gu, "\\$&")}%`;
-  return database
+  const rows = await database
     .select({
       userId: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       email: users.email,
       sharedTeamNames: sql<string[]>`coalesce((
         select jsonb_agg(t.name order by t.name, t.id)
@@ -48,4 +51,8 @@ export async function findParticipants(
       asc(users.id),
     )
     .limit(8);
+  return rows.map(({ avatar, ...row }) => ({
+    ...row,
+    avatar: toAvatar(avatar),
+  }));
 }

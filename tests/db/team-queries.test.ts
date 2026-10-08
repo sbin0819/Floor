@@ -10,6 +10,7 @@ import {
 } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTeamQueries } from "@/features/teams/query-factory";
+import { avatarColorFor } from "@/lib/avatar";
 import { ActionError } from "@/lib/actions/result";
 import type { Session } from "@/lib/auth/types";
 import * as dal from "@/lib/dal";
@@ -89,6 +90,43 @@ describe("authenticated team queries and safe DTOs", () => {
       canSendEmail: () => false,
     });
 
+  it("uses the same safe avatar for member and administrator-only request rows", async () => {
+    await database.db
+      .update(users)
+      .set({
+        avatarColor: "teal",
+        avatarPhoto: true,
+        avatarUrl: "https://avatars.githubusercontent.com/u/321",
+      })
+      .where(eq(users.id, actors.member.userId));
+    await database.db
+      .update(users)
+      .set({
+        avatarColor: "pink",
+        avatarPhoto: true,
+        avatarUrl: "https://unsafe.example.test/avatar",
+      })
+      .where(eq(users.id, actors.outsider.userId));
+    const data = await queries(actors.owner).getTeamPageData(teamId);
+    expect(
+      data?.members.find(({ id }) => id === actors.member.userId)?.avatar,
+    ).toEqual({
+      color: "teal",
+      photoUrl: "https://avatars.githubusercontent.com/u/321",
+    });
+    expect(data?.role).toBe("admin");
+    if (data?.role !== "admin")
+      throw new Error("Expected administrator fixture");
+    expect(data.joinRequests[0]?.avatar).toEqual({
+      color: "pink",
+      photoUrl: null,
+    });
+    expect(JSON.stringify(data)).not.toContain("unsafe.example.test");
+    for (const person of [...data.members, ...data.joinRequests]) {
+      expect(person).not.toHaveProperty("avatarUrl");
+      expect(person).not.toHaveProperty("avatarPhoto");
+    }
+  });
   it("requires a session separately for every public query before database access", async () => {
     const readSession = vi.fn(async () => {
       throw new ActionError("UNAUTHENTICATED");
@@ -147,6 +185,10 @@ describe("authenticated team queries and safe DTOs", () => {
         {
           id: actors.member.userId,
           name: actors.member.name,
+          avatar: {
+            color: avatarColorFor(actors.member.userId, null),
+            photoUrl: null,
+          },
           email: actors.member.email,
           role: "member",
           title: "개발자",

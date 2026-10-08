@@ -36,6 +36,7 @@ const sdk = vi.hoisted(() => ({
 }));
 
 const created: Extract<RealtimeEvent, { type: "message.created" }> = {
+  authorAvatar: { color: "blue" as const, photoUrl: null },
   attachments: [],
   type: "message.created",
   roomId: "a",
@@ -157,6 +158,7 @@ describe("Ably SDK bridge", () => {
       systemData: { type: "booking_created", actorName: "김서연" },
       authorId: null,
       authorName: null,
+      authorAvatar: null,
       clientId: null,
       replyTo: null,
       mentions: [],
@@ -313,6 +315,28 @@ describe("Ably SDK bridge", () => {
       },
     });
     expect(listener).toHaveBeenCalledExactlyOnceWith(created);
+  });
+  it("preserves the public avatar and rejects missing or unsafe author avatars", async () => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const listener = vi.fn();
+    await client.channel("room:a").subscribe(listener);
+    const receive = sdk.subscribe.mock.calls[0]![0];
+    const event = {
+      ...created,
+      authorAvatar: {
+        color: "teal",
+        photoUrl: "https://lh3.googleusercontent.com/a/photo",
+      },
+    };
+    receive({ data: event });
+    expect(listener).toHaveBeenCalledExactlyOnceWith(event);
+    for (const authorAvatar of [
+      undefined,
+      { color: "teal", photoUrl: "https://evil.test/avatar" },
+      { ...event.authorAvatar, avatarUrl: "private" },
+    ])
+      receive({ data: { ...event, authorAvatar } });
+    expect(listener).toHaveBeenCalledTimes(1);
   });
   it("forwards validated system snapshots and falls back to body for malformed data", async () => {
     const client = await loadAblyBrowserClient(vi.fn());

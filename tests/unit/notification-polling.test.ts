@@ -23,6 +23,7 @@ describe("notification polling and toast decisions", () => {
       id: "previously-seen",
       type: "booking_invited" as const,
       read: false,
+      actorAvatar: null,
       scheduledFor: "2026-10-08T05:55:10Z",
       bookingId: null,
       data: {

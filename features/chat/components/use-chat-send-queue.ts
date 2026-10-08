@@ -192,6 +192,7 @@ export function useChatSendQueue(
       seq: 0,
       authorId: userId,
       authorName: data.user.name,
+      authorAvatar: data.user.avatar,
       kind: "text",
       body,
       createdAt: new Date().toISOString(),

@@ -31,13 +31,28 @@ const data: ChannelView = {
     muted: false,
     unreadMentions: 0,
   },
-  user: { id: park, name: "박지훈" },
+  user: {
+    avatar: { color: "blue" as const, photoUrl: null },
+    id: park,
+    name: "박지훈",
+  },
   members: [
-    { id: park, name: "박지훈", admin: true },
-    { id: lee, name: "이서연", admin: false },
+    {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: park,
+      name: "박지훈",
+      admin: true,
+    },
+    {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: lee,
+      name: "이서연",
+      admin: false,
+    },
   ],
   messages: [
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "first",
       seq: 1,
@@ -49,6 +64,7 @@ const data: ChannelView = {
       clientId: null,
     },
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "second",
       seq: 2,
@@ -60,6 +76,7 @@ const data: ChannelView = {
       clientId: null,
     },
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "third",
       seq: 3,
@@ -90,6 +107,8 @@ function ChannelStory({
   const [client] = useState(() => {
     const client = new QueryClient();
     client.setQueryData(["chat", "nav"], {
+      chatToasts: true,
+      tabBadge: true,
       filesEnabled: false,
       callsEnabled: false,
       calls: [],
@@ -188,6 +207,7 @@ function bubble(
   values: Partial<DisplayMessage> = {},
 ): DisplayMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: `bubble-${seq}`,
     seq,

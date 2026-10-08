@@ -15,6 +15,7 @@ import {
 } from "./ably-test-client";
 
 const event: RealtimeEvent = {
+  authorAvatar: { color: "blue" as const, photoUrl: null },
   attachments: [],
   type: "message.created",
   roomId: "a",

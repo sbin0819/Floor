@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avatarSchema } from "@/lib/avatar";
 import {
   bookingNotificationDataSchema,
   bookingNotificationTypes,
@@ -12,6 +13,7 @@ import {
 const instant = z.iso.datetime({ offset: true });
 const itemFields = {
   id: z.string().min(1),
+  actorAvatar: avatarSchema.nullable(),
   read: z.boolean(),
   scheduledFor: instant,
   bookingId: z.string().min(1).nullable(),

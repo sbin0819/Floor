@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { avatarSchema } from "@/lib/avatar";
 import type { ParticipantSearchResult } from "./participants";
 
 const resultSchema = z.strictObject({
   userId: z.string().min(1),
   name: z.string().min(1),
+  avatar: avatarSchema,
   sharedTeamNames: z.array(z.string()),
   maskedEmail: z.string().regex(/^[^@]{1,2}•••@[^@]+$/u),
 });

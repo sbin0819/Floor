@@ -8,12 +8,14 @@ const people: BookingParticipantDraft[] = [
   {
     userId: "first",
     name: "이서연",
+    avatar: { color: "blue" as const, photoUrl: null },
     sharedTeamNames: ["디자인팀"],
     maskedEmail: "se•••@floor.example",
   },
   {
     userId: "second",
     name: "김하은",
+    avatar: { color: "blue" as const, photoUrl: null },
     sharedTeamNames: [],
     maskedEmail: "ha•••@floor.example",
     email: "haneul@floor.example",
@@ -28,9 +30,10 @@ const meta = {
     onChange: () => {},
     maxParticipants: 7,
     search: async () =>
-      people.map(({ userId, name, sharedTeamNames, maskedEmail }) => ({
+      people.map(({ userId, name, avatar, sharedTeamNames, maskedEmail }) => ({
         userId,
         name,
+        avatar,
         sharedTeamNames,
         maskedEmail,
       })),

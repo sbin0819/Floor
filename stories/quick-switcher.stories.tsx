@@ -11,6 +11,8 @@ import type { MessageContact } from "@/features/people/types";
 const id = (n: number) =>
   `76000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const data: ChatNav = {
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: false,
   calls: [],
@@ -42,7 +44,12 @@ const data: ChatNav = {
     {
       roomId: id(3),
       kind: "dm",
-      other: { userId: id(4), name: "김하은", username: "haeun" },
+      other: {
+        avatar: { color: "blue" as const, photoUrl: null },
+        userId: id(4),
+        name: "김하은",
+        username: "haeun",
+      },
       lastSeq: 1,
       lastMessageAt: "2026-10-09T03:00:00.000Z",
       unread: true,
@@ -72,6 +79,7 @@ const data: ChatNav = {
 };
 const people: MessageContact[] = [
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: id(4),
     name: "김하은",
     username: "haeun",
@@ -80,6 +88,7 @@ const people: MessageContact[] = [
     isFriend: true,
   },
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: id(7),
     name: "정유나",
     username: "yuna",

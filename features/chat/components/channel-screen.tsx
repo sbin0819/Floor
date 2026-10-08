@@ -1,4 +1,5 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
 
 import {
   useCallback,
@@ -118,9 +119,27 @@ export function ChannelScreen({
       roomKind: data.room.kind,
       name: data.room.name,
       href: `/s/${data.space.id}/${data.room.id}`,
-      participants: data.call?.participants ?? [],
+      participants: [
+        ...new Map(
+          [
+            ...data.members.map((member) => ({
+              userId: member.id,
+              name: member.name,
+              avatar: member.avatar,
+            })),
+            ...(data.call?.participants ?? []),
+          ].map((person) => [person.userId, person]),
+        ).values(),
+      ],
     }),
-    [data.room.id, data.room.kind, data.room.name, data.space.id, data.call],
+    [
+      data.room.id,
+      data.room.kind,
+      data.room.name,
+      data.space.id,
+      data.call,
+      data.members,
+    ],
   );
   return (
     <ChatRoomScreen
@@ -156,10 +175,22 @@ export function DirectMessageScreen({
         data.call?.participants ??
         (data.kind === "dm"
           ? [
-              { userId: data.user.id, name: data.user.name },
-              { userId: data.other.userId, name: data.other.name },
+              {
+                userId: data.user.id,
+                name: data.user.name,
+                avatar: data.user.avatar,
+              },
+              {
+                userId: data.other.userId,
+                name: data.other.name,
+                avatar: data.other.avatar,
+              },
             ]
-          : []),
+          : data.members.map((member) => ({
+              userId: member.userId,
+              name: member.name,
+              avatar: member.avatar,
+            }))),
     }),
     [data],
   );
@@ -171,6 +202,7 @@ export function DirectMessageScreen({
             members: data.members.map((member) => ({
               id: member.userId,
               name: member.name,
+              avatar: member.avatar,
               admin: false,
               sharesSpace: member.sharesSpace,
             })),
@@ -221,9 +253,13 @@ export function MeetingScreen({
       roomKind: "meeting",
       name: meetingName(data.booking),
       href: `/m/${data.booking.id}`,
-      participants: data.call?.participants ?? [],
+      participants: data.members.map((member) => ({
+        userId: member.userId,
+        name: member.name,
+        avatar: member.avatar,
+      })),
     }),
-    [data.room.id, data.booking, data.call],
+    [data.room.id, data.booking, data.members],
   );
   const source = useMemo(
     () => ({
@@ -231,6 +267,7 @@ export function MeetingScreen({
       members: data.members.map((member) => ({
         id: member.userId,
         name: member.name,
+        avatar: member.avatar,
         admin: false,
         sharesSpace: member.sharesSpace,
       })),
@@ -869,12 +906,12 @@ function ChatRoomScreen({
 function DirectIntroduction({ other }: { other: DirectOther }) {
   return (
     <div className="flex flex-col items-center gap-1 text-center">
-      <span
-        aria-hidden="true"
-        className="mb-2 flex size-16 items-center justify-center rounded-full bg-muted text-xl font-semibold"
-      >
-        {Array.from(other.name.trim())[0] ?? "?"}
-      </span>
+      <UserAvatar
+        name={other.name}
+        avatar={other.avatar}
+        size={64}
+        className="mb-2"
+      />
       <p className="font-bold text-foreground">{other.name}</p>
       {other.username && (
         <p className="text-xs text-muted-foreground">@{other.username}</p>

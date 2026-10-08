@@ -1,4 +1,6 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
+import { avatarColorFor } from "@/lib/avatar";
 
 import {
   useEffect,
@@ -98,7 +100,24 @@ export function RoomCallArea({
       ? eventState.event
       : null;
   const snapshot = changed ? (changed.sessionId ? changed : null) : initialCall;
-  const current = snapshot && snapshot.participantCount > 0 ? snapshot : null;
+  const current =
+    snapshot && snapshot.participantCount > 0
+      ? {
+          ...snapshot,
+          participants: snapshot.participants.map((person) => ({
+            ...person,
+            avatar:
+              "avatar" in person
+                ? person.avatar
+                : (target.participants.find(
+                    (member) => member.userId === person.userId,
+                  )?.avatar ?? {
+                    color: avatarColorFor(person.userId, null),
+                    photoUrl: null,
+                  }),
+          })),
+        }
+      : null;
   const joined =
     participantId !== null &&
     ["connecting", "connected", "reconnecting"].includes(active.phase);
@@ -129,14 +148,14 @@ export function RoomCallArea({
             </span>
             <span className="hidden items-center -space-x-1 sm:flex">
               {current.participants.slice(0, 3).map((person) => (
-                <span
+                <UserAvatar
                   key={person.userId}
-                  role="img"
-                  aria-label={person.name}
-                  className="flex size-7 items-center justify-center rounded-full border border-card bg-muted text-xs"
-                >
-                  {Array.from(person.name)[0]}
-                </span>
+                  name={person.name}
+                  avatar={person.avatar}
+                  alt={person.name}
+                  size={28}
+                  className="rounded-full ring-1 ring-card"
+                />
               ))}
             </span>
           </>

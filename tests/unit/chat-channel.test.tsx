@@ -73,6 +73,7 @@ vi.mock("@/components/realtime-provider", () => ({
 const now = "2026-10-08T03:00:00Z";
 function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: "message",
     seq: 1,
@@ -113,10 +114,24 @@ function view(overrides: Partial<ChannelView> = {}): ChannelView {
       muted: false,
       unreadMentions: 0,
     },
-    user: { id: "me", name: "박지훈" },
+    user: {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: "me",
+      name: "박지훈",
+    },
     members: [
-      { id: "me", name: "박지훈", admin: true },
-      { id: "other", name: "이서연", admin: false },
+      {
+        avatar: { color: "blue" as const, photoUrl: null },
+        id: "me",
+        name: "박지훈",
+        admin: true,
+      },
+      {
+        avatar: { color: "blue" as const, photoUrl: null },
+        id: "other",
+        name: "이서연",
+        admin: false,
+      },
     ],
     messages: [message()],
     canWrite: true,
@@ -138,6 +153,8 @@ function setup(data = view(), send: SendChatMessage = vi.fn()) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   client.setQueryData(["chat", "nav"], {
+    chatToasts: true,
+    tabBadge: true,
     filesEnabled: false,
     callsEnabled: false,
     calls: [],
@@ -273,6 +290,8 @@ describe("chat channel presentation", () => {
     expect(screen.queryByText("안녕하세요")).not.toBeInTheDocument();
     await act(async () => {
       client.setQueryData(["chat", "nav"], {
+        chatToasts: true,
+        tabBadge: true,
         filesEnabled: false,
         callsEnabled: false,
         calls: [],

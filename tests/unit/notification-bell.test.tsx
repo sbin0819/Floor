@@ -42,6 +42,7 @@ const initial: NotificationSummary = {
       bookingId: "booking",
       type: "booking_invited",
       read: false,
+      actorAvatar: null,
       scheduledFor: "2026-10-08T05:50:00Z",
       href: "/bookings?view=calendar",
       data: {

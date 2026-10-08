@@ -25,6 +25,8 @@ function show() {
   });
   client.setQueryData<ChatNav>(CHAT_NAV_KEY, {
     filesEnabled: false,
+    chatToasts: true,
+    tabBadge: true,
     callsEnabled: false,
     calls: [],
     myCall: null,
@@ -38,6 +40,7 @@ function show() {
   render(
     <QueryClientProvider client={client}>
       <AccountMenu
+        avatar={{ color: "blue", photoUrl: null }}
         name="가상 회원"
         email="member@example.test"
         username="floor.member"

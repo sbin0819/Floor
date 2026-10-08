@@ -7,6 +7,7 @@ import {
 const person = {
   userId: "first",
   name: "이서연",
+  avatar: { color: "blue" as const, photoUrl: null },
   sharedTeamNames: ["디자인팀"],
   maskedEmail: "se•••@floor.example",
 };
@@ -47,6 +48,21 @@ describe("participant search transport", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(Response.json({ results: [result] })),
+    );
+    await expect(
+      fetchParticipants("이서", new AbortController().signal),
+    ).rejects.toEqual(new ParticipantSearchError(500));
+  });
+  it.each([
+    { color: "blue", photoUrl: "https://unsafe.example.test/photo" },
+    { color: "blue", photoUrl: null, avatarPhoto: true },
+    { color: "unknown", photoUrl: null },
+  ])("rejects unsafe or expanded avatar data", async (avatar) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(Response.json({ results: [{ ...person, avatar }] })),
     );
     await expect(
       fetchParticipants("이서", new AbortController().signal),

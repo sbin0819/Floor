@@ -34,6 +34,7 @@ const me = "00000000-0000-4000-8000-000000000001";
 const communityId = "00000000-0000-4000-8000-000000000013";
 const members: SpaceMember[] = [
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: me,
     name: "김하은",
     username: "haeun",
@@ -41,6 +42,7 @@ const members: SpaceMember[] = [
     sharesSpace: true,
   },
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: "00000000-0000-4000-8000-000000000002",
     name: "박지훈",
     username: "jihoon",
@@ -48,6 +50,7 @@ const members: SpaceMember[] = [
     sharesSpace: true,
   },
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: "00000000-0000-4000-8000-000000000003",
     name: "이서연",
     username: "seoyeon",
@@ -124,6 +127,7 @@ const membersData: SpaceMembersView = {
   members,
   banned: [
     {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: "00000000-0000-4000-8000-000000000004",
       name: "최도윤",
       username: "doyun",
@@ -133,6 +137,8 @@ const membersData: SpaceMembersView = {
   ],
 };
 const nav: ChatNav = {
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: false,
   calls: [],
@@ -170,6 +176,7 @@ function Preview({ children }: { children: ReactNode }) {
       ...(membersData.view === "full" ? membersData.banned : []),
     ]) {
       const profile: PersonProfile = {
+        avatar: { color: "blue" as const, photoUrl: null },
         userId: member.userId,
         name: member.name,
         username: member.username,
@@ -392,6 +399,7 @@ export const InviteLinks: Story = {
     <SpaceInvitesList
       rows={[
         {
+          createdByAvatar: { color: "blue" as const, photoUrl: null },
           inviteId: "00000000-0000-4000-8000-000000000031",
           codePrefix: "story1",
           createdByName: "김하은",
@@ -400,6 +408,7 @@ export const InviteLinks: Story = {
           maxUses: 10,
         },
         {
+          createdByAvatar: { color: "blue" as const, photoUrl: null },
           inviteId: "00000000-0000-4000-8000-000000000032",
           codePrefix: "story2",
           createdByName: "박지훈",

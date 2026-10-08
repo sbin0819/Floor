@@ -20,6 +20,7 @@ function notification(
     id: type,
     type,
     read: false,
+    actorAvatar: null,
     scheduledFor: "2026-10-08T05:50:00Z",
     bookingId: "booking",
     data: {
@@ -44,6 +45,40 @@ function notification(
 }
 
 describe("shared notification rows", () => {
+  it("uses the actor avatar for person events and keeps reminders as a clock", () => {
+    const { container, rerender } = render(
+      <NotificationRow
+        item={{
+          ...notification(),
+          actorAvatar: {
+            color: "pink",
+            photoUrl: "https://avatars.githubusercontent.com/u/987",
+          },
+        }}
+        now={now}
+        onActivate={vi.fn()}
+      />,
+    );
+    expect(container.querySelector("[data-user-avatar] img")).toHaveAttribute(
+      "src",
+      "https://avatars.githubusercontent.com/u/987",
+    );
+    expect(container.querySelector("img")).toHaveAttribute(
+      "referrerpolicy",
+      "no-referrer",
+    );
+    rerender(
+      <NotificationRow
+        item={notification("booking_reminder")}
+        now={now}
+        onActivate={vi.fn()}
+      />,
+    );
+    expect(
+      container.querySelector("[data-user-avatar]"),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector("svg")).toBeInTheDocument();
+  });
   it.each([
     ["booking_invited", "박지훈 님이 회의실 C 예약에 초대했어요"],
     ["booking_changed", "박지훈 님이 회의실 C 예약의 시간을 바꿨어요"],

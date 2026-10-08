@@ -1,5 +1,7 @@
+import type { Avatar } from "@/lib/avatar";
+
 export type CallKind = "voice" | "huddle";
-export type CallPerson = { userId: string; name: string };
+export type CallPerson = { userId: string; name: string; avatar: Avatar };
 export type CallView = {
   sessionId: string;
   kind: CallKind;

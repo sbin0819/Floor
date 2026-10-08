@@ -2,6 +2,9 @@ import "server-only";
 
 import { and, asc, desc, eq, ne, or, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import { alias } from "drizzle-orm/pg-core";
+import { toAvatar } from "@/lib/avatar";
+import { avatarColumns, avatarJson } from "./avatar";
 import { friendships, users } from "@/lib/db/schema";
 import type {
   FriendRow,
@@ -56,7 +59,7 @@ function relation(me: string, now: Date) {
 }
 const personId = sql`${users.id}`;
 
-export function searchPeopleRows(
+export async function searchPeopleRows(
   me: string,
   input: { query: string; username: string | null },
   now: Date,
@@ -71,10 +74,11 @@ export function searchPeopleRows(
     sharedTeamCondition(me, personId),
     sharedMembershipSpace(me, personId),
   )!;
-  return database
+  const rows = await database
     .select({
       userId: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       username: users.username,
       relation: relation(me, now),
       sharedTeamNames: sharedTeamNames(me, personId),
@@ -104,6 +108,10 @@ export function searchPeopleRows(
     )
     .orderBy(desc(exact), desc(shared), asc(users.name), asc(users.id))
     .limit(8);
+  return rows.map(({ avatar, ...row }) => ({
+    ...row,
+    avatar: toAvatar(avatar),
+  }));
 }
 
 export async function readPersonProfile(
@@ -116,6 +124,7 @@ export async function readPersonProfile(
     .select({
       userId: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       username: users.username,
       relation: relation(me, now),
       directRoomId: directRoomId(me, personId),
@@ -160,17 +169,18 @@ export async function readPersonProfile(
         ),
       ),
     );
-  return row ?? null;
+  return row ? { ...row, avatar: toAvatar(row.avatar) } : null;
 }
 
-export function listMessageContacts(
+export async function listMessageContacts(
   me: string,
   database: DalDatabase = getDb(),
 ) {
-  return database
+  const rows = await database
     .select({
       userId: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       username: users.username,
       isFriend: sql<boolean>`coalesce(${friendships.status} = 'accepted', false)`,
       sharedTeamNames: sharedTeamNames(me, personId),
@@ -191,6 +201,10 @@ export function listMessageContacts(
     )
     .orderBy(asc(users.name), asc(users.id))
     .limit(500);
+  return rows.map(({ avatar, ...row }) => ({
+    ...row,
+    avatar: toAvatar(avatar),
+  }));
 }
 
 export async function readFriendsList(
@@ -200,6 +214,10 @@ export async function readFriendsList(
   database: DalDatabase = getDb(),
 ) {
   const peer = sql`peer.id`;
+  const storedAvatar = avatarJson(alias(users, "peer"));
+  type StoredFriend = Omit<FriendRow, "avatar"> & {
+    avatar: Parameters<typeof toAvatar>[0];
+  };
   const required =
     tab === "all"
       ? sql`f.status = 'accepted'`
@@ -215,16 +233,18 @@ export async function readFriendsList(
       messageRequestCount: messageRequestCount(me),
       rows:
         tab === "requests"
-          ? sql<FriendRow[]>`'[]'::jsonb`
+          ? sql<StoredFriend[]>`'[]'::jsonb`
           : tab === "blocked"
-            ? sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
+            ? sql<StoredFriend[]>`coalesce((select jsonb_agg(jsonb_build_object(
       'userId', peer.id, 'name', peer.name, 'username', peer.username,
+      'avatar', ${storedAvatar},
       'sharedTeamNames', ${sharedTeamNames(me, peer)}, 'directRoomId', ${directRoomId(me, peer)}
     ) order by peer.name, peer.id)
     from user_blocks blocked join users peer on peer.id = blocked.blocked_id
     where blocked.blocker_id = ${me}::uuid), '[]'::jsonb)`
-            : sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
+            : sql<StoredFriend[]>`coalesce((select jsonb_agg(jsonb_build_object(
       'userId', peer.id, 'name', peer.name, 'username', peer.username,
+      'avatar', ${storedAvatar},
       'sharedTeamNames', ${sharedTeamNames(me, peer)}, 'directRoomId', ${directRoomId(me, peer)}
     ) order by peer.name, peer.id)
     from friendships f join users peer on peer.id = case when f.user_low_id = ${me}::uuid then f.user_high_id else f.user_low_id end
@@ -232,5 +252,13 @@ export async function readFriendsList(
     })
     .from(users)
     .where(eq(users.id, me));
-  return row ?? null;
+  return row
+    ? {
+        ...row,
+        rows: row.rows.map(({ avatar, ...person }) => ({
+          ...person,
+          avatar: toAvatar(avatar),
+        })),
+      }
+    : null;
 }

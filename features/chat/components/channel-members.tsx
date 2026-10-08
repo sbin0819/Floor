@@ -4,6 +4,8 @@ import { usePresenceStatuses } from "@/components/realtime-provider";
 import { StatusDot } from "@/features/people/components/person-status";
 import { presenceSortGroup } from "@/features/people/status";
 import { PersonCard } from "@/features/people/components/person-card";
+import { UserAvatar } from "@/components/user-avatar";
+import type { Avatar } from "@/lib/avatar";
 
 export function ChannelMembers({
   members,
@@ -11,6 +13,7 @@ export function ChannelMembers({
   members: {
     id: string;
     name: string;
+    avatar: Avatar;
     admin: boolean;
     sharesSpace?: boolean;
   }[];
@@ -37,12 +40,12 @@ export function ChannelMembers({
               aria-label={`${member.name} 프로필`}
               className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
             >
-              <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-muted font-medium">
-                <span aria-hidden="true">{Array.from(member.name)[0]}</span>
-                <span className="absolute right-0 bottom-0">
-                  <StatusDot status={statuses[member.id] ?? "unknown"} />
-                </span>
-              </span>
+              <UserAvatar
+                name={member.name}
+                avatar={member.avatar}
+                size={36}
+                status={<StatusDot status={statuses[member.id] ?? "unknown"} />}
+              />
               <span className="min-w-0 flex-1 truncate text-sm">
                 {member.name}
               </span>

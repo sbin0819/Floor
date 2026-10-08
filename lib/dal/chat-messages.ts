@@ -12,6 +12,8 @@ import type {
 import { excerptOf } from "@/features/chat/message-text";
 import { parseSystemMessageData } from "@/features/chat/system-messages";
 import type { DalDatabase } from "./database";
+import { avatarColumns } from "./avatar";
+import { toAvatar } from "@/lib/avatar";
 
 type ReplyRow = {
   id: string;
@@ -30,6 +32,7 @@ export function selectChatMessages(userId: string, database: DalDatabase) {
       seq: messages.seq,
       authorId: messages.authorId,
       authorName: users.name,
+      author: avatarColumns(users),
       kind: messages.kind,
       systemData: messages.systemData,
       body: messages.body,
@@ -85,8 +88,10 @@ export function selectChatMessages(userId: string, database: DalDatabase) {
 
 type MessageRow = Awaited<ReturnType<typeof selectChatMessages>>[number];
 export function serializeChatMessage(row: MessageRow): ChatMessage {
+  const { author, ...message } = row;
   return {
-    ...row,
+    ...message,
+    authorAvatar: row.kind === "text" && author ? toAvatar(author) : null,
     systemData:
       row.kind === "system" ? parseSystemMessageData(row.systemData) : null,
     createdAt: row.createdAt.toISOString(),

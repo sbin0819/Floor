@@ -3,6 +3,8 @@ import type { MessageContact } from "@/features/people/types";
 export const id = (n: number) =>
   `76000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 export const nav: ChatNav = {
+  chatToasts: true,
+  tabBadge: true,
   filesEnabled: false,
   callsEnabled: false,
   calls: [],
@@ -44,7 +46,12 @@ export const nav: ChatNav = {
     {
       roomId: id(4),
       kind: "dm",
-      other: { userId: id(20), name: "김하은", username: "HAEUN" },
+      other: {
+        avatar: { color: "blue" as const, photoUrl: null },
+        userId: id(20),
+        name: "김하은",
+        username: "HAEUN",
+      },
       lastSeq: 1,
       lastMessageAt: "2026-10-09T03:00:00.000Z",
       unread: false,
@@ -57,8 +64,16 @@ export const nav: ChatNav = {
       kind: "group_dm",
       name: null,
       members: [
-        { userId: id(21), name: "박지훈" },
-        { userId: id(22), name: "이서연" },
+        {
+          avatar: { color: "blue" as const, photoUrl: null },
+          userId: id(21),
+          name: "박지훈",
+        },
+        {
+          avatar: { color: "blue" as const, photoUrl: null },
+          userId: id(22),
+          name: "이서연",
+        },
       ],
       memberCount: 3,
       lastSeq: 1,
@@ -87,6 +102,7 @@ export const nav: ChatNav = {
 };
 export const contacts: MessageContact[] = [
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: id(20),
     name: "김하은",
     username: "haeun",
@@ -95,6 +111,7 @@ export const contacts: MessageContact[] = [
     directRoomId: id(4),
   },
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: id(23),
     name: "정유나",
     username: "yuna",

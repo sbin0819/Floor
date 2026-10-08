@@ -25,6 +25,7 @@ describe("chat page client", () => {
       height: null,
     };
     const message = {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "message",
       seq: 1,
@@ -60,6 +61,7 @@ describe("chat page client", () => {
     );
     const result = await fetchRoomMessagesPage("room", { after: 0 });
     expect(result.messages[0]?.attachments).toEqual([attachment]);
+    expect(result.messages[0]?.authorAvatar).toEqual(message.authorAvatar);
     expect(result.messages[0]?.replyTo?.attachmentSummary).toEqual({
       images: 1,
       files: 0,

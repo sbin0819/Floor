@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState, useSyncExternalStore, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import { avatarSchema } from "@/lib/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +29,7 @@ import { PersonStatus } from "./person-status";
 const profileSchema = z.strictObject({
   userId: z.uuid(),
   name: z.string(),
+  avatar: avatarSchema,
   username: z.string().nullable(),
   isMe: z.boolean(),
   relation: z
@@ -161,19 +164,21 @@ function ProfileContent({
 export function PersonProfileContent({
   person,
   actions,
+  preview = false,
 }: {
   person: PersonProfile;
   actions?: FriendActions;
+  preview?: boolean;
 }) {
   return (
     <div className="space-y-4">
       <div>
-        <span
-          aria-hidden="true"
-          className="mb-3 flex size-16 items-center justify-center rounded-full bg-muted text-xl font-semibold"
-        >
-          {Array.from(person.name.trim())[0] ?? "?"}
-        </span>
+        <UserAvatar
+          name={person.name}
+          avatar={person.avatar}
+          size={64}
+          className="mb-3"
+        />
         <h2 className="text-lg font-bold">{person.name}</h2>
         <PersonStatus
           userId={person.userId}
@@ -192,18 +197,28 @@ export function PersonProfileContent({
           <ul>
             {person.sharedSpaces.map((space) => (
               <li key={space.id}>
-                <Link
-                  href={`/s/${space.id}`}
-                  className="inline-flex min-h-11 items-center rounded-md text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  {space.name}
-                </Link>
+                {preview ? (
+                  <span className="inline-flex min-h-11 items-center text-sm">
+                    {space.name}
+                  </span>
+                ) : (
+                  <Link
+                    href={`/s/${space.id}`}
+                    className="inline-flex min-h-11 items-center rounded-md text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    {space.name}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
         </section>
       )}
-      {person.isMe ? (
+      {preview ? (
+        <Button disabled variant="outline">
+          {person.isMe ? "설정" : "메시지"}
+        </Button>
+      ) : person.isMe ? (
         <Button asChild variant="outline">
           <Link href="/settings">설정</Link>
         </Button>

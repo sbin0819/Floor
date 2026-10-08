@@ -27,6 +27,8 @@ import type { DalDatabase } from "./database";
 import { selectChatMessages } from "./chat-messages";
 import type { UserStatus } from "@/features/people/status";
 import { blockedBy } from "./people-blocks";
+import { avatarColumns } from "./avatar";
+import { toAvatar } from "@/lib/avatar";
 
 export function listChatNav(userId: string, database: DalDatabase = getDb()) {
   const access = spaceAccessFields(userId);
@@ -100,6 +102,8 @@ export async function readChatNavigation(
   const [result] = await database
     .select({
       myStatus: sql<UserStatus>`${users.status}`,
+      chatToasts: users.chatToasts,
+      tabBadge: users.tabBadge,
       blockedUserIds: sql<
         string[]
       >`array(select b.blocked_id from user_blocks b where b.blocker_id = ${userId}::uuid order by b.blocked_id)`,
@@ -116,7 +120,13 @@ export async function readChatNavigation(
     .from(users)
     .where(eq(users.id, userId));
   return (
-    result ?? { myStatus: "online" as const, blockedUserIds: [], rows: [] }
+    result ?? {
+      myStatus: "online" as const,
+      chatToasts: true,
+      tabBadge: true,
+      blockedUserIds: [],
+      rows: [],
+    }
   );
 }
 
@@ -132,15 +142,16 @@ export async function listRecentMessages(
   return rows.reverse();
 }
 
-export function listChatMembers(
+export async function listChatMembers(
   teamId: string,
   database: DalDatabase = getDb(),
   mentionAuthorId?: string,
 ) {
-  return database
+  const rows = await database
     .select({
       id: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       admin: sql<boolean>`${teamMembers.role} = 'admin'`,
       ...(mentionAuthorId
         ? {
@@ -152,6 +163,7 @@ export function listChatMembers(
     .innerJoin(users, eq(teamMembers.userId, users.id))
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(asc(users.name), asc(users.id));
+  return rows.map((row) => ({ ...row, avatar: toAvatar(row.avatar) }));
 }
 
 export async function listChannelMembers(
@@ -181,10 +193,11 @@ export async function listChannelMembers(
     space.spaceKind === "branch"
       ? sql<boolean>`(${regularAdmin} or (${staffAdmin} and ${staff}))`
       : sql<boolean>`member.role in ('owner', 'admin')`;
-  return database
+  const rows = await database
     .select({
       id: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       admin,
       sharesSpace: sharesChatSpace(viewerId, sql`${users.id}`),
       ...(options.mentionAuthorId
@@ -211,6 +224,7 @@ export async function listChannelMembers(
       ),
     )
     .orderBy(asc(users.name), asc(users.id));
+  return rows.map((row) => ({ ...row, avatar: toAvatar(row.avatar) }));
 }
 
 export async function listMessagesPage(

@@ -14,7 +14,9 @@ import {
 } from "drizzle-orm";
 import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db/client";
-import { notifications } from "@/lib/db/schema";
+import { notifications, users } from "@/lib/db/schema";
+import { toAvatar } from "@/lib/avatar";
+import { avatarColumns } from "./avatar";
 import type { DalDatabase } from "./database";
 
 export function visibleNotificationWindow(
@@ -40,10 +42,21 @@ function visible(
   );
 }
 
+function reminderEnabled(
+  userId: string,
+  table: { type: AnyPgColumn; data: AnyPgColumn } = notifications,
+) {
+  return sql<boolean>`(${table.type} <> 'booking_reminder' or
+    (${table.data}->>'minutesBefore')::smallint = any(
+      (select reminder_minutes from users where id = ${userId}::uuid)::smallint[]
+    ))`;
+}
+
 function latestVisible(userId: string, now: Date, database: DalDatabase) {
   const newer = alias(notifications, "newer_reminder");
   return and(
     visible(userId, now),
+    reminderEnabled(userId),
     or(
       sql`${notifications.type} <> 'booking_reminder'`,
       isNull(notifications.bookingId),
@@ -54,6 +67,7 @@ function latestVisible(userId: string, now: Date, database: DalDatabase) {
           .where(
             and(
               visible(userId, now, newer),
+              reminderEnabled(userId, newer),
               eq(newer.type, "booking_reminder"),
               eq(newer.bookingId, notifications.bookingId),
               gt(newer.scheduledFor, notifications.scheduledFor),
@@ -64,13 +78,13 @@ function latestVisible(userId: string, now: Date, database: DalDatabase) {
   );
 }
 
-export function listVisibleNotifications(
+export async function listVisibleNotifications(
   userId: string,
   now: Date,
   limit: 20 | 100,
   database: DalDatabase = getDb(),
 ) {
-  return database
+  const rows = await database
     .select({
       id: notifications.id,
       type: notifications.type,
@@ -78,11 +92,18 @@ export function listVisibleNotifications(
       data: notifications.data,
       scheduledFor: notifications.scheduledFor,
       readAt: notifications.readAt,
+      actor: avatarColumns(users),
     })
     .from(notifications)
+    .leftJoin(users, eq(notifications.actorId, users.id))
     .where(latestVisible(userId, now, database))
     .orderBy(desc(notifications.scheduledFor), asc(notifications.id))
     .limit(limit);
+  return rows.map(({ actor, ...row }) => ({
+    ...row,
+    actorAvatar:
+      row.type !== "booking_reminder" && actor ? toAvatar(actor) : null,
+  }));
 }
 
 export async function countUnreadNotifications(
@@ -110,6 +131,7 @@ export async function nextNotificationAt(
     .where(
       and(
         eq(notifications.userId, userId),
+        reminderEnabled(userId),
         gt(notifications.scheduledFor, now),
         or(isNull(notifications.expiresAt), gt(notifications.expiresAt, now)),
       ),

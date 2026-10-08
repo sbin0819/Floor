@@ -22,12 +22,14 @@ import type {
 const colleague: ParticipantSearchResult = {
   userId: "first",
   name: "이서연",
+  avatar: { color: "blue" as const, photoUrl: null },
   sharedTeamNames: ["디자인팀"],
   maskedEmail: "se•••@floor.example",
 };
 const guest: ParticipantSearchResult = {
   userId: "second",
   name: "김하은",
+  avatar: { color: "blue" as const, photoUrl: null },
   sharedTeamNames: [],
   maskedEmail: "ha•••@floor.example",
 };
@@ -132,6 +134,7 @@ describe("ParticipantInput", () => {
       ...guest,
       userId: `guest-${index}`,
       name: `손님${index}`,
+      avatar: { color: "blue" as const, photoUrl: null },
     }));
     const { changes } = display({
       value: chosen,

@@ -6,6 +6,8 @@ import { CHAT_NAV_KEY, pendingMyStatus } from "../nav-state";
 import type { ChatNav } from "../types";
 
 export type ChatMetadata = {
+  chatToasts: boolean;
+  tabBadge: boolean;
   myStatus: UserStatus;
   blockedUserIds: readonly string[];
 };
@@ -19,6 +21,8 @@ export function useChatMetadata() {
     enabled: false,
   });
   return {
+    chatToasts: data?.chatToasts,
+    tabBadge: data?.tabBadge,
     filesEnabled: data?.filesEnabled ?? false,
     myStatus: data?.myStatus ?? pendingMyStatus(client),
     blockedUserIds: data?.blockedUserIds,

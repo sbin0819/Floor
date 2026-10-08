@@ -28,9 +28,14 @@ const data: MeetingView = {
     status: "confirmed",
     attendeeCount: 3,
   },
-  user: { id: "park", name: "박지훈" },
+  user: {
+    avatar: { color: "blue" as const, photoUrl: null },
+    id: "park",
+    name: "박지훈",
+  },
   members: [
     {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: "park",
       name: "박지훈",
       username: "designadmin",
@@ -38,6 +43,7 @@ const data: MeetingView = {
       sharesSpace: true,
     },
     {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: "lee",
       name: "이서연",
       username: "designer",
@@ -45,6 +51,7 @@ const data: MeetingView = {
       sharesSpace: true,
     },
     {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: "jung",
       name: "정유나",
       username: "guest",
@@ -54,6 +61,7 @@ const data: MeetingView = {
   ],
   messages: [
     {
+      authorAvatar: null,
       ...emptyMessageDetails(),
       id: "system",
       seq: 1,
@@ -66,6 +74,7 @@ const data: MeetingView = {
       clientId: null,
     },
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "text",
       seq: 2,
@@ -97,6 +106,8 @@ function MeetingStory({ example = "upcoming" }: { example?: Example }) {
   const [client] = useState(() => {
     const value = new QueryClient();
     value.setQueryData(["chat", "nav"], {
+      chatToasts: true,
+      tabBadge: true,
       filesEnabled: false,
       callsEnabled: false,
       calls: [],

@@ -116,6 +116,7 @@ beforeEach(() => {
   });
   vi.mocked(getAccountMenuData).mockResolvedValue({
     name: "가상 회원",
+    avatar: { color: "blue", photoUrl: null },
     email: "member@example.test",
     isOperator: false,
     myStatus: "online",
@@ -186,6 +187,7 @@ it("shows team roles and the operator destination without a personal limit card"
   });
   vi.mocked(getAccountMenuData).mockResolvedValue({
     name: "가상 회원",
+    avatar: { color: "blue", photoUrl: null },
     email: "member@example.test",
     isOperator: true,
     myStatus: "online",

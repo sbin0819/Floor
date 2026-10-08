@@ -18,6 +18,7 @@ function message(
   overrides: Partial<ChatMessage> = {},
 ): ChatMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: `m-${seq}`,
     seq,

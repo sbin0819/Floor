@@ -189,6 +189,7 @@ export function useChannelMessages(
       seq: event.seq,
       authorId: event.authorId,
       authorName: event.authorName,
+      authorAvatar: event.authorAvatar,
       kind: event.kind,
       systemData: event.systemData,
       body: event.body,

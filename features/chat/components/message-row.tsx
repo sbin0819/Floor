@@ -1,4 +1,5 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
 
 import {
   memo,
@@ -386,12 +387,14 @@ export const MessageRow = memo(function MessageRow({
                       aria-label={`${message.authorName ?? "알 수 없는 사람"} 아바타 프로필`}
                       className="-mx-1 flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
                     >
-                      <span
-                        aria-hidden="true"
-                        className="flex size-9 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground @max-[600px]:size-7.5"
-                      >
-                        {Array.from(message.authorName ?? "?")[0]}
-                      </span>
+                      {message.authorAvatar && (
+                        <UserAvatar
+                          name={message.authorName ?? "?"}
+                          avatar={message.authorAvatar}
+                          size={36}
+                          className="@max-[600px]:size-7.5"
+                        />
+                      )}
                     </button>
                   </PersonCard>
                 )}

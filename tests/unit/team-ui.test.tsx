@@ -340,6 +340,7 @@ describe("invites and requests", () => {
             {
               id: requestId,
               name: "가상 요청자",
+              avatar: { color: "blue" as const, photoUrl: null },
               email: "requester@example.com",
               message: "함께하고 싶어요",
               createdAt: "2026-10-07T12:00:00.000Z",
@@ -431,6 +432,7 @@ describe("read-only views and search", () => {
         {
           id: crypto.randomUUID(),
           name: "가상 회원",
+          avatar: { color: "blue" as const, photoUrl: null },
           email: "member@example.com",
           role: "member",
           title: "디자이너",

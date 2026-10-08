@@ -26,6 +26,7 @@ vi.mock("@/features/chat/actions", () => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 function message(): ChatMessage {
   return {
+    authorAvatar: { color: "blue" as const, photoUrl: null },
     ...emptyMessageDetails(),
     id: "message",
     seq: 1,

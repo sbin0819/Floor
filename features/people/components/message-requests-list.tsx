@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use } from "react";
+import { UserAvatar } from "@/components/user-avatar";
 import { notificationAge } from "@/features/notifications/format";
 import type { MessageRequestRow } from "../types";
 
@@ -26,12 +27,11 @@ export function MessageRequestsList({
             href={`/dm/${row.roomId}`}
             className="flex min-h-11 items-center gap-3 p-4 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
           >
-            <span
-              aria-hidden="true"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted font-semibold"
-            >
-              {Array.from(row.other.name)[0]}
-            </span>
+            <UserAvatar
+              name={row.other.name}
+              avatar={row.other.avatar}
+              size={40}
+            />
             <span className="min-w-0 flex-1">
               <strong className="block text-sm">{row.other.name}</strong>
               {row.other.username && (

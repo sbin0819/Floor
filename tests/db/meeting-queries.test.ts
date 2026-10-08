@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { avatarColorFor } from "@/lib/avatar";
 import {
   afterAll,
   beforeAll,
@@ -161,13 +162,21 @@ describe("meeting channel views and navigation", () => {
         status: "confirmed",
         attendeeCount: 4,
       },
-      user: { id: actors.stranger.userId, name: actors.stranger.name },
+      user: {
+        id: actors.stranger.userId,
+        name: actors.stranger.name,
+        avatar: {
+          color: avatarColorFor(actors.stranger.userId, null),
+          photoUrl: null,
+        },
+      },
       members: [
         { ...actors.person, isBooker: true },
         { ...actors.admin, isBooker: false },
         { ...actors.member, isBooker: false },
         { ...actors.stranger, isBooker: false },
       ].map(({ userId, name, isBooker }) => ({
+        avatar: { color: avatarColorFor(userId, null), photoUrl: null },
         userId,
         name,
         isBooker,
@@ -181,6 +190,7 @@ describe("meeting channel views and navigation", () => {
           seq: 1,
           authorId: null,
           authorName: null,
+          authorAvatar: null,
           kind: "system",
           body: "가상 예약자 님이 예약을 만들었어요",
           systemData: { type: "booking_created", actorName: "가상 예약자" },
@@ -228,6 +238,10 @@ describe("meeting channel views and navigation", () => {
     expect(data?.members).toEqual([
       {
         userId: actors.person.userId,
+        avatar: {
+          color: avatarColorFor(actors.person.userId, null),
+          photoUrl: null,
+        },
         name: actors.person.name,
         username: null,
         isBooker: true,
@@ -235,6 +249,10 @@ describe("meeting channel views and navigation", () => {
       },
       {
         userId: actors.admin.userId,
+        avatar: {
+          color: avatarColorFor(actors.admin.userId, null),
+          photoUrl: null,
+        },
         name: actors.admin.name,
         username: null,
         isBooker: false,
@@ -242,6 +260,10 @@ describe("meeting channel views and navigation", () => {
       },
       {
         userId: actors.member.userId,
+        avatar: {
+          color: avatarColorFor(actors.member.userId, null),
+          photoUrl: null,
+        },
         name: actors.member.name,
         username: "member",
         isBooker: false,

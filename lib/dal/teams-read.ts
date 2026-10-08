@@ -13,6 +13,8 @@ import {
 } from "@/lib/db/schema";
 import { normalizeTeamName } from "@/lib/teams/normalize";
 import { isQueryableInviteToken } from "@/lib/teams/invite-token";
+import { avatarColumns } from "./avatar";
+import { toAvatar } from "@/lib/avatar";
 
 export function pendingInvite() {
   return and(
@@ -95,14 +97,15 @@ export function listMyTeams(userId: string, database: DalDatabase = getDb()) {
     .orderBy(asc(teams.name), asc(teams.id));
 }
 
-export function listTeamMembers(
+export async function listTeamMembers(
   teamId: string,
   database: DalDatabase = getDb(),
 ) {
-  return database
+  const rows = await database
     .select({
       userId: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       email: users.email,
       role: teamMembers.role,
       title: teamMembers.title,
@@ -111,6 +114,10 @@ export function listTeamMembers(
     .innerJoin(users, eq(teamMembers.userId, users.id))
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(asc(users.name), asc(users.id));
+  return rows.map(({ avatar, ...row }) => ({
+    ...row,
+    avatar: toAvatar(avatar),
+  }));
 }
 
 export function searchTeams(query: string, database: DalDatabase = getDb()) {
@@ -215,15 +222,16 @@ export function listSentInvites(
     .orderBy(desc(teamInvites.createdAt), asc(teamInvites.id));
 }
 
-export function listTeamJoinRequests(
+export async function listTeamJoinRequests(
   teamId: string,
   database: DalDatabase = getDb(),
 ) {
-  return database
+  const rows = await database
     .select({
       id: teamJoinRequests.id,
       userId: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       email: users.email,
       message: teamJoinRequests.message,
       createdAt: teamJoinRequests.createdAt,
@@ -237,6 +245,10 @@ export function listTeamJoinRequests(
       ),
     )
     .orderBy(asc(teamJoinRequests.createdAt), asc(teamJoinRequests.id));
+  return rows.map(({ avatar, ...row }) => ({
+    ...row,
+    avatar: toAvatar(avatar),
+  }));
 }
 
 export function listMyJoinRequests(

@@ -31,6 +31,7 @@ const meta = {
         확인 중인 상대에게는 상태 점을 표시하지 않아요.
       </p>
       <AccountMenu
+        avatar={{ color: "blue", photoUrl: null }}
         name="김하은"
         email="haeun@example.test"
         username="haeun.kim"

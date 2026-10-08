@@ -19,6 +19,7 @@ vi.mock("sonner", () => ({ toast: { error: mocks.error } }));
 vi.mock("@/features/chat/actions", () => ({ openDirectMessage: vi.fn() }));
 const people: MessageContact[] = [
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: "friend",
     name: "이서연",
     username: "seoyeon.lee",
@@ -27,6 +28,7 @@ const people: MessageContact[] = [
     directRoomId: "existing",
   },
   {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: "team",
     name: "박지훈",
     username: "jihoon.park",

@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getActionErrorCode } from "@/lib/actions/errors";
 import * as dal from "@/lib/dal";
+import { avatarColorFor } from "@/lib/avatar";
 import type { TransactionDatabase } from "@/lib/dal/database";
 import * as schema from "@/lib/db/schema";
 import {
@@ -216,6 +217,7 @@ describe("team data access and state transitions", () => {
       {
         userId: adminId,
         name: "관리자",
+        avatar: { color: avatarColorFor(adminId, null), photoUrl: null },
         email: "admin@example.test",
         role: "admin",
         title: "팀장",

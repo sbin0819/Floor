@@ -1,4 +1,6 @@
 import "server-only";
+import { avatarColumns } from "./avatar";
+import { toAvatar } from "@/lib/avatar";
 
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { ActionError } from "@/lib/actions/result";
@@ -139,15 +141,16 @@ export function archiveGroup(roomId: string, now: Date, database: DalDatabase) {
     .returning({ id: chatRooms.id });
 }
 
-export function listGroupMembers(
+export async function listGroupMembers(
   roomId: string,
   viewerId: string,
   database: DalDatabase = getDb(),
 ) {
-  return database
+  const rows = await database
     .select({
       userId: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       username: users.username,
       sharesSpace: sharesChatSpace(viewerId, sql`${users.id}`),
     })
@@ -160,4 +163,5 @@ export function listGroupMembers(
       ),
     )
     .orderBy(asc(users.name), asc(users.id));
+  return rows.map((row) => ({ ...row, avatar: toAvatar(row.avatar) }));
 }

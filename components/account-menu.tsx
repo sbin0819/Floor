@@ -21,6 +21,8 @@ import {
 } from "@/components/realtime-provider";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/user-avatar";
+import type { Avatar } from "@/lib/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +38,7 @@ export type AccountMenuVariant = "pill" | "card" | "avatar";
 
 export type AccountMenuProps = {
   name: string;
+  avatar: Avatar;
   email: string;
   isOperator: boolean;
   myStatus?: UserStatus;
@@ -45,13 +48,13 @@ export type AccountMenuProps = {
 
 export function AccountMenu({
   name,
+  avatar,
   email,
   isOperator,
   myStatus = "online",
   username = null,
   variant = "pill",
 }: AccountMenuProps) {
-  const initial = Array.from(name.trim())[0] ?? "?";
   const metadata = useChatMetadata();
   const selected = metadata.myStatus ?? myStatus;
   const presence = useRealtimeScope().status;
@@ -96,20 +99,12 @@ export function AccountMenu({
           )}
           aria-label={`${name}님 사용자 메뉴`}
         >
-          <span
-            aria-hidden="true"
-            className={cn(
-              "relative flex shrink-0 items-center justify-center rounded-full font-medium",
-              variant === "pill" && "size-7 bg-muted text-xs",
-              variant === "card" && "size-8 bg-muted text-sm",
-              variant === "avatar" && "text-sm",
-            )}
-          >
-            {initial}
-            <span className="absolute -right-1 -bottom-1 rounded-full bg-card p-0.5">
-              <StatusDot status={shownStatus} />
-            </span>
-          </span>
+          <UserAvatar
+            name={name}
+            avatar={avatar}
+            size={variant === "pill" ? 28 : variant === "card" ? 32 : 40}
+            status={<StatusDot status={shownStatus} />}
+          />
           {variant !== "avatar" && (
             <>
               <span

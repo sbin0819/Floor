@@ -1,4 +1,6 @@
 import "server-only";
+import { avatarColumns } from "./avatar";
+import { toAvatar } from "@/lib/avatar";
 
 import {
   and,
@@ -293,13 +295,13 @@ export function insertInviteNotifications(
   return database.insert(notifications).values(rows);
 }
 
-export function listSpaceInvites(
+export async function listSpaceInvites(
   spaceId: string,
   me: string,
   now: Date,
   database: DalDatabase = getDb(),
 ) {
-  return database
+  const rows = await database
     .select({
       inviteId: chatSpaceInvites.id,
       codePrefix: sql<string>`left(${chatSpaceInvites.code}, 6)`,
@@ -307,6 +309,7 @@ export function listSpaceInvites(
         string | null
       >`case when ${chatSpaceInvites.createdBy} = ${me}::uuid then ${chatSpaceInvites.code} else null end`,
       createdByName: users.name,
+      createdByAvatar: avatarColumns(users),
       expiresAt: chatSpaceInvites.expiresAt,
       useCount: chatSpaceInvites.useCount,
       maxUses: chatSpaceInvites.maxUses,
@@ -326,14 +329,23 @@ export function listSpaceInvites(
       ),
     )
     .orderBy(desc(chatSpaceInvites.createdAt), asc(chatSpaceInvites.id));
+  return rows.map((row) => ({
+    ...row,
+    createdByAvatar: toAvatar(row.createdByAvatar),
+  }));
 }
-export function listInviteCandidates(
+export async function listInviteCandidates(
   spaceId: string,
   me: string,
   database: DalDatabase = getDb(),
 ) {
-  return database
-    .select({ userId: users.id, name: users.name, username: users.username })
+  const rows = await database
+    .select({
+      userId: users.id,
+      name: users.name,
+      username: users.username,
+      avatar: avatarColumns(users),
+    })
     .from(users)
     .where(
       and(
@@ -346,4 +358,5 @@ export function listInviteCandidates(
     )
     .orderBy(asc(users.name), asc(users.id))
     .limit(500);
+  return rows.map((row) => ({ ...row, avatar: toAvatar(row.avatar) }));
 }

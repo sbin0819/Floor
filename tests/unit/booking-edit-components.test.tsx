@@ -228,6 +228,7 @@ describe("booking edit local form", () => {
       ...data.participants[0]!,
       userId: `guest${index}`,
       name: `손님${index}`,
+      avatar: { color: "blue" as const, photoUrl: null },
     }));
     display(data);
     expect(screen.getByText("손님은 5명까지예요")).toBeVisible();
@@ -243,6 +244,7 @@ describe("booking edit local form", () => {
       {
         userId: "colleague",
         name: "김하은",
+        avatar: { color: "blue" as const, photoUrl: null },
         sharedTeamNames: ["가상 팀"],
         maskedEmail: "ha•••@floor.example",
       },
@@ -255,6 +257,7 @@ describe("booking edit local form", () => {
       {
         userId: "guest",
         name: "박지훈",
+        avatar: { color: "blue" as const, photoUrl: null },
         sharedTeamNames: [],
         maskedEmail: "ji•••@floor.example",
       },
@@ -291,6 +294,7 @@ describe("booking edit local form", () => {
       ...data.participants[0]!,
       userId: `guest${index}`,
       name: `손님${index}`,
+      avatar: { color: "blue" as const, photoUrl: null },
     }));
     const view = display(data);
     changeTitle();

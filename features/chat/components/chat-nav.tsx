@@ -35,6 +35,7 @@ import { CallSession } from "@/features/calls/components/call-provider";
 import { callNavigationTargets } from "@/features/calls/nav-targets";
 import { CallRinging } from "@/features/calls/components/call-ringing";
 import { CallingStatus } from "@/features/calls/components/calling-status";
+import { avatarSchema } from "@/lib/avatar";
 
 const spaceSchema = z.array(
   z.object({
@@ -45,7 +46,13 @@ const spaceSchema = z.array(
         capacity: z.number().int().min(2).max(25),
         participantCount: z.number().int().min(0).max(25),
         participants: z
-          .array(z.object({ userId: z.uuid(), name: z.string() }))
+          .array(
+            z.object({
+              userId: z.uuid(),
+              name: z.string(),
+              avatar: avatarSchema,
+            }),
+          )
           .max(25),
       }),
     ),
@@ -79,6 +86,8 @@ const directNavBase = z.object({
   muted: z.boolean(),
 });
 const navSchema = z.object({
+  chatToasts: z.boolean(),
+  tabBadge: z.boolean(),
   filesEnabled: z.boolean(),
   callsEnabled: z.boolean(),
   calls: z.array(
@@ -124,6 +133,7 @@ const navSchema = z.object({
           userId: z.uuid(),
           name: z.string(),
           username: z.string().nullable(),
+          avatar: avatarSchema,
         }),
       }),
       directNavBase.extend({
@@ -131,7 +141,13 @@ const navSchema = z.object({
         name: z.string().nullable(),
         memberCount: z.number().int().min(1).max(10),
         members: z
-          .array(z.object({ userId: z.uuid(), name: z.string() }))
+          .array(
+            z.object({
+              userId: z.uuid(),
+              name: z.string(),
+              avatar: avatarSchema,
+            }),
+          )
           .max(3),
       }),
     ]),

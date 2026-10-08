@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -135,8 +136,9 @@ export function ParticipantInput({
           {value.map((person) => (
             <li
               key={person.userId}
-              className="flex items-center rounded-lg border border-border bg-muted pl-3 text-sm"
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-muted pl-2 text-sm"
             >
+              <UserAvatar name={person.name} avatar={person.avatar} size={20} />
               <span>{person.name}</span>
               <Button
                 type="button"
@@ -249,7 +251,12 @@ export function ParticipantInput({
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => add(person)}
                 >
-                  <span className="min-w-0">
+                  <UserAvatar
+                    name={person.name}
+                    avatar={person.avatar}
+                    size={32}
+                  />
+                  <span className="min-w-0 flex-1">
                     <span className="block font-medium">{person.name}</span>
                     <span className="block text-xs break-words text-muted-foreground">
                       {[...person.sharedTeamNames, person.maskedEmail].join(

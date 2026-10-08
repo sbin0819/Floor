@@ -3,9 +3,9 @@ import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { chatRooms, chatSpaces, users } from "@/lib/db/schema";
-import type { CallView, MyCall } from "@/features/calls/types";
+import type { MyCall } from "@/features/calls/types";
 import { readableRoomCondition } from "./chat-access";
-import { callSnapshot } from "./call-sql";
+import { callSnapshot, serializeCall, type CallSnapshot } from "./call-sql";
 import type { DalDatabase } from "./database";
 
 type NavigationRoom = {
@@ -14,7 +14,7 @@ type NavigationRoom = {
   kind: "text" | "voice" | "dm" | "group_dm" | "meeting";
   name: string | null;
   capacity: number | null;
-  call: CallView | null;
+  call: CallSnapshot | null;
 };
 
 export async function readCallNavigation(
@@ -68,5 +68,11 @@ export async function readCallNavigation(
     })
     .from(users)
     .where(eq(users.id, userId));
-  return row ?? { rooms: [], myCall: null };
+  return {
+    rooms: (row?.rooms ?? []).map((room) => ({
+      ...room,
+      call: serializeCall(room.call),
+    })),
+    myCall: row?.myCall ?? null,
+  };
 }

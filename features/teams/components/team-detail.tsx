@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import { PageContainer, PageHeading } from "@/components/page-container";
@@ -55,7 +56,14 @@ export function TeamDetail({ data }: { data: TeamPageData }) {
                   className="flex flex-wrap items-center justify-between gap-4 py-4 first:pt-0 last:pb-0 [&:has([data-team-pending=true])]:opacity-50"
                 >
                   <div className="space-y-2">
-                    <p className="font-medium">{request.name}</p>
+                    <p className="flex items-center gap-2 font-medium">
+                      <UserAvatar
+                        name={request.name}
+                        avatar={request.avatar}
+                        size={32}
+                      />
+                      {request.name}
+                    </p>
                     <p className="text-sm break-all text-muted-foreground">
                       {request.email}
                     </p>
@@ -99,12 +107,11 @@ export function TeamDetail({ data }: { data: TeamPageData }) {
                 <TableRow key={member.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <span
-                        aria-hidden="true"
-                        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted"
-                      >
-                        {Array.from(member.name)[0]}
-                      </span>
+                      <UserAvatar
+                        name={member.name}
+                        avatar={member.avatar}
+                        size={36}
+                      />
                       {member.name}
                     </div>
                   </TableCell>

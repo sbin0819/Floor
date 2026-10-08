@@ -1,4 +1,5 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
 
 import { useId } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -72,12 +73,11 @@ export function SpaceMembers({
                   aria-label={`${member.name} 프로필`}
                   className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted font-semibold"
-                  >
-                    {Array.from(member.name.trim())[0] ?? "?"}
-                  </span>
+                  <UserAvatar
+                    name={member.name}
+                    avatar={member.avatar}
+                    size={40}
+                  />
                   <span className="min-w-0">
                     <span className="block truncate font-medium">
                       {member.name}

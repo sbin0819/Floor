@@ -25,6 +25,7 @@ function entry(
     roomId,
     send,
     message: {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: body,
       clientId: body,

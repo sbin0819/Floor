@@ -184,6 +184,7 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
       const members = memberRows.map((member) => ({
         id: member.userId,
         name: member.name,
+        avatar: member.avatar,
         email: member.email,
         role: member.role,
         title: member.title,
@@ -209,6 +210,7 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
         joinRequests: requests.map((request) => ({
           id: request.id,
           name: request.name,
+          avatar: request.avatar,
           email: request.email,
           message: request.message,
           createdAt: request.createdAt.toISOString(),

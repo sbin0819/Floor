@@ -13,6 +13,7 @@ const summary: NotificationSummary = {
       id: "invited",
       type: "booking_invited",
       read: false,
+      actorAvatar: null,
       scheduledFor: "2026-10-08T05:50:00Z",
       bookingId: "booking",
       href: "/bookings?view=calendar",

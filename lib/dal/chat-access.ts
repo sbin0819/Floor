@@ -9,11 +9,15 @@ import {
   chatSpacePrefs,
   teamMembers,
   teams,
+  users,
 } from "@/lib/db/schema";
+import { alias } from "drizzle-orm/pg-core";
+import { toAvatar, type AvatarSource } from "@/lib/avatar";
+import { avatarColumns, avatarJson } from "./avatar";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { blockedBetween, blockedBy } from "./people-blocks";
-import { callSnapshot } from "./call-sql";
+import { callSnapshot, serializeCall } from "./call-sql";
 import {
   loungeAccessFrom,
   type LoungeRoleSettings,
@@ -188,6 +192,7 @@ async function readRoom(
   const [room] = await database
     .select({
       id: chatRooms.id,
+      viewer: { ...avatarColumns(users), name: users.name },
       call: snapshot.call,
       kind: chatRooms.kind,
       spaceId: chatSpaces.id,
@@ -234,8 +239,9 @@ async function readRoom(
         name: string;
         username: string | null;
         sharesSpace: boolean;
+        avatar: AvatarSource;
       } | null>`(
-        select json_build_object('userId', u.id, 'name', u.name, 'username', u.username, 'sharesSpace', ${sharesChatSpace(userId, sql`u.id`)})
+        select json_build_object('userId', u.id, 'name', u.name, 'username', u.username, 'sharesSpace', ${sharesChatSpace(userId, sql`u.id`)}, 'avatar', ${avatarJson(alias(users, "u"))})
         from users u where ${chatRooms.kind} = 'dm' and u.id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end
       )`,
       peerActive: sql<boolean>`exists (select 1 from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end and m.status = 'active')`,
@@ -264,6 +270,7 @@ async function readRoom(
         ),
     })
     .from(chatRooms)
+    .innerJoin(users, eq(users.id, userId))
     .leftJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
     .leftJoinLateral(snapshot, sql`true`)
     .leftJoin(teams, eq(chatSpaces.teamId, teams.id))
@@ -287,7 +294,21 @@ async function readRoom(
     )
     .where(and(target, readableRoomCondition(userId)))
     .limit(1);
-  return room ? { ...room, role: spaceRoleFrom(room) } : null;
+  return room
+    ? {
+        ...room,
+        viewer: {
+          id: room.viewer.id,
+          name: room.viewer.name,
+          avatar: toAvatar(room.viewer),
+        },
+        peer: room.peer
+          ? { ...room.peer, avatar: toAvatar(room.peer.avatar) }
+          : null,
+        call: serializeCall(room.call),
+        role: spaceRoleFrom(room),
+      }
+    : null;
 }
 
 export async function canReadSpace(

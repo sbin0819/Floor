@@ -67,6 +67,7 @@ const firstSettings: UsernameSettings = {
 const person: FriendRow = {
   userId: "10000000-0000-4000-8000-000000000002",
   name: "이서연",
+  avatar: { color: "blue" as const, photoUrl: null },
   username: "seoyeon.lee",
   sharedTeamNames: ["디자인 팀"],
   directRoomId: null,
@@ -446,6 +447,7 @@ describe("fixed shell and safe search client", () => {
               {
                 userId: person.userId,
                 name: person.name,
+                avatar: { color: "blue" as const, photoUrl: null },
                 username: person.username,
                 sharedTeamNames: [],
                 relation: "none",

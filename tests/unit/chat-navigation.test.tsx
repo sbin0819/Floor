@@ -278,6 +278,8 @@ describe("team chat navigation", () => {
     render(
       <MessagesList
         data={{
+          chatToasts: true,
+          tabBadge: true,
           filesEnabled: false,
           callsEnabled: false,
           calls: [],
@@ -305,6 +307,8 @@ describe("team chat navigation", () => {
     render(
       <MessagesList
         data={{
+          chatToasts: true,
+          tabBadge: true,
           callsEnabled: false,
           calls: [],
           myCall: null,

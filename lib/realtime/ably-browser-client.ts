@@ -1,5 +1,6 @@
 import type { ConnectionState, TokenRequest } from "ably";
 import { z } from "zod";
+import { avatarSchema } from "@/lib/avatar";
 
 import { reactionEmojis } from "@/features/chat/types";
 import { parseSystemMessageData } from "@/features/chat/system-messages";
@@ -128,6 +129,7 @@ const eventSchema = z.discriminatedUnion("type", [
     seq: z.number().int().positive(),
     authorId: z.string().nullable(),
     authorName: z.string().nullable(),
+    authorAvatar: avatarSchema.nullable(),
     clientId: z.string().nullable(),
     kind: z.enum(["text", "system"]),
     systemData: z.unknown().transform(parseSystemMessageData),

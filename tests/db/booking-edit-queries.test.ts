@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { avatarColorFor } from "@/lib/avatar";
 import {
   afterAll,
   afterEach,
@@ -263,6 +264,37 @@ describe("booking edit query", () => {
     });
   });
 
+  it("includes current safe avatars in editable participants without another query", async () => {
+    const own = await insertFixtureBooking(database, actors, {
+      userId: actors.member.userId,
+    });
+    await database.db
+      .insert(bookingParticipants)
+      .values({ bookingId: own.id, userId: actors.admin.userId });
+    await database.db
+      .update(users)
+      .set({
+        avatarColor: "purple",
+        avatarPhoto: true,
+        avatarUrl: "https://lh3.googleusercontent.com/photo",
+      })
+      .where(eq(users.id, actors.admin.userId));
+    const result = await query(actors.member).getBookingForEdit(own.id);
+    expect(result.participants[0]?.avatar).toEqual({
+      color: "purple",
+      photoUrl: "https://lh3.googleusercontent.com/photo",
+    });
+    expect(result.participants[0]).not.toHaveProperty("email");
+    expect(result.participants[0]).not.toHaveProperty("avatarUrl");
+    await database.db
+      .update(users)
+      .set({ avatarPhoto: false })
+      .where(eq(users.id, actors.admin.userId));
+    expect(
+      (await query(actors.member).getBookingForEdit(own.id)).participants[0]
+        ?.avatar,
+    ).toEqual({ color: "purple", photoUrl: null });
+  });
   it("retains existing unverified and external participants but masks every email", async () => {
     const own = await insertFixtureBooking(database, actors, {
       userId: actors.member.userId,
@@ -287,6 +319,7 @@ describe("booking edit query", () => {
       expect(participant).toEqual({
         userId: person.userId,
         name: person.name,
+        avatar: { color: avatarColorFor(person.userId, null), photoUrl: null },
         maskedEmail: maskParticipantEmail(person.email),
         sharedTeamNames:
           person === actors.admin

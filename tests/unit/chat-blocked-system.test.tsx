@@ -21,6 +21,7 @@ const message = (
   seq: number,
   values: Partial<ChatMessage> = {},
 ): ChatMessage => ({
+  authorAvatar: { color: "blue" as const, photoUrl: null },
   ...emptyMessageDetails(),
   id: `m${seq}`,
   seq,

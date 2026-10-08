@@ -12,6 +12,9 @@ import type { DalDatabase } from "./database";
 import { unreadDirectCount, unreadMentionCount } from "./chat-reads";
 import { blockedBy } from "./people-blocks";
 import { lockRoomForMessage } from "./chat-write";
+import { alias } from "drizzle-orm/pg-core";
+import { avatarColumns, avatarJson } from "./avatar";
+import { toAvatar, type AvatarSource } from "@/lib/avatar";
 
 export {
   canOpenDirectMessageCondition,
@@ -72,15 +75,16 @@ export async function createDirectRoom(
   return { roomId: room.id };
 }
 
-export function listDirectMembers(
+export async function listDirectMembers(
   roomId: string,
   database: DalDatabase = getDb(),
   mentionAuthorId?: string,
 ) {
-  return database
+  const rows = await database
     .select({
       id: users.id,
       name: users.name,
+      avatar: avatarColumns(users),
       admin: sql<false>`false`,
       ...(mentionAuthorId
         ? {
@@ -99,27 +103,36 @@ export function listDirectMembers(
       ),
     )
     .orderBy(users.name, users.id);
+  return rows.map((row) => ({ ...row, avatar: toAvatar(row.avatar) }));
 }
 
 export function directPeerId(userId: string) {
   return sql<string>`case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end`;
 }
 
-export function listDirectNav(userId: string, database: DalDatabase = getDb()) {
-  return database
+export async function listDirectNav(
+  userId: string,
+  database: DalDatabase = getDb(),
+) {
+  const rows = await database
     .select({
       roomId: chatRooms.id,
       kind: sql<"dm" | "group_dm">`${chatRooms.kind}`,
-      other: { userId: users.id, name: users.name, username: users.username },
+      other: {
+        userId: users.id,
+        name: users.name,
+        username: users.username,
+        avatar: avatarJson(users),
+      },
       name: chatRooms.name,
       memberCount:
         sql<number>`(select count(*)::int from chat_room_members m where m.room_id = ${chatRooms.id} and m.status = 'active')`.mapWith(
           Number,
         ),
       members: sql<
-        { userId: string; name: string }[]
-      >`coalesce((select json_agg(json_build_object('userId', member.id, 'name', member.name) order by member.name, member.id) from (
-        select u.id, u.name from chat_room_members m inner join users u on u.id = m.user_id
+        { userId: string; name: string; avatar: AvatarSource }[]
+      >`coalesce((select json_agg(json_build_object('userId', member.id, 'name', member.name, 'avatar', member.avatar) order by member.name, member.id) from (
+        select u.id, u.name, ${avatarJson(alias(users, "u"))} as avatar from chat_room_members m inner join users u on u.id = m.user_id
         where m.room_id = ${chatRooms.id} and m.status = 'active' and m.user_id <> ${userId}::uuid order by u.name, u.id limit 3
       ) member), '[]'::json)`,
       lastSeq: chatRooms.lastSeq,
@@ -153,4 +166,14 @@ export function listDirectNav(userId: string, database: DalDatabase = getDb()) {
     )
     .orderBy(desc(chatRooms.lastMessageAt), chatRooms.id)
     .limit(50);
+  return rows.map((row) => ({
+    ...row,
+    other: row.other
+      ? { ...row.other, avatar: toAvatar(row.other.avatar) }
+      : null,
+    members: row.members.map((member) => ({
+      ...member,
+      avatar: toAvatar(member.avatar),
+    })),
+  }));
 }

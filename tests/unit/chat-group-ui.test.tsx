@@ -48,6 +48,7 @@ vi.mock("@/features/chat/actions", () => ({
   markRoomRead: vi.fn(async () => ({ ok: true, data: { lastReadSeq: 1 } })),
 }));
 const contacts: MessageContact[] = Array.from({ length: 11 }, (_, index) => ({
+  avatar: { color: "blue" as const, photoUrl: null },
   userId: `p${index}`,
   name: `사람${index}`,
   username: `person${index}`,
@@ -63,6 +64,8 @@ const actions = (): GroupActions => ({
 async function setup(ui: ReactNode) {
   const client = new QueryClient();
   client.setQueryData(["chat", "nav"], {
+    chatToasts: true,
+    tabBadge: true,
     filesEnabled: false,
     callsEnabled: false,
     calls: [],
@@ -100,9 +103,21 @@ describe("new group selection", () => {
             name: null,
             memberCount: 5,
             members: [
-              { userId: "a", name: "김하은" },
-              { userId: "b", name: "박지훈" },
-              { userId: "c", name: "이서연" },
+              {
+                avatar: { color: "blue" as const, photoUrl: null },
+                userId: "a",
+                name: "김하은",
+              },
+              {
+                avatar: { color: "blue" as const, photoUrl: null },
+                userId: "b",
+                name: "박지훈",
+              },
+              {
+                avatar: { color: "blue" as const, photoUrl: null },
+                userId: "c",
+                name: "이서연",
+              },
             ],
             lastSeq: 4,
             lastMessageAt: "2030-01-01T00:00:00Z",
@@ -338,16 +353,28 @@ describe("shared group chat screen", () => {
         muted: false,
         unreadMentions: 0,
       },
-      user: { id: "me", name: "김하은" },
+      user: {
+        avatar: { color: "blue" as const, photoUrl: null },
+        id: "me",
+        name: "김하은",
+      },
       members: [
-        { userId: "me", name: "김하은", username: "haeun", sharesSpace: true },
         {
+          avatar: { color: "blue" as const, photoUrl: null },
+          userId: "me",
+          name: "김하은",
+          username: "haeun",
+          sharesSpace: true,
+        },
+        {
+          avatar: { color: "blue" as const, photoUrl: null },
           userId: "other",
           name: "박지훈",
           username: "jihoon",
           sharesSpace: false,
         },
         {
+          avatar: { color: "blue" as const, photoUrl: null },
           userId: "third",
           name: "최서연",
           username: "seoyeon",
@@ -356,6 +383,7 @@ describe("shared group chat screen", () => {
       ],
       messages: [
         {
+          authorAvatar: null,
           ...emptyMessageDetails(),
           id: "system",
           seq: 1,

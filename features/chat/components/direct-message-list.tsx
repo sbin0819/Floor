@@ -1,4 +1,5 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -69,21 +70,23 @@ export function DirectMessageList({
                       className="relative h-8 w-9 shrink-0"
                     >
                       {group.members.slice(0, 2).map((member, index) => (
-                        <span
+                        <UserAvatar
                           key={member.userId}
-                          className={`absolute flex size-6 items-center justify-center rounded-full border-2 border-sidebar bg-muted text-xs ${index ? "right-0 bottom-0" : "top-0 left-0"}`}
-                        >
-                          {Array.from(member.name)[0]}
-                        </span>
+                          name={member.name}
+                          avatar={member.avatar}
+                          size={24}
+                          className={`absolute rounded-full ring-2 ring-sidebar ${index ? "right-0 bottom-0" : "top-0 left-0"}`}
+                        />
                       ))}
                     </span>
                   ) : (
-                    <span
-                      aria-hidden="true"
-                      className="relative flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs"
-                    >
-                      {Array.from(name)[0]}
-                    </span>
+                    room.kind === "dm" && (
+                      <UserAvatar
+                        name={name}
+                        avatar={room.other.avatar}
+                        size={24}
+                      />
+                    )
                   )}
                   <span className="relative min-w-0 flex-1">
                     <span className="block truncate">{name}</span>

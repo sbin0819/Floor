@@ -114,6 +114,7 @@ describe("message attachments", () => {
       render(
         <MessageRow
           message={{
+            authorAvatar: null,
             ...emptyMessageDetails(),
             id: "temporary",
             clientId: "draft",

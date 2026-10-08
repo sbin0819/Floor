@@ -22,6 +22,7 @@ const item = {
   type: "space_invite" as const,
   data,
   read: false,
+  actorAvatar: null,
   scheduledFor: "2026-10-09T00:00:00Z",
   bookingId: null,
   href: `/s/join/${data.inviteCode}`,

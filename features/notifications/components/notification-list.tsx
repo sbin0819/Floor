@@ -3,6 +3,7 @@
 import { Clock3 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { cn } from "cn";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   notificationAge,
   notificationPresentation,
@@ -68,16 +69,20 @@ export function NotificationRow({
           />
         )}
       </span>
-      <span
-        aria-hidden="true"
-        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
-      >
-        {item.type === "booking_reminder" ? (
+      {item.type === "booking_reminder" ? (
+        <span
+          aria-hidden="true"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
+        >
           <Clock3 className="size-5" />
-        ) : (
-          Array.from(item.data.actorName ?? "회원")[0]
-        )}
-      </span>
+        </span>
+      ) : (
+        <UserAvatar
+          name={item.data.actorName ?? "회원"}
+          avatar={item.actorAvatar ?? { color: "gray", photoUrl: null }}
+          size={40}
+        />
+      )}
       <span className="min-w-0 flex-1 space-y-1">
         <span className="block text-sm leading-6 break-words">
           {presentation.parts.map((part, index) =>

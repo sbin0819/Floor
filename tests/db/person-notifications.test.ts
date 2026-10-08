@@ -1,6 +1,7 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createNotificationQueries } from "@/features/notifications/query-factory";
+import { avatarColorFor } from "@/lib/avatar";
 import { createNotificationActions } from "@/features/notifications/action-factory";
 import {
   createPersonNotification,
@@ -63,6 +64,10 @@ describe("person notification persistence", () => {
       id: request.id,
       type: "friend_request",
       data: { actorName: "박지훈" },
+      actorAvatar: {
+        color: avatarColorFor(other.userId, null),
+        photoUrl: null,
+      },
       read: false,
       scheduledFor: now.toISOString(),
       bookingId: null,
@@ -80,6 +85,39 @@ describe("person notification persistence", () => {
     expect((await queries().getNotificationSummary()).unreadCount).toBe(1);
   });
 
+  it("reads the actor's current safe avatar and returns null for a snapshot without an actor reference", async () => {
+    await create("friend_request");
+    await database.db
+      .update(users)
+      .set({
+        avatarColor: "pink",
+        avatarPhoto: true,
+        avatarUrl: "https://avatars.githubusercontent.com/u/789",
+      })
+      .where(eq(users.id, other.userId));
+    const first = (await queries().getNotificationSummary()).items[0]!;
+    expect(first.actorAvatar).toEqual({
+      color: "pink",
+      photoUrl: "https://avatars.githubusercontent.com/u/789",
+    });
+    expect(first).not.toHaveProperty("actor");
+    expect(first).not.toHaveProperty("actorId");
+    await database.db
+      .update(users)
+      .set({ avatarUrl: "https://private.example.test/photo" })
+      .where(eq(users.id, other.userId));
+    expect((await queries().getNotifications()).items[0]?.actorAvatar).toEqual({
+      color: "pink",
+      photoUrl: null,
+    });
+    await database.db
+      .update(notifications)
+      .set({ actorId: null })
+      .where(eq(notifications.actorId, other.userId));
+    const orphan = (await queries().getNotifications()).items[0]!;
+    expect(orphan.actorAvatar).toBeNull();
+    expect(orphan.data).toEqual({ actorName: "박지훈" });
+  });
   it("deletes only the specified recipient's request from the actor, not acceptance or reverse alerts", async () => {
     const request = await create("friend_request");
     const accepted = await create("friend_accepted");
@@ -112,6 +150,10 @@ describe("person notification persistence", () => {
         id: request.id,
         type: "message_request",
         data: { actorName: "박지훈" },
+        actorAvatar: {
+          color: avatarColorFor(other.userId, null),
+          photoUrl: null,
+        },
         read: false,
         scheduledFor: now.toISOString(),
         bookingId: null,

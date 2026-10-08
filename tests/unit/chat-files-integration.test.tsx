@@ -72,6 +72,7 @@ const channel: ChannelView = {
   members: source.members.map((member) => ({
     id: member.userId,
     name: member.name,
+    avatar: member.avatar,
     admin: false,
   })),
   messages: source.messages,
@@ -87,6 +88,7 @@ const direct: Extract<DirectMessageView, { kind: "dm" }> = {
   blockedByMe: false,
   peerReadSeq: 0,
   other: {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: source.members[1]!.userId,
     name: "김민지",
     username: "minji",
@@ -98,12 +100,15 @@ const group: Extract<DirectMessageView, { kind: "group_dm" }> = {
   kind: "group_dm",
   name: "가상 그룹",
   displayName: "가상 그룹",
-  members: source.members.map(({ userId, name, username, sharesSpace }) => ({
-    userId,
-    name,
-    username,
-    sharesSpace,
-  })),
+  members: source.members.map(
+    ({ userId, name, username, sharesSpace, avatar }) => ({
+      userId,
+      name,
+      username,
+      sharesSpace,
+      avatar,
+    }),
+  ),
 };
 const page = (name = "리뷰 자료.pdf"): RoomFilesPage => ({
   files: [

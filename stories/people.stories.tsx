@@ -14,6 +14,7 @@ import type {
 const person: PersonProfile = {
   userId: "00000000-0000-4000-8000-000000000002",
   name: "이서연",
+  avatar: { color: "blue" as const, photoUrl: null },
   username: "seoyeon.lee",
   isMe: false,
   relation: "friend",
@@ -37,6 +38,7 @@ const data: FriendsView = {
     {
       userId: person.userId,
       name: person.name,
+      avatar: { color: "blue" as const, photoUrl: null },
       username: person.username,
       sharedTeamNames: ["디자인 팀"],
       directRoomId: person.directRoomId,

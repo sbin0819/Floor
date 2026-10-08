@@ -25,6 +25,7 @@ beforeEach(() => {
   vi.mocked(getSession).mockResolvedValue(session);
   vi.mocked(getAccountMenuData).mockResolvedValue({
     name: session.name,
+    avatar: { color: "blue", photoUrl: null },
     email: session.email,
     isOperator: false,
     myStatus: "online",
@@ -49,6 +50,7 @@ describe("shell account slots", () => {
       expect(result?.props).toEqual({
         variant,
         name: session.name,
+        avatar: { color: "blue", photoUrl: null },
         email: session.email,
         isOperator: false,
         myStatus: "online",

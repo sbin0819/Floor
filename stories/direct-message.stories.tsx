@@ -23,18 +23,34 @@ const data: Extract<DirectMessageView, { kind: "dm" }> = {
     unreadMentions: 0,
   },
   other: {
+    avatar: { color: "blue" as const, photoUrl: null },
     userId: peer,
     name: "이서연",
     username: "seoyeon.lee",
     sharesSpace: false,
   },
-  user: { id: me, name: "김하은" },
+  user: {
+    avatar: { color: "blue" as const, photoUrl: null },
+    id: me,
+    name: "김하은",
+  },
   members: [
-    { id: me, name: "김하은", admin: false },
-    { id: peer, name: "이서연", admin: false },
+    {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: me,
+      name: "김하은",
+      admin: false,
+    },
+    {
+      avatar: { color: "blue" as const, photoUrl: null },
+      id: peer,
+      name: "이서연",
+      admin: false,
+    },
   ],
   messages: [
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "direct-1",
       seq: 1,
@@ -46,6 +62,7 @@ const data: Extract<DirectMessageView, { kind: "dm" }> = {
       clientId: null,
     },
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "direct-2",
       seq: 2,
@@ -57,6 +74,7 @@ const data: Extract<DirectMessageView, { kind: "dm" }> = {
       clientId: null,
     },
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "direct-3",
       seq: 3,
@@ -68,6 +86,7 @@ const data: Extract<DirectMessageView, { kind: "dm" }> = {
       clientId: null,
     },
     {
+      authorAvatar: { color: "blue" as const, photoUrl: null },
       ...emptyMessageDetails(),
       id: "direct-4",
       seq: 4,

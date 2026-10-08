@@ -1,4 +1,5 @@
 "use client";
+import { UserAvatar } from "@/components/user-avatar";
 
 import { useId, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -78,12 +79,11 @@ export function ContactPicker({
                           aria-label={`${person.name} 선택${present ? " (참여 중)" : ""}`}
                           className="size-4 shrink-0 accent-primary"
                         />
-                        <span
-                          aria-hidden="true"
-                          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted font-semibold"
-                        >
-                          {Array.from(person.name.trim())[0] ?? "?"}
-                        </span>
+                        <UserAvatar
+                          name={person.name}
+                          avatar={person.avatar}
+                          size={40}
+                        />
                         <span className="min-w-0 text-left">
                           <span className="block truncate font-semibold">
                             {person.name}

@@ -29,6 +29,7 @@ const other = {
 };
 const now = "2026-10-08T03:00:00Z";
 const messages: ChatMessage[] = [1, 2, 3].map((seq) => ({
+  authorAvatar: { color: "blue" as const, photoUrl: null },
   ...emptyMessageDetails(),
   id: `message-${seq}`,
   seq,
@@ -55,11 +56,22 @@ const group: DirectMessageView = {
   },
   name: "디자인 리뷰",
   displayName: "디자인 리뷰",
-  user: { id: me, name: "김하은" },
+  user: {
+    avatar: { color: "blue" as const, photoUrl: null },
+    id: me,
+    name: "김하은",
+  },
   members: [
-    { userId: me, name: "김하은", username: "haeun.kim", sharesSpace: true },
-    { ...other },
     {
+      avatar: { color: "blue" as const, photoUrl: null },
+      userId: me,
+      name: "김하은",
+      username: "haeun.kim",
+      sharesSpace: true,
+    },
+    { avatar: { color: "blue" as const, photoUrl: null }, ...other },
+    {
+      avatar: { color: "blue" as const, photoUrl: null },
       userId: "00000000-0000-4000-8000-000000000003",
       name: "최서연",
       username: "seoyeon",
@@ -68,6 +80,7 @@ const group: DirectMessageView = {
   ],
   messages: [
     {
+      authorAvatar: null,
       ...emptyMessageDetails(),
       id: "system",
       seq: 1,
@@ -91,6 +104,8 @@ function Frame({ children }: { children: ReactNode }) {
   const [client] = useState(() => {
     const client = new QueryClient();
     client.setQueryData(["chat", "nav"], {
+      chatToasts: true,
+      tabBadge: true,
       filesEnabled: false,
       callsEnabled: false,
       calls: [],
@@ -188,8 +203,20 @@ export const GroupMembers: Story = {
       <div className="w-60 border border-border bg-sidebar">
         <ChannelMembers
           members={[
-            { id: me, name: "김하은", admin: false, sharesSpace: true },
-            { id: peer, name: "박지훈", admin: false, sharesSpace: false },
+            {
+              avatar: { color: "blue" as const, photoUrl: null },
+              id: me,
+              name: "김하은",
+              admin: false,
+              sharesSpace: true,
+            },
+            {
+              avatar: { color: "blue" as const, photoUrl: null },
+              id: peer,
+              name: "박지훈",
+              admin: false,
+              sharesSpace: false,
+            },
           ]}
         />
       </div>

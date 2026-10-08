@@ -10,6 +10,7 @@ import {
 } from "vitest";
 import { createParticipantSearch } from "@/features/bookings/participant-search-factory";
 import { ActionError } from "@/lib/actions/result";
+import { avatarColorFor } from "@/lib/avatar";
 import { users, teamMembers, teams } from "@/lib/db/schema";
 import {
   createMemoryRateLimiter,
@@ -43,6 +44,10 @@ describe("participant search privacy and limits", () => {
       {
         userId: fixture.admin.userId,
         name: fixture.admin.name,
+        avatar: {
+          color: avatarColorFor(fixture.admin.userId, null),
+          photoUrl: null,
+        },
         sharedTeamNames: ["그로스팀"],
         maskedEmail: "ad•••@example.test",
       },
@@ -54,11 +59,45 @@ describe("participant search privacy and limits", () => {
       {
         userId: fixture.stranger.userId,
         name: fixture.stranger.name,
+        avatar: {
+          color: avatarColorFor(fixture.stranger.userId, null),
+          photoUrl: null,
+        },
         sharedTeamNames: [],
         maskedEmail: "st•••@example.test",
       },
     ]);
     expect(await search(fixture.person)("관리자")).toEqual([]);
+  });
+  it("adds only the safe avatar to participant results without exposing photo preferences or raw URLs", async () => {
+    await database.db
+      .update(users)
+      .set({
+        avatarColor: "orange",
+        avatarPhoto: true,
+        avatarUrl: "https://lh3.googleusercontent.com/photo",
+      })
+      .where(eq(users.id, fixture.admin.userId));
+    const first = (await search()("관리자"))[0]!;
+    expect(first.avatar).toEqual({
+      color: "orange",
+      photoUrl: "https://lh3.googleusercontent.com/photo",
+    });
+    expect(Object.keys(first).sort()).toEqual([
+      "avatar",
+      "maskedEmail",
+      "name",
+      "sharedTeamNames",
+      "userId",
+    ]);
+    await database.db
+      .update(users)
+      .set({ avatarUrl: "https://unsafe.example.test/photo" })
+      .where(eq(users.id, fixture.admin.userId));
+    expect((await search()("관리자"))[0]?.avatar).toEqual({
+      color: "orange",
+      photoUrl: null,
+    });
   });
   it("never returns the caller or unverified accounts even for exact emails", async () => {
     const read = search();
@@ -168,13 +207,14 @@ describe("participant search privacy and limits", () => {
         result.every(
           (row) =>
             Object.keys(row).sort().join() ===
-            ["userId", "name", "sharedTeamNames", "maskedEmail"].sort().join(),
+            ["userId", "name", "avatar", "sharedTeamNames", "maskedEmail"]
+              .sort()
+              .join(),
         ),
       ).toBe(true);
-      expect((await search()(fixture.admin.email))[0]!.sharedTeamNames).toEqual([
-        "그로스팀",
-        "추가팀",
-      ]);
+      expect((await search()(fixture.admin.email))[0]!.sharedTeamNames).toEqual(
+        ["그로스팀", "추가팀"],
+      );
     } finally {
       meter.restore();
     }

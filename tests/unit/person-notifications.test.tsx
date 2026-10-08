@@ -22,6 +22,7 @@ vi.mock("@/features/chat/components/use-chat-metadata", () => ({
 const base = {
   id: "friend",
   read: false,
+  actorAvatar: null,
   scheduledFor: "2026-10-08T15:02:00Z",
   bookingId: null,
   data: { actorName: "김하은" },

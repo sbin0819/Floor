@@ -75,6 +75,8 @@ export function createCallController(deps: CallDependencies) {
                 person.participantId === other.participantId &&
                 person.userId === other.userId &&
                 person.name === other.name &&
+                person.avatar.color === other.avatar.color &&
+                person.avatar.photoUrl === other.avatar.photoUrl &&
                 person.local === other.local &&
                 person.speaking === other.speaking &&
                 person.microphoneEnabled === other.microphoneEnabled &&
@@ -124,24 +126,21 @@ export function createCallController(deps: CallDependencies) {
   }
   function readPeople(connection: Connection) {
     if (!current(connection) || !state.call) return;
-    const names = new Map(
-      state.call.participants.map((person) => [person.userId, person.name]),
+    const approved = new Map(
+      state.call.participants.map((person) => [person.userId, person]),
     );
     const people = connection.room.people();
     const participants: CallParticipant[] = people.flatMap((person) => {
       const id = person.attributes.userId;
-      const name = id && names.get(id);
-      if (
-        !id ||
-        name === undefined ||
-        person.attributes.participantId !== person.identity
-      )
+      const member = id && approved.get(id);
+      if (!id || !member || person.attributes.participantId !== person.identity)
         return [];
       return [
         {
           participantId: person.identity,
           userId: id,
-          name,
+          name: member.name,
+          avatar: member.avatar,
           local: person.local,
           speaking: person.speaking,
           microphoneEnabled: person.microphoneEnabled,

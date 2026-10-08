@@ -30,6 +30,7 @@ function items(
       ? [
           {
             id: row.id,
+            actorAvatar: row.actorAvatar,
             ...content,
             read: row.readAt !== null,
             scheduledFor: row.scheduledFor.toISOString(),

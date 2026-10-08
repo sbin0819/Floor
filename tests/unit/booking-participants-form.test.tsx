@@ -48,12 +48,14 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const colleague = {
   userId: "first",
   name: "이서연",
+  avatar: { color: "blue" as const, photoUrl: null },
   sharedTeamNames: ["디자인팀"],
   maskedEmail: "se•••@floor.example",
 };
 const guest = {
   userId: "second",
   name: "김하은",
+  avatar: { color: "blue" as const, photoUrl: null },
   sharedTeamNames: [],
   maskedEmail: "ha•••@floor.example",
 };
@@ -250,11 +252,9 @@ describe("participants in booking forms", () => {
     const next = bookingDraftScope("branch", "floor", view.data.date, "other");
     act(() => {
       runtime.store!.getState().activate(next);
-      runtime
-        .store!.getState()
-        .changeDraft(next, {
-          participants: [{ ...guest, email: "haneul@floor.example" }],
-        });
+      runtime.store!.getState().changeDraft(next, {
+        participants: [{ ...guest, email: "haneul@floor.example" }],
+      });
     });
     await act(async () => {
       finish({ ok: true, data: { bookingId: "created" } });

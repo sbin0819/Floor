@@ -7,6 +7,7 @@ import type { ChatMessage, RoomMessagesPage } from "@/features/chat/types";
 import { emptyMessageDetails } from "@/features/chat/types";
 
 const message = (seq: number): ChatMessage => ({
+  authorAvatar: { color: "blue" as const, photoUrl: null },
   ...emptyMessageDetails(),
   id: `message-${seq}`,
   seq,

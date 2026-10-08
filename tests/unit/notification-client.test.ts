@@ -51,6 +51,7 @@ describe("notification summary transport", () => {
       id: "one",
       type: "booking_invited",
       read: false,
+      actorAvatar: null,
       scheduledFor: data.now,
       bookingId: null,
       href: "//external.example",

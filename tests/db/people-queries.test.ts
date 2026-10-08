@@ -11,6 +11,7 @@ import {
 import { createPeopleQueries } from "@/features/people/query-factory";
 import { canReadSpace } from "@/lib/dal/chat-access";
 import { ActionError } from "@/lib/actions/result";
+import { avatarColorFor } from "@/lib/avatar";
 import { createMemoryRateLimiter } from "@/lib/rate-limit/memory";
 import {
   chatRoomMembers,
@@ -142,6 +143,7 @@ describe("people query privacy and budgets", () => {
     expect(rows[0]).toEqual({
       userId: id(3),
       name: "박지훈",
+      avatar: { color: avatarColorFor(id(3), null), photoUrl: null },
       username: "jihoon.park",
       relation: "none",
       sharedTeamNames: [],
@@ -218,9 +220,39 @@ describe("people query privacy and budgets", () => {
         "sharedTeamNames",
         "directRoomId",
         "canDirectMessage",
+        "avatar",
       ]);
     },
   );
+  it("shares one safe avatar projection across search, profile, friends and contacts", async () => {
+    await friend(2, "accepted");
+    const photoUrl = "https://avatars.githubusercontent.com/u/123";
+    for (const [avatarPhoto, avatarUrl, expected] of [
+      [true, photoUrl, photoUrl],
+      [false, photoUrl, null],
+      [true, "https://private.example.test/avatar.png", null],
+    ] as const) {
+      await database.db
+        .update(users)
+        .set({ avatarColor: "green", avatarPhoto, avatarUrl })
+        .where(eq(users.id, id(2)));
+      const query = queries();
+      const values = await Promise.all([
+        query.searchPeople("seoyeon.lee"),
+        query.getPersonProfile(id(2)).then((row) => [row]),
+        query.getFriendsView("all").then(({ rows }) => rows),
+        query.getMessageContacts(),
+      ]);
+      for (const rows of values) {
+        const person = rows.find((row) => row?.userId === id(2));
+        expect(person?.avatar).toEqual({ color: "green", photoUrl: expected });
+        expect(person).not.toHaveProperty("avatarUrl");
+        expect(person).not.toHaveProperty("avatarPhoto");
+        expect(person).not.toHaveProperty("email");
+        expect(JSON.stringify(person)).not.toContain("private.example.test");
+      }
+    }
+  });
   it("masks declined requests for exactly 30 days in search and sent list", async () => {
     await friend(
       3,
@@ -302,6 +334,7 @@ describe("people query privacy and budgets", () => {
         expect(profile).toEqual({
           userId: id(3),
           name: "박지훈",
+          avatar: { color: avatarColorFor(id(3), null), photoUrl: null },
           username: "jihoon.park",
           relation: "none",
           isMe: false,
