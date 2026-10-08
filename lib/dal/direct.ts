@@ -11,6 +11,7 @@ import {
 import type { DalDatabase } from "./database";
 import { unreadDirectCount, unreadMentionCount } from "./chat-reads";
 import { blockedBy } from "./people-blocks";
+import { lockRoomForMessage } from "./chat-write";
 
 export {
   canOpenDirectMessageCondition,
@@ -54,6 +55,7 @@ export async function createDirectRoom(
         )
     )[0];
   if (!room) throw new Error("Direct room could not be created.");
+  await lockRoomForMessage(room.id, database);
   await database
     .insert(chatRoomMembers)
     .values(

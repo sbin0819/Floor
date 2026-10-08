@@ -42,8 +42,11 @@ export const reportMessageSchema = z.strictObject({
 
 export function friendsTab(
   input: unknown,
-): "all" | "received" | "sent" | "blocked" {
-  return input === "received" || input === "sent" || input === "blocked"
+): "all" | "received" | "sent" | "blocked" | "requests" {
+  return input === "received" ||
+    input === "sent" ||
+    input === "blocked" ||
+    input === "requests"
     ? input
     : "all";
 }

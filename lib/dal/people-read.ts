@@ -11,6 +11,7 @@ import type {
 import { canOpenDirectMessageCondition } from "./direct-permission";
 import type { DalDatabase } from "./database";
 import { blockedBetween, blockedBy } from "./people-blocks";
+import { messageRequestCount } from "./message-requests-read";
 export { blockBetween } from "./people-blocks";
 
 export function sharedTeamCondition(me: string, other: SQL) {
@@ -191,15 +192,18 @@ export async function readFriendsList(
     .select({
       receivedCount: sql<number>`(select count(*)::int from friendships f
       where ${me}::uuid in (f.user_low_id, f.user_high_id) and f.status = 'pending' and f.requested_by <> ${me}::uuid)`,
+      messageRequestCount: messageRequestCount(me),
       rows:
-        tab === "blocked"
-          ? sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
+        tab === "requests"
+          ? sql<FriendRow[]>`'[]'::jsonb`
+          : tab === "blocked"
+            ? sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
       'userId', peer.id, 'name', peer.name, 'username', peer.username,
       'sharedTeamNames', ${sharedTeamNames(me, peer)}, 'directRoomId', ${directRoomId(me, peer)}
     ) order by peer.name, peer.id)
     from user_blocks blocked join users peer on peer.id = blocked.blocked_id
     where blocked.blocker_id = ${me}::uuid), '[]'::jsonb)`
-          : sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
+            : sql<FriendRow[]>`coalesce((select jsonb_agg(jsonb_build_object(
       'userId', peer.id, 'name', peer.name, 'username', peer.username,
       'sharedTeamNames', ${sharedTeamNames(me, peer)}, 'directRoomId', ${directRoomId(me, peer)}
     ) order by peer.name, peer.id)

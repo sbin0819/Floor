@@ -59,12 +59,10 @@ describe("chat block boundaries", () => {
       events.filter(({ event }) => event.type === "mention.created"),
     );
   const block = (reverse = false) =>
-    database.db
-      .insert(userBlocks)
-      .values({
-        blockerId: reverse ? actors.admin.userId : actors.member.userId,
-        blockedId: reverse ? actors.member.userId : actors.admin.userId,
-      });
+    database.db.insert(userBlocks).values({
+      blockerId: reverse ? actors.admin.userId : actors.member.userId,
+      blockedId: reverse ? actors.member.userId : actors.admin.userId,
+    });
   async function sent(body: string, roomId = actors.roomId) {
     const result = await actions().sendMessage({
       roomId,
@@ -90,7 +88,12 @@ describe("chat block boundaries", () => {
       ] as const) {
         expect(
           await directPeerAccess(me.userId, peer.userId, database.db),
-        ).toEqual({ existsVerified: true, canOpen: false });
+        ).toEqual({
+          existsVerified: true,
+          canOpen: false,
+          blocked: true,
+          related: true,
+        });
         expect(
           await actions(me).openDirectMessage({ userId: peer.userId }),
         ).toEqual({ ok: false, code: "FORBIDDEN" });

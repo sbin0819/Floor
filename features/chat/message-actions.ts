@@ -105,6 +105,9 @@ export function createMessageActions(
             );
             const everyone =
               parsed.everyone &&
+              (currentAccess.room.kind !== "dm" ||
+                (currentAccess.room.directMembership?.mine === "active" &&
+                  currentAccess.room.directMembership.peer === "active")) &&
               (currentAccess.room.kind === "dm" ||
                 currentAccess.room.role === "admin");
             const oldMentions = new Set(

@@ -6,6 +6,14 @@ export async function sendMessage(input: unknown) {
   return createChatActions().sendMessage(input);
 }
 
+export async function sendMessageRequest(input: unknown) {
+  return createChatActions().sendMessageRequest(input);
+}
+
+export async function respondMessageRequest(input: unknown) {
+  return createChatActions().respondMessageRequest(input);
+}
+
 export async function openDirectMessage(input: unknown) {
   return createChatActions().openDirectMessage(input);
 }

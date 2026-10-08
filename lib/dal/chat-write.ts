@@ -61,6 +61,23 @@ export async function lockUsersForKeyShare(
     .for("key share");
 }
 
+export async function lockMessageUsers(
+  authorId: string,
+  otherIds: readonly string[],
+  database: DalDatabase,
+) {
+  // 요청의 하루 한도와 FK 대상의 잠금을 처음부터 최종 세기로 UUID 순서에 맞춘다.
+  for (const id of [
+    ...new Set([authorId, ...otherIds].map((value) => value.toLowerCase())),
+  ].sort()) {
+    await database
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, id))
+      .for(id === authorId.toLowerCase() ? "update" : "key share");
+  }
+}
+
 export async function lockRoomForMessage(
   roomId: string,
   database: DalDatabase,

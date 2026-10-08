@@ -5,6 +5,16 @@ import { createDirectRoom, directPeerAccess } from "@/lib/dal/direct";
 import { lockUsersForKeyShare } from "@/lib/dal/chat-write";
 import { withTransaction } from "@/lib/dal/database";
 import type { ChatActionDependencies } from "./action-factory";
+import { canReadRoom } from "@/lib/dal/chat-access";
+import { lockRoomForMessage } from "@/lib/dal/chat-write";
+import {
+  changeDirectMember,
+  deleteMessageRequestNotification,
+  lockDirectMembers,
+} from "@/lib/dal/direct-requests";
+import { roomChannel, userChannel } from "@/lib/realtime/channels";
+import { getRealtimePublisher } from "@/lib/realtime/server";
+import type { RealtimeItem } from "@/lib/realtime/types";
 
 export function createDirectActions(dependencies: ChatActionDependencies = {}) {
   return {
@@ -27,8 +37,100 @@ export function createDirectActions(dependencies: ChatActionDependencies = {}) {
             );
             if (!access.existsVerified) throw new ActionError("NOT_FOUND");
             if (!access.canOpen) throw new ActionError("FORBIDDEN");
-            return createDirectRoom([session.userId, input.userId], now, tx);
+            const room = await createDirectRoom(
+              [session.userId, input.userId],
+              now,
+              tx,
+            );
+            const members = await lockDirectMembers(room.roomId, tx);
+            const mine = members.find(
+              (member) => member.userId === session.userId,
+            );
+            if (mine?.status === "declined")
+              await changeDirectMember(
+                {
+                  roomId: room.roomId,
+                  userId: session.userId,
+                  from: "declined",
+                  status: "active",
+                  now,
+                },
+                tx,
+              );
+            return room;
           }, dependencies.database);
+        },
+      },
+      dependencies,
+    ),
+    respondMessageRequest: createAction(
+      {
+        input: z.strictObject({ roomId: z.uuid(), accept: z.boolean() }),
+        authorize: "none",
+        async handler({ session, input }) {
+          const room = await canReadRoom(
+            session.userId,
+            input.roomId,
+            dependencies.database,
+          );
+          if (!room || room.kind !== "dm" || !room.peer)
+            throw new ActionError("NOT_FOUND");
+          const peerId = room.peer.userId;
+          const now = dependencies.now?.() ?? new Date();
+          await withTransaction(async (tx) => {
+            await lockUsersForKeyShare([session.userId, peerId], tx);
+            await lockRoomForMessage(input.roomId, tx);
+            const members = await lockDirectMembers(input.roomId, tx);
+            if (
+              members.find((member) => member.userId === session.userId)
+                ?.status !== "requested"
+            )
+              throw new ActionError("NOT_FOUND");
+            const changed = await changeDirectMember(
+              {
+                roomId: input.roomId,
+                userId: session.userId,
+                from: "requested",
+                status: input.accept ? "active" : "declined",
+                now,
+              },
+              tx,
+            );
+            if (!changed.length) throw new ActionError("NOT_FOUND");
+            await deleteMessageRequestNotification(session.userId, peerId, tx);
+          }, dependencies.database);
+          const events: RealtimeItem[] = [
+            {
+              channel: userChannel(session.userId),
+              event: { type: "notifications.changed" },
+            },
+          ];
+          if (input.accept)
+            events.push(
+              {
+                channel: roomChannel(input.roomId),
+                event: { type: "room.changed", roomId: input.roomId },
+              },
+              {
+                channel: userChannel(peerId),
+                event: { type: "friend.changed" },
+              },
+            );
+          else
+            events.push({
+              channel: userChannel(session.userId),
+              event: { type: "realtime.reauth" },
+            });
+          try {
+            await (
+              dependencies.publisher ?? getRealtimePublisher()
+            ).publishMany(events);
+          } catch {
+            (dependencies.logError ?? console.error)(
+              "Chat realtime publication failed.",
+            );
+          }
+          return {};
         },
       },
       dependencies,

@@ -45,6 +45,9 @@ describe("chat read cursor constraints and unread boundaries", () => {
       seq,
       authorId,
       kind: authorId ? "text" : "system",
+      systemData: authorId
+        ? null
+        : { type: "group_created", actorName: "관리자" },
       body: "가상 메시지",
       createdAt,
     });

@@ -25,6 +25,7 @@ import type {
 } from "./types";
 import { listDirectMembers, listDirectNav } from "@/lib/dal/direct";
 import { serializeChatMessage } from "@/lib/dal/chat-messages";
+import { requestCooldownMs } from "@/lib/dal/direct-requests";
 
 const pageLimiter = createMemoryRateLimiter();
 
@@ -191,7 +192,24 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         listRecentMessages(roomId, session.userId, dependencies.database),
         listDirectMembers(roomId, dependencies.database),
       ]);
+      const now = dependencies.now?.() ?? new Date();
+      const membership = room.directMembership;
       return {
+        request:
+          membership?.mine === "requested"
+            ? { role: "recipient" }
+            : membership &&
+                (membership.peer === "requested" ||
+                  membership.peer === "declined")
+              ? {
+                  role: "sender",
+                  sentCount:
+                    new Date(membership.statusChangedAt).getTime() <=
+                    now.getTime() - requestCooldownMs
+                      ? 0
+                      : membership.sentCount,
+                }
+              : null,
         room: {
           id: room.id,
           archived: room.archivedAt !== null,
@@ -207,7 +225,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         firstUnreadSeq: room.firstUnreadSeq,
         peerReadSeq: room.peerReadSeq,
         canWrite: writableRoom(room),
-        now: (dependencies.now?.() ?? new Date()).toISOString(),
+        now: now.toISOString(),
       };
     },
   };

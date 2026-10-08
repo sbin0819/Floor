@@ -8,7 +8,7 @@ export type UsernameSettings = {
 
 export type PersonRelation =
   "friend" | "outgoing" | "incoming" | "none" | "blocked";
-export type FriendsTab = "all" | "received" | "sent" | "blocked";
+export type FriendsTab = "all" | "received" | "sent" | "blocked" | "requests";
 export type FriendRow = {
   userId: string;
   name: string;
@@ -19,6 +19,7 @@ export type FriendRow = {
 export type FriendsView = {
   settings: UsernameSettings;
   receivedCount: number;
+  messageRequestCount: number;
   rows: FriendRow[];
 };
 export type PersonSearchResult = FriendRow & {
@@ -36,3 +37,10 @@ export type PersonProfile = {
   canDirectMessage: boolean;
 };
 export type MessageContact = FriendRow & { isFriend: boolean };
+
+export type MessageRequestRow = {
+  roomId: string;
+  other: { userId: string; name: string; username: string | null };
+  excerpt: string;
+  lastMessageAt: string;
+};

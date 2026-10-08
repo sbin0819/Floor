@@ -7,6 +7,8 @@ import {
   type RateLimiter,
 } from "@/lib/rate-limit/memory";
 import * as people from "@/lib/dal/people-read";
+import { listMessageRequests } from "@/lib/dal/message-requests-read";
+import { excerptOf } from "@/features/chat/message-text";
 import { parseUsername } from "@/lib/people/username";
 import { peopleSearchSchema, friendsTab } from "./schema";
 import { readUsernameSettings, type PeopleQueryDependencies } from "./username";
@@ -15,6 +17,7 @@ import type {
   MessageContact,
   PersonProfile,
   PersonSearchResult,
+  MessageRequestRow,
 } from "./types";
 
 const limiter = createMemoryRateLimiter();
@@ -33,6 +36,22 @@ export function createPeopleQueries(
     if (!result.allowed) throw new RateLimitError(result.retryAfter);
   }
   return {
+    async getMessageRequests(): Promise<MessageRequestRow[]> {
+      const me = await session();
+      const rows = await listMessageRequests(me.userId, database);
+      return rows.map((row) => ({
+        roomId: row.roomId,
+        other: row.other,
+        excerpt: excerptOf(
+          row.body,
+          new Map([
+            [me.userId, me.name],
+            [row.other.userId, row.other.name],
+          ]),
+        ),
+        lastMessageAt: row.lastMessageAt!.toISOString(),
+      }));
+    },
     async searchPeople(query: unknown): Promise<PersonSearchResult[]> {
       const me = await session();
       const input = peopleSearchSchema.safeParse(query);

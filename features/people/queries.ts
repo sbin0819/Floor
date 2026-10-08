@@ -7,4 +7,5 @@ export const {
   getPersonProfile,
   getFriendsView,
   getMessageContacts,
+  getMessageRequests,
 } = createPeopleQueries();

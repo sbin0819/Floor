@@ -33,7 +33,7 @@ export function readableRoomCondition(
         select 1 from chat_spaces s inner join team_members m on m.team_id = s.team_id
         where s.id = readable_room.space_id and s.kind = 'team' and s.deleted_at is null and m.user_id = ${userId}::uuid
       )) or (readable_room.kind = 'dm' and exists (
-        select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status = 'active'
+        select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status in ('active', 'requested')
       ))
     ))`;
 }
@@ -70,12 +70,23 @@ export async function canReadRoom(
         from users u where ${chatRooms.kind} = 'dm' and u.id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end
       )`,
       peerActive: sql<boolean>`exists (select 1 from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end and m.status = 'active')`,
+      directMembership: sql<{
+        mine: "active" | "requested" | "declined" | "left";
+        peer: "active" | "requested" | "declined" | "left";
+        statusChangedAt: string;
+        sentCount: number;
+      } | null>`(select json_build_object('mine', mine.status, 'peer', peer.status,
+        'statusChangedAt', peer.status_changed_at, 'sentCount', (
+          select count(*)::int from messages sent where sent.room_id = ${chatRooms.id}
+          and sent.author_id = ${userId}::uuid and sent.created_at >= peer.requested_at
+        )) from chat_room_members mine inner join chat_room_members peer on peer.room_id = mine.room_id and peer.user_id <> mine.user_id
+        where mine.room_id = ${chatRooms.id} and mine.user_id = ${userId}::uuid and ${chatRooms.kind} = 'dm')`,
       peerBlocked: blockedBetween(
         sql`${userId}::uuid`,
         sql`case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end`,
       ),
       peerReadSeq:
-        sql<number>`coalesce((select r.last_read_seq from chat_room_reads r where r.room_id = ${chatRooms.id} and r.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end), 0)`.mapWith(
+        sql<number>`coalesce((select r.last_read_seq from chat_room_reads r inner join chat_room_members m on m.room_id = r.room_id and m.user_id = r.user_id and m.status = 'active' where r.room_id = ${chatRooms.id} and r.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end), 0)`.mapWith(
           Number,
         ),
     })
@@ -126,7 +137,9 @@ export function writableRoom(
   return (
     room.archivedAt === null &&
     (room.kind === "dm"
-      ? room.peerActive && !room.peerBlocked
+      ? room.directMembership !== null &&
+        room.directMembership.peer !== "left" &&
+        !room.peerBlocked
       : !room.adminOnly || room.role === "admin")
   );
 }

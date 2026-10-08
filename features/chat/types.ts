@@ -78,6 +78,7 @@ export type ChatNav = {
   directMessages: DirectMessageNav[];
 };
 export type DirectMessageView = {
+  request: { role: "recipient" } | { role: "sender"; sentCount: number } | null;
   room: {
     id: string;
     archived: boolean;
