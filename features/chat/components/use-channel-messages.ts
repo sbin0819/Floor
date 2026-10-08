@@ -1,29 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  skipToken,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRealtimeChannel } from "@/components/realtime-provider";
-import type { ActionResult } from "@/lib/actions/result";
 import { roomChannel } from "@/lib/realtime/channels";
 import { sendMessage } from "@/features/chat/actions";
 import type { ChannelView, ChatMessage } from "../types";
 import { useChannelCatchUp } from "./use-channel-catch-up";
+import { useChatSendQueue } from "./use-chat-send-queue";
+import type { SendChatMessage } from "../send-queue";
 import {
   mergeChatMessages,
   roomMessagesKey,
   type DisplayMessage,
 } from "./message-state";
 
-export type SendChatMessage = (input: {
-  roomId: string;
-  clientId: string;
-  body: string;
-}) => Promise<ActionResult<ChatMessage>>;
+export type { SendChatMessage } from "../send-queue";
 
 const noLiveMessages: ChatMessage[] = [];
 
@@ -35,6 +27,7 @@ export function useChannelMessages(
   const roomId = data.room.id;
   const userId = data.user.id;
   const catchUp = useChannelCatchUp(data);
+  const sending = useChatSendQueue(data, send);
   const liveBuffer = useRef<{
     roomId: string;
     messages: ChatMessage[];
@@ -107,111 +100,16 @@ export function useChannelMessages(
         });
     }
   });
-  const fail = (
-    targetRoomId: string,
-    clientId: string,
-    result?: Extract<ActionResult<ChatMessage>, { ok: false }>,
-  ) => {
-    client.setQueryData<DisplayMessage[]>(
-      roomMessagesKey(targetRoomId),
-      (current = []) =>
-        current.map((row) =>
-          row.clientId === clientId && row.authorId === userId && row.delivery
-            ? {
-                ...row,
-                delivery: "failed",
-                errorCode: result?.code ?? "INTERNAL",
-                errorMessage: result?.message,
-              }
-            : row,
-        ),
-    );
-  };
-  const mutation = useMutation({
-    mutationKey: ["chat", "send", roomId],
-    scope: { id: `chat-send:${roomId}` },
-    networkMode: "always",
-    retry: false,
-    mutationFn: send,
-    onSuccess(result, input) {
-      // 방 이동 뒤 도착한 응답도 제출 당시 방에만 반영한다.
-      if (result.ok)
-        client.setQueryData<DisplayMessage[]>(
-          roomMessagesKey(input.roomId),
-          (current = []) => mergeChatMessages(current, [result.data], userId),
-        );
-      else fail(input.roomId, input.clientId, result);
-    },
-    onError(_error, input) {
-      fail(input.roomId, input.clientId);
-    },
-  });
-  const submit = (body: string) => {
-    const clientId = crypto.randomUUID();
-    const pending: DisplayMessage = {
-      id: clientId,
-      clientId,
-      seq: 0,
-      authorId: userId,
-      authorName: data.user.name,
-      kind: "text",
-      body,
-      createdAt: new Date().toISOString(),
-      delivery: "pending",
-    };
-    client.setQueryData<DisplayMessage[]>(
-      roomMessagesKey(roomId),
-      (current = []) => [...current, pending],
-    );
-    mutation.mutate({ roomId, clientId, body });
-  };
-  const retry = (message: DisplayMessage) => {
-    if (
-      !message.clientId ||
-      message.authorId !== userId ||
-      message.delivery !== "failed"
-    )
-      return;
-    client.setQueryData<DisplayMessage[]>(
-      roomMessagesKey(roomId),
-      (current = []) =>
-        current.map((row) =>
-          row.id === message.id
-            ? {
-                ...row,
-                delivery: "pending",
-                errorCode: undefined,
-                errorMessage: undefined,
-              }
-            : row,
-        ),
-    );
-    mutation.mutate({ roomId, clientId: message.clientId, body: message.body });
-  };
-  const remove = (message: DisplayMessage) => {
-    client.setQueryData<DisplayMessage[]>(
-      roomMessagesKey(roomId),
-      (current = []) =>
-        current.filter(
-          (row) =>
-            !(
-              row.id === message.id &&
-              row.delivery === "failed" &&
-              row.authorId === userId
-            ),
-        ),
-    );
-  };
   const messages: DisplayMessage[] = query.data ?? data.messages;
   return {
     messages,
-    submit,
-    retry,
-    remove,
+    submit: sending.submit,
+    retry: sending.retry,
+    remove: sending.remove,
     reconnecting: catchUp.reconnecting,
     historyReset: catchUp.historyReset,
     liveMessages:
       liveBatch.roomId === roomId ? liveBatch.messages : noLiveMessages,
-    sending: mutation.isPending,
+    sending: sending.pending,
   };
 }

@@ -5,7 +5,8 @@ export const CHAT_NAV_KEY = ["chat", "nav"] as const;
 type NavChanges = {
   revision: number;
   rooms: Map<string, number>;
-  dirty: Set<string>;
+  activitySeq: Map<string, number>;
+  readThrough: Map<string, number>;
   incoming: WeakSet<ChatSpaceNav[]>;
   viewport: { roomId: string; atBottom: boolean } | null;
 };
@@ -16,7 +17,8 @@ function state(client: QueryClient) {
     value = {
       revision: 0,
       rooms: new Map(),
-      dirty: new Set(),
+      activitySeq: new Map(),
+      readThrough: new Map(),
       incoming: new WeakSet(),
       viewport: null,
     };
@@ -40,7 +42,6 @@ export function releaseRoomViewport(client: QueryClient, roomId: string) {
 function setUnread(client: QueryClient, roomId: string, unread: boolean) {
   const snapshot = state(client);
   snapshot.rooms.set(roomId, ++snapshot.revision);
-  snapshot.dirty.add(roomId);
   client.setQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY, (current) =>
     current?.map((space) => {
       const channels = space.channels.map((room) =>
@@ -55,23 +56,47 @@ function setUnread(client: QueryClient, roomId: string, unread: boolean) {
   );
 }
 
-export function clearRoomUnread(client: QueryClient, roomId: string) {
+export function clearRoomUnread(
+  client: QueryClient,
+  roomId: string,
+  throughSeq?: number,
+  ifUnchangedSince?: number,
+) {
+  const snapshot = state(client);
+  if (throughSeq !== undefined) {
+    snapshot.readThrough.set(
+      roomId,
+      Math.max(snapshot.readThrough.get(roomId) ?? 0, throughSeq),
+    );
+    if ((snapshot.activitySeq.get(roomId) ?? 0) > throughSeq) return;
+  }
+  if (
+    ifUnchangedSince !== undefined &&
+    (snapshot.rooms.get(roomId) ?? 0) > ifUnchangedSince
+  )
+    return;
   setUnread(client, roomId, false);
 }
 
 export function applyRoomActivity(
   client: QueryClient,
-  event: { roomId: string; authorId: string | null },
+  event: { roomId: string; authorId: string | null; seq: number },
   userId: string,
 ) {
-  const viewport = state(client).viewport;
+  const snapshot = state(client);
+  const viewport = snapshot.viewport;
   if (
     event.authorId === userId ||
+    event.seq <= (snapshot.readThrough.get(event.roomId) ?? 0) ||
     (viewport?.roomId === event.roomId &&
       viewport.atBottom &&
       document.visibilityState === "visible")
   )
     return;
+  snapshot.activitySeq.set(
+    event.roomId,
+    Math.max(snapshot.activitySeq.get(event.roomId) ?? 0, event.seq),
+  );
   setUnread(client, event.roomId, true);
 }
 
@@ -96,11 +121,12 @@ export function mergeChatNav(
     const channels = space.channels.map((room) => {
       const protect =
         requestedAt === null
-          ? snapshot.dirty.has(room.id)
+          ? unread.has(room.id)
           : (snapshot.rooms.get(room.id) ?? 0) > requestedAt;
       if (protect && unread.has(room.id))
         return { ...room, unread: unread.get(room.id)! };
-      if (requestedAt !== null) snapshot.dirty.delete(room.id);
+      if (requestedAt !== null)
+        snapshot.rooms.set(room.id, ++snapshot.revision);
       return room;
     });
     return { ...space, channels, unread: channels.some((room) => room.unread) };

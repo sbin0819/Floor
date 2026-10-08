@@ -10,6 +10,7 @@ import {
 } from "@/features/chat/components/chat-nav";
 import {
   CHAT_NAV_KEY,
+  chatNavRevision,
   clearRoomUnread,
   reportRoomViewport,
   releaseRoomViewport,
@@ -94,6 +95,46 @@ afterEach(() => {
 });
 
 describe("chat unread navigation", () => {
+  it("preserves a newer unread poll while a send acknowledgment was in flight", async () => {
+    const read = vi.fn(async () =>
+      fixture().map((space) => ({
+        ...space,
+        unread: true,
+        channels: space.channels.map((room) => ({ ...room, unread: true })),
+      })),
+    );
+    const { client } = setup(read);
+    const sendingAt = chatNavRevision(client);
+    await advance(60_001);
+    act(() => clearRoomUnread(client, roomId, 5, sendingAt));
+    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+      true,
+    );
+  });
+  it("does not let a late send or read acknowledgment clear a newer message", async () => {
+    const { client } = setup();
+    act(() => {
+      mocks.event({
+        type: "room.activity",
+        spaceId,
+        roomId,
+        seq: 6,
+        authorId: "other",
+      });
+      clearRoomUnread(client, roomId, 5);
+    });
+    await advance(1);
+    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+      true,
+    );
+    act(() => {
+      clearRoomUnread(client, roomId, 6);
+      activity();
+    });
+    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+      false,
+    );
+  });
   it("subscribes only the selected space and gives unread channels and rail accessible marks", async () => {
     const { container } = setup();
     expect(mocks.channel).toBe(`space:${spaceId}`);
@@ -221,6 +262,23 @@ describe("chat unread navigation", () => {
   it("does not let delayed SSR navigation erase a recent event", async () => {
     const { client, rerender, node } = setup();
     act(() => activity());
+    rerender(node(fixture()));
+    await advance(1);
+    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+      true,
+    );
+  });
+
+  it("keeps a fresh poll's unread value when older SSR props arrive later", async () => {
+    const read = vi.fn(async () =>
+      fixture().map((space) => ({
+        ...space,
+        unread: true,
+        channels: space.channels.map((room) => ({ ...room, unread: true })),
+      })),
+    );
+    const { client, rerender, node } = setup(read);
+    await advance(60_001);
     rerender(node(fixture()));
     await advance(1);
     expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(

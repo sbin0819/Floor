@@ -19,6 +19,7 @@ import {
 import { getSession } from "@/lib/auth/session";
 import { getNotificationSummary } from "@/features/notifications/queries";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { ChatQueueConnection } from "@/features/chat/components/use-chat-send-queue";
 
 export async function HeaderNotifications() {
   if (!(await getSession())) return null;
@@ -96,6 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Suspense fallback={null}>
         <ChatNavSyncSlot />
       </Suspense>
+      <ChatQueueConnection />
     </RealtimeProvider>
   );
 }
