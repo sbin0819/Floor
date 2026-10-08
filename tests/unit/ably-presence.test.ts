@@ -170,4 +170,94 @@ describe("shared Ably presence lifecycle", () => {
     expect(presence.enter).toHaveBeenCalledTimes(1);
     registry.reset();
   });
+  it("retries a failed enter only after a fresh synchronization signal", async () => {
+    const { registry, presence } = setup();
+    presence.enter.mockRejectedValueOnce(new Error("temporarily disconnected"));
+    const observer = registry.observe("space:a", vi.fn());
+    observer.update({ status: "dnd", auto: false });
+    registry.bind("space:a", presence);
+    await tick();
+    expect(presence.enter).toHaveBeenCalledTimes(1);
+    expect(presence.update).not.toHaveBeenCalled();
+    registry.resync("space:a");
+    await tick();
+    expect(presence.update).toHaveBeenCalledExactlyOnceWith({
+      status: "dnd",
+      auto: false,
+    });
+    registry.resync("space:a");
+    await tick();
+    expect(presence.update).toHaveBeenCalledTimes(1);
+    registry.reset();
+  });
+  it("recovers an initial subscription failure on reconnect without retry loops", async () => {
+    const { registry, presence } = setup();
+    presence.subscribe.mockRejectedValueOnce(new Error("attach failed"));
+    const sync = vi.fn();
+    const observer = registry.observe("space:a", vi.fn(), sync);
+    observer.update({ status: "away", auto: false });
+    registry.bind("space:a", presence);
+    await tick();
+    expect(presence.subscribe).toHaveBeenCalledTimes(1);
+    expect(presence.unsubscribe).toHaveBeenCalledExactlyOnceWith(
+      presence.subscribe.mock.calls[0]![0],
+    );
+    expect(presence.enter).not.toHaveBeenCalled();
+    expect(sync).toHaveBeenLastCalledWith(false);
+    registry.resync("space:a");
+    registry.resync("space:a");
+    await tick();
+    expect(presence.subscribe).toHaveBeenCalledTimes(2);
+    expect(presence.enter).toHaveBeenCalledExactlyOnceWith({
+      status: "away",
+      auto: false,
+    });
+    expect(sync).toHaveBeenLastCalledWith(true);
+    registry.reset();
+  });
+  it("defers one reconnect retry until an in-flight update fails and stops after another failure", async () => {
+    const { registry, presence } = setup();
+    const observer = registry.observe("space:a", vi.fn());
+    observer.update({ status: "online", auto: false });
+    registry.bind("space:a", presence);
+    await tick();
+    const pending = Promise.withResolvers<void>();
+    presence.update
+      .mockReturnValueOnce(pending.promise)
+      .mockRejectedValue(new Error("still disconnected"));
+    observer.update({ status: "dnd", auto: false });
+    registry.resync("space:a");
+    expect(presence.update).toHaveBeenCalledTimes(1);
+    pending.reject(new Error("connection lost"));
+    await tick();
+    expect(presence.update).toHaveBeenCalledTimes(2);
+    await tick();
+    expect(presence.update).toHaveBeenCalledTimes(2);
+    presence.update.mockResolvedValue(undefined);
+    registry.resync("space:a");
+    await tick();
+    expect(presence.update).toHaveBeenCalledTimes(3);
+    expect(presence.update).toHaveBeenLastCalledWith({
+      status: "dnd",
+      auto: false,
+    });
+    registry.reset();
+  });
+  it("does not revive a binding closed during a pending subscription retry", async () => {
+    const { registry, presence } = setup();
+    presence.subscribe.mockRejectedValueOnce(new Error("attach failed"));
+    const observer = registry.observe("space:a", vi.fn());
+    observer.update({ status: "online", auto: false });
+    registry.bind("space:a", presence);
+    await tick();
+    const pending = deferred<void>();
+    presence.subscribe.mockReturnValueOnce(pending.promise);
+    registry.resync("space:a");
+    observer.close();
+    await registry.unbind("space:a");
+    pending.resolve();
+    await tick();
+    expect(presence.enter).not.toHaveBeenCalled();
+    expect(presence.get).not.toHaveBeenCalled();
+  });
 });

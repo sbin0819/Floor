@@ -8,6 +8,7 @@ export type PresenceObserver = {
 
 type Watcher = {
   notify: (members: readonly PresenceMember[]) => void;
+  onSync?: (synced: boolean) => void;
   data?: PresenceData;
   order: number;
 };
@@ -20,6 +21,7 @@ type Binding = {
   refresh: number;
   onChange: () => void;
   operation?: Promise<void>;
+  subscribing?: Promise<void>;
 };
 type Entry = { watchers: Set<Watcher>; binding?: Binding };
 
@@ -30,6 +32,9 @@ export function createPresenceRegistry() {
 
   const notify = (entry: Entry, members: readonly PresenceMember[]) => {
     for (const watcher of entry.watchers) watcher.notify(members);
+  };
+  const sync = (entry: Entry, ready: boolean) => {
+    for (const watcher of entry.watchers) watcher.onSync?.(ready);
   };
   const desired = (entry: Entry) =>
     [...entry.watchers]
@@ -73,18 +78,44 @@ export function createPresenceRegistry() {
     binding.active = false;
     binding.presence.unsubscribe(binding.onChange);
     entry.binding = undefined;
+    sync(entry, false);
     notify(entry, []);
     return binding;
+  }
+
+  function subscribe(entry: Entry, binding: Binding) {
+    if (!binding.active || binding.ready || binding.subscribing) return;
+    binding.subscribing = binding.presence
+      .subscribe(binding.onChange)
+      .then(() => {
+        if (!binding.active) return;
+        binding.ready = true;
+        binding.onChange();
+        flush(entry, binding);
+      })
+      .catch(() => {
+        if (!binding.active) return;
+        binding.presence.unsubscribe(binding.onChange);
+        sync(entry, false);
+      })
+      .finally(() => {
+        binding.subscribing = undefined;
+      });
   }
 
   return {
     hasObservers: (channel: string) =>
       (entries.get(channel)?.watchers.size ?? 0) > 0,
-    observe(channel: string, notify: Watcher["notify"]): PresenceObserver {
+    observe(
+      channel: string,
+      notify: Watcher["notify"],
+      onSync?: Watcher["onSync"],
+    ): PresenceObserver {
       const entry = entries.get(channel) ?? { watchers: new Set<Watcher>() };
       entries.set(channel, entry);
-      const watcher: Watcher = { notify, order: 0 };
+      const watcher: Watcher = { notify, onSync, order: 0 };
       entry.watchers.add(watcher);
+      onSync?.(false);
       let closed = false;
       entry.binding?.onChange();
       return {
@@ -118,22 +149,35 @@ export function createPresenceRegistry() {
           void presence
             .get()
             .then((members) => {
-              if (binding.active && version === binding.refresh)
+              if (binding.active && version === binding.refresh) {
                 notify(entry, members);
+                sync(entry, true);
+              }
             })
-            .catch(() => {});
+            .catch(() => {
+              if (binding.active && version === binding.refresh)
+                sync(entry, false);
+            });
         },
       };
       entry.binding = binding;
-      void presence
-        .subscribe(binding.onChange)
-        .then(() => {
-          if (!binding.active) return;
-          binding.ready = true;
-          binding.onChange();
-          flush(entry, binding);
-        })
-        .catch(() => {});
+      subscribe(entry, binding);
+    },
+    resync(channel: string) {
+      const entry = entries.get(channel);
+      if (!entry) return;
+      sync(entry, false);
+      const binding = entry.binding;
+      if (!binding) return;
+      if (!binding.ready) {
+        subscribe(entry, binding);
+        return;
+      }
+      binding.onChange();
+      // 실패 직후 자체 재시도는 하지 않고 새 attach/reconnect 신호가 있을 때만 보낸다.
+      if (binding.operation)
+        void binding.operation.then(() => flush(entry, binding));
+      else flush(entry, binding);
     },
     async unbind(channel: string) {
       const entry = entries.get(channel);

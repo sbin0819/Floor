@@ -12,6 +12,11 @@ import {
 } from "@/lib/realtime/ably-browser-client";
 import { createPresenceRegistry, type PresenceObserver } from "./ably-presence";
 import type { RealtimeEvent, RealtimeSubscriber } from "@/lib/realtime/types";
+import type { StatusPresence } from "@/features/people/status";
+import {
+  createSpacePresence,
+  type RealtimeScopeSnapshot,
+} from "./ably-space-presence";
 
 export type RealtimeConnectionState = ConnectionState | "disabled";
 export type RealtimeLifecycleEvent =
@@ -19,6 +24,11 @@ export type RealtimeLifecycleEvent =
   | { type: "channel"; channel: string; state: "attached"; resumed: boolean };
 
 export interface BrowserRealtime extends RealtimeSubscriber {
+  getScopeSnapshot?(): RealtimeScopeSnapshot;
+  subscribeScope?(listener: () => void): () => void;
+  setStatusPresence?(value: StatusPresence): void;
+  subscribeSpaces?(listener: (event: RealtimeEvent) => void): () => void;
+  reauthorize?(): void;
   observePresence(
     channel: string,
     onMembers: (members: readonly PresenceMember[]) => void,
@@ -74,6 +84,8 @@ export function createAblyBrowserRealtime({
   const listeners = new Map<string, Set<(event: RealtimeEvent) => void>>();
   const bindings = new Map<string, Binding>();
   const presence = createPresenceRegistry();
+  const spaces = createSpacePresence(presence);
+  const spaceListeners = new Set<(event: RealtimeEvent) => void>();
   const stateListeners = new Set<() => void>();
   const lifecycleListeners = new Set<(event: RealtimeLifecycleEvent) => void>();
   let state: RealtimeConnectionState = "initialized";
@@ -81,6 +93,7 @@ export function createAblyBrowserRealtime({
   let stopConnection: (() => void) | undefined;
   let active = false;
   let generation = 0;
+  let authorizationRevision = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
   let dirty = false;
@@ -115,6 +128,7 @@ export function createAblyBrowserRealtime({
     timer = undefined;
     stopConnection?.();
     stopConnection = undefined;
+    spaces.reset();
     presence.reset();
     for (const binding of bindings.values()) {
       binding.channel.unsubscribe(binding.listener);
@@ -129,6 +143,7 @@ export function createAblyBrowserRealtime({
   function close() {
     active = false;
     resetClient();
+    spaces.reset(true);
     failureScope = undefined;
     failedChannels.clear();
     setState("closed");
@@ -163,12 +178,15 @@ export function createAblyBrowserRealtime({
 
   async function initialize(version: number) {
     const firstInput = currentChannels();
-    let firstToken: { token: TokenRequest; scope: string } | undefined;
+    const firstRevision = authorizationRevision;
+    let firstToken:
+      { token: TokenRequest; scope: string; revision: number } | undefined;
     try {
       // 키가 없는 환경에서는 SDK를 불러오거나 Ably에 연결하지 않는다.
       firstToken = {
         token: await requestToken(firstInput),
         scope: JSON.stringify(firstInput),
+        revision: firstRevision,
       };
     } catch (error) {
       if (version !== generation || !active || stopForAuth(error)) return;
@@ -183,14 +201,26 @@ export function createAblyBrowserRealtime({
         while (active && version === generation) {
           const input = currentChannels();
           const scope = JSON.stringify(input);
+          const revision = authorizationRevision;
           const cached = firstToken;
           firstToken = undefined;
           // SDK 로딩·연결을 기다리는 동안 바뀐 선택에 이전 토큰을 넘기지 않는다.
           const token =
-            cached?.scope === scope ? cached.token : await requestToken(input);
+            cached?.scope === scope && cached.revision === revision
+              ? cached.token
+              : await requestToken(input);
           if (!active || version !== generation) break;
-          if (JSON.stringify(currentChannels()) !== scope) continue;
+          if (
+            JSON.stringify(currentChannels()) !== scope ||
+            revision !== authorizationRevision
+          )
+            continue;
           authorization = { scope, ...grantedChannels(token) };
+          spaces.authorize(
+            authorization.channels,
+            authorization.presenceChannels,
+            input.rooms,
+          );
           callback(null, token);
           schedule();
           return;
@@ -214,7 +244,10 @@ export function createAblyBrowserRealtime({
         previous: change.previous,
         current: change.current,
       });
-      if (change.current === "connected") schedule();
+      if (change.current === "connected") {
+        for (const name of bindings.keys()) presence.resync(name);
+        schedule();
+      }
     });
     client.connect();
   }
@@ -235,7 +268,13 @@ export function createAblyBrowserRealtime({
       }
       // 제거할 채널이 붙어 있는 채로 권한을 줄이지 않도록 먼저 뗀다.
       for (const [name, binding] of bindings) {
-        if (listeners.has(name) && authorization?.channels.has(name)) continue;
+        if (
+          (listeners.has(name) ||
+            (name.startsWith("space:") &&
+              authorization?.presenceChannels.has(name))) &&
+          authorization?.channels.has(name)
+        )
+          continue;
         binding.channel.unsubscribe(binding.listener);
         binding.stopAttached();
         bindings.delete(name);
@@ -260,7 +299,7 @@ export function createAblyBrowserRealtime({
         dirty = true;
         return;
       }
-      for (const name of listeners.keys()) {
+      for (const name of new Set([...listeners.keys(), ...spaces.channels()])) {
         if (
           bindings.has(name) ||
           failedChannels.has(name) ||
@@ -270,8 +309,11 @@ export function createAblyBrowserRealtime({
         const channel = client.channel(name);
         const listener = (event: RealtimeEvent) => {
           for (const notify of [...(listeners.get(name) ?? [])]) notify(event);
+          if (name.startsWith("space:"))
+            for (const notify of spaceListeners) notify(event);
         };
         const stopAttached = channel.onAttached((resumed) => {
+          presence.resync(name);
           emit({ type: "channel", channel: name, state: "attached", resumed });
         });
         const binding = { channel, listener, stopAttached };
@@ -327,6 +369,18 @@ export function createAblyBrowserRealtime({
   };
 
   return {
+    getScopeSnapshot: spaces.getSnapshot,
+    subscribeScope: spaces.subscribe,
+    setStatusPresence: spaces.setStatus,
+    subscribeSpaces(listener) {
+      spaceListeners.add(listener);
+      return () => spaceListeners.delete(listener);
+    },
+    reauthorize() {
+      authorizationRevision += 1;
+      if (authorization) authorization = { ...authorization, scope: "" };
+      schedule();
+    },
     observePresence(channel, onMembers) {
       const stop = subscribe(channel, () => {});
       const observer = presence.observe(channel, onMembers);

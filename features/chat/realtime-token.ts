@@ -3,7 +3,8 @@ import { z } from "zod";
 import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
-import { canReadRoom, canReadSpace } from "@/lib/dal/chat-access";
+import { canReadRoom } from "@/lib/dal/chat-access";
+import { listRealtimeSpaces } from "@/lib/dal/chat-presence";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getEnv } from "@/lib/env";
 import {
@@ -20,10 +21,8 @@ import {
 
 const tokenSchema = z.strictObject({
   rooms: z.array(z.uuid().transform((id) => id.toLowerCase())).max(3),
-  spaces: z
-    .array(z.uuid().transform((id) => id.toLowerCase()))
-    .max(1)
-    .default([]),
+  // 옛 클라이언트가 보낸 선택은 무시하고 서버 소속으로만 capability를 만든다.
+  spaces: z.unknown().optional(),
 });
 const limiter = createMemoryRateLimiter();
 export class RealtimeDisabledError extends Error {}
@@ -67,9 +66,8 @@ export function createRealtimeToken(
         if (await canReadRoom(session.userId, roomId, dependencies.database))
           capability[roomChannel(roomId)] = ["subscribe", "presence"];
       }),
-      ...parsed.data.spaces.map(async (spaceId) => {
-        if (await canReadSpace(session.userId, spaceId, dependencies.database))
-          capability[spaceChannel(spaceId)] = ["subscribe"];
+      listRealtimeSpaces(session.userId, dependencies.database).then((spaces) => {
+        for (const { id } of spaces) capability[spaceChannel(id)] = ["subscribe", "presence"];
       }),
     ]);
     const params: TokenParams = {

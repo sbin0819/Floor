@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { notificationPresentation } from "../format";
 import { newlyPublishedNotifications, notificationToastId } from "../polling";
 import type { NotificationItem, NotificationSummary } from "../types";
+import { useChatMetadata } from "@/features/chat/components/use-chat-metadata";
 
 export function useNotificationToasts(
   data: NotificationSummary,
@@ -13,10 +14,12 @@ export function useNotificationToasts(
 ) {
   const previousNow = useRef(data.now);
   const router = useRouter();
+  const { myStatus } = useChatMetadata();
   useEffect(() => {
     if (Date.parse(data.now) <= Date.parse(previousNow.current)) return;
     const incoming = newlyPublishedNotifications(data, previousNow.current);
     previousNow.current = data.now;
+    if (myStatus === undefined || myStatus === "dnd") return;
     if (incoming.length >= 4) {
       toast(`새 알림 ${incoming.length}개`, {
         id: `notifications:${data.now}`,
@@ -43,5 +46,5 @@ export function useNotificationToasts(
           : {}),
       });
     }
-  }, [data, activate, router]);
+  }, [data, activate, router, myStatus]);
 }

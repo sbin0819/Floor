@@ -4,16 +4,21 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useRealtimeChannel } from "@/components/realtime-provider";
+import {
+  useRealtimeChannel,
+  useRealtimeReauthorize,
+} from "@/components/realtime-provider";
 import { userChannel } from "@/lib/realtime/channels";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 import type { ChatNav } from "../types";
+import { groupDisplayName } from "../group-name";
 import {
   CHAT_NAV_KEY,
   applyDirectActivity,
   applyMention,
   isViewingRoom,
   hasReadThrough,
+  applyMyStatus,
 } from "../nav-state";
 
 type Activity = Extract<RealtimeEvent, { type: "room.activity" }>;
@@ -23,9 +28,11 @@ type ToastEntry = {
   seq: number;
   roomId: string;
   authorName: string;
+  authorId?: string | null;
   excerpt: string;
   href: string;
   roomName?: string;
+  groupName?: string;
   direct: boolean;
 };
 export function ChatMentions({
@@ -40,6 +47,7 @@ export function ChatMentions({
   const client = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
+  const reauthorize = useRealtimeReauthorize();
   const pathnameRef = useRef(pathname);
   useEffect(() => {
     pathnameRef.current = pathname;
@@ -87,14 +95,21 @@ export function ChatMentions({
     };
   }, []);
   function enqueue(entry: ToastEntry) {
-    if (shown.current.has(entry.messageId) || isViewingEntry(entry)) return;
+    if (
+      shown.current.has(entry.messageId) ||
+      isViewingEntry(entry) ||
+      suppressed(entry)
+    )
+      return;
     batch.current.set(entry.messageId, entry);
     if (timer.current) return;
     timer.current = setTimeout(() => {
       timer.current = undefined;
       const entries = [...batch.current.values()].filter(
         (entry) =>
-          !shown.current.has(entry.messageId) && !isViewingEntry(entry),
+          !shown.current.has(entry.messageId) &&
+          !isViewingEntry(entry) &&
+          !suppressed(entry),
       );
       batch.current.clear();
       for (const entry of entries) shown.current.add(entry.messageId);
@@ -113,15 +128,26 @@ export function ChatMentions({
         for (const entry of entries)
           toast(
             entry.direct
-              ? entry.authorName
+              ? (entry.groupName ?? entry.authorName)
               : `${entry.authorName} 님이 #${entry.roomName}에서 멘션했어요`,
             {
               id: `${entry.direct ? "dm" : "mention"}:${entry.messageId}`,
-              description: entry.excerpt,
+              description: entry.groupName
+                ? `${entry.authorName}: ${entry.excerpt}`
+                : entry.excerpt,
               action: { label: "보기", onClick: () => open(entry) },
             },
           );
     }, 250);
+  }
+  function suppressed(entry: ToastEntry) {
+    const metadata = client.getQueryData<ChatNav>(CHAT_NAV_KEY);
+    return (
+      metadata?.myStatus === "dnd" ||
+      Boolean(
+        entry.authorId && metadata?.blockedUserIds?.includes(entry.authorId),
+      )
+    );
   }
   function isViewingEntry(entry: ToastEntry) {
     return (
@@ -136,22 +162,38 @@ export function ChatMentions({
     const room = data?.directMessages.find(
       (room) => room.roomId === event.roomId,
     );
-    if (!room || room.muted || !event.preview || event.preview.authorName === null || event.authorId === userId)
+    if (
+      !room ||
+      room.muted ||
+      !event.preview ||
+      event.preview.authorName === null ||
+      event.authorId === userId
+    )
       return;
     enqueue({
       ...event.preview,
       authorName: event.preview.authorName,
+      authorId: event.authorId,
       seq: event.seq,
       roomId: event.roomId,
       href: `/dm/${event.roomId}`,
       direct: true,
+      ...(room.kind === "group_dm"
+        ? {
+            groupName: groupDisplayName(
+              room.name,
+              room.members.map((member) => member.name),
+              room.memberCount - 1,
+            ),
+          }
+        : {}),
     });
   }
   function enqueueDirectMention(event: Mention, data: ChatNav | undefined) {
-    if (
-      !data?.directMessages.find((room) => room.roomId === event.roomId)?.muted
-    )
-      return;
+    const room = data?.directMessages.find(
+      (room) => room.roomId === event.roomId,
+    );
+    if (!room?.muted) return;
     enqueue({
       messageId: event.messageId,
       seq: event.seq,
@@ -160,6 +202,15 @@ export function ChatMentions({
       excerpt: event.excerpt,
       href: `/dm/${event.roomId}`,
       direct: true,
+      ...(room.kind === "group_dm"
+        ? {
+            groupName: groupDisplayName(
+              room.name,
+              room.members.map((member) => member.name),
+              room.memberCount - 1,
+            ),
+          }
+        : {}),
     });
   }
   function requestUnknown() {
@@ -187,7 +238,23 @@ export function ChatMentions({
     }, 250);
   }
   useRealtimeChannel(userChannel(userId), (event) => {
-    if (event.type === "room.activity" && event.roomKind === "dm") {
+    if (event.type === "status.changed") {
+      applyMyStatus(client, event.status);
+      return;
+    }
+    if (event.type === "realtime.reauth" || event.type === "friend.changed") {
+      if (event.type === "realtime.reauth") reauthorize();
+      void refreshRef.current().catch(() => {});
+      return;
+    }
+    if (
+      event.type === "room.activity" &&
+      (event.roomKind === "dm" || event.roomKind === "group_dm")
+    ) {
+      if (event.authorId === null || event.preview === null) {
+        void refreshRef.current().catch(() => {});
+        return;
+      }
       const result = applyDirectActivity(client, event, userId);
       if (result === "missing") {
         unknown.current.set(
@@ -202,7 +269,7 @@ export function ChatMentions({
     if (event.type !== "mention.created") return;
     const fresh = applyMention(client, event);
     if (!fresh) return;
-    if (event.roomKind === "dm") {
+    if (event.roomKind === "dm" || event.roomKind === "group_dm") {
       const data = client.getQueryData<ChatNav>(CHAT_NAV_KEY);
       if (data?.directMessages.some((room) => room.roomId === event.roomId))
         enqueueDirectMention(event, data);

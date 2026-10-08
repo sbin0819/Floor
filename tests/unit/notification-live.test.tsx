@@ -105,6 +105,7 @@ function setup({
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
   });
+  client.setQueryData(["chat", "nav"], {myStatus:"online",blockedUserIds:[],spaces:[],directMessages:[]});
   function Frame({ children }: { children: ReactNode }) {
     const content = (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>

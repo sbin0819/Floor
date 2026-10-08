@@ -15,7 +15,7 @@ import {
   type RealtimeTokenDependencies,
 } from "@/features/chat/realtime-token";
 import { ActionError } from "@/lib/actions/result";
-import { chatSpaces, teamMembers } from "@/lib/db/schema";
+import { chatSpaces, teamMembers, teams } from "@/lib/db/schema";
 import {
   createMemoryRateLimiter,
   RateLimitError,
@@ -63,6 +63,7 @@ describe("realtime token capabilities", () => {
     expect(JSON.parse(value.capability)).toEqual({
       [`user:${actors.member.userId}`]: ["subscribe"],
       [`room:${actors.roomId}`]: ["subscribe", "presence"],
+      [`space:${actors.spaceId}`]: ["subscribe", "presence"],
     });
     expect(value.clientId).toBe(actors.member.userId);
     expect(value.ttl).toBe(600_000);
@@ -81,7 +82,7 @@ describe("realtime token capabilities", () => {
       clientId: actors.member.userId,
     });
   });
-  it("grants only the selected readable space without presence or publish capabilities", async () => {
+  it("grants all readable spaces with presence and ignores the requested selection", async () => {
     const value = await token()({
       rooms: [actors.roomId],
       spaces: [actors.spaceId],
@@ -89,7 +90,7 @@ describe("realtime token capabilities", () => {
     expect(JSON.parse(value.capability)).toEqual({
       [`user:${actors.member.userId}`]: ["subscribe"],
       [`room:${actors.roomId}`]: ["subscribe", "presence"],
-      [`space:${actors.spaceId}`]: ["subscribe"],
+      [`space:${actors.spaceId}`]: ["subscribe", "presence"],
     });
     expect(value.clientId).toBe(actors.member.userId);
     expect(value.ttl).toBe(600_000);
@@ -100,6 +101,7 @@ describe("realtime token capabilities", () => {
     });
     expect(JSON.parse(foreign.capability)).toEqual({
       [`user:${actors.member.userId}`]: ["subscribe"],
+      [`space:${actors.spaceId}`]: ["subscribe", "presence"],
     });
     const operator = await token({
       requireSession: async () => actors.operator,
@@ -173,13 +175,64 @@ describe("realtime token capabilities", () => {
     { rooms: ["invalid"] },
     { rooms: Array.from({ length: 4 }, () => crypto.randomUUID()) },
     { rooms: [], userId: "foreign" },
-    { rooms: [], spaces: ["invalid"] },
-    { rooms: [], spaces: [crypto.randomUUID(), crypto.randomUUID()] },
   ])("rejects malformed input without issuing a token", async (input) => {
     await expect(token()(input)).rejects.toMatchObject({
       code: "INVALID_INPUT",
     });
     expect(request).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["invalid"],
+    [crypto.randomUUID(), crypto.randomUUID()],
+    "untrusted",
+    null,
+  ])(
+    "ignores legacy spaces input %j without expanding capability",
+    async (spaces) => {
+      const value = await token()({ rooms: [], spaces });
+      expect(JSON.parse(value.capability)).toEqual({
+        [`user:${actors.member.userId}`]: ["subscribe"],
+        [`space:${actors.spaceId}`]: ["subscribe", "presence"],
+      });
+    },
+  );
+  it("caps automatically selected spaces at one hundred in rail name order", async () => {
+    const rows = Array.from({ length: 102 }, (_, i) => ({
+      id: crypto.randomUUID(),
+      name: `A${String(i).padStart(3, "0")}`,
+    }));
+    await database.db
+      .insert(teams)
+      .values(rows.map((row) => ({ ...row, createdBy: actors.member.userId })));
+    await database.db
+      .insert(teamMembers)
+      .values(
+        rows.map((row) => ({
+          teamId: row.id,
+          userId: actors.member.userId,
+          role: "member" as const,
+        })),
+      );
+    const spaces = await database.db
+      .insert(chatSpaces)
+      .values(rows.map((row) => ({ kind: "team" as const, teamId: row.id })))
+      .returning();
+    const value = await token()({ rooms: [] });
+    const capability = JSON.parse(value.capability) as Record<string, string[]>;
+    const actual = Object.keys(capability).filter((key) =>
+      key.startsWith("space:"),
+    );
+    expect(actual).toHaveLength(100);
+    expect(actual).toEqual(
+      rows
+        .slice(0, 100)
+        .map(
+          (row) =>
+            `space:${spaces.find((space) => space.teamId === row.id)!.id}`,
+        ),
+    );
+    expect(capability).not.toHaveProperty(`space:${actors.otherSpace.spaceId}`);
+    expect(Object.values(capability).flat()).not.toContain("publish");
   });
   it("rejects malformed JSON and rate-limits requests with a retry duration", async () => {
     await expect(

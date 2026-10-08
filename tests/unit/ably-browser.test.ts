@@ -55,6 +55,47 @@ afterEach(() => {
 });
 
 describe("Ably browser connection ownership", () => {
+  it("discards a preflight token invalidated by reauthorization with unchanged room input", async () => {
+    const { realtime, requestToken, client } = setup();
+    const pending = Promise.withResolvers<typeof fakeTokenRequest>();
+    requestToken
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(fakeTokenFor({ rooms: [] }));
+    realtime.subscribe("user:user-a", vi.fn());
+    realtime.subscribe("room:revoked", vi.fn());
+    realtime.start();
+    await vi.advanceTimersByTimeAsync(25);
+    realtime.reauthorize?.();
+    pending.resolve(fakeTokenFor({ rooms: ["revoked"] }));
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenCalledTimes(2);
+    expect(requestToken.mock.calls.map(([input]) => input.rooms)).toEqual([
+      ["revoked"],
+      ["revoked"],
+    ]);
+    expect(client.channel("room:revoked").subscribe).not.toHaveBeenCalled();
+    expect(realtime.getScopeSnapshot?.().channels).toEqual(["user:user-a"]);
+  });
+  it("does not overwrite a second reauthorization with an older pending renewal response", async () => {
+    const { realtime, requestToken, client } = setup();
+    realtime.subscribe("user:user-a", vi.fn());
+    realtime.subscribe("room:revoked", vi.fn());
+    realtime.start();
+    await vi.runAllTimersAsync();
+    const pending = Promise.withResolvers<typeof fakeTokenRequest>();
+    requestToken
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValue(fakeTokenFor({ rooms: [] }));
+    realtime.reauthorize?.();
+    await vi.advanceTimersByTimeAsync(25);
+    realtime.reauthorize?.();
+    pending.resolve(fakeTokenFor({ rooms: ["revoked"] }));
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenCalledTimes(3);
+    expect(client.channel("room:revoked").subscribe).toHaveBeenCalledTimes(1);
+    expect(client.channel("room:revoked").detach).toHaveBeenCalledTimes(1);
+    expect(realtime.getScopeSnapshot?.().channels).toEqual(["user:user-a"]);
+  });
   it("authorizes presence without a message consumer and leaves before detach even when leave rejects", async () => {
     const { realtime, requestToken, client, calls } = setup();
     const presence = client.channel("room:a").presence;

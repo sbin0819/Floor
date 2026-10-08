@@ -4,6 +4,8 @@ import type { ChatNav, DirectMessageNav } from "./types";
 export const CHAT_NAV_KEY = ["chat", "nav"] as const;
 type NavChanges = {
   revision: number;
+  statusRevision: number;
+  lastStatus?: ChatNav["myStatus"];
   rooms: Map<string, number>;
   activitySeq: Map<string, number>;
   readThrough: Map<string, number>;
@@ -17,6 +19,7 @@ function state(client: QueryClient) {
   if (!value) {
     value = {
       revision: 0,
+      statusRevision: 0,
       rooms: new Map(),
       activitySeq: new Map(),
       readThrough: new Map(),
@@ -264,7 +267,34 @@ export function mergeChatNav(
     if (protect(id) && !directMessages.some((row) => row.roomId === id))
       directMessages.push(room);
   }
-  return { spaces, directMessages: sortDirectMessages(directMessages) };
+  if (requestedAt !== null && snapshot.statusRevision <= requestedAt)
+    snapshot.lastStatus = undefined;
+  return {
+    ...incoming,
+    myStatus:
+      requestedAt === null || snapshot.statusRevision > requestedAt
+        ? (snapshot.lastStatus ?? current?.myStatus ?? incoming.myStatus)
+        : incoming.myStatus,
+    spaces,
+    directMessages: sortDirectMessages(directMessages),
+  };
+}
+
+export function applyMyStatus(
+  client: QueryClient,
+  status: ChatNav["myStatus"],
+) {
+  const snapshot = state(client);
+  snapshot.lastStatus = status;
+  snapshot.statusRevision = ++snapshot.revision;
+  client.setQueryData<ChatNav>(
+    CHAT_NAV_KEY,
+    (current) => current && { ...current, myStatus: status },
+  );
+}
+
+export function pendingMyStatus(client: QueryClient) {
+  return state(client).lastStatus;
 }
 
 export function mergeInitialChatNav(client: QueryClient, incoming: ChatNav) {

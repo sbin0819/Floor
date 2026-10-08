@@ -17,13 +17,17 @@ import {
 } from "@/features/chat/nav-state";
 import type { ChatNav, ChatSpaceNav } from "@/features/chat/types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
+import type { RealtimeLifecycleEvent } from "@/lib/realtime/ably-browser";
 
 const spaceId = "11111111-1111-4111-8111-111111111111";
 const roomId = "22222222-2222-4222-8222-222222222222";
 const secondId = "33333333-3333-4333-8333-333333333333";
 const mocks = vi.hoisted(() => ({
   pathname: "/",
-  channel: null as string | null,
+  subscribeSpaces: vi.fn(),
+  lifecycle: (_event: RealtimeLifecycleEvent) => {
+    void _event;
+  },
   mention: (_event: RealtimeEvent) => {
     void _event;
   },
@@ -45,14 +49,20 @@ vi.mock("next/link", async (original) => ({
   ...(await original<typeof import("next/link")>()),
   useLinkStatus: () => ({ pending: false }),
 }));
-vi.mock("@/components/realtime-provider", () => ({
+vi.mock("@/components/realtime-provider", async (original) => ({
+  ...(await original<typeof import("@/components/realtime-provider")>()),
   useRealtimeChannel: (channel: string | null, event: typeof mocks.event) => {
     if (channel?.startsWith("user:")) {
       mocks.mention = event;
       return;
     }
-    mocks.channel = channel;
+  },
+  useRealtimeSpaces: (event: typeof mocks.event) => {
+    mocks.subscribeSpaces();
     mocks.event = event;
+  },
+  useRealtimeLifecycle: (event: typeof mocks.lifecycle) => {
+    mocks.lifecycle = event;
   },
 }));
 const spaceFixture = (): ChatSpaceNav[] => [
@@ -82,9 +92,19 @@ const spaceFixture = (): ChatSpaceNav[] => [
     ],
   },
 ];
-const fixture = (): ChatNav => ({ spaces: spaceFixture(), directMessages: [] });
+const fixture = (): ChatNav => ({
+  spaces: spaceFixture(),
+  directMessages: [],
+  myStatus: "online",
+  blockedUserIds: [],
+});
 function mappedFixture(map: (space: ChatSpaceNav) => ChatSpaceNav): ChatNav {
-  return { spaces: spaceFixture().map(map), directMessages: [] };
+  return {
+    spaces: spaceFixture().map(map),
+    directMessages: [],
+    myStatus: "online",
+    blockedUserIds: [],
+  };
 }
 function activity(id = roomId, authorId: string | null = "other") {
   mocks.event({
@@ -123,6 +143,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   document.title = "Floor";
   mocks.toast.mockReset();
+  mocks.subscribeSpaces.mockClear();
   mocks.pathname = `/s/${spaceId}/${roomId}`;
   Object.defineProperty(document, "visibilityState", {
     configurable: true,
@@ -136,6 +157,46 @@ afterEach(() => {
 });
 
 describe("chat unread navigation", () => {
+  it("refreshes once after a reconnect even when connecting is the intermediate state", async () => {
+    const { read } = setup();
+    act(() =>
+      mocks.lifecycle({
+        type: "connection",
+        previous: "connecting",
+        current: "connected",
+      }),
+    );
+    await advance(1);
+    expect(read).not.toHaveBeenCalled();
+    act(() => {
+      mocks.lifecycle({
+        type: "connection",
+        previous: "connected",
+        current: "disconnected",
+      });
+      mocks.lifecycle({
+        type: "connection",
+        previous: "disconnected",
+        current: "connecting",
+      });
+      mocks.lifecycle({
+        type: "connection",
+        previous: "connecting",
+        current: "connected",
+      });
+    });
+    await advance(1);
+    expect(read).toHaveBeenCalledTimes(1);
+    act(() =>
+      mocks.lifecycle({
+        type: "connection",
+        previous: "connected",
+        current: "connected",
+      }),
+    );
+    await advance(1);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
   it("deduplicates mention counts and toasts, protects newer mentions from old reads, and restores title after metadata navigation", async () => {
     const { client, rerender, node } = setup();
     const event = {
@@ -266,9 +327,9 @@ describe("chat unread navigation", () => {
       false,
     );
   });
-  it("subscribes only the selected space and gives unread channels and rail accessible marks", async () => {
+  it("listens to joined-space events and gives unread channels and rail accessible marks", async () => {
     const { container } = setup();
-    expect(mocks.channel).toBe(`space:${spaceId}`);
+    expect(mocks.subscribeSpaces).toHaveBeenCalled();
     act(() => activity());
     await advance(1);
     expect(
@@ -279,7 +340,7 @@ describe("chat unread navigation", () => {
     ).toBeInTheDocument();
     expect(container.querySelector('[data-unread="true"]')).toHaveClass("h-7");
   });
-  it("does not subscribe from home and shows an 8px unread bar on another space", async () => {
+  it("receives joined-space activity from home and keeps the 8px unread bar after polling", async () => {
     mocks.pathname = "/";
     const read = vi.fn(async () =>
       mappedFixture((space) => ({
@@ -288,10 +349,55 @@ describe("chat unread navigation", () => {
         channels: space.channels.map((room) => ({ ...room, unread: true })),
       })),
     );
-    const { container } = setup(read);
-    expect(mocks.channel).toBeNull();
+    const { container, client } = setup(read);
+    expect(mocks.subscribeSpaces).toHaveBeenCalled();
+    act(() => activity());
+    await advance(1);
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unread).toBe(
+      true,
+    );
+    expect(container.querySelector('[data-unread="true"]')).toHaveClass("h-2");
     await advance(60_001);
     expect(container.querySelector('[data-unread="true"]')).toHaveClass("h-2");
+  });
+  it("updates another joined space while the selected channel stays unchanged", async () => {
+    const { client } = setup();
+    const otherSpaceId = "44444444-4444-4444-8444-444444444444";
+    const otherRoomId = "55555555-5555-4555-8555-555555555555";
+    act(() => {
+      client.setQueryData<ChatNav>(CHAT_NAV_KEY, (current) => ({
+        ...current!,
+        spaces: [
+          ...current!.spaces,
+          {
+            ...spaceFixture()[0]!,
+            id: otherSpaceId,
+            name: "개발팀",
+            initial: "개",
+            channels: [{ ...spaceFixture()[0]!.channels[0]!, id: otherRoomId }],
+          },
+        ],
+      }));
+      mocks.event({
+        type: "room.activity",
+        roomKind: "text",
+        preview: null,
+        spaceId: otherSpaceId,
+        roomId: otherRoomId,
+        seq: 2,
+        authorId: "other",
+      });
+    });
+    await advance(1);
+    const spaces = client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces;
+    expect(spaces.map((space) => space.unread)).toEqual([false, true]);
+    expect(
+      screen.getByRole("link", { name: "개발팀, 안 읽은 메시지 있음" }),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "일반" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
   it("ignores my messages and the visible bottom, but includes system messages and hidden tabs", async () => {
     const { client } = setup();
@@ -471,6 +577,7 @@ describe("chat unread navigation", () => {
       ...fixture(),
       directMessages: [
         {
+          kind: "dm",
           roomId: directId,
           other: {
             userId: "55555555-5555-4555-8555-555555555555",
