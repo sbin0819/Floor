@@ -4,6 +4,7 @@ import type { MyCalendarBooking } from "@/features/bookings/types";
 
 const booking: MyCalendarBooking = {
   relation: "owner",
+  meetingRoomId: null,
   invitedByName: null,
   participantNames: [],
   id: "booking",

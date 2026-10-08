@@ -49,6 +49,7 @@ const photo = {
 function bookingFixture(): MyBooking {
   return {
     relation: "owner",
+    meetingRoomId: null,
     invitedByName: null,
     participantNames: [],
     desk: null,

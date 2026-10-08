@@ -36,7 +36,7 @@ const items: NotificationItem[] = bookingNotificationTypes.map((type, index) => 
     read: index >= 3,
     scheduledFor: "2026-10-08T05:50:00Z",
     bookingId: "booking",
-    href: notificationHref(content),
+    href: notificationHref({ ...content, bookingId: "booking" }),
   };
 });
 

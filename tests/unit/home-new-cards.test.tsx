@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
 const booking: MyCalendarBooking = {
   relation: "owner",
+  meetingRoomId: null,
   invitedByName: null,
   participantNames: [],
   id: "booking",

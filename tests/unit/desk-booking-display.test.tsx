@@ -20,6 +20,7 @@ const now = "2026-10-07T01:10:00.000Z";
 function booking(): MyCalendarBooking {
   return {
     relation: "owner",
+    meetingRoomId: null,
     invitedByName: null,
     participantNames: [],
     id: "reservation",

@@ -81,6 +81,7 @@ it.each(["upcoming", "past"] as const)(
 it("shows upcoming links, plain past entries and a confirmation before cancellation", async () => {
   const booking = {
     relation: "owner" as const,
+    meetingRoomId: null,
     invitedByName: null,
     participantNames: [],
     id: "booking",

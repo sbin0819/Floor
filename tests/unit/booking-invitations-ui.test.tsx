@@ -43,6 +43,7 @@ function fixture(patch: Partial<MyCalendarBooking> = {}): MyCalendarBooking {
   return {
     id: "invited",
     relation: "invited",
+    meetingRoomId: null,
     invitedByName: "최민준",
     participantNames: ["김하은", "이서연"],
     start: "2026-10-08T00:00:00.000Z",

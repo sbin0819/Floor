@@ -25,13 +25,12 @@ function items(
   rows: Awaited<ReturnType<typeof listVisibleNotifications>>,
 ): NotificationItem[] {
   return rows.flatMap((row) => {
-    const content = parseNotificationContent(row.type, row.data);
+    const content = parseNotificationContent(row.type, row.data, row.bookingId);
     return content
       ? [
           {
             id: row.id,
             ...content,
-            bookingId: row.bookingId,
             read: row.readAt !== null,
             scheduledFor: row.scheduledFor.toISOString(),
             href: notificationHref(content),

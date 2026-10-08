@@ -140,6 +140,7 @@ const floorDto = (floor: FloorSummary): FloorSummary => ({
 const myBookingDto = (
   row: Awaited<ReturnType<typeof listMyBookings>>["upcoming"][number],
 ): MyBooking => ({
+  meetingRoomId: row.meetingRoomId,
   relation: row.isOwner ? "owner" : "invited",
   invitedByName: row.isOwner ? null : row.userName,
   participantNames: row.participantNames,

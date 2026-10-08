@@ -4,7 +4,7 @@ import {
   formatBookingTime,
 } from "@/features/bookings/format";
 import { addDays, localDate } from "@/lib/time/zoned";
-import type { NotificationContent } from "./types";
+import type { NotificationContent, NotificationSnapshot } from "./types";
 export type NotificationTextPart = { text: string; strong: boolean };
 
 const actionText = {
@@ -20,17 +20,22 @@ function notificationDate(start: string, timezone: string) {
   return formatBookingDate(date, timezone).replace(/요일$/, "");
 }
 
-export function notificationHref({ type, data }: NotificationContent) {
+export function notificationHref({
+  type,
+  data,
+  bookingId,
+}: NotificationContent) {
   if (type === "friend_request") return "/friends?tab=received";
   if (type === "friend_accepted") return "/friends";
   if (type === "message_request") return "/friends?tab=requests";
   if (type === "booking_removed") return null;
   if (type === "booking_cancelled") return "/bookings?tab=past";
+  if (type === "booking_reminder") return bookingId ? `/m/${bookingId}` : null;
   const date = localDate(new Date(data.start), data.timezone);
   return myBookingsCalendarHref(date.slice(0, 7), date);
 }
 
-export function notificationPresentation({ type, data }: NotificationContent) {
+export function notificationPresentation({ type, data }: NotificationSnapshot) {
   if (
     type === "friend_request" ||
     type === "friend_accepted" ||

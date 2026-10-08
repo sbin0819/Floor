@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, MessageSquare } from "lucide-react";
 import { SpacePhoto } from "@/components/photos/space-photo";
 import { StatusLine } from "@/components/status-line";
 import { Button } from "@/components/ui/button";
@@ -89,6 +89,14 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
           </div>
           <BookingParticipantsSummary booking={booking} />
           <div className="flex flex-wrap items-center gap-2">
+            {!booking.desk && (
+              <Button asChild variant="outline">
+                <Link href={`/m/${booking.id}`}>
+                  <MessageSquare aria-hidden="true" className="size-4" />
+                  채팅
+                </Link>
+              </Button>
+            )}
             {spaceHref && (
               <Button asChild variant="outline">
                 <Link href={spaceHref}>일정 보기</Link>

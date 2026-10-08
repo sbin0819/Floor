@@ -19,6 +19,7 @@ import { serializeTimeRange, type TimeRange } from "@/lib/db/range";
 import {
   bookings,
   branches,
+  chatRooms,
   floors,
   spaceBlocks,
   spacePhotos,
@@ -233,6 +234,7 @@ function locatedBookings(database: DalDatabase, userId: string) {
   const area = alias(spaces, "booking_desk_area");
   return database
     .select({
+      meetingRoomId: chatRooms.id,
       booking: bookings,
       space: spaces,
       area,
@@ -245,6 +247,7 @@ function locatedBookings(database: DalDatabase, userId: string) {
       participantNames: bookingParticipantNames,
     })
     .from(bookings)
+    .leftJoin(chatRooms, eq(chatRooms.bookingId, bookings.id))
     .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
     .leftJoin(
       area,

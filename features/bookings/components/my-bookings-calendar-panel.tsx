@@ -25,6 +25,7 @@ import { BookingTime } from "./booking-time";
 import { LeaveBookingButton } from "./leave-booking-button";
 import { BookingParticipantsSummary } from "./booking-participants-summary";
 import { EditBookingLink } from "./edit-booking-link";
+import { BookingChatLink } from "./booking-chat-link";
 import {
   CalendarBookingData,
   type CalendarBookings,
@@ -118,6 +119,9 @@ function CalendarBookingCards({
                   )
                 )}
               </div>
+            )}
+            {booking.meetingRoomId && !booking.desk && (
+              <BookingChatLink bookingId={booking.id} />
             )}
           </li>
         );

@@ -56,7 +56,7 @@ export type PersonNotificationData = z.infer<
   typeof personNotificationDataSchema
 >;
 export type NotificationData = BookingNotificationData | PersonNotificationData;
-export type NotificationContent =
+export type NotificationSnapshot =
   | {
       [Type in BookingNotificationType]: {
         type: Type;
@@ -69,6 +69,9 @@ export type NotificationContent =
         data: PersonNotificationData;
       };
     }[PersonNotificationType];
+export type NotificationContent = NotificationSnapshot & {
+  bookingId: string | null;
+};
 
 export function isPersonNotificationType(
   type: NotificationType,
@@ -126,20 +129,20 @@ export function parseNotificationData(
 export function parseNotificationContent(
   type: NotificationType,
   input: unknown,
+  bookingId: string | null,
 ): NotificationContent | null {
   if (isPersonNotificationType(type)) {
     const data = parseNotificationData(type, input);
-    return data ? { type, data } : null;
+    return data ? { type, data, bookingId: null } : null;
   }
   const data = parseNotificationData(type, input);
-  return data ? { type, data } : null;
+  return data ? { type, data, bookingId } : null;
 }
 
 export type NotificationItem = NotificationContent & {
   id: string;
   read: boolean;
   scheduledFor: string;
-  bookingId: string | null;
   href: string | null;
 };
 

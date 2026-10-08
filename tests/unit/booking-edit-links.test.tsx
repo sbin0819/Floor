@@ -18,6 +18,7 @@ const now = "2026-10-07T03:00:00.000Z";
 const booking: MyCalendarBooking = {
   id: "a03230cc-e9e0-47db-b409-c6b2c482b318",
   relation: "owner",
+  meetingRoomId: null,
   invitedByName: null,
   participantNames: [],
   start: "2026-10-07T04:00:00.000Z",

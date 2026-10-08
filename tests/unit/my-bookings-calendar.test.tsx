@@ -65,6 +65,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const now = "2026-10-08T01:00:00Z";
 const booking: MyCalendarBooking = {
   relation: "owner",
+  meetingRoomId: null,
   invitedByName: null,
   participantNames: [],
   id: "booking",

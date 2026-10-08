@@ -111,11 +111,11 @@ describe("notification destinations", () => {
     "booking_invited",
     "booking_changed",
     "participant_left",
-    "booking_reminder",
   ] as const)("%s uses the snapshot's local date", (type) => {
     expect(
       notificationHref({
         type,
+        bookingId: "booking",
         data: {
           ...data,
           start: "2026-10-31T16:00:00Z",
@@ -125,15 +125,16 @@ describe("notification destinations", () => {
     ).toBe("/bookings?view=calendar&month=2026-11&day=2026-11-01");
   });
   it("routes cancellations to history and gives removed invitations no destination", () => {
-    expect(notificationHref({ type: "booking_cancelled", data })).toBe(
+    expect(notificationHref({ type: "booking_cancelled", data, bookingId: "booking" })).toBe(
       "/bookings?tab=past",
     );
-    expect(notificationHref({ type: "booking_removed", data })).toBeNull();
+    expect(notificationHref({ type: "booking_removed", data, bookingId: "booking" })).toBeNull();
   });
   it("uses the stored timezone rather than the device timezone", () => {
     expect(
       notificationHref({
         type: "booking_invited",
+        bookingId: "booking",
         data: {
           ...data,
           timezone: "America/Los_Angeles",
@@ -141,6 +142,10 @@ describe("notification destinations", () => {
         },
       }),
     ).toBe("/bookings?view=calendar&month=2026-10&day=2026-10-07");
+  });
+  it("opens the reminder's meeting without depending on the device date", () => {
+    expect(notificationHref({ type: "booking_reminder", data, bookingId: "booking" })).toBe("/m/booking");
+    expect(notificationHref({ type: "booking_reminder", data, bookingId: null })).toBeNull();
   });
 });
 

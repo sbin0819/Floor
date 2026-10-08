@@ -33,6 +33,7 @@ import { LeaveBookingButton } from "./leave-booking-button";
 import { BookingParticipantsSummary } from "./booking-participants-summary";
 import { EditBookingLink } from "./edit-booking-link";
 import { MyBookingsViewLinks } from "./my-bookings-view-links";
+import { BookingChatLink } from "./booking-chat-link";
 
 export type BookingHistoryTab = "upcoming" | "past";
 function BookingList({
@@ -115,6 +116,9 @@ function BookingList({
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {booking.meetingRoomId && !booking.desk && (
+                      <BookingChatLink bookingId={booking.id} />
+                    )}
                     {booking.desk && <Badge variant="secondary">좌석</Badge>}
                     {booking.attendeeCount != null && (
                       <Badge variant="secondary" className="tabular-nums">
