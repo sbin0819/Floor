@@ -7,6 +7,7 @@ import { useFloorSelection } from "./branch-workspace";
 import { useWideScreen, type MatchMedia } from "./use-wide-screen";
 import { useFloorView } from "./floor-view";
 import { BookingStrip } from "./booking-strip";
+import { spaceDetailMode } from "../space-detail-mode";
 
 export function SpaceDetailContainer({
   children,
@@ -22,20 +23,27 @@ export function SpaceDetailContainer({
   const wide = useWideScreen(matchMedia);
   const navigation = useFloorSelection();
   const { effectiveView } = useFloorView();
-  const rightDetail =
-    wide &&
-    effectiveView === "timeline" &&
-    navigation?.location.detail === true;
+  const space = navigation?.floorData?.spaces.find(
+    (space) =>
+      space.kind === "accessible" && space.id === navigation.location.spaceId,
+  );
+  const { mode, keepSpaceOnClose } = spaceDetailMode({
+    wide,
+    view: effectiveView,
+    detail: navigation?.location.detail === true,
+    space: space?.kind === "accessible" ? space : null,
+  });
+  const rightDetail = mode === "detail";
   if (closed || navigation?.floorData?.openHours === null)
     return resolution ?? null;
-  if (wide && effectiveView === "timeline" && !rightDetail)
+  if (mode === "strip")
     return (
       <>
         {resolution}
         <BookingStrip>{children}</BookingStrip>
       </>
     );
-  if (wide && !rightDetail)
+  if (mode === "panel")
     return (
       <>
         {resolution}
@@ -51,10 +59,6 @@ export function SpaceDetailContainer({
     navigation !== null &&
     !navigation.detailCleared &&
     navigation.location.spaceId !== null;
-  const space = navigation?.floorData?.spaces.find(
-    (space) =>
-      space.kind === "accessible" && space.id === navigation.location.spaceId,
-  );
   const title =
     rightDetail && space?.kind === "accessible"
       ? `${space.name} 상세`
@@ -66,7 +70,7 @@ export function SpaceDetailContainer({
         open={open}
         onOpenChange={(next) => {
           if (next || !navigation) return;
-          const location = rightDetail
+          const location = keepSpaceOnClose
             ? { ...navigation.location, detail: false }
             : { ...navigation.location, spaceId: null, detail: false };
           navigation.change(

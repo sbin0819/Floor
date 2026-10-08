@@ -19,11 +19,13 @@ export function useBookingMutation<T>({
   action,
   successMessage,
   onSuccess,
+  onFailure,
   errorOptions,
 }: {
   action: (input: unknown) => Promise<ActionResult<T>>;
   successMessage: string;
   onSuccess?: (data: T) => void;
+  onFailure?: (result: Extract<ActionResult<T>, { ok: false }>) => void;
   errorOptions?: Parameters<typeof bookingErrorMessage>[1];
 }) {
   const router = useRouter();
@@ -55,6 +57,7 @@ export function useBookingMutation<T>({
             : (result.fieldErrors ?? {}),
         );
         toast.error(text);
+        onFailure?.(result);
         if (
           result.code === "BOOKING_CONFLICT" ||
           result.code === "SPACE_BLOCKED"

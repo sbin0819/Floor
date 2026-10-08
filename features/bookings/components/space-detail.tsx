@@ -16,21 +16,35 @@ import { getSpaceDayStatusLine } from "@/features/bookings/space-status-line";
 import { cn } from "@/lib/utils";
 import { localDate } from "@/lib/time/zoned";
 import { useBranchDisplayNow } from "./branch-display-clock";
+import { hasDeskSeats, spaceDetailMode } from "../space-detail-mode";
+import { DeskPicker } from "./desk-picker";
+import { SpaceDetailLoading } from "./space-detail-loading";
 
 export function SpaceDetail({ data }: { data: SpaceDayData }) {
   const { effectiveView } = useFloorView();
   const wide = useWideScreen();
   const workspace = useFloorSelection();
+  const floorSpace = workspace?.floorData?.spaces.find(
+    (space) =>
+      space.kind === "accessible" && space.id === workspace.location.spaceId,
+  );
   const displayNow = useBranchDisplayNow({
     branchId: data.branch.id,
     now: data.now,
   });
-  const rightDetail =
-    wide && effectiveView === "timeline" && workspace?.location.detail === true;
+  const { mode, keepSpaceOnClose } = spaceDetailMode({
+    wide,
+    view: effectiveView,
+    detail: workspace?.location.detail === true,
+    space: floorSpace?.kind === "accessible" ? floorSpace : null,
+  });
+  const rightDetail = mode === "detail";
+  const isDesk = hasDeskSeats(data.space) && data.desk !== null;
   const status = getSpaceDayStatusLine({ ...data, now: displayNow });
   const isToday =
     data.date === localDate(new Date(displayNow), data.branch.timezone);
-  if (wide && effectiveView === "timeline" && !rightDetail)
+  if (isDesk && workspace && !floorSpace) return <SpaceDetailLoading />;
+  if (mode === "strip")
     return (
       <BookingForm
         key={`${data.space.id}:${data.date}`}
@@ -68,12 +82,12 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
               data.branch.id,
               data.floor.id,
               data.date,
-              rightDetail ? data.space.id : undefined,
+              keepSpaceOnClose ? data.space.id : undefined,
             )}
             location={{
               floorId: data.floor.id,
               date: data.date,
-              spaceId: rightDetail ? data.space.id : null,
+              spaceId: keepSpaceOnClose ? data.space.id : null,
               detail: false,
             }}
             replace
@@ -86,7 +100,7 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
       <header className="shrink-0 space-y-2 border-b border-border px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">{data.space.name}</h2>
-          {isToday && (
+          {isToday && !isDesk && (
             <Badge
               className={cn(
                 "border-0",
@@ -104,7 +118,10 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
           <span>
             {data.floor.level}층
-            {data.space.capacity !== null && ` · 최대 ${data.space.capacity}인`}
+            {isDesk
+              ? ` · ${data.space.deskCount}석`
+              : data.space.capacity !== null &&
+                ` · 최대 ${data.space.capacity}인`}
           </span>
           {data.space.amenities.map((key) => (
             <Badge key={key} variant="outline" className="text-xs font-normal">
@@ -113,7 +130,15 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
           ))}
         </div>
       </header>
-      <BookingForm key={`${data.space.id}:${data.date}`} data={data} />
+      {isDesk && data.desk ? (
+        <DeskPicker
+          key={`${data.space.id}:${data.date}`}
+          data={data}
+          desk={data.desk}
+        />
+      ) : (
+        <BookingForm key={`${data.space.id}:${data.date}`} data={data} />
+      )}
     </section>
   );
 }

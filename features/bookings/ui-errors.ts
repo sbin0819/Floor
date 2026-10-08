@@ -8,11 +8,14 @@ export function bookingErrorMessage(
     isToday?: boolean;
     restricted?: boolean;
     capacity?: number | null;
+    desk?: boolean;
   } = {},
 ): string {
   switch (result.code) {
     case "BOOKING_CONFLICT":
-      return "방금 다른 예약이 들어왔어요. 시간을 다시 골라 주세요";
+      return options.desk
+        ? "방금 다른 사람이 이 자리를 예약했어요. 다른 자리를 골라 주세요"
+        : "방금 다른 예약이 들어왔어요. 시간을 다시 골라 주세요";
     case "SPACE_BLOCKED":
       return "점검 중인 시간이에요";
     case "OUTSIDE_HOURS":
@@ -24,6 +27,8 @@ export function bookingErrorMessage(
           ? `참석자가 정원(${options.capacity}명)보다 많아요`
           : `정원은 ${options.capacity}명이에요`;
     case "LIMIT_EXCEEDED":
+      if (result.message === "desk_per_person")
+        return "이 시간에 이미 예약한 자리가 있어요";
       if (
         result.message === "per_booking" &&
         options.limits?.maxMinutesPerBooking != null
