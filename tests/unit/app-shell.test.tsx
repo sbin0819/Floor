@@ -279,9 +279,7 @@ describe("member app shell frame", () => {
     await expectClosed(trigger);
     await userEvent.click(trigger);
     const reopened = screen.getByRole("dialog", { name: "메뉴" });
-    fireEvent.click(
-      within(reopened).getByRole("link", { name: "Floor" }),
-    );
+    fireEvent.click(within(reopened).getByRole("link", { name: "Floor" }));
     await expectClosed(trigger);
   });
 
