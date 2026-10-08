@@ -140,6 +140,7 @@ export async function requireOperatorPage(): Promise<Session>;            // adm
 // 서버
 export interface RealtimePublisher {
   publish(channel: string, event: RealtimeEvent): Promise<void>;
+  publishMany(items: { channel: string; event: RealtimeEvent }[]): Promise<void>; // 지시서 22
 }
 // 브라우저
 export interface RealtimeSubscriber {
@@ -152,6 +153,7 @@ export interface RealtimeSubscriber {
 
 ```ts
 export type ChatRoomKind = 'text' | 'voice' | 'dm' | 'group_dm' | 'meeting'; // roomKind는 지시서 23부터, bookingId(회의 채널만 값)는 지시서 25부터
+// SystemMessageData는 features/chat/system-messages.ts의 zod 타입 (지시서 24. docs/codex/24-people-requests-groups.md 1단계)
 export type ReactionEmoji = 'thumbs_up' | 'heart' | 'joy' | 'tada' | 'open_mouth' | 'cry' | 'pray' | 'check'; // 지시서 22
 
 export type RealtimeEvent =
@@ -163,6 +165,7 @@ export type RealtimeEvent =
       body: string; clientId: string | null; createdAt: string;
       // 지시서 22부터. 새 메시지라 editedAt·deletedAt은 null, reactions는 []
       replyTo: { id: string; authorName: string | null; excerpt: string; deleted: boolean } | null;
+      systemData: SystemMessageData | null; // 지시서 24. text면 null
       mentions: { userId: string; name: string }[]; mentionsEveryone: boolean;
       editedAt: null; deletedAt: null; reactions: [] }
   | { type: 'room.activity'; spaceId: string | null; roomId: string; roomKind: ChatRoomKind; bookingId: string | null; seq: number; authorId: string | null;

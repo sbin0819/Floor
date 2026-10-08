@@ -248,6 +248,7 @@ describe("message replies and mentions", () => {
       expect(Object.keys(page.messages[1]!).sort()).toEqual(
         [
           "id",
+          "systemData",
           "seq",
           "authorId",
           "authorName",

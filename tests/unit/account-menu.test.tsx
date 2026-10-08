@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@/components/account-menu";
@@ -43,7 +43,8 @@ describe("account menu", () => {
     const trigger = screen.getByRole("button", {
       name: "가상 회원님 사용자 메뉴",
     });
-    expect(trigger).toHaveTextContent("가가상 회원");
+    expect(within(trigger).getByText("가")).toBeVisible();
+    expect(within(trigger).getByText(profile.name)).toBeVisible();
     expect(trigger).toHaveClass("h-11");
     expect(screen.queryByText(profile.email)).not.toBeInTheDocument();
     await user.click(trigger);
