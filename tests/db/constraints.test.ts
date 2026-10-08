@@ -9,8 +9,8 @@ import {
   bookings,
   branches,
   branchStaff,
-  callSessions,
   chatRooms,
+  chatSpaces,
   floorPlans,
   floors,
   messages,
@@ -48,6 +48,7 @@ describe("database constraints from the real migrations", () => {
   let otherSpaceId: string;
   let teamId: string;
   let roomId: string;
+  let chatSpaceId: string;
 
   beforeAll(async () => {
     database = await createTestDatabase();
@@ -64,6 +65,7 @@ describe("database constraints from the real migrations", () => {
     otherSpaceId = crypto.randomUUID();
     teamId = crypto.randomUUID();
     roomId = crypto.randomUUID();
+    chatSpaceId = crypto.randomUUID();
     await database.db.insert(users).values({
       id: userId,
       name: "테스트 사용자",
@@ -82,7 +84,18 @@ describe("database constraints from the real migrations", () => {
     await database.db
       .insert(teams)
       .values({ id: teamId, name: "가상 팀", createdBy: userId });
-    await database.db.insert(chatRooms).values({ id: roomId, kind: "inquiry" });
+    await database.db.insert(chatSpaces).values({
+      id: chatSpaceId,
+      kind: "community",
+      name: "가상 커뮤니티",
+      createdBy: userId,
+    });
+    await database.db.insert(chatRooms).values({
+      id: roomId,
+      kind: "text",
+      spaceId: chatSpaceId,
+      name: "일반",
+    });
   });
 
   it("1. rejects overlapping confirmed bookings for one space with SQLSTATE 23P01", async () => {
@@ -222,28 +235,76 @@ describe("database constraints from the real migrations", () => {
     });
   });
 
-  it("8. allows only one active call per room, with completed history retained", async () => {
-    await database.db.insert(callSessions).values([
-      { roomId, livekitRoom: "past-call", endedAt: new Date() },
-      { roomId, livekitRoom: "current-call" },
+  it.each([
+    "team_without_team",
+    "team_with_branch",
+    "team_with_name",
+    "branch_without_branch",
+    "branch_with_team",
+    "branch_with_name",
+    "community_without_name",
+    "community_without_creator",
+    "community_with_team",
+    "community_with_branch",
+  ] as const)(
+    "8. rejects a space with invalid references: %s",
+    async (fixture) => {
+      const fixtures: Record<typeof fixture, typeof chatSpaces.$inferInsert> = {
+        team_without_team: { kind: "team" },
+        team_with_branch: { kind: "team", teamId, branchId },
+        team_with_name: { kind: "team", teamId, name: "별도 이름" },
+        branch_without_branch: { kind: "branch" },
+        branch_with_team: { kind: "branch", branchId, teamId },
+        branch_with_name: { kind: "branch", branchId, name: "별도 이름" },
+        community_without_name: { kind: "community", createdBy: userId },
+        community_without_creator: { kind: "community", name: "가상 커뮤니티" },
+        community_with_team: {
+          kind: "community",
+          name: "가상 커뮤니티",
+          createdBy: userId,
+          teamId,
+        },
+        community_with_branch: {
+          kind: "community",
+          name: "가상 커뮤니티",
+          createdBy: userId,
+          branchId,
+        },
+      };
+      await expect(
+        database.db.insert(chatSpaces).values(fixtures[fixture]),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "chat_spaces_kind_ref" },
+      });
+    },
+  );
+
+  it("8. accepts each space kind and permits only one space for each team or branch", async () => {
+    await database.db.insert(chatSpaces).values([
+      { kind: "team", teamId },
+      { kind: "branch", branchId },
+      { kind: "community", name: "다른 커뮤니티", createdBy: userId },
     ]);
     await expect(
-      database.db
-        .insert(callSessions)
-        .values({ roomId, livekitRoom: "duplicate-call" }),
+      database.db.insert(chatSpaces).values({ kind: "team", teamId }),
     ).rejects.toMatchObject({
-      cause: { code: "23505", constraint: "call_sessions_one_active" },
+      cause: { code: "23505", constraint: "chat_spaces_team_unique" },
+    });
+    await expect(
+      database.db.insert(chatSpaces).values({ kind: "branch", branchId }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "chat_spaces_branch_unique" },
     });
   });
 
   it("9. rejects duplicate room message sequence numbers", async () => {
     await database.db
       .insert(messages)
-      .values({ roomId, seq: 1, body: "첫 메시지" });
+      .values({ roomId, seq: 1, authorId: userId, body: "첫 메시지" });
     await expect(
       database.db
         .insert(messages)
-        .values({ roomId, seq: 1, body: "중복 메시지" }),
+        .values({ roomId, seq: 1, authorId: userId, body: "중복 메시지" }),
     ).rejects.toMatchObject({
       cause: { code: "23505", constraint: "messages_room_id_seq_unique" },
     });
@@ -251,20 +312,99 @@ describe("database constraints from the real migrations", () => {
 
   it("9. rejects duplicate non-null client ids and permits multiple null client ids", async () => {
     await database.db.insert(messages).values([
-      { roomId, seq: 1, body: "첫 메시지", clientId: "retry-key" },
-      { roomId, seq: 2, body: "둘째 메시지" },
-      { roomId, seq: 3, body: "셋째 메시지" },
+      {
+        roomId,
+        seq: 1,
+        authorId: userId,
+        body: "첫 메시지",
+        clientId: "retry-key",
+      },
+      { roomId, seq: 2, authorId: userId, body: "둘째 메시지" },
+      { roomId, seq: 3, authorId: userId, body: "셋째 메시지" },
     ]);
     await expect(
       database.db
         .insert(messages)
-        .values({ roomId, seq: 4, body: "재전송", clientId: "retry-key" }),
+        .values({
+          roomId,
+          seq: 4,
+          authorId: userId,
+          body: "재전송",
+          clientId: "retry-key",
+        }),
     ).rejects.toMatchObject({
       cause: { code: "23505", constraint: "messages_room_id_client_id_unique" },
     });
   });
 
-  it.each(["booking", "channel", "team"] as const)(
+  it("9. permits the same client id in different rooms", async () => {
+    const secondRoomId = crypto.randomUUID();
+    await database.db.insert(chatRooms).values({
+      id: secondRoomId,
+      kind: "text",
+      spaceId: chatSpaceId,
+      name: "다른 채널",
+    });
+    await database.db.insert(messages).values([
+      {
+        roomId,
+        seq: 1,
+        authorId: userId,
+        body: "첫 방",
+        clientId: "retry-key",
+      },
+      {
+        roomId: secondRoomId,
+        seq: 1,
+        authorId: userId,
+        body: "다른 방",
+        clientId: "retry-key",
+      },
+    ]);
+    expect(await database.db.select().from(messages)).toHaveLength(2);
+  });
+
+  it.each(["text", "system"] as const)(
+    "9. rejects %s with the wrong author presence",
+    async (kind) => {
+      await expect(
+        database.db.insert(messages).values({
+          roomId,
+          seq: 1,
+          kind,
+          authorId: kind === "system" ? userId : null,
+          body: "작성자 검사",
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "messages_author_kind" },
+      });
+    },
+  );
+
+  it.each([0, 4001])("9. rejects invalid body length %i", async (length) => {
+    await expect(
+      database.db
+        .insert(messages)
+        .values({
+          roomId,
+          seq: 1,
+          authorId: userId,
+          body: "가".repeat(length),
+        }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "messages_body_length" },
+    });
+  });
+
+  it("9. accepts a system message without an author and 4000 Unicode code points", async () => {
+    await database.db.insert(messages).values([
+      { roomId, seq: 1, kind: "system", body: "시스템 메시지" },
+      { roomId, seq: 2, authorId: userId, body: "😀".repeat(4000) },
+    ]);
+    expect(await database.db.select().from(messages)).toHaveLength(2);
+  });
+
+  it.each(["text", "voice"] as const)(
     "10. rejects %s rooms missing their required reference",
     async (kind) => {
       await expect(
@@ -275,20 +415,75 @@ describe("database constraints from the real migrations", () => {
     },
   );
 
-  it("10. accepts each chat room kind with the appropriate reference", async () => {
-    const bookingId = crypto.randomUUID();
-    await database.db
-      .insert(bookings)
-      .values({ id: bookingId, spaceId, userId, during });
+  it.each(["text", "voice"] as const)(
+    "10. requires both space and name for a %s channel",
+    async (kind) => {
+      for (const value of [
+        { kind, spaceId: chatSpaceId },
+        { kind, name: "새 채널" },
+      ]) {
+        await expect(
+          database.db.insert(chatRooms).values(value),
+        ).rejects.toMatchObject({
+          cause: { code: "23514", constraint: "chat_rooms_kind_ref" },
+        });
+      }
+    },
+  );
+
+  it("10. accepts channel names again after archival and allows the same name in another space", async () => {
     await database.db
       .insert(chatRooms)
-      .values([
-        { kind: "booking", bookingId },
-        { kind: "channel", floorId },
-        { kind: "team", teamId, floorId },
-        { kind: "inquiry" },
-      ]);
-    expect(await database.db.select().from(chatRooms)).toHaveLength(5);
+      .values({ kind: "text", spaceId: chatSpaceId, name: "General" });
+    await expect(
+      database.db
+        .insert(chatRooms)
+        .values({ kind: "voice", spaceId: chatSpaceId, name: "gENERAL" }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "chat_rooms_space_name_unique" },
+    });
+    await database.db
+      .update(chatRooms)
+      .set({ archivedAt: new Date("2026-10-07T12:00:00Z") });
+    await database.db
+      .insert(chatRooms)
+      .values({ kind: "text", spaceId: chatSpaceId, name: "gENERAL" });
+    const secondSpaceId = crypto.randomUUID();
+    await database.db
+      .insert(chatSpaces)
+      .values({ id: secondSpaceId, kind: "team", teamId });
+    await database.db
+      .insert(chatRooms)
+      .values({ kind: "text", spaceId: secondSpaceId, name: "General" });
+    expect(await database.db.select().from(chatRooms)).toHaveLength(4);
+  });
+
+  it.each([
+    { name: "", topic: null },
+    { name: "가".repeat(31), topic: null },
+    { name: "채널", topic: "가".repeat(201) },
+  ])(
+    "10. rejects invalid channel name or topic length: $name",
+    async (fields) => {
+      await expect(
+        database.db
+          .insert(chatRooms)
+          .values({ kind: "text", spaceId: chatSpaceId, ...fields }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "chat_rooms_name_length" },
+      });
+    },
+  );
+
+  it("10. accepts 30-character channel names and 200-character topics", async () => {
+    await database.db
+      .insert(chatRooms)
+      .values({
+        kind: "voice",
+        spaceId: chatSpaceId,
+        name: "😀".repeat(30),
+        topic: "가".repeat(200),
+      });
   });
 
   it("11. rejects team names that differ only by case", async () => {
@@ -657,7 +852,7 @@ describe("database constraints from the real migrations", () => {
   it("cascades messages when their room is deleted", async () => {
     await database.db
       .insert(messages)
-      .values({ roomId, seq: 1, body: "메시지" });
+      .values({ roomId, seq: 1, authorId: userId, body: "메시지" });
     await database.db.delete(chatRooms).where(eq(chatRooms.id, roomId));
     expect(await database.db.select().from(messages)).toHaveLength(0);
   });

@@ -32,7 +32,7 @@ const protectedTables = {
   notifications: ["id"],
   chat_rooms: ["id"],
   messages: ["id"],
-  call_sessions: ["id"],
+  chat_spaces: ["id"],
 } as const;
 type ProtectedTable = keyof typeof protectedTables;
 type RowFingerprint = { key: string; hash: string };

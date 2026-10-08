@@ -22,11 +22,17 @@ export const bookingStatus = pgEnum("booking_status", [
   "confirmed",
   "cancelled",
 ]);
-export const chatRoomKind = pgEnum("chat_room_kind", [
-  "booking",
-  "channel",
-  "inquiry",
+export const chatSpaceKind = pgEnum("chat_space_kind", [
   "team",
+  "branch",
+  "community",
+]);
+export const chatRoomKind = pgEnum("chat_room_kind", [
+  "text",
+  "voice",
+  "dm",
+  "group_dm",
+  "meeting",
 ]);
 export const messageKind = pgEnum("message_kind", ["text", "system"]);
 export const teamRole = pgEnum("team_role", ["admin", "member"]);

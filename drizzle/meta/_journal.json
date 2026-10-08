@@ -85,6 +85,20 @@
       "when": 1791432720394,
       "tag": "0011_charming_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791437621080,
+      "tag": "0012_sweet_photon",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791437655908,
+      "tag": "0013_tough_sabra",
+      "breakpoints": true
     }
   ]
 }

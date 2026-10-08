@@ -23,6 +23,7 @@ import {
   bookings,
   branches,
   chatRooms,
+  chatSpaces,
   messages,
   floors,
   notifications,
@@ -210,10 +211,15 @@ describe("read-only booking round2 preservation audit", () => {
   });
 
   it("detects deletion of baseline rows and changes in chat or composite-key rows", async () => {
-    const booking = await insertFixtureBooking(database, actors);
+    await insertFixtureBooking(database, actors);
+    const [space] = await database.db
+      .insert(chatSpaces)
+      .values({ kind: "team", teamId: actors.teamId })
+      .returning();
+    if (!space) throw new Error("Expected test space.");
     const [room] = await database.db
       .insert(chatRooms)
-      .values({ kind: "booking", bookingId: booking.id })
+      .values({ kind: "text", spaceId: space.id, name: "일반" })
       .returning();
     if (!room) throw new Error("Expected test room.");
     const [message] = await database.db
@@ -261,14 +267,19 @@ describe("read-only booking round2 preservation audit", () => {
   });
 
   it("preserves bigint precision while fingerprinting raw JSONB", async () => {
+    const [space] = await database.db
+      .insert(chatSpaces)
+      .values({ kind: "team", teamId: actors.teamId })
+      .returning();
+    if (!space) throw new Error("Expected test space.");
     const [room] = await database.db
       .insert(chatRooms)
-      .values({ kind: "team", teamId: actors.teamId })
+      .values({ kind: "text", spaceId: space.id, name: "일반" })
       .returning();
     if (!room) throw new Error("Expected test room.");
     const id = crypto.randomUUID();
     await database.db.execute(
-      sql`insert into messages (id, room_id, seq, body) values (${id}, ${room.id}, 9007199254740992, 'precision fixture')`,
+      sql`insert into messages (id, room_id, seq, body, kind) values (${id}, ${room.id}, 9007199254740992, 'precision fixture', 'system')`,
     );
     const before = await capture();
     await database.db.execute(

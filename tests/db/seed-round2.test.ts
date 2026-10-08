@@ -65,7 +65,7 @@ const protectedTables = [
   "floor_plans",
   "chat_rooms",
   "messages",
-  "call_sessions",
+  "chat_spaces",
 ];
 
 describe("receipt-backed booking round 2 additions", () => {
