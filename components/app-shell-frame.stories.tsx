@@ -43,7 +43,7 @@ function ExampleMenu() {
           href={href}
           onClick={(event) => event.preventDefault()}
           aria-current={href === "/" ? "page" : undefined}
-          className="relative inline-flex h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar-accent-foreground"
+          className="relative inline-flex h-11 items-center gap-2 rounded-sm px-3 text-sm text-muted-foreground hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-[current=page]:bg-sidebar-accent aria-[current=page]:font-semibold aria-[current=page]:text-sidebar-accent-foreground"
         >
           <Icon aria-hidden="true" className="size-5" />
           {label}

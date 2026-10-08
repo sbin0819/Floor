@@ -35,7 +35,7 @@ export function MemberNavPlaceholder() {
         <span
           key={key}
           aria-hidden="true"
-          className="h-11 rounded-lg bg-muted"
+          className="h-11 rounded-sm bg-muted"
         />
       ))}
     </div>

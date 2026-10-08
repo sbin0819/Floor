@@ -63,7 +63,7 @@ export function MemberNav({
               "relative inline-flex min-h-11 items-center justify-center px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
               mobile
                 ? "flex-col gap-1 rounded-lg text-xs"
-                : "h-11 justify-start gap-2 rounded-lg text-sm",
+                : "h-11 justify-start gap-2 rounded-sm text-sm",
               selected
                 ? mobile
                   ? "font-semibold text-primary"

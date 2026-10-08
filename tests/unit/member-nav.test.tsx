@@ -100,7 +100,7 @@ describe("member navigation", () => {
       expect(link).toHaveClass(
         "h-11",
         "min-h-11",
-        "rounded-lg",
+        "rounded-sm",
         "px-3",
         "focus-visible:outline-2",
       );
