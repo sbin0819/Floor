@@ -185,6 +185,7 @@ export function createMessageActions(
               channel: userChannel(recipient.userId),
               event: {
                 type: "mention.created",
+                bookingId: null,
                 spaceId: result.room.spaceId,
                 roomKind: result.room.kind,
                 roomId: target.roomId,

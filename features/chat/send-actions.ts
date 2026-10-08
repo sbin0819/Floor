@@ -172,6 +172,7 @@ async function sendLockedMessage(
         channel,
         event: {
           type: "room.activity",
+          bookingId: null,
           spaceId: room.spaceId,
           roomKind: room.kind,
           preview:
@@ -197,6 +198,7 @@ async function sendLockedMessage(
         channel: userChannel(recipient),
         event: {
           type: "mention.created",
+          bookingId: null,
           spaceId: room.spaceId,
           roomKind: room.kind,
           roomId: room.id,

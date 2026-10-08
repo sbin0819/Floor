@@ -2,6 +2,7 @@ export type RealtimeEvent =
   | {
       type: "room.activity";
       spaceId: string | null;
+      bookingId: string | null;
       roomKind: ChatRoomKind;
       preview: {
         messageId: string;
@@ -63,6 +64,7 @@ export type RealtimeEvent =
   | {
       type: "mention.created";
       spaceId: string | null;
+      bookingId: string | null;
       roomKind: ChatRoomKind;
       roomId: string;
       roomName: string;

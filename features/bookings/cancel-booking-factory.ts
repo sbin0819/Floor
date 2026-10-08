@@ -1,6 +1,7 @@
 import {
   bookingActionDependencies,
   publishBookingChange,
+  publishBookingChatEvents,
   type BookingDependencies,
 } from "@/features/bookings/action-factory";
 import { cancelBookingSchema } from "@/features/bookings/schema";
@@ -8,6 +9,7 @@ import { canCancelBooking } from "@/features/bookings/visibility";
 import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
 import { getSpaceForAccess } from "@/lib/dal";
+import { recordMeetingMessages } from "@/lib/dal/chat-meeting";
 import {
   cancelBookingRecord,
   getBookingWithLocation,
@@ -145,8 +147,27 @@ export function createCancelBookingAction(
               transaction,
             );
           }
+          const memberIds = [cancelled.userId, ...participantIds];
+          const chatEvents = isDesk
+            ? []
+            : await recordMeetingMessages(
+                {
+                  bookingId: cancelled.id,
+                  actorId: memberIds.includes(session.userId)
+                    ? session.userId
+                    : null,
+                  memberIds,
+                  messages: [
+                    { type: "booking_cancelled", actorName: session.name },
+                  ],
+                  changed: true,
+                  now,
+                },
+                transaction,
+              );
           return {
             bookingId: cancelled.id,
+            chatEvents,
             floorId: row.floor.id,
             spaceId:
               row.space.type === "desk"
@@ -159,6 +180,7 @@ export function createCancelBookingAction(
           result.spaceId,
           dependencies,
         );
+        await publishBookingChatEvents(result.chatEvents, dependencies);
         return { bookingId: result.bookingId };
       },
     },

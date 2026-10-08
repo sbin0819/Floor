@@ -13,6 +13,7 @@ import {
 import {
   bookingActionDependencies,
   publishBookingChange,
+  publishBookingChatEvents,
   type BookingDependencies,
 } from "@/features/bookings/action-factory";
 import {
@@ -52,6 +53,10 @@ import {
   notificationBookingSnapshot,
 } from "@/features/notifications/builders";
 import { insertNotifications } from "@/lib/dal/notifications";
+import {
+  createMeetingRoom,
+  recordMeetingMessages,
+} from "@/lib/dal/chat-meeting";
 
 function assertBookable(space: { bookable: boolean; type: string }) {
   if (!space.bookable || space.type === "desk")
@@ -264,10 +269,32 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
               branch.id,
               transaction,
             );
-            return created;
+            const meetingRoom = await createMeetingRoom(
+              { bookingId: created.id, now },
+              transaction,
+            );
+            const chatEvents = await recordMeetingMessages(
+              {
+                bookingId: created.id,
+                actorId: session.userId,
+                memberIds: [
+                  session.userId,
+                  ...participants.map(({ userId }) => userId),
+                ],
+                messages: [
+                  { type: "booking_created", actorName: session.name },
+                ],
+                changed: false,
+                now,
+              },
+              transaction,
+              meetingRoom,
+            );
+            return { created, chatEvents };
           }, db);
           await publishBookingChange(space.floor.id, space.id, dependencies);
-          return { bookingId: booking.id };
+          await publishBookingChatEvents(booking.chatEvents, dependencies);
+          return { bookingId: booking.created.id };
         },
       },
       bookingActionDependencies(dependencies),

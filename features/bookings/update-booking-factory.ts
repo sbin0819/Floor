@@ -3,6 +3,7 @@ import { assertAttendeeCapacity } from "./capacity";
 import {
   bookingActionDependencies,
   publishBookingChange,
+  publishBookingChatEvents,
   type BookingDependencies,
 } from "./action-factory";
 import {
@@ -37,6 +38,8 @@ import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
 import { getSpaceForAccess, type DalDatabase } from "@/lib/dal";
 import { getBranch } from "@/lib/dal/branches";
+import { readUserNames, recordMeetingMessages } from "@/lib/dal/chat-meeting";
+import type { SystemMessageData } from "@/features/chat/system-messages";
 import {
   getBookingWithLocation,
   listSpaceBlocks,
@@ -445,10 +448,67 @@ export function createUpdateBookingAction(
             ],
             transaction,
           );
+          const names = await readUserNames(
+            [...addedIds, ...removedIds],
+            transaction,
+          );
+          const snapshots: SystemMessageData[] = [
+            ...(timeChanged
+              ? [
+                  {
+                    type: "booking_time_changed" as const,
+                    actorName: session.name,
+                    timezone: branch.timezone,
+                    previousStart: locked.during.start.toISOString(),
+                    previousEnd: locked.during.end.toISOString(),
+                    start: updated.during.start.toISOString(),
+                    end: updated.during.end.toISOString(),
+                  },
+                ]
+              : []),
+            ...(addedIds.length
+              ? [
+                  {
+                    type: "participants_added" as const,
+                    actorName: session.name,
+                    names: names
+                      .filter(({ id }) => addedIds.includes(id))
+                      .map(({ name }) => name),
+                  },
+                ]
+              : []),
+            ...(removedIds.length
+              ? [
+                  {
+                    type: "participant_removed" as const,
+                    actorName: session.name,
+                    names: names
+                      .filter(({ id }) => removedIds.includes(id))
+                      .map(({ name }) => name),
+                  },
+                ]
+              : []),
+          ];
+          const chatEvents = await recordMeetingMessages(
+            {
+              bookingId: updated.id,
+              actorId: session.userId,
+              memberIds: [session.userId, ...finalIds],
+              removedUserIds: removedIds,
+              messages: snapshots,
+              changed:
+                snapshots.length > 0 ||
+                locked.title !== updated.title ||
+                locked.attendeeCount !== updated.attendeeCount,
+              now,
+            },
+            transaction,
+          );
           return {
             bookingId: updated.id,
             floorId: current.floor.id,
             spaceId: current.id,
+            chatEvents,
           };
         }, db);
         await publishBookingChange(
@@ -456,6 +516,7 @@ export function createUpdateBookingAction(
           result.spaceId,
           dependencies,
         );
+        await publishBookingChatEvents(result.chatEvents, dependencies);
         return { bookingId: result.bookingId };
       },
     },

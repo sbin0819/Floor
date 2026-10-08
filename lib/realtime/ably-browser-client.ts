@@ -68,6 +68,7 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("room.activity"),
     spaceId: z.string().nullable(),
+    bookingId: z.string().nullable(),
     roomKind: z.enum(["text", "voice", "dm", "group_dm", "meeting"]),
     preview: z
       .object({
@@ -134,6 +135,7 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("mention.created"),
     spaceId: z.string().nullable(),
+    bookingId: z.string().nullable(),
     roomKind: z.enum(["text", "voice", "dm", "group_dm", "meeting"]),
     roomId: z.string(),
     roomName: z.string(),

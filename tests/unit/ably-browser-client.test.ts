@@ -128,6 +128,45 @@ describe("Ably HTTP token request", () => {
 });
 
 describe("Ably SDK bridge", () => {
+  it("accepts meeting activity and mentions with booking metadata and validated system snapshots", async () => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const channel = client.channel("room:a");
+    const listener = vi.fn();
+    await channel.subscribe(listener);
+    const deliver = (data: unknown) =>
+      sdk.subscribe.mock.calls[0]?.[0]({ data });
+    const activity: RealtimeEvent = {
+      type: "room.activity",
+      roomId: "a",
+      bookingId: "booking",
+      roomKind: "meeting",
+      spaceId: null,
+      seq: 2,
+      authorId: null,
+      preview: {
+        messageId: "message",
+        authorName: null,
+        excerpt: "예약했어요",
+      },
+    };
+    const system: RealtimeEvent = {
+      ...created,
+      kind: "system",
+      systemData: { type: "booking_created", actorName: "김서연" },
+      authorId: null,
+      authorName: null,
+      clientId: null,
+      replyTo: null,
+      mentions: [],
+    };
+    deliver({ ...activity, privateEmail: "private@example.test" });
+    deliver(system);
+    deliver({ ...activity, bookingId: undefined });
+    expect(listener.mock.calls.map(([event]) => event)).toEqual([
+      activity,
+      system,
+    ]);
+  });
   it("constructs a disconnected client and delegates auth through the callback", async () => {
     const auth = vi.fn((callback) => callback(null, fakeTokenRequest));
     const client = await loadAblyBrowserClient(auth);
@@ -196,6 +235,7 @@ describe("Ably SDK bridge", () => {
     sdk.subscribe.mock.calls[0]?.[0]({
       data: {
         type: "room.activity",
+        bookingId: null,
         roomKind: "text",
         preview: null,
         spaceId: "a",
@@ -208,6 +248,7 @@ describe("Ably SDK bridge", () => {
     });
     expect(listener).toHaveBeenCalledExactlyOnceWith({
       type: "room.activity",
+      bookingId: null,
       roomKind: "text",
       preview: null,
       spaceId: "a",
@@ -281,6 +322,7 @@ describe("Ably SDK bridge", () => {
     { type: "status.changed", status: "dnd" },
     {
       type: "room.activity",
+      bookingId: null,
       roomId: "a",
       spaceId: null,
       roomKind: "dm",
@@ -290,6 +332,7 @@ describe("Ably SDK bridge", () => {
     },
     {
       type: "mention.created",
+      bookingId: null,
       roomId: "a",
       spaceId: null,
       roomKind: "dm",
@@ -319,6 +362,7 @@ describe("Ably SDK bridge", () => {
     },
     {
       type: "mention.created",
+      bookingId: null,
       roomKind: "text",
       spaceId: "s",
       roomId: "a",

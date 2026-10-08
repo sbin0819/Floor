@@ -2,12 +2,14 @@ import type { ActionDependencies } from "@/lib/actions/create-action";
 import type { DalDatabase, TransactionDatabase } from "@/lib/dal";
 import { floorChannel } from "@/lib/realtime/channels";
 import { noopRealtime } from "@/lib/realtime/noop";
-import type { RealtimePublisher } from "@/lib/realtime/types";
+import { getRealtimePublisher } from "@/lib/realtime/server";
+import type { RealtimeItem, RealtimePublisher } from "@/lib/realtime/types";
 
 export type BookingDependencies = Partial<ActionDependencies> & {
   database?: DalDatabase & TransactionDatabase;
   now?: () => Date;
   publisher?: Pick<RealtimePublisher, "publish">;
+  chatPublisher?: RealtimePublisher;
 };
 
 export function bookingActionDependencies(
@@ -17,6 +19,22 @@ export function bookingActionDependencies(
     ...(dependencies.getSession ? { getSession: dependencies.getSession } : {}),
     ...(dependencies.logError ? { logError: dependencies.logError } : {}),
   };
+}
+
+export async function publishBookingChatEvents(
+  events: readonly RealtimeItem[],
+  dependencies: BookingDependencies,
+) {
+  if (!events.length) return;
+  try {
+    await (dependencies.chatPublisher ?? getRealtimePublisher()).publishMany(
+      events,
+    );
+  } catch {
+    (dependencies.logError ?? console.error)(
+      "Booking chat publication failed.",
+    );
+  }
 }
 
 export async function publishBookingChange(

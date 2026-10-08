@@ -17,7 +17,13 @@ import type { Session } from "@/lib/auth/types";
 import * as participantDal from "@/lib/dal/booking-participants";
 import * as bookingDal from "@/lib/dal/bookings";
 import * as schema from "@/lib/db/schema";
-import { bookingParticipants, bookings, spaces, users } from "@/lib/db/schema";
+import {
+  bookingParticipants,
+  bookings,
+  chatRooms,
+  spaces,
+  users,
+} from "@/lib/db/schema";
 import { bookingDayRange } from "@/features/bookings/rules";
 import {
   bookingInput,
@@ -414,7 +420,9 @@ describe("booking participants and leave action", () => {
         fixture.publicSpaceId,
         ...ids,
         ...(mode ? [fixture.teamId] : []),
+        (await database.db.select({ id: chatRooms.id }).from(chatRooms))[0]!.id,
       ]);
+      expect(locks.at(-1)?.query).toMatch(/from "chat_rooms".*for update/);
       for (const lock of locks.slice(2, 5))
         expect(lock.query).toContain(
           lock.params[0] === owner.userId && !mode
@@ -557,10 +565,12 @@ describe("booking participants and leave action", () => {
     expect(locks.map(({ params }) => params[0])).toEqual([
       ...[fixture.person.userId, fixture.stranger.userId].sort(),
       booked.id,
+      booked.id,
     ]);
     expect(
       locks.map(({ query }) => query.match(/for (update|key share)/u)?.[1]),
-    ).toEqual(["key share", "key share", "update"]);
+    ).toEqual(["key share", "key share", "update", "update"]);
+    expect(locks.at(-1)?.query).toMatch(/from "chat_rooms".*for update/);
     const deletion = record.statements.find(({ query }) =>
       query.startsWith('delete from "booking_participants"'),
     );

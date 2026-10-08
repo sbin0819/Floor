@@ -69,6 +69,7 @@ function groupEvents(
       channel: userChannel(userId),
       event: {
         type: "room.activity" as const,
+        bookingId: null,
         roomId,
         roomKind: "group_dm" as const,
         spaceId: null,

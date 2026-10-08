@@ -1,6 +1,7 @@
 import {
   bookingActionDependencies,
   publishBookingChange,
+  publishBookingChatEvents,
   type BookingDependencies,
 } from "./action-factory";
 import { leaveBookingSchema } from "./schema";
@@ -8,8 +9,10 @@ import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
 import { withTransaction } from "@/lib/dal";
 import { getBookingWithLocation } from "@/lib/dal/bookings";
+import { recordMeetingMessages } from "@/lib/dal/chat-meeting";
 import {
   deleteCurrentBookingParticipant,
+  listBookingParticipantIds,
   lockBookingUsers,
   lockParticipantBooking,
 } from "@/lib/dal/booking-participants";
@@ -72,8 +75,25 @@ export function createLeaveBookingAction(
             }),
             transaction,
           );
+          const currentIds = await listBookingParticipantIds(
+            locked.id,
+            transaction,
+          );
+          const chatEvents = await recordMeetingMessages(
+            {
+              bookingId: locked.id,
+              actorId: null,
+              memberIds: [locked.userId, ...currentIds],
+              removedUserIds: [session.userId],
+              messages: [{ type: "participant_left", name: session.name }],
+              changed: true,
+              now,
+            },
+            transaction,
+          );
           return {
             bookingId: removed.bookingId,
+            chatEvents,
             floorId: row.floor.id,
             spaceId: row.space.id,
           };
@@ -83,6 +103,7 @@ export function createLeaveBookingAction(
           result.spaceId,
           dependencies,
         );
+        await publishBookingChatEvents(result.chatEvents, dependencies);
         return { bookingId: result.bookingId };
       },
     },
