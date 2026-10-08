@@ -38,8 +38,11 @@ vi.mock("@/components/realtime-provider", () => ({
   },
 }));
 const data: ChannelView = {
+  call: null,
+  canCall: false,
   space: { id: "space", name: "디자인팀", muted: false },
   room: {
+    kind: "text",
     id: "room",
     name: "일반",
     topic: null,

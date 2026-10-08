@@ -43,6 +43,8 @@ const messages: ChatMessage[] = [1, 2, 3].map((seq) => ({
   clientId: null,
 }));
 const group: DirectMessageView = {
+  call: null,
+  canCall: false,
   kind: "group_dm",
   room: {
     id: "group",
@@ -89,6 +91,9 @@ function Frame({ children }: { children: ReactNode }) {
   const [client] = useState(() => {
     const client = new QueryClient();
     client.setQueryData(["chat", "nav"], {
+      callsEnabled: false,
+      calls: [],
+      myCall: null,
       spaces: [],
       directMessages: [],
       blockedUserIds: [],

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createAction } from "@/lib/actions/create-action";
+import { evictCalls } from "@/lib/calls/evict";
 import { ActionError } from "@/lib/actions/result";
 import { createDirectRoom, directPeerAccess } from "@/lib/dal/direct";
 import { lockUsersForKeyShare } from "@/lib/dal/chat-write";
@@ -98,6 +99,12 @@ export function createDirectActions(dependencies: ChatActionDependencies = {}) {
             if (!changed.length) throw new ActionError("NOT_FOUND");
             await deleteMessageRequestNotification(session.userId, peerId, tx);
           }, dependencies.database);
+          if (!input.accept)
+            await Promise.all(
+              [session.userId, peerId].map((userId) =>
+                evictCalls(userId, dependencies),
+              ),
+            );
           const events: RealtimeItem[] = [
             {
               channel: userChannel(session.userId),

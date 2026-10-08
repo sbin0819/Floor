@@ -24,6 +24,9 @@ function show() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   client.setQueryData<ChatNav>(CHAT_NAV_KEY, {
+    callsEnabled: false,
+    calls: [],
+    myCall: null,
     spaces: [],
     directMessages: [],
     blockedUserIds: [],

@@ -55,6 +55,7 @@ function render(ui: ReactNode) {
 
 const spaces: ChatSpaceNav[] = [
   {
+    voiceChannels: [],
     id: "11111111-1111-4111-8111-111111111111",
     kind: "team",
     iconColor: "blue",
@@ -82,6 +83,7 @@ const spaces: ChatSpaceNav[] = [
     ],
   },
   {
+    voiceChannels: [],
     id: "44444444-4444-4444-8444-444444444444",
     kind: "team",
     iconColor: "blue",
@@ -276,6 +278,9 @@ describe("team chat navigation", () => {
     render(
       <MessagesList
         data={{
+          callsEnabled: false,
+          calls: [],
+          myCall: null,
           spaces: [],
           directMessages: [],
           myStatus: "online",
@@ -299,6 +304,9 @@ describe("team chat navigation", () => {
     render(
       <MessagesList
         data={{
+          callsEnabled: false,
+          calls: [],
+          myCall: null,
           spaces,
           directMessages: [],
           myStatus: "online",

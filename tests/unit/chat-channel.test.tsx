@@ -99,8 +99,11 @@ function created(
 }
 function view(overrides: Partial<ChannelView> = {}): ChannelView {
   return {
+    call: null,
+    canCall: false,
     space: { id: "space", name: "디자인팀", muted: false },
     room: {
+      kind: "text",
       id: "room",
       name: "일반",
       topic: "디자인팀 전체 이야기",
@@ -135,6 +138,9 @@ function setup(data = view(), send: SendChatMessage = vi.fn()) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   client.setQueryData(["chat", "nav"], {
+    callsEnabled: false,
+    calls: [],
+    myCall: null,
     spaces: [],
     directMessages: [],
     myStatus: "online",
@@ -266,6 +272,9 @@ describe("chat channel presentation", () => {
     expect(screen.queryByText("안녕하세요")).not.toBeInTheDocument();
     await act(async () => {
       client.setQueryData(["chat", "nav"], {
+        callsEnabled: false,
+        calls: [],
+        myCall: null,
         spaces: [],
         directMessages: [],
         myStatus: "online",

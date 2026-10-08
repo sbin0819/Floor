@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createAction } from "@/lib/actions/create-action";
+import { evictCalls, evictTargetCalls } from "@/lib/calls/evict";
 import { ActionError } from "@/lib/actions/result";
 import { isSpaceAdmin } from "@/lib/dal/chat-access";
 import {
@@ -116,6 +117,8 @@ export function createChannelActions(
             return { spaceId, changed };
           }, dependencies.database);
           if (result.changed)
+            await evictTargetCalls({ roomId: input.roomId }, dependencies);
+          if (result.changed)
             await publishSpaceEvents(
               [spaceChanged(result.spaceId)],
               dependencies,
@@ -150,6 +153,7 @@ export function createChannelActions(
               throw new ActionError("FORBIDDEN");
             await banCommunityMember(input.spaceId, input.userId, now(), tx);
           }, dependencies.database);
+          await evictCalls(input.userId, dependencies);
           await publishSpaceEvents(
             [spaceChanged(input.spaceId), reauthorize(input.userId)],
             dependencies,

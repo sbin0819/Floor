@@ -1,4 +1,6 @@
 import type { ActionDependencies } from "@/lib/actions/create-action";
+import type { LiveKitServer } from "@/lib/calls/types";
+import { evictCalls } from "@/lib/calls/evict";
 import type { DalDatabase, TransactionDatabase } from "@/lib/dal";
 import { floorChannel } from "@/lib/realtime/channels";
 import { noopRealtime } from "@/lib/realtime/noop";
@@ -6,11 +8,26 @@ import { getRealtimePublisher } from "@/lib/realtime/server";
 import type { RealtimeItem, RealtimePublisher } from "@/lib/realtime/types";
 
 export type BookingDependencies = Partial<ActionDependencies> & {
+  livekit?: LiveKitServer | null;
   database?: DalDatabase & TransactionDatabase;
   now?: () => Date;
   publisher?: Pick<RealtimePublisher, "publish">;
   chatPublisher?: RealtimePublisher;
 };
+
+export function evictBookingCalls(
+  userIds: readonly string[],
+  dependencies: BookingDependencies,
+) {
+  return Promise.all(
+    [...new Set(userIds)].map((userId) =>
+      evictCalls(userId, {
+        ...dependencies,
+        publisher: dependencies.chatPublisher,
+      }),
+    ),
+  );
+}
 
 export function bookingActionDependencies(
   dependencies: BookingDependencies,

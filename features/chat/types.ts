@@ -86,6 +86,9 @@ export type DirectMessageNav = DirectMessageNavBase &
       }
   );
 export type ChatNav = {
+  callsEnabled: boolean;
+  calls: { roomId: string; participantCount: number }[];
+  myCall: import("@/features/calls/types").MyCall | null;
   myStatus: "online" | "away" | "dnd";
   blockedUserIds: string[];
   spaces: ChatSpaceNav[];
@@ -107,6 +110,8 @@ export type MeetingNav = {
   muted: boolean;
 };
 export type MeetingView = {
+  call: import("@/features/calls/types").CallView | null;
+  canCall: boolean;
   room: {
     id: string;
     lastSeq: number;
@@ -143,6 +148,8 @@ export type MeetingView = {
   now: string;
 };
 type DirectMessageViewBase = {
+  call: import("@/features/calls/types").CallView | null;
+  canCall: boolean;
   room: {
     id: string;
     archived: boolean;
@@ -187,6 +194,13 @@ export type DirectMessageView = DirectMessageViewBase &
   );
 
 export type ChatSpaceNav = {
+  voiceChannels: {
+    id: string;
+    name: string;
+    capacity: number;
+    participantCount: number;
+    participants: import("@/features/calls/types").CallPerson[];
+  }[];
   id: string;
   kind: "team" | "branch" | "community";
   iconColor: import("./space-schema").SpaceIconColor;
@@ -206,9 +220,12 @@ export type ChatSpaceNav = {
 };
 
 export type ChannelView = {
+  call: import("@/features/calls/types").CallView | null;
+  canCall: boolean;
   space: { id: string; name: string; muted: boolean };
   room: {
     id: string;
+    kind: "text" | "voice";
     name: string;
     topic: string | null;
     archived: boolean;

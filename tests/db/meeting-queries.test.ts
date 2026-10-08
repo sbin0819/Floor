@@ -140,6 +140,8 @@ describe("meeting channel views and navigation", () => {
     });
     const data = await queries(actors.stranger).getMeetingView(booking.id);
     expect(data).toEqual({
+      call: null,
+      canCall: false,
       room: {
         id: room.id,
         lastSeq: 1,
@@ -407,13 +409,11 @@ describe("meeting channel views and navigation", () => {
   it("retains unread and mention values on a muted meeting without adding DM unread counts", async () => {
     const { booking, room } = await meeting({}, [actors.member]);
     const rows = await fill(room.id, 2);
-    await database.db
-      .insert(messageMentions)
-      .values({
-        messageId: rows[1]!.id,
-        userId: actors.person.userId,
-        createdAt: now,
-      });
+    await database.db.insert(messageMentions).values({
+      messageId: rows[1]!.id,
+      userId: actors.person.userId,
+      createdAt: now,
+    });
     await database.db
       .update(chatRoomReads)
       .set({ muted: true })
@@ -442,14 +442,14 @@ describe("meeting channel views and navigation", () => {
     });
   });
 
-  it("keeps view [1,2], page [2] and navigation [3] budgets when more than twenty meeting rooms exist", async () => {
+  it("keeps view [1,2], page [2] and navigation [4] budgets when more than twenty meeting rooms exist", async () => {
     const first = await meeting({}, [actors.member]);
     await fill(first.room.id, 60);
     const meter = createQueryMeter(database.client);
     try {
       meter.start();
       const initial = await queries().getMyChatNav();
-      expect(meter.stop().perStage).toEqual([3]);
+      expect(meter.stop().perStage).toEqual([4]);
       expect(initial.meetings).toHaveLength(1);
 
       const bookingIds = [first.booking.id];
@@ -467,7 +467,7 @@ describe("meeting channel views and navigation", () => {
       }
       meter.start();
       const grown = await queries().getMyChatNav();
-      expect(meter.stop().perStage).toEqual([3]);
+      expect(meter.stop().perStage).toEqual([4]);
       expect(grown.meetings.map(({ bookingId }) => bookingId)).toEqual(
         bookingIds.slice(0, 20),
       );

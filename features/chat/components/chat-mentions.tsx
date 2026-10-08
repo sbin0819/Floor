@@ -21,6 +21,7 @@ import {
   hasReadThrough,
   applyMyStatus,
   applyRoomActivity,
+  applyCallChanged,
 } from "../nav-state";
 
 type Activity = Extract<RealtimeEvent, { type: "room.activity" }>;
@@ -272,6 +273,10 @@ export function ChatMentions({
     }, 250);
   }
   useRealtimeChannel(userChannel(userId), (event) => {
+    if (event.type === "call.changed") {
+      applyCallChanged(client, event);
+      return;
+    }
     if (event.type === "status.changed") {
       applyMyStatus(client, event.status);
       return;

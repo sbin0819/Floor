@@ -57,6 +57,7 @@ const members: SpaceMember[] = [
 ];
 const spaces: ChatSpaceNav[] = [
   {
+    voiceChannels: [],
     id: "00000000-0000-4000-8000-000000000011",
     kind: "team",
     iconColor: "blue",
@@ -69,6 +70,7 @@ const spaces: ChatSpaceNav[] = [
     channels: [],
   },
   {
+    voiceChannels: [],
     id: "00000000-0000-4000-8000-000000000012",
     kind: "branch",
     iconColor: "blue",
@@ -81,6 +83,7 @@ const spaces: ChatSpaceNav[] = [
     channels: [],
   },
   {
+    voiceChannels: [],
     id: communityId,
     kind: "community",
     iconColor: "green",
@@ -130,6 +133,9 @@ const membersData: SpaceMembersView = {
   ],
 };
 const nav: ChatNav = {
+  callsEnabled: false,
+  calls: [],
+  myCall: null,
   spaces,
   meetings: [],
   directMessages: [],

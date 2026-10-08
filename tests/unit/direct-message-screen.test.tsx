@@ -100,6 +100,8 @@ function message(seq: number, authorId = me): ChatMessage {
 type DmView = Extract<DirectMessageView, { kind: "dm" }>;
 function view(extra: Partial<DmView> = {}): DmView {
   return {
+    call: null,
+    canCall: false,
     kind: "dm",
     request: null,
     blockedByMe: false,
@@ -368,6 +370,9 @@ describe("shared direct message screen", () => {
   it("refreshes the nav after a first saved DM but never sends internal room kind to the action", async () => {
     const { user, client, send } = setup(view({ messages: [] }));
     client.setQueryData(CHAT_NAV_KEY, {
+      callsEnabled: false,
+      calls: [],
+      myCall: null,
       spaces: [],
       directMessages: [],
       myStatus: "online",
@@ -401,6 +406,9 @@ describe("shared direct message screen", () => {
       muted: false,
     };
     client.setQueryData(CHAT_NAV_KEY, {
+      callsEnabled: false,
+      calls: [],
+      myCall: null,
       spaces: [],
       myStatus: "online",
       blockedUserIds: [],
@@ -426,7 +434,13 @@ describe("shared direct message screen", () => {
     const data: ChannelView = {
       ...base,
       space: { id: "space", name: "팀", muted: false },
-      room: { ...base.room, name: "일반", topic: null, adminOnly: false },
+      room: {
+        ...base.room,
+        kind: "text",
+        name: "일반",
+        topic: null,
+        adminOnly: false,
+      },
     };
     const client = new QueryClient();
     const invalidate = vi.spyOn(client, "invalidateQueries");

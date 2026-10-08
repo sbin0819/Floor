@@ -227,6 +227,44 @@ describe("Ably SDK bridge", () => {
     expect(sdk.unsubscribe).toHaveBeenCalledExactlyOnceWith(callback);
     expect(sdk.detach).toHaveBeenCalledTimes(1);
   });
+  it("validates call identities and strips unknown call payload properties", async () => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const listener = vi.fn();
+    await client.channel("room:call").subscribe(listener);
+    const callback = sdk.subscribe.mock.calls[0]?.[0];
+    const id = crypto.randomUUID();
+    const cases = [
+      {
+        type: "call.changed",
+        roomId: id,
+        roomKind: "voice",
+        spaceId: id,
+        bookingId: null,
+        sessionId: id,
+        kind: "voice",
+        participantCount: 1,
+        participants: [{ userId: id, name: "김서연" }],
+      },
+      {
+        type: "call.ringing",
+        roomId: id,
+        sessionId: id,
+        callerId: id,
+        callerName: "김서연",
+      },
+      { type: "call.declined", roomId: id, sessionId: id },
+      { type: "call.replaced", participantId: id },
+    ];
+    for (const event of cases) {
+      callback?.({
+        data: { ...event, token: "private", email: "private@example.test" },
+      });
+      expect(listener).toHaveBeenLastCalledWith(event);
+    }
+    callback?.({ data: { ...cases[0], participantCount: -1 } });
+    callback?.({ data: { type: "call.replaced", participantId: "invalid" } });
+    expect(listener).toHaveBeenCalledTimes(4);
+  });
   it("accepts minimal space activity and strips message content", async () => {
     const client = await loadAblyBrowserClient(vi.fn());
     const channel = client.channel("space:a");

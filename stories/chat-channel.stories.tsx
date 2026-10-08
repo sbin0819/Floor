@@ -12,8 +12,11 @@ const park = "00000000-0000-4000-8000-000000000001";
 const lee = "00000000-0000-4000-8000-000000000002";
 
 const data: ChannelView = {
+  call: null,
+  canCall: false,
   space: { id: "story-space", name: "디자인팀", muted: false },
   room: {
+    kind: "text",
     id: "story-room",
     name: "일반",
     topic: "디자인팀 전체 이야기",
@@ -82,6 +85,9 @@ function ChannelStory({
   const [client] = useState(() => {
     const client = new QueryClient();
     client.setQueryData(["chat", "nav"], {
+      callsEnabled: false,
+      calls: [],
+      myCall: null,
       spaces: [],
       directMessages: [],
       myStatus: "online",

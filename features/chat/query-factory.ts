@@ -37,6 +37,9 @@ import type {
 import { listDirectMembers, listDirectNav } from "@/lib/dal/direct";
 import { serializeChatMessage } from "@/lib/dal/chat-messages";
 import { requestCooldownMs } from "@/lib/dal/direct-requests";
+import { callsEnabled } from "@/lib/calls/livekit-server";
+import { joinableCall } from "@/lib/dal/call-access";
+import { readCallNavigation } from "@/lib/dal/call-navigation";
 import { listGroupMembers } from "@/lib/dal/group-dm";
 import { groupDisplayName } from "./group-name";
 
@@ -47,10 +50,12 @@ export type ChatQueryDependencies = {
   requireSession?: () => Promise<Session>;
   now?: () => Date;
   limiter?: RateLimiter;
+  callsEnabled?: boolean;
 };
 
 export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
   const readSession = dependencies.requireSession ?? requireSession;
+  const enabled = () => dependencies.callsEnabled ?? callsEnabled();
   return {
     async getRoomMessagesPage(
       roomId: string,
@@ -98,11 +103,13 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
     async getMyChatNav(): Promise<ChatNav> {
       const session = await readSession();
       const now = dependencies.now?.() ?? new Date();
-      const [navigation, directRows, meetingRows] = await Promise.all([
-        readChatNavigation(session.userId, dependencies.database),
-        listDirectNav(session.userId, dependencies.database),
-        listMeetingNav(session.userId, now, dependencies.database),
-      ]);
+      const [navigation, directRows, meetingRows, callNavigation] =
+        await Promise.all([
+          readChatNavigation(session.userId, dependencies.database),
+          listDirectNav(session.userId, dependencies.database),
+          listMeetingNav(session.userId, now, dependencies.database),
+          readCallNavigation(session.userId, now, dependencies.database),
+        ]);
       const spaces = new Map<string, ChatSpaceNav>();
       for (const row of navigation.rows) {
         let space = spaces.get(row.spaceId);
@@ -118,6 +125,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
             muted: row.spaceMuted,
             unreadMentions: 0,
             channels: [],
+            voiceChannels: [],
           };
           spaces.set(space.id, space);
         }
@@ -133,7 +141,30 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           space.unreadMentions += row.unreadMentions;
         }
       }
+      for (const room of callNavigation.rooms) {
+        if (room.kind === "voice" && room.spaceId && room.name && room.capacity)
+          spaces.get(room.spaceId)?.voiceChannels.push({
+            id: room.id,
+            name: room.name,
+            capacity: room.capacity,
+            participantCount: room.call?.participantCount ?? 0,
+            participants: room.call?.participants ?? [],
+          });
+      }
       return {
+        callsEnabled: enabled(),
+        calls: callNavigation.rooms
+          .filter((room) => room.call?.kind === "huddle")
+          .map((room) => ({
+            roomId: room.id,
+            participantCount: room.call!.participantCount,
+          })),
+        myCall: callNavigation.myCall
+          ? {
+              ...callNavigation.myCall,
+              joinedAt: new Date(callNavigation.myCall.joinedAt).toISOString(),
+            }
+          : null,
         now: now.toISOString(),
         meetings: meetingRows.map(({ during, ...row }) => ({
           ...row,
@@ -176,6 +207,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         session.userId,
         bookingId,
         dependencies.database,
+        now,
       );
       if (!room?.booking) return null;
       const [messages, members] = await Promise.all([
@@ -185,6 +217,13 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
       const { userId, ...booking } = room.booking;
       const isBooker = userId === session.userId;
       return {
+        call: room.call
+          ? {
+              ...room.call,
+              startedAt: new Date(room.call.startedAt).toISOString(),
+            }
+          : null,
+        canCall: enabled() && joinableCall(room, now),
         room: {
           id: room.id,
           lastSeq: room.lastSeq,
@@ -229,14 +268,16 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         !z.uuid().safeParse(roomId).success
       )
         return null;
+      const now = dependencies.now?.() ?? new Date();
       const room = await canReadRoom(
         session.userId,
         roomId,
         dependencies.database,
+        now,
       );
       if (
         !room ||
-        room.kind !== "text" ||
+        (room.kind !== "text" && room.kind !== "voice") ||
         room.spaceId !== spaceId.toLowerCase() ||
         !room.spaceName
       )
@@ -248,6 +289,13 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         }),
       ]);
       return {
+        call: room.call
+          ? {
+              ...room.call,
+              startedAt: new Date(room.call.startedAt).toISOString(),
+            }
+          : null,
+        canCall: enabled() && joinableCall(room, now),
         space: {
           id: room.spaceId,
           name: room.spaceName,
@@ -256,6 +304,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         room: {
           id: room.id,
           name: room.name!,
+          kind: room.kind,
           topic: room.topic,
           archived: room.archivedAt !== null,
           adminOnly: room.adminOnly,
@@ -269,7 +318,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         lastReadSeq: room.lastReadSeq,
         firstUnreadSeq: room.firstUnreadSeq,
         canWrite: writableRoom(room),
-        now: (dependencies.now?.() ?? new Date()).toISOString(),
+        now: now.toISOString(),
       };
     },
     async getDirectMessageView(
@@ -277,10 +326,12 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
     ): Promise<DirectMessageView | null> {
       const session = await readSession();
       if (!z.uuid().safeParse(roomId).success) return null;
+      const now = dependencies.now?.() ?? new Date();
       const room = await canReadRoom(
         session.userId,
         roomId,
         dependencies.database,
+        now,
       );
       if (!room || (room.kind !== "dm" && room.kind !== "group_dm"))
         return null;
@@ -290,6 +341,13 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           listGroupMembers(roomId, session.userId, dependencies.database),
         ]);
         return {
+          call: room.call
+            ? {
+                ...room.call,
+                startedAt: new Date(room.call.startedAt).toISOString(),
+              }
+            : null,
+          canCall: enabled() && joinableCall(room, now),
           kind: "group_dm",
           room: {
             id: room.id,
@@ -311,7 +369,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           lastReadSeq: room.lastReadSeq,
           firstUnreadSeq: room.firstUnreadSeq,
           canWrite: writableRoom(room),
-          now: (dependencies.now?.() ?? new Date()).toISOString(),
+          now: now.toISOString(),
         };
       }
       if (!room.peer) return null;
@@ -319,9 +377,15 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         listRecentMessages(roomId, session.userId, dependencies.database),
         listDirectMembers(roomId, dependencies.database),
       ]);
-      const now = dependencies.now?.() ?? new Date();
       const membership = room.directMembership;
       return {
+        call: room.call
+          ? {
+              ...room.call,
+              startedAt: new Date(room.call.startedAt).toISOString(),
+            }
+          : null,
+        canCall: enabled() && joinableCall(room, now),
         kind: "dm",
         blockedByMe: room.blockedByMe,
         request:

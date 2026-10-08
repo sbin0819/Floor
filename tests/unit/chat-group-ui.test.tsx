@@ -63,6 +63,9 @@ const actions = (): GroupActions => ({
 async function setup(ui: ReactNode) {
   const client = new QueryClient();
   client.setQueryData(["chat", "nav"], {
+    callsEnabled: false,
+    calls: [],
+    myCall: null,
     spaces: [],
     directMessages: [],
     myStatus: "online",
@@ -322,6 +325,8 @@ describe("group management dialogs", () => {
 describe("shared group chat screen", () => {
   it("uses the existing chat list, system row and member controls without direct read receipts", async () => {
     const data: DirectMessageView = {
+      call: null,
+      canCall: false,
       kind: "group_dm",
       name: "점심 모임",
       displayName: "점심 모임",

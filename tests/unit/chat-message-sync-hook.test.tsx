@@ -73,7 +73,10 @@ function message(seq: number, extra: Partial<ChatMessage> = {}): ChatMessage {
 }
 function view(roomId = "room-a", messages = [message(1)]): ChannelView {
   return {
+    call: null,
+    canCall: false,
     room: {
+      kind: "text",
       id: roomId,
       name: "일반",
       topic: null,

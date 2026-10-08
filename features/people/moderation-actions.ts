@@ -1,4 +1,6 @@
 import { createAction } from "@/lib/actions/create-action";
+import { evictCalls } from "@/lib/calls/evict";
+import type { LiveKitServer } from "@/lib/calls/types";
 import { ActionError } from "@/lib/actions/result";
 import { withTransaction } from "@/lib/dal/database";
 import { canReadRoom } from "@/lib/dal/chat-access";
@@ -25,6 +27,7 @@ import type { PeopleActionDependencies } from "./username";
 export function createModerationActions(
   dependencies: PeopleActionDependencies & {
     publisher?: RealtimePublisher;
+    livekit?: LiveKitServer | null;
   } = {},
 ) {
   const database = dependencies.database;
@@ -95,6 +98,9 @@ export function createModerationActions(
               });
             return events;
           }, database);
+          await Promise.all(
+            [me, other].map((userId) => evictCalls(userId, dependencies)),
+          );
           await publish(events);
           return {};
         },

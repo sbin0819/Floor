@@ -93,12 +93,12 @@ describe("space navigation and token capabilities", () => {
       }),
     })({ rooms });
 
-  it("returns all joined kinds, roles and colors in fixed kind order without increasing three SQL statements", async () => {
+  it("returns all joined kinds, roles and colors in fixed kind order within four SQL statements", async () => {
     const meter = createQueryMeter(database.client);
     try {
       meter.start();
       const nav = await queries().getMyChatNav();
-      expect(meter.stop()).toEqual({ stages: 1, statements: 3, perStage: [3] });
+      expect(meter.stop()).toEqual({ stages: 1, statements: 4, perStage: [4] });
       expect(
         nav.spaces.map(({ id, kind, role, iconColor }) => ({
           id,
@@ -130,6 +130,7 @@ describe("space navigation and token capabilities", () => {
           "muted",
           "unreadMentions",
           "channels",
+          "voiceChannels",
         ].sort(),
       );
       expect(JSON.stringify(nav)).not.toMatch(
@@ -222,7 +223,7 @@ describe("space navigation and token capabilities", () => {
     try {
       meter.start();
       const nav = await queries().getMyChatNav();
-      expect(meter.stop()).toEqual({ stages: 1, statements: 3, perStage: [3] });
+      expect(meter.stop()).toEqual({ stages: 1, statements: 4, perStage: [4] });
       expect(nav.spaces).toHaveLength(104);
       const readable = await listRealtimeSpaces(
         actors.member.userId,

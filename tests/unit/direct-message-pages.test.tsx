@@ -9,6 +9,8 @@ import { resolvePageContent } from "./page-test-utils";
 import type { DirectMessageView } from "@/features/chat/types";
 import type { MessageContact } from "@/features/people/types";
 const roomData = {
+  call: null,
+  canCall: false,
   room: {
     id: "room",
     archived: false,

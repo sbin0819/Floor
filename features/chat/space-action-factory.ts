@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createAction } from "@/lib/actions/create-action";
+import { evictCalls, evictTargetCalls } from "@/lib/calls/evict";
 import { ActionError } from "@/lib/actions/result";
 import { withTransaction } from "@/lib/dal/database";
 import { lockMessageUsers, lockUsersForKeyShare } from "@/lib/dal/chat-write";
@@ -91,6 +92,7 @@ export function createSpaceActions(dependencies: ChatActionDependencies = {}) {
               reauthorize(session.userId),
             ];
           }, dependencies.database);
+          await evictCalls(session.userId, dependencies);
           await publishSpaceEvents(events, dependencies);
           return {};
         },
@@ -213,6 +215,7 @@ export function createSpaceActions(dependencies: ChatActionDependencies = {}) {
                 .map((member) => reauthorize(member.userId)),
             ];
           }, dependencies.database);
+          await evictTargetCalls({ spaceId: input.spaceId }, dependencies);
           await publishSpaceEvents(events, dependencies);
           return {};
         },

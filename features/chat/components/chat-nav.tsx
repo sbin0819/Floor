@@ -19,6 +19,7 @@ import { StatusSync } from "@/features/people/components/status-sync";
 import {
   CHAT_NAV_KEY,
   applyRoomActivity,
+  applyCallChanged,
   chatNavRevision,
   mergeChatNav,
   mergeInitialChatNav,
@@ -33,6 +34,17 @@ import { QuickSwitcher } from "./quick-switcher";
 
 const spaceSchema = z.array(
   z.object({
+    voiceChannels: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        capacity: z.number().int().min(2).max(25),
+        participantCount: z.number().int().min(0).max(25),
+        participants: z
+          .array(z.object({ userId: z.uuid(), name: z.string() }))
+          .max(25),
+      }),
+    ),
     id: z.uuid(),
     kind: z.enum(["team", "branch", "community"]),
     iconColor: z.enum(spaceIconColors),
@@ -63,6 +75,23 @@ const directNavBase = z.object({
   muted: z.boolean(),
 });
 const navSchema = z.object({
+  callsEnabled: z.boolean(),
+  calls: z.array(
+    z.object({
+      roomId: z.uuid(),
+      participantCount: z.number().int().min(0).max(25),
+    }),
+  ),
+  myCall: z
+    .object({
+      participantId: z.uuid(),
+      sessionId: z.uuid(),
+      roomId: z.uuid(),
+      kind: z.enum(["voice", "huddle"]),
+      joinedAt: z.iso.datetime({ offset: true }),
+      stale: z.boolean(),
+    })
+    .nullable(),
   now: z.iso.datetime({ offset: true }),
   meetings: z.array(
     z.object({
@@ -234,6 +263,7 @@ export function ChatNavSync({
     if (event.type === "room.activity")
       applyRoomActivity(client, event, userId);
     else if (event.type === "space.changed") refreshSpaces(event.spaceId);
+    else if (event.type === "call.changed") applyCallChanged(client, event);
   });
   const disconnected = useRef(false);
   useRealtimeLifecycle((event) => {

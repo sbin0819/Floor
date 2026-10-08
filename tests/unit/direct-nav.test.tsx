@@ -82,6 +82,9 @@ const direct = (patch: Partial<DirectNav> = {}): DirectNav => ({
   ...patch,
 });
 const fixture = (rows: DirectMessageNav[] = [direct()]): ChatNav => ({
+  callsEnabled: false,
+  calls: [],
+  myCall: null,
   spaces: [],
   directMessages: rows,
   myStatus: "online",
@@ -733,6 +736,7 @@ describe("direct activity toasts and navigation", () => {
     ]);
     data.spaces = [
       {
+        voiceChannels: [],
         id: "63000000-0000-4000-8000-000000000001",
         kind: "team",
         iconColor: "blue",

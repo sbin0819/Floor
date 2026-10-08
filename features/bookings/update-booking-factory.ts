@@ -2,6 +2,7 @@ import { canBookAs } from "./access";
 import { assertAttendeeCapacity } from "./capacity";
 import {
   bookingActionDependencies,
+  evictBookingCalls,
   publishBookingChange,
   publishBookingChatEvents,
   type BookingDependencies,
@@ -506,11 +507,13 @@ export function createUpdateBookingAction(
           );
           return {
             bookingId: updated.id,
+            removedIds,
             floorId: current.floor.id,
             spaceId: current.id,
             chatEvents,
           };
         }, db);
+        await evictBookingCalls(result.removedIds, dependencies);
         await publishBookingChange(
           result.floorId,
           result.spaceId,

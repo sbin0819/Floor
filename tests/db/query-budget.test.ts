@@ -216,7 +216,9 @@ describe("authenticated query execution budgets", () => {
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
       if (name === "chat.getMyChatNav" || name === "chat.getRoomMessagesPage") {
         expect(result.stages).toBe(1);
-        expect(result.statements).toBeLessThanOrEqual(3);
+        expect(result.statements).toBeLessThanOrEqual(
+          name === "chat.getMyChatNav" ? 4 : 3,
+        );
       }
     },
   );

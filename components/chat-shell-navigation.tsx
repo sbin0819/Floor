@@ -13,6 +13,9 @@ async function readNavigation() {
   return (await getSession())
     ? getMyChatNav()
     : {
+        callsEnabled: false,
+        calls: [],
+        myCall: null,
         spaces: [],
         meetings: [],
         now: "1970-01-01T00:00:00.000Z",

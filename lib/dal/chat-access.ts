@@ -13,6 +13,7 @@ import {
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { blockedBetween, blockedBy } from "./people-blocks";
+import { callSnapshot } from "./call-sql";
 import {
   loungeAccessFrom,
   type LoungeRoleSettings,
@@ -152,26 +153,42 @@ export async function canReadRoom(
   userId: string,
   roomId: string,
   database: DalDatabase = getDb(),
+  now = new Date(),
 ) {
-  return readRoom(userId, eq(chatRooms.id, roomId), database);
+  return readRoom(userId, eq(chatRooms.id, roomId), database, now);
 }
 
 export function canReadMeeting(
   userId: string,
   bookingId: string,
   database: DalDatabase = getDb(),
+  now = new Date(),
 ) {
   return readRoom(
     userId,
     and(eq(chatRooms.bookingId, bookingId), eq(chatRooms.kind, "meeting"))!,
     database,
+    now,
   );
 }
 
-async function readRoom(userId: string, target: SQL, database: DalDatabase) {
+async function readRoom(
+  userId: string,
+  target: SQL,
+  database: DalDatabase,
+  now: Date,
+) {
+  const snapshot = callSnapshot(
+    userId,
+    sql`${chatRooms.id}`,
+    sql`${chatSpaces.kind}`,
+    now,
+    database,
+  );
   const [room] = await database
     .select({
       id: chatRooms.id,
+      call: snapshot.call,
       kind: chatRooms.kind,
       spaceId: chatSpaces.id,
       spaceName: sql<
@@ -248,6 +265,7 @@ async function readRoom(userId: string, target: SQL, database: DalDatabase) {
     })
     .from(chatRooms)
     .leftJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
+    .leftJoinLateral(snapshot, sql`true`)
     .leftJoin(teams, eq(chatSpaces.teamId, teams.id))
     .leftJoin(
       teamMembers,

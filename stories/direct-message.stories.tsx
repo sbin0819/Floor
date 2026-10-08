@@ -10,6 +10,8 @@ import {
 const me = "00000000-0000-4000-8000-000000000001";
 const peer = "00000000-0000-4000-8000-000000000002";
 const data: DirectMessageView = {
+  call: null,
+  canCall: false,
   kind: "dm",
   request: null,
   blockedByMe: false,

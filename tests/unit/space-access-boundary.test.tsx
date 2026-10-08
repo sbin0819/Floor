@@ -5,12 +5,16 @@ import { SpaceAccessBoundary } from "@/features/chat/components/space-access-bou
 import { CHAT_NAV_KEY } from "@/features/chat/nav-state";
 import type { ChatNav } from "@/features/chat/types";
 const nav = (ids: string[]): ChatNav => ({
+  callsEnabled: false,
+  calls: [],
+  myCall: null,
   myStatus: "online",
   blockedUserIds: [],
   directMessages: [],
   meetings: [],
   now: "2026-10-08T03:00:00Z",
   spaces: ids.map((id) => ({
+    voiceChannels: [],
     id,
     kind: "community",
     role: "member",

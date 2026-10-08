@@ -51,6 +51,32 @@ const replySchema = z.object({
 });
 
 const eventSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("call.changed"),
+    roomId: z.uuid(),
+    roomKind: z.enum(["text", "voice", "dm", "group_dm", "meeting"]),
+    spaceId: z.uuid().nullable(),
+    bookingId: z.uuid().nullable(),
+    sessionId: z.uuid().nullable(),
+    kind: z.enum(["voice", "huddle"]).nullable(),
+    participantCount: z.number().int().min(0).max(25),
+    participants: z
+      .array(z.object({ userId: z.uuid(), name: z.string() }))
+      .max(25),
+  }),
+  z.object({
+    type: z.literal("call.ringing"),
+    roomId: z.uuid(),
+    sessionId: z.uuid(),
+    callerId: z.uuid(),
+    callerName: z.string(),
+  }),
+  z.object({
+    type: z.literal("call.declined"),
+    roomId: z.uuid(),
+    sessionId: z.uuid(),
+  }),
+  z.object({ type: z.literal("call.replaced"), participantId: z.uuid() }),
   z.object({ type: z.literal("friend.changed") }),
   z.object({ type: z.literal("notifications.changed") }),
   z.object({ type: z.literal("room.changed"), roomId: z.string() }),

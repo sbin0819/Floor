@@ -12,6 +12,8 @@ import {
 import { systemMessageText } from "@/features/chat/system-messages";
 
 const data: MeetingView = {
+  call: null,
+  canCall: false,
   room: { id: "story-meeting", lastSeq: 2, muted: false, unreadMentions: 0 },
   booking: {
     id: "story-booking",
@@ -94,6 +96,9 @@ function MeetingStory({ example = "upcoming" }: { example?: Example }) {
   const [client] = useState(() => {
     const value = new QueryClient();
     value.setQueryData(["chat", "nav"], {
+      callsEnabled: false,
+      calls: [],
+      myCall: null,
       spaces: [],
       directMessages: [],
       meetings: [],

@@ -8,6 +8,8 @@ import {
 export const meetingNow = "2026-10-08T01:00:00.000Z";
 export function meetingView(overrides: Partial<MeetingView> = {}): MeetingView {
   return {
+    call: null,
+    canCall: false,
     room: {
       id: "a1111111-1111-4111-8111-111111111111",
       lastSeq: 1,
@@ -85,6 +87,9 @@ export function meetingNav(overrides: Partial<MeetingNav> = {}): MeetingNav {
 }
 export function meetingChatNav(overrides: Partial<ChatNav> = {}): ChatNav {
   return {
+    callsEnabled: false,
+    calls: [],
+    myCall: null,
     spaces: [],
     directMessages: [],
     meetings: [meetingNav()],

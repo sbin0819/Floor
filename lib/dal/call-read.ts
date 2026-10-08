@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   callParticipants,
@@ -11,10 +11,16 @@ import {
 } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
 
-export function activeCallParticipant(now: Date) {
+export function activeCallParticipant(
+  now: Date,
+  fields: { leftAt: SQL; lastSeenAt: SQL } = {
+    leftAt: sql`${callParticipants.leftAt}`,
+    lastSeenAt: sql`${callParticipants.lastSeenAt}`,
+  },
+) {
   return and(
-    isNull(callParticipants.leftAt),
-    sql`${callParticipants.lastSeenAt} > ${new Date(now.getTime() - 120_000)}`,
+    isNull(fields.leftAt),
+    sql`${fields.lastSeenAt} > ${new Date(now.getTime() - 120_000)}::timestamptz`,
   )!;
 }
 

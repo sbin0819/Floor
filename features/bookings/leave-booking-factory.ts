@@ -1,5 +1,6 @@
 import {
   bookingActionDependencies,
+  evictBookingCalls,
   publishBookingChange,
   publishBookingChatEvents,
   type BookingDependencies,
@@ -98,6 +99,7 @@ export function createLeaveBookingAction(
             spaceId: row.space.id,
           };
         }, dependencies.database);
+        await evictBookingCalls([session.userId], dependencies);
         await publishBookingChange(
           result.floorId,
           result.spaceId,

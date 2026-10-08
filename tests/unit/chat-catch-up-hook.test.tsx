@@ -64,7 +64,10 @@ function created(
 }
 function view(id = "room-a"): ChannelView {
   return {
+    call: null,
+    canCall: false,
     room: {
+      kind: "text",
       id,
       name: "일반",
       topic: null,

@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { ChatNav, DirectMessageNav } from "./types";
+import type { RealtimeEvent } from "@/lib/realtime/types";
 
 export const CHAT_NAV_KEY = ["chat", "nav"] as const;
 type NavChanges = {
@@ -7,6 +8,7 @@ type NavChanges = {
   statusRevision: number;
   lastStatus?: ChatNav["myStatus"];
   rooms: Map<string, number>;
+  calls: Map<string, number>;
   activitySeq: Map<string, number>;
   readThrough: Map<string, number>;
   incoming: WeakSet<ChatNav>;
@@ -21,6 +23,7 @@ function state(client: QueryClient) {
       revision: 0,
       statusRevision: 0,
       rooms: new Map(),
+      calls: new Map(),
       activitySeq: new Map(),
       readThrough: new Map(),
       incoming: new WeakSet(),
@@ -136,6 +139,48 @@ export function chatNavRevision(client: QueryClient) {
   return state(client).revision;
 }
 
+export function applyCallChanged(
+  client: QueryClient,
+  event: Extract<RealtimeEvent, { type: "call.changed" }>,
+) {
+  const snapshot = state(client);
+  snapshot.calls.set(event.roomId, ++snapshot.revision);
+  client.setQueryData<ChatNav>(CHAT_NAV_KEY, (current) => {
+    if (!current) return current;
+    const known =
+      current.spaces.some((space) =>
+        [...space.channels, ...space.voiceChannels].some(
+          (room) => room.id === event.roomId,
+        ),
+      ) ||
+      current.directMessages.some((room) => room.roomId === event.roomId) ||
+      current.meetings.some((room) => room.roomId === event.roomId);
+    if (!known) return current;
+    const calls = current.calls.filter((call) => call.roomId !== event.roomId);
+    if (event.sessionId && event.kind === "huddle")
+      calls.push({
+        roomId: event.roomId,
+        participantCount: event.participantCount,
+      });
+    return {
+      ...current,
+      calls,
+      spaces: current.spaces.map((space) => ({
+        ...space,
+        voiceChannels: space.voiceChannels.map((room) =>
+          room.id !== event.roomId
+            ? room
+            : {
+                ...room,
+                participantCount: event.participantCount,
+                participants: space.kind === "branch" ? [] : event.participants,
+              },
+        ),
+      })),
+    };
+  });
+}
+
 export function isViewingRoom(
   client: QueryClient,
   roomId: string,
@@ -229,6 +274,7 @@ export function mergeChatNav(
     ),
   );
   const spaces = incoming.spaces.map((space) => {
+    const oldSpace = current?.spaces.find((old) => old.id === space.id);
     const channels = space.channels.map((room) => {
       const protect =
         requestedAt === null
@@ -242,6 +288,22 @@ export function mergeChatNav(
     });
     return {
       ...space,
+      voiceChannels: space.voiceChannels.map((room) => {
+        const previous = oldSpace?.voiceChannels.find(
+          (old) => old.id === room.id,
+        );
+        const protect =
+          requestedAt === null ||
+          (snapshot.calls.get(room.id) ?? 0) > requestedAt;
+        return previous && protect
+          ? {
+              ...room,
+              participantCount: previous.participantCount,
+              participants:
+                space.kind === "branch" ? [] : previous.participants,
+            }
+          : room;
+      }),
       channels,
       unread:
         !space.muted && channels.some((room) => room.unread && !room.muted),
@@ -298,6 +360,15 @@ export function mergeChatNav(
   }
   if (requestedAt !== null && snapshot.statusRevision <= requestedAt)
     snapshot.lastStatus = undefined;
+  const protectedCalls = new Set(
+    [...snapshot.calls]
+      .filter(([, revision]) => requestedAt === null || revision > requestedAt)
+      .map(([id]) => id),
+  );
+  const calls = [
+    ...incoming.calls.filter((call) => !protectedCalls.has(call.roomId)),
+    ...(current?.calls.filter((call) => protectedCalls.has(call.roomId)) ?? []),
+  ];
   return {
     ...incoming,
     myStatus:
@@ -305,6 +376,7 @@ export function mergeChatNav(
         ? (snapshot.lastStatus ?? current?.myStatus ?? incoming.myStatus)
         : incoming.myStatus,
     spaces,
+    calls,
     meetings,
     directMessages: sortDirectMessages(directMessages),
   };

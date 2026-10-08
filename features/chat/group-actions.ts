@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createAction } from "@/lib/actions/create-action";
+import { evictCalls } from "@/lib/calls/evict";
 import { ActionError } from "@/lib/actions/result";
 import { withTransaction, type DalDatabase } from "@/lib/dal/database";
 import {
@@ -235,6 +236,7 @@ export function createGroupActions(dependencies: ChatActionDependencies) {
               },
             ];
           }, dependencies.database);
+          await evictCalls(session.userId, dependencies);
           await publish(events);
           return {};
         },

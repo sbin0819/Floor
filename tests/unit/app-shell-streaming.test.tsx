@@ -92,6 +92,9 @@ describe("member shell streaming", () => {
     expect(await ShellRealtimeSession()).toBeNull();
     for (const slot of [ChatRailSlot, ChatSidebarSlot, ChatSidebarTitleSlot]) {
       expect((await slot()).props.data).toEqual({
+        callsEnabled: false,
+        calls: [],
+        myCall: null,
         spaces: [],
         directMessages: [],
         myStatus: "online",

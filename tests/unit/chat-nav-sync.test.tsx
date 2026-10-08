@@ -69,6 +69,7 @@ vi.mock("@/components/realtime-provider", async (original) => ({
 }));
 const spaceFixture = (): ChatSpaceNav[] => [
   {
+    voiceChannels: [],
     id: spaceId,
     kind: "team",
     iconColor: "blue",
@@ -97,6 +98,9 @@ const spaceFixture = (): ChatSpaceNav[] => [
   },
 ];
 const fixture = (): ChatNav => ({
+  callsEnabled: false,
+  calls: [],
+  myCall: null,
   spaces: spaceFixture(),
   directMessages: [],
   myStatus: "online",
@@ -106,6 +110,9 @@ const fixture = (): ChatNav => ({
 });
 function mappedFixture(map: (space: ChatSpaceNav) => ChatSpaceNav): ChatNav {
   return {
+    callsEnabled: false,
+    calls: [],
+    myCall: null,
     spaces: spaceFixture().map(map),
     directMessages: [],
     myStatus: "online",

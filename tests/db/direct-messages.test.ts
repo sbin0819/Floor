@@ -548,7 +548,7 @@ describe("direct messages", () => {
     const meter = createQueryMeter(database.client);
     try {
       for (const [query, expected] of [
-        [() => queries().getMyChatNav(), [3]],
+        [() => queries().getMyChatNav(), [4]],
         [() => queries().getDirectMessageView(roomId), [1, 2]],
         [() => queries().getRoomMessagesPage(roomId, { before: "100" }), [2]],
       ] as const) {

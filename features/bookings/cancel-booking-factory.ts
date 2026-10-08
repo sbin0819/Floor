@@ -1,5 +1,6 @@
 import {
   bookingActionDependencies,
+  evictBookingCalls,
   publishBookingChange,
   publishBookingChatEvents,
   type BookingDependencies,
@@ -167,6 +168,7 @@ export function createCancelBookingAction(
               );
           return {
             bookingId: cancelled.id,
+            callUserIds: isDesk ? [] : memberIds,
             chatEvents,
             floorId: row.floor.id,
             spaceId:
@@ -175,6 +177,7 @@ export function createCancelBookingAction(
                 : row.space.id,
           };
         }, db);
+        await evictBookingCalls(result.callUserIds, dependencies);
         await publishBookingChange(
           result.floorId,
           result.spaceId,
