@@ -48,13 +48,18 @@ function setup(
   return { ...renderUi, open, user: userEvent.setup() };
 }
 describe("new message contacts", () => {
-  it("groups friends first without duplicating shared team members and keeps existing room links", () => {
-    setup();
-    expect(
-      within(screen.getByRole("region", { name: "친구" })).getByRole("link", {
-        name: /이서연/,
-      }),
-    ).toHaveAttribute("href", "/dm/existing");
+  it("groups friends first without duplicating shared team members and preserves existing room navigation after selection", async () => {
+    const { user, open } = setup();
+    await user.click(
+      within(screen.getByRole("region", { name: "친구" })).getByRole(
+        "checkbox",
+        { name: /이서연/ },
+      ),
+    );
+    expect(mocks.push).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "메시지" }));
+    expect(mocks.push).toHaveBeenCalledWith("/dm/existing");
+    expect(open).not.toHaveBeenCalled();
     expect(
       within(screen.getByRole("region", { name: "같은 팀" })).queryByText(
         "이서연",
@@ -68,7 +73,7 @@ describe("new message contacts", () => {
   it("filters locally by name and case-insensitive username without fetching or opening a room", async () => {
     const { user, open } = setup();
     await user.type(screen.getByLabelText("이름으로 거르기"), "JIHOON");
-    expect(screen.getByRole("button", { name: /박지훈/ })).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: /박지훈/ })).toBeVisible();
     expect(screen.queryByText("이서연")).not.toBeInTheDocument();
     expect(open).not.toHaveBeenCalled();
     await user.clear(screen.getByLabelText("이름으로 거르기"));
@@ -86,7 +91,8 @@ describe("new message contacts", () => {
         <MessageContacts people={people} open={open} />
       </QueryClientProvider>,
     );
-    const button = screen.getByRole("button", { name: /박지훈/ });
+    fireEvent.click(screen.getByRole("checkbox", { name: /박지훈/ }));
+    const button = screen.getByRole("button", { name: "메시지" });
     fireEvent.click(button);
     fireEvent.click(button);
     await waitFor(() =>

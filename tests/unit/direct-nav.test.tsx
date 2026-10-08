@@ -54,7 +54,8 @@ vi.mock("@/features/chat/actions", () => ({
   setRoomMuted: vi.fn(),
   setSpaceMuted: vi.fn(),
 }));
-vi.mock("@/components/realtime-provider", () => ({
+vi.mock("@/components/realtime-provider", async (original) => ({
+  ...(await original<typeof import("@/components/realtime-provider")>()),
   useRealtimeChannel: (
     channel: string | null,
     receive: typeof mocks.receive,
@@ -63,7 +64,9 @@ vi.mock("@/components/realtime-provider", () => ({
   },
 }));
 
-const direct = (patch: Partial<DirectMessageNav> = {}): DirectMessageNav => ({
+type DirectNav = Extract<DirectMessageNav, { kind: "dm" }>;
+const direct = (patch: Partial<DirectNav> = {}): DirectNav => ({
+  kind: "dm",
   roomId,
   other: {
     userId: "61000000-0000-4000-8000-000000000002",
@@ -78,9 +81,11 @@ const direct = (patch: Partial<DirectMessageNav> = {}): DirectMessageNav => ({
   muted: false,
   ...patch,
 });
-const fixture = (rows = [direct()]): ChatNav => ({
+const fixture = (rows: DirectMessageNav[] = [direct()]): ChatNav => ({
   spaces: [],
   directMessages: rows,
+  myStatus: "online",
+  blockedUserIds: [],
 });
 const activity = (
   patch: Partial<Extract<RealtimeEvent, { type: "room.activity" }>> = {},
@@ -380,6 +385,69 @@ describe("direct navigation cache", () => {
       });
     },
   );
+  it.each(["poll", "SSR"] as const)(
+    "accepts group membership/name metadata from %s without replacing newer unread state",
+    (source) => {
+      const group: DirectMessageNav = {
+        kind: "group_dm",
+        roomId,
+        name: null,
+        memberCount: 3,
+        members: [
+          { userId, name: "나" },
+          { userId: "peer", name: "서연" },
+          { userId: "third", name: "지훈" },
+        ],
+        lastSeq: 3,
+        lastMessageAt: "2026-10-08T01:00:00.000Z",
+        unread: false,
+        unreadCount: 0,
+        unreadMentions: 0,
+        muted: false,
+      };
+      const client = cache(fixture([group]));
+      const revision = chatNavRevision(client);
+      applyDirectActivity(
+        client,
+        activity({ roomKind: "group_dm" }),
+        userId,
+        now,
+      );
+      applyMention(client, mention({ roomKind: "group_dm" }));
+      const incoming = fixture([
+        {
+          ...group,
+          name: "새 그룹 이름",
+          memberCount: 2,
+          members: group.members.slice(0, 2),
+          muted: true,
+        },
+      ]);
+      if (source === "SSR") mergeInitialChatNav(client, incoming);
+      else
+        client.setQueryData(
+          CHAT_NAV_KEY,
+          mergeChatNav(client, incoming, revision),
+        );
+      expect(snapshot(client).directMessages[0]).toEqual({
+        ...incoming.directMessages[0],
+        lastSeq: 4,
+        lastMessageAt: now,
+        unread: true,
+        unreadCount: 1,
+        unreadMentions: 1,
+      });
+      clearRoomUnread(client, roomId, 4);
+      expect(snapshot(client).directMessages[0]).toEqual({
+        ...incoming.directMessages[0],
+        lastSeq: 4,
+        lastMessageAt: now,
+        unread: false,
+        unreadCount: 0,
+        unreadMentions: 0,
+      });
+    },
+  );
 });
 
 describe("direct activity toasts and navigation", () => {
@@ -468,14 +536,18 @@ describe("direct activity toasts and navigation", () => {
     await advance(251);
     expect(mocks.toast).not.toHaveBeenCalled();
   });
-  it("does not toast my own message or a system event without a preview", async () => {
-    const { client } = setup();
+  it("does not toast my own message or a system event, and refreshes metadata for the system event", async () => {
+    const read = vi.fn(async () =>
+      fixture([direct({ lastSeq: 5, unreadCount: 1, unread: true })]),
+    );
+    const { client } = setup(fixture(), read);
     act(() => {
       mocks.receive(activity({ authorId: userId }));
       mocks.receive(activity({ seq: 5, authorId: null, preview: null }));
     });
     await advance(251);
     expect(mocks.toast).not.toHaveBeenCalled();
+    expect(read).toHaveBeenCalledTimes(1);
     expect(snapshot(client).directMessages[0]).toMatchObject({
       lastSeq: 5,
       unreadCount: 1,
@@ -695,7 +767,9 @@ describe("direct activity toasts and navigation", () => {
         ...data,
         directMessages: data.directMessages.map((room) => ({
           ...room,
-          other: { ...room.other, email: "secret@example.test" },
+          ...(room.kind === "dm"
+            ? { other: { ...room.other, email: "secret@example.test" } }
+            : {}),
         })),
       }),
     );

@@ -21,6 +21,7 @@ import {
   type MessageToolbarProps,
 } from "./message-toolbar";
 import { ReactionPills } from "./reaction-pills";
+import { SystemMessageContent } from "./system-message-content";
 import type { ChatMessage, ReactionEmoji } from "../types";
 
 export type MessageActions = {
@@ -38,6 +39,7 @@ export type MessageActions = {
   onEdit?: (message: DisplayMessage) => void;
   onReply?: (message: DisplayMessage) => void;
   onJump?: (messageId: string) => void;
+  onReport?: (message: DisplayMessage) => void;
 };
 
 export const MessageRow = memo(function MessageRow({
@@ -55,6 +57,8 @@ export const MessageRow = memo(function MessageRow({
   highlighted = false,
   editor,
   read = false,
+  foldedCount = 0,
+  onExpand,
 }: {
   message: DisplayMessage;
   grouped: boolean;
@@ -70,6 +74,8 @@ export const MessageRow = memo(function MessageRow({
   highlighted?: boolean;
   editor?: ReactNode;
   read?: boolean;
+  foldedCount?: number;
+  onExpand?: () => void;
 }) {
   const article = useRef<HTMLElement>(null);
   const tools = useRef<HTMLDivElement>(null);
@@ -92,7 +98,8 @@ export const MessageRow = memo(function MessageRow({
     if (toolbar)
       tools.current?.querySelector<HTMLButtonElement>("button")?.focus();
   }, [toolbar]);
-  const usable = actions && message.kind === "text" && !message.delivery;
+  const usable =
+    actions && message.kind === "text" && !message.delivery && !foldedCount;
   const permissions = {
     canReact: Boolean(usable && actions.canReact && !message.deletedAt),
     canReply: Boolean(usable && actions.canWrite && actions.onReply),
@@ -107,6 +114,13 @@ export const MessageRow = memo(function MessageRow({
       usable &&
       !message.deletedAt &&
       (message.authorId === actions.userId || actions.admin),
+    ),
+    canReport: Boolean(
+      usable &&
+      actions.onReport &&
+      !message.deletedAt &&
+      message.authorId &&
+      message.authorId !== actions.userId,
     ),
   };
   const available = Object.values(permissions).some(Boolean);
@@ -134,6 +148,10 @@ export const MessageRow = memo(function MessageRow({
       actions?.onDelete(message);
     },
     onEscape: returnFocus,
+    onReport: () => {
+      setToolbar(false);
+      actions?.onReport?.(message);
+    },
   };
   const names = new Map(actions?.names);
   for (const mention of message.mentions)
@@ -231,149 +249,168 @@ export const MessageRow = memo(function MessageRow({
         data-highlighted={highlighted || undefined}
         className={`relative flex gap-3 rounded-md py-1 outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${mentioned ? "bg-status-pending" : highlighted ? "bg-accent" : ""} ${!grouped ? "mt-4" : ""} ${message.delivery === "pending" ? "opacity-50" : ""}`}
       >
-        <div className="w-10 shrink-0">
-          {!grouped && message.kind === "text" && message.authorId && (
-            <PersonCard
-              userId={message.authorId}
-              name={message.authorName ?? "알 수 없는 사람"}
-            >
-              <button
-                type="button"
-                aria-label={`${message.authorName ?? "알 수 없는 사람"} 아바타 프로필`}
-                className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex size-10 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground"
-                >
-                  {Array.from(message.authorName ?? "?")[0]}
-                </span>
-              </button>
-            </PersonCard>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          {!grouped && (
-            <div className="mb-1 flex items-baseline gap-2">
-              {message.kind === "text" && message.authorId ? (
+        {foldedCount ? (
+          <Button
+            variant="ghost"
+            className="min-h-11 text-muted-foreground"
+            onClick={onExpand}
+          >
+            차단한 사용자의 메시지{foldedCount > 1 ? ` ${foldedCount}개` : ""} ·
+            보기
+          </Button>
+        ) : message.kind === "system" ? (
+          <SystemMessageContent
+            data={message.systemData}
+            body={message.body}
+            createdAt={message.createdAt}
+          />
+        ) : (
+          <>
+            <div className="w-10 shrink-0">
+              {!grouped && message.authorId && (
                 <PersonCard
                   userId={message.authorId}
                   name={message.authorName ?? "알 수 없는 사람"}
                 >
                   <button
                     type="button"
-                    className="rounded-sm text-left text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-                    aria-label={`${message.authorName ?? "알 수 없는 사람"} 프로필`}
+                    aria-label={`${message.authorName ?? "알 수 없는 사람"} 아바타 프로필`}
+                    className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
                   >
-                    <strong>{message.authorName ?? "알 수 없는 사람"}</strong>
+                    <span
+                      aria-hidden="true"
+                      className="flex size-10 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground"
+                    >
+                      {Array.from(message.authorName ?? "?")[0]}
+                    </span>
                   </button>
                 </PersonCard>
-              ) : (
-                <strong className="text-sm font-semibold">
-                  {message.kind === "system"
-                    ? "시스템"
-                    : (message.authorName ?? "알 수 없는 사람")}
-                </strong>
               )}
-              <time
-                dateTime={message.createdAt}
-                className="text-xs text-muted-foreground tabular-nums"
-              >
-                {formatChatTime(message.createdAt)}
-              </time>
             </div>
-          )}
-          {message.replyTo && !message.deletedAt && (
-            <button
-              type="button"
-              aria-label={`${message.replyTo.authorName ?? "알 수 없는 사람"} 님의 원문: ${message.replyTo.deleted ? "삭제된 메시지예요" : message.replyTo.excerpt}`}
-              className="mb-1 flex min-h-11 max-w-full items-center gap-2 rounded-md border-l-2 border-border px-2 text-left text-xs text-muted-foreground hover:bg-muted"
-              onClick={() => actions?.onJump?.(message.replyTo!.id)}
-            >
-              <span
-                aria-hidden="true"
-                className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted"
-              >
-                {Array.from(message.replyTo.authorName ?? "?")[0]}
-              </span>
-              <strong className="shrink-0">
-                {message.replyTo.authorName ?? "알 수 없는 사람"}
-              </strong>
-              <span className="truncate">
-                {message.replyTo.deleted
-                  ? "삭제된 메시지예요"
-                  : message.replyTo.excerpt}
-              </span>
-            </button>
-          )}
-          {(message.deletedAt ? null : editor) ??
-            (message.deletedAt ? (
-              <p className="text-sm text-muted-foreground italic">
-                삭제된 메시지예요
-              </p>
-            ) : (
-              <MessageBody body={message.body} names={names} />
-            ))}
-          {message.editedAt && !message.deletedAt && (
-            <span className="text-xs text-muted-foreground">(수정됨)</span>
-          )}
-          {read && (
-            <p
-              className="text-right text-xs text-muted-foreground"
-              data-chat-read-receipt
-            >
-              읽음
-            </p>
-          )}
-          {!message.deletedAt && (
-            <ReactionPills
-              reactions={message.reactions}
-              disabled={!permissions.canReact}
-              onChange={toolbarProps.onReaction}
-            />
-          )}
-          {message.delivery === "pending" && (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <Clock className="size-3" aria-hidden="true" />
-              보내는 중이에요
-            </span>
-          )}
-          {message.delivery === "failed" && (
-            <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-              <span>{messageSendError(message)}</span>
-              {message.errorCode === "UNAUTHENTICATED" ? (
-                <Link
-                  href="/login"
-                  className="inline-flex min-h-11 items-center underline"
-                >
-                  로그인
-                </Link>
-              ) : message.errorCode === "NOT_FOUND" ? (
-                <Link
-                  href="/messages"
-                  className="inline-flex min-h-11 items-center underline"
-                >
-                  메시지 목록
-                </Link>
-              ) : (
-                <Button
+            <div className="min-w-0 flex-1">
+              {!grouped && (
+                <div className="mb-1 flex items-baseline gap-2">
+                  {message.authorId ? (
+                    <PersonCard
+                      userId={message.authorId}
+                      name={message.authorName ?? "알 수 없는 사람"}
+                    >
+                      <button
+                        type="button"
+                        className="rounded-sm text-left text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                        aria-label={`${message.authorName ?? "알 수 없는 사람"} 프로필`}
+                      >
+                        <strong>
+                          {message.authorName ?? "알 수 없는 사람"}
+                        </strong>
+                      </button>
+                    </PersonCard>
+                  ) : (
+                    <strong className="text-sm font-semibold">
+                      {message.authorName ?? "알 수 없는 사람"}
+                    </strong>
+                  )}
+                  <time
+                    dateTime={message.createdAt}
+                    className="text-xs text-muted-foreground tabular-nums"
+                  >
+                    {formatChatTime(message.createdAt)}
+                  </time>
+                </div>
+              )}
+              {message.replyTo && !message.deletedAt && (
+                <button
                   type="button"
-                  variant="ghost"
-                  onClick={() => onRetry(message)}
+                  aria-label={`${message.replyTo.authorName ?? "알 수 없는 사람"} 님의 원문: ${message.replyTo.deleted ? "삭제된 메시지예요" : message.replyTo.excerpt}`}
+                  className="mb-1 flex min-h-11 max-w-full items-center gap-2 rounded-md border-l-2 border-border px-2 text-left text-xs text-muted-foreground hover:bg-muted"
+                  onClick={() => actions?.onJump?.(message.replyTo!.id)}
                 >
-                  다시 보내기
-                </Button>
+                  <span
+                    aria-hidden="true"
+                    className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted"
+                  >
+                    {Array.from(message.replyTo.authorName ?? "?")[0]}
+                  </span>
+                  <strong className="shrink-0">
+                    {message.replyTo.authorName ?? "알 수 없는 사람"}
+                  </strong>
+                  <span className="truncate">
+                    {message.replyTo.deleted
+                      ? "삭제된 메시지예요"
+                      : message.replyTo.excerpt}
+                  </span>
+                </button>
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onRemove(message)}
-              >
-                지우기
-              </Button>
+              {(message.deletedAt ? null : editor) ??
+                (message.deletedAt ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    삭제된 메시지예요
+                  </p>
+                ) : (
+                  <MessageBody body={message.body} names={names} />
+                ))}
+              {message.editedAt && !message.deletedAt && (
+                <span className="text-xs text-muted-foreground">(수정됨)</span>
+              )}
+              {read && (
+                <p
+                  className="text-right text-xs text-muted-foreground"
+                  data-chat-read-receipt
+                >
+                  읽음
+                </p>
+              )}
+              {!message.deletedAt && (
+                <ReactionPills
+                  reactions={message.reactions}
+                  disabled={!permissions.canReact}
+                  onChange={toolbarProps.onReaction}
+                />
+              )}
+              {message.delivery === "pending" && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="size-3" aria-hidden="true" />
+                  보내는 중이에요
+                </span>
+              )}
+              {message.delivery === "failed" && (
+                <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <span>{messageSendError(message)}</span>
+                  {message.errorCode === "UNAUTHENTICATED" ? (
+                    <Link
+                      href="/login"
+                      className="inline-flex min-h-11 items-center underline"
+                    >
+                      로그인
+                    </Link>
+                  ) : message.errorCode === "NOT_FOUND" ? (
+                    <Link
+                      href="/messages"
+                      className="inline-flex min-h-11 items-center underline"
+                    >
+                      메시지 목록
+                    </Link>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => onRetry(message)}
+                    >
+                      다시 보내기
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => onRemove(message)}
+                  >
+                    지우기
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
         {available && !editor && !sheet && (
           <div
             ref={tools}

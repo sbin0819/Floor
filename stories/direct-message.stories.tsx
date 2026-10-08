@@ -10,6 +10,9 @@ import {
 const me = "00000000-0000-4000-8000-000000000001";
 const peer = "00000000-0000-4000-8000-000000000002";
 const data: DirectMessageView = {
+  kind: "dm",
+  request: null,
+  blockedByMe: false,
   room: {
     id: "story-direct-message",
     archived: false,
@@ -17,7 +20,12 @@ const data: DirectMessageView = {
     muted: false,
     unreadMentions: 0,
   },
-  other: { userId: peer, name: "이서연", username: "seoyeon.lee" },
+  other: {
+    userId: peer,
+    name: "이서연",
+    username: "seoyeon.lee",
+    sharesSpace: false,
+  },
   user: { id: me, name: "김하은" },
   members: [
     { id: me, name: "김하은", admin: false },

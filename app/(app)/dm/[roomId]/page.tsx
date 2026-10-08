@@ -4,6 +4,7 @@ import { requirePageSession } from "@/lib/auth/session";
 import { getDirectMessageView } from "@/features/chat/queries";
 import { DirectMessageScreen } from "@/features/chat/components/channel-screen";
 import { ChannelSkeleton } from "@/features/chat/components/channel-skeleton";
+import { getMessageContacts } from "@/features/people/queries";
 
 type Props = { params: Promise<{ roomId: string }> };
 async function DirectContent({ params }: Props) {
@@ -11,7 +12,10 @@ async function DirectContent({ params }: Props) {
   await requirePageSession(`/dm/${roomId}`);
   const data = await getDirectMessageView(roomId);
   if (!data) notFound();
-  return <DirectMessageScreen key={data.room.id} data={data} />;
+  const contacts = data.kind === "group_dm" ? getMessageContacts() : undefined;
+  return (
+    <DirectMessageScreen key={data.room.id} data={data} contacts={contacts} />
+  );
 }
 export default function DirectPage(props: Props) {
   return (

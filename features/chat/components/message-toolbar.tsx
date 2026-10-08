@@ -1,7 +1,15 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { Ellipsis, Pencil, Reply, SmilePlus, Trash2, X } from "lucide-react";
+import {
+  Ellipsis,
+  Flag,
+  Pencil,
+  Reply,
+  SmilePlus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,12 +47,14 @@ export type MessageToolbarProps = {
   canReply: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  canReport?: boolean;
   reactions?: readonly ChatReaction[];
   disabled?: boolean;
   onReaction: (emoji: ReactionEmoji, on: boolean) => void;
   onReply: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onReport?: () => void;
   onEscape?: () => void;
 };
 
@@ -118,7 +128,13 @@ export function MessageToolbar(props: MessageToolbarProps) {
   const [choosing, setChoosing] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const actionSelected = useRef(false);
-  if (!props.canReact && !props.canReply && !props.canEdit && !props.canDelete)
+  if (
+    !props.canReact &&
+    !props.canReply &&
+    !props.canEdit &&
+    !props.canDelete &&
+    !props.canReport
+  )
     return null;
   return (
     <div
@@ -197,7 +213,7 @@ export function MessageToolbar(props: MessageToolbarProps) {
           <Pencil aria-hidden="true" />
         </ActionButton>
       )}
-      {props.canDelete && (
+      {(props.canDelete || props.canReport) && (
         <DropdownMenu open={moreOpen} onOpenChange={setMoreOpen}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -220,17 +236,31 @@ export function MessageToolbar(props: MessageToolbarProps) {
               }
             }}
           >
-            <DropdownMenuItem
-              variant="destructive"
-              className="min-h-11"
-              onSelect={() => {
-                actionSelected.current = true;
-                props.onDelete();
-              }}
-            >
-              <Trash2 aria-hidden="true" />
-              삭제
-            </DropdownMenuItem>
+            {props.canDelete && (
+              <DropdownMenuItem
+                variant="destructive"
+                className="min-h-11"
+                onSelect={() => {
+                  actionSelected.current = true;
+                  props.onDelete();
+                }}
+              >
+                <Trash2 aria-hidden="true" />
+                삭제
+              </DropdownMenuItem>
+            )}
+            {props.canReport && (
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => {
+                  actionSelected.current = true;
+                  props.onReport?.();
+                }}
+              >
+                <Flag aria-hidden="true" />
+                신고
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
@@ -329,6 +359,18 @@ export function MessageActionsSheet({
             >
               <Trash2 aria-hidden="true" />
               삭제
+            </Button>
+          )}
+          {props.canReport && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start"
+              disabled={props.disabled}
+              onClick={() => choose(() => props.onReport?.(), true)}
+            >
+              <Flag aria-hidden="true" />
+              신고
             </Button>
           )}
         </div>

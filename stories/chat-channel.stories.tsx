@@ -79,7 +79,16 @@ function ChannelStory({
   loading?: boolean;
   example?: "conversation" | "formatted" | "deleted" | "reactions" | "reply";
 }) {
-  const [client] = useState(() => new QueryClient());
+  const [client] = useState(() => {
+    const client = new QueryClient();
+    client.setQueryData(["chat", "nav"], {
+      spaces: [],
+      directMessages: [],
+      myStatus: "online",
+      blockedUserIds: [],
+    });
+    return client;
+  });
   const messages = data.messages.map((message, index) => {
     if (example === "formatted" && index === 1)
       return {

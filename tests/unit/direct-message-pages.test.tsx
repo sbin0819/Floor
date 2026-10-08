@@ -6,6 +6,23 @@ import { requirePageSession } from "@/lib/auth/session";
 import { getDirectMessageView } from "@/features/chat/queries";
 import { getMessageContacts } from "@/features/people/queries";
 import { resolvePageContent } from "./page-test-utils";
+import type { DirectMessageView } from "@/features/chat/types";
+import type { MessageContact } from "@/features/people/types";
+const roomData = {
+  room: {
+    id: "room",
+    archived: false,
+    lastSeq: 0,
+    muted: false,
+    unreadMentions: 0,
+  },
+  user: { id: "me", name: "나" },
+  messages: [],
+  lastReadSeq: 0,
+  firstUnreadSeq: null,
+  canWrite: true,
+  now: "2030-01-01T00:00:00Z",
+};
 const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
@@ -31,6 +48,51 @@ beforeEach(() => {
   vi.mocked(getMessageContacts).mockResolvedValue([]);
 });
 describe("direct messages page guards", () => {
+  it("passes a group contacts promise without waiting for it to render the room", async () => {
+    const contacts = Promise.withResolvers<MessageContact[]>();
+    vi.mocked(getMessageContacts).mockReturnValue(contacts.promise);
+    const data: DirectMessageView = {
+      ...roomData,
+      kind: "group_dm",
+      name: null,
+      displayName: "그룹 대화",
+      members: [
+        { userId: "me", name: "나", username: "me", sharesSpace: true },
+      ],
+    };
+    vi.mocked(getDirectMessageView).mockResolvedValue(data);
+    const result = await resolvePageContent(
+      DirectPage({ params: Promise.resolve({ roomId: "room" }) }),
+    );
+    expect(result.props.data).toBe(data);
+    expect(result.props.contacts).toBe(contacts.promise);
+    expect(requirePageSession).toHaveBeenCalledExactlyOnceWith("/dm/room");
+    expect(getMessageContacts).toHaveBeenCalledOnce();
+    contacts.resolve([]);
+  });
+  it("does not load group contacts for a direct conversation", async () => {
+    const data: DirectMessageView = {
+      ...roomData,
+      kind: "dm",
+      request: null,
+      blockedByMe: false,
+      other: {
+        userId: "other",
+        name: "상대",
+        username: null,
+        sharesSpace: false,
+      },
+      members: [],
+      peerReadSeq: 0,
+    };
+    vi.mocked(getDirectMessageView).mockResolvedValue(data);
+    const result = await resolvePageContent(
+      DirectPage({ params: Promise.resolve({ roomId: "room" }) }),
+    );
+    expect(result.props.data).toBe(data);
+    expect(result.props.contacts).toBeUndefined();
+    expect(getMessageContacts).not.toHaveBeenCalled();
+  });
   it.each(["invalid", "10000000-0000-4000-8000-000000000001"])(
     "returns the same not-found state for unavailable room %s",
     async (roomId) => {

@@ -29,7 +29,7 @@ export function useChannelMessages(
   data: RoomMessageSource,
   send: SendChatMessage = sendMessage,
   onPageRead?: (roomId: string, seq: number) => void,
-  isDirect = false,
+  directKind: false | "dm" | "group_dm" = false,
 ) {
   const client = useQueryClient();
   const roomId = data.room.id;
@@ -55,7 +55,7 @@ export function useChannelMessages(
       sync.revalidate();
   });
   const catchUp = useChannelCatchUp(data, onPageRead);
-  const sending = useChatSendQueue(data, send, isDirect);
+  const sending = useChatSendQueue(data, send, directKind);
   const liveBuffer = useRef<{
     roomId: string;
     messages: ChatMessage[];
@@ -94,9 +94,60 @@ export function useChannelMessages(
     },
     [client, roomId, userId, sync],
   );
+  const announce = useCallback(
+    (incoming: ChatMessage[]) => {
+      const buffer = liveBuffer.current;
+      if (
+        !buffer ||
+        buffer.roomId !== roomId ||
+        !buffer.active ||
+        !incoming.length
+      )
+        return;
+      const empty = buffer.messages.length === 0;
+      buffer.messages.push(...incoming);
+      if (empty)
+        queueMicrotask(() => {
+          if (!buffer.active) return;
+          const confirmed =
+            client.getQueryData<DisplayMessage[]>(roomMessagesKey(roomId)) ??
+            [];
+          setLiveBatch({
+            roomId,
+            messages: buffer.messages.flatMap((received) => {
+              const saved = confirmed.find((row) => row.id === received.id);
+              return saved && !saved.deletedAt ? [saved] : [];
+            }),
+          });
+          buffer.messages = [];
+        });
+    },
+    [client, roomId],
+  );
+  const serverCursor = useRef({ roomId, seq: data.room.lastSeq });
   useEffect(() => {
+    const previous = serverCursor.current;
+    const current =
+      client.getQueryData<DisplayMessage[]>(roomMessagesKey(roomId)) ?? [];
     merge(data.messages);
-  }, [data.messages, merge]);
+    // 그룹 변경은 room.changed 뒤의 서버 갱신으로 오므로 새 시스템 행만 알린다.
+    if (previous.roomId === roomId)
+      announce(
+        data.messages.filter(
+          (message) =>
+            message.kind === "system" &&
+            message.seq > previous.seq &&
+            !current.some((row) => row.id === message.id),
+        ),
+      );
+    serverCursor.current = {
+      roomId,
+      seq: Math.max(
+        previous.roomId === roomId ? previous.seq : 0,
+        data.room.lastSeq,
+      ),
+    };
+  }, [data.messages, data.room.lastSeq, merge, announce, client, roomId]);
   useRealtimeChannel(roomChannel(roomId), (event) => {
     if (event.type === "message.updated" || event.type === "message.deleted") {
       if (event.roomId !== roomId) return;
@@ -142,26 +193,8 @@ export function useChannelMessages(
     if (
       event.authorId !== userId &&
       !current.some((row) => row.id === event.id)
-    ) {
-      const buffer = liveBuffer.current;
-      if (!buffer || buffer.roomId !== roomId || !buffer.active) return;
-      buffer.messages.push(message);
-      if (buffer.messages.length === 1)
-        queueMicrotask(() => {
-          if (!buffer.active) return;
-          const confirmed =
-            client.getQueryData<DisplayMessage[]>(roomMessagesKey(roomId)) ??
-            [];
-          setLiveBatch({
-            roomId,
-            messages: buffer.messages.flatMap((received) => {
-              const saved = confirmed.find((row) => row.id === received.id);
-              return saved && !saved.deletedAt ? [saved] : [];
-            }),
-          });
-          buffer.messages = [];
-        });
-    }
+    )
+      announce([message]);
   });
   const rows: DisplayMessage[] = query.data ?? data.messages;
   const messages = useMemo(

@@ -42,7 +42,7 @@ function makeQueue(client: QueryClient) {
         (current = []) =>
           mergeChatMessages(current, [message], entry.message.authorId!),
       );
-      if (entry.roomKind === "dm") {
+      if (entry.roomKind === "dm" || entry.roomKind === "group_dm") {
         const changed = applyDirectActivity(
           client,
           {
@@ -135,7 +135,7 @@ export function ChatQueueConnection() {
 export function useChatSendQueue(
   data: RoomMessageSource,
   send: SendChatMessage,
-  isDirect = false,
+  directKind: false | "dm" | "group_dm" = false,
 ) {
   const client = useQueryClient();
   const queue = getQueue(client);
@@ -161,7 +161,7 @@ export function useChatSendQueue(
     client.setQueryDefaults(roomMessagesKey(roomId), { gcTime: Infinity });
     const entry: QueuedMessage = {
       roomId,
-      ...(isDirect ? { roomKind: "dm" as const } : {}),
+      ...(directKind ? { roomKind: directKind } : {}),
       message,
       send(input) {
         entry.navigationRevision = chatNavRevision(client);

@@ -46,6 +46,7 @@ vi.mock("@/features/chat/actions", () => ({
   editMessage: vi.fn(),
   deleteMessage: vi.fn(),
   setReaction: vi.fn(),
+  respondMessageRequest: vi.fn(async () => ({ ok: true, data: {} })),
   markRoomRead: vi.fn(async ({ seq }: { seq: number }) => ({
     ok: true,
     data: { lastReadSeq: seq },
@@ -53,6 +54,9 @@ vi.mock("@/features/chat/actions", () => ({
 }));
 vi.mock("@/features/chat/client", () => ({ fetchRoomMessagesPage: vi.fn() }));
 vi.mock("@/components/realtime-provider", () => ({
+  useRealtimeScope: () => ({ channels: null, requestedRooms: [] }),
+  usePresenceStatus: () => "unknown",
+  usePresenceStatuses: () => ({}),
   useRealtimeChannel: (
     channel: string | null,
     receive: (event: RealtimeEvent) => void,
@@ -91,8 +95,12 @@ function message(seq: number, authorId = me): ChatMessage {
     clientId: null,
   };
 }
-function view(extra: Partial<DirectMessageView> = {}): DirectMessageView {
+type DmView = Extract<DirectMessageView, { kind: "dm" }>;
+function view(extra: Partial<DmView> = {}): DmView {
   return {
+    kind: "dm",
+    request: null,
+    blockedByMe: false,
     room: {
       id: "room",
       archived: false,
@@ -100,7 +108,12 @@ function view(extra: Partial<DirectMessageView> = {}): DirectMessageView {
       muted: false,
       unreadMentions: 0,
     },
-    other: { userId: peer, name: "이서연", username: "seoyeon.lee" },
+    other: {
+      userId: peer,
+      name: "이서연",
+      username: "seoyeon.lee",
+      sharesSpace: false,
+    },
     user: { id: me, name: "김하은" },
     members: [
       { id: me, name: "김하은", admin: false },
@@ -159,6 +172,54 @@ beforeEach(() => {
 afterEach(() => restore());
 
 describe("shared direct message screen", () => {
+  it("shows the recipient request, allows an accepting reply, and never shows a pending read receipt", () => {
+    setup(view({ request: { role: "recipient" }, peerReadSeq: 3 }));
+    expect(
+      screen.getByText("이서연 님이 메시지를 보내고 싶어 해요"),
+    ).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "메시지" })).toHaveAttribute(
+      "placeholder",
+      "답장하면 요청을 수락해요",
+    );
+    expect(screen.queryByText("읽음")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "수락" })).toBeEnabled();
+  });
+  it("replaces the sender composer at the third message including a just-saved send", async () => {
+    const data = view({
+      request: { role: "sender", sentCount: 2 },
+      peerReadSeq: 3,
+    });
+    const { user, send, ui, rerender } = setup(data);
+    expect(screen.queryByText("읽음")).not.toBeInTheDocument();
+    await user.type(
+      screen.getByRole("combobox", { name: "메시지" }),
+      "세 번째 요청",
+    );
+    await user.click(screen.getByRole("button", { name: "보내기" }));
+    await waitFor(() => expect(send).toHaveBeenCalledOnce());
+    expect(
+      screen.queryByRole("combobox", { name: "메시지" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("상대가 수락하면 더 보낼 수 있어요")).toBeVisible();
+    rerender(ui(view({ request: null, peerReadSeq: 4 })));
+    expect(screen.getByRole("combobox", { name: "메시지" })).toBeVisible();
+    expect(screen.queryByText(/수락하면 대화가/)).not.toBeInTheDocument();
+  });
+  it("identifies only my own block and leaves every other denial generic", () => {
+    const { ui, rerender } = setup(
+      view({ blockedByMe: true, canWrite: false }),
+    );
+    expect(screen.getByText("차단한 사용자예요")).toBeVisible();
+    expect(screen.getByRole("button", { name: "차단 풀기" })).toBeEnabled();
+    rerender(ui(view({ blockedByMe: false, canWrite: false })));
+    expect(
+      screen.getByText("이 대화에는 메시지를 보낼 수 없어요"),
+    ).toBeVisible();
+    expect(screen.queryByText("차단한 사용자예요")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "차단 풀기" }),
+    ).not.toBeInTheDocument();
+  });
   it("uses the common chat viewport with a person heading, DM placeholder and no member list", () => {
     const { container } = setup(view({ messages: [] }));
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -192,7 +253,16 @@ describe("shared direct message screen", () => {
     expect(screen.queryByText(/#이서연/)).not.toBeInTheDocument();
   });
   it("does not show a username placeholder when the peer has none", () => {
-    setup(view({ other: { userId: peer, name: "이서연", username: null } }));
+    setup(
+      view({
+        other: {
+          userId: peer,
+          name: "이서연",
+          username: null,
+          sharesSpace: false,
+        },
+      }),
+    );
     expect(screen.queryByText(/^@/)).not.toBeInTheDocument();
   });
   it("offers only the peer and everyone to either member", async () => {

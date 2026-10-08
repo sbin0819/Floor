@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -22,17 +23,21 @@ import {
   type DisplayMessage,
 } from "./message-state";
 import { MessageRow, type MessageActions } from "./message-row";
+import { foldBlockedMessages } from "../blocked-messages";
 
 const emptyLiveMessages: ChatMessage[] = [];
 const noViewport = () => {};
 const noLoad = async () => {};
+const noBlockedUsers: readonly string[] = [];
 
 const LiveMessages = memo(function LiveMessages({
   messages,
   userId,
+  blockedUserIds,
 }: {
   messages: readonly ChatMessage[];
   userId: string;
+  blockedUserIds: readonly string[];
 }) {
   const seen = useRef(new Set<string>());
   const [announcement, setAnnouncement] = useState({ key: "", text: "" });
@@ -50,10 +55,13 @@ const LiveMessages = memo(function LiveMessages({
       const message = incoming[0]!;
       setAnnouncement({
         key: message.id,
-        text: `${message.authorName ?? "시스템"}: ${Array.from(message.body).slice(0, 100).join("")}`,
+        text:
+          message.authorId && blockedUserIds.includes(message.authorId)
+            ? "차단한 사용자의 새 메시지"
+            : `${message.authorName ?? "시스템"}: ${Array.from(message.body).slice(0, 100).join("")}`,
       });
     }
-  }, [messages, userId]);
+  }, [messages, userId, blockedUserIds]);
   return (
     <span
       role="status"
@@ -70,7 +78,7 @@ const LiveMessages = memo(function LiveMessages({
 });
 
 export const MessageList = memo(function MessageList({
-  messages,
+  messages: allMessages,
   channelName,
   now,
   userId,
@@ -90,6 +98,7 @@ export const MessageList = memo(function MessageList({
   jumpToId,
   introduction,
   readReceiptMessageId,
+  blockedUserIds = noBlockedUsers,
 }: {
   messages: readonly DisplayMessage[];
   channelName: string;
@@ -115,7 +124,18 @@ export const MessageList = memo(function MessageList({
   jumpToId?: string | null;
   introduction?: ReactNode;
   readReceiptMessageId?: string | null;
+  blockedUserIds?: readonly string[];
 }) {
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  useLayoutEffect(() => {
+    setExpanded((previous) => (previous.size ? new Set() : previous));
+  }, []);
+  const { rows: messages, groups } = useMemo(
+    () => foldBlockedMessages(allMessages, blockedUserIds, expanded),
+    [allMessages, blockedUserIds, expanded],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   // 읽음 응답은 경계선을 지우지 않는다. 방이나 복구 세대가 바뀔 때만 다시 만든다.
   const [unreadSeq, setUnreadSeq] = useState(firstUnreadSeq);
@@ -172,15 +192,22 @@ export const MessageList = memo(function MessageList({
   const atBottom =
     messages.length === 0 ||
     visibleRows.some((row) => row.index === messages.length - 1);
-  const lastSeq = messages.reduce(
+  const lastSeq = allMessages.reduce(
     (seq, message) => Math.max(seq, message.seq),
     0,
   );
   const visibleSeq = visibleRows.reduce(
-    (seq, row) => Math.max(seq, messages[row.index]!.seq),
+    (seq, row) =>
+      Math.max(
+        seq,
+        groups.get(messages[row.index]!.id)?.lastSeq ??
+          messages[row.index]!.seq,
+      ),
     0,
   );
-  const confirmedCount = messages.filter((message) => !message.delivery).length;
+  const confirmedCount = allMessages.filter(
+    (message) => !message.delivery,
+  ).length;
 
   const focusRow = (index: number) => {
     const message = messages[index];
@@ -217,12 +244,15 @@ export const MessageList = memo(function MessageList({
   }, [focusMessageId, messages, virtualizer]);
   useEffect(() => {
     if (!jumpId) return;
-    const index = messages.findIndex(({ id }) => id === jumpId);
+    const index = messages.findIndex(
+      ({ id }) => id === jumpId || groups.get(id)?.ids.includes(jumpId),
+    );
     if (index >= 0) {
-      setFocusedId(jumpId);
-      setPendingFocus(jumpId);
+      const targetId = messages[index]!.id;
+      setFocusedId(targetId);
+      setPendingFocus(targetId);
       virtualizer.scrollToIndex(index, { align: "center" });
-      setHighlighted(jumpId);
+      setHighlighted(targetId);
       setJumpId(null);
     } else if (!hasMore || confirmedCount >= 500) {
       setJumpError("원문이 너무 멀리 있어요");
@@ -230,6 +260,7 @@ export const MessageList = memo(function MessageList({
     } else if (!loadingOlder && !historyError) void onLoadOlder(500);
   }, [
     jumpId,
+    groups,
     messages,
     hasMore,
     confirmedCount,
@@ -247,7 +278,11 @@ export const MessageList = memo(function MessageList({
   useLayoutEffect(() => {
     if (initialized || !height) return;
     if (unreadSeq !== null) {
-      const index = messages.findIndex((message) => message.seq === unreadSeq);
+      const index = messages.findIndex(
+        (message) =>
+          message.seq === unreadSeq ||
+          groups.get(message.id)?.seqs.includes(unreadSeq),
+      );
       if (index >= 0) {
         const start = virtualizer.getOffsetForIndex(index, "start")?.[0];
         if (start === undefined) return;
@@ -262,6 +297,7 @@ export const MessageList = memo(function MessageList({
     setInitialized(true);
   }, [
     confirmedCount,
+    groups,
     hasMore,
     height,
     initialized,
@@ -275,13 +311,18 @@ export const MessageList = memo(function MessageList({
     const seekingUnread =
       !initialized &&
       unreadSeq !== null &&
-      !messages.some((message) => message.seq === unreadSeq) &&
+      !messages.some(
+        (message) =>
+          message.seq === unreadSeq ||
+          groups.get(message.id)?.seqs.includes(unreadSeq),
+      ) &&
       confirmedCount < 500;
     const currentOffset = scrollRef.current?.scrollTop ?? offset;
     if (seekingUnread) void onLoadOlder(500);
     else if (initialized && currentOffset <= 200) void onLoadOlder();
   }, [
     confirmedCount,
+    groups,
     hasMore,
     historyError,
     initialized,
@@ -305,7 +346,7 @@ export const MessageList = memo(function MessageList({
 
   const newBelow =
     initialized && !atBottom
-      ? messages.filter(
+      ? allMessages.filter(
           (message) =>
             !message.delivery &&
             message.authorId !== userId &&
@@ -315,7 +356,11 @@ export const MessageList = memo(function MessageList({
   return (
     <TooltipProvider>
       <div className="relative min-h-0 flex-1">
-        <LiveMessages messages={liveMessages} userId={userId} />
+        <LiveMessages
+          messages={liveMessages}
+          userId={userId}
+          blockedUserIds={blockedUserIds}
+        />
         {jumpError && (
           <p
             role="status"
@@ -390,7 +435,13 @@ export const MessageList = memo(function MessageList({
                       chatDate(previous.createdAt) !==
                         chatDate(message.createdAt)
                     }
-                    unread={message.seq === unreadSeq}
+                    unread={
+                      message.seq === unreadSeq ||
+                      (unreadSeq !== null &&
+                        Boolean(
+                          groups.get(message.id)?.seqs.includes(unreadSeq),
+                        ))
+                    }
                     now={now}
                     onRetry={onRetry}
                     onRemove={onRemove}
@@ -431,6 +482,10 @@ export const MessageList = memo(function MessageList({
                         : undefined
                     }
                     read={readReceiptMessageId === message.id}
+                    foldedCount={groups.get(message.id)?.ids.length}
+                    onExpand={() =>
+                      setExpanded((old) => new Set([...old, message.id]))
+                    }
                   />
                 </div>
               );

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { cn } from "cn";
 import type { DirectMessageNav } from "../types";
 import { LinkPending } from "@/components/link-pending";
+import { groupDisplayName } from "../group-name";
 
 export function DirectMessageList({
   rows,
@@ -30,6 +31,15 @@ export function DirectMessageList({
       {rows.length ? (
         <ul className="space-y-1">
           {rows.slice(0, limit).map((room) => {
+            const group = room.kind === "group_dm" ? room : null;
+            const name =
+              room.kind === "group_dm"
+                ? groupDisplayName(
+                    room.name,
+                    room.members.map((member) => member.name),
+                    room.memberCount - 1,
+                  )
+                : room.other.name;
             const count = room.muted ? room.unreadMentions : room.unreadCount;
             const selected = pathname === `/dm/${room.roomId}`;
             return (
@@ -37,7 +47,7 @@ export function DirectMessageList({
                 <Link
                   href={`/dm/${room.roomId}`}
                   aria-current={selected ? "page" : undefined}
-                  aria-label={`${room.other.name}${count > 0 ? `, 읽지 않은 메시지 ${count}개` : ""}`}
+                  aria-label={`${name}${group ? `, ${group.memberCount}명` : ""}${count > 0 ? `, 읽지 않은 메시지 ${count}개` : ""}`}
                   className={cn(
                     "relative flex min-h-11 items-center gap-2 rounded-sm px-3 text-sm hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring",
                     selected && "bg-sidebar-accent",
@@ -46,13 +56,36 @@ export function DirectMessageList({
                   )}
                 >
                   <LinkPending />
-                  <span
-                    aria-hidden="true"
-                    className="relative flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs"
-                  >
-                    {room.other.name.slice(0, 1)}
+                  {group ? (
+                    <span
+                      aria-hidden="true"
+                      className="relative h-8 w-9 shrink-0"
+                    >
+                      {group.members.slice(0, 2).map((member, index) => (
+                        <span
+                          key={member.userId}
+                          className={`absolute flex size-6 items-center justify-center rounded-full border-2 border-sidebar bg-muted text-xs ${index ? "right-0 bottom-0" : "top-0 left-0"}`}
+                        >
+                          {Array.from(member.name)[0]}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="relative flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs"
+                    >
+                      {Array.from(name)[0]}
+                    </span>
+                  )}
+                  <span className="relative min-w-0 flex-1">
+                    <span className="block truncate">{name}</span>
+                    {group && (
+                      <span className="block text-xs font-normal text-muted-foreground tabular-nums">
+                        {group.memberCount}명
+                      </span>
+                    )}
                   </span>
-                  <span className="relative truncate">{room.other.name}</span>
                   {count > 0 && (
                     <span
                       aria-hidden="true"

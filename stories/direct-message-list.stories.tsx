@@ -4,6 +4,7 @@ import type { DirectMessageNav } from "@/features/chat/types";
 
 const rows: DirectMessageNav[] = ["이서연", "최민준", "박지훈"].map(
   (name, index) => ({
+    kind: "dm",
     roomId: `73000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
     other: {
       userId: `73000000-0000-4000-8000-${String(index + 11).padStart(12, "0")}`,

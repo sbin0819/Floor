@@ -53,6 +53,9 @@ vi.mock("@/features/chat/actions", () => ({
 }));
 vi.mock("@/features/chat/client", () => ({ fetchRoomMessagesPage: vi.fn() }));
 vi.mock("@/components/realtime-provider", () => ({
+  useRealtimeScope: () => ({ channels: null, requestedRooms: [] }),
+  usePresenceStatus: () => "unknown",
+  usePresenceStatuses: () => ({}),
   useRealtimeChannel: (_channel: string, onEvent: typeof realtime.event) => {
     realtime.event = onEvent;
   },
@@ -131,6 +134,12 @@ function setup(data = view(), send: SendChatMessage = vi.fn()) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  client.setQueryData(["chat", "nav"], {
+    spaces: [],
+    directMessages: [],
+    myStatus: "online",
+    blockedUserIds: [],
+  });
   const renderView = (incoming: ChannelView) => (
     <QueryClientProvider client={client}>
       <ChannelScreen data={incoming} send={send} />
@@ -203,6 +212,67 @@ describe("chat message composer", () => {
 });
 
 describe("chat channel presentation", () => {
+  it("merges and announces a new system row from a server refresh without an extra message event", async () => {
+    const initial = view();
+    const { update, container } = setup(initial);
+    const row = message({
+      id: "system-added",
+      seq: initial.room.lastSeq + 1,
+      authorId: null,
+      authorName: null,
+      kind: "system",
+      systemData: { type: "member_left", name: "이서연" },
+      body: "이서연 님이 나갔어요",
+    });
+    const refreshed = {
+      ...initial,
+      room: { ...initial.room, lastSeq: row.seq },
+      messages: [...initial.messages, row],
+    };
+    update(refreshed);
+    await waitFor(() =>
+      expect(
+        container.querySelector("[data-chat-announcement]"),
+      ).toHaveTextContent("시스템: 이서연 님이 나갔어요"),
+    );
+    expect(screen.getByRole("article", { name: /시스템/ })).toHaveTextContent(
+      "이서연 님이 나갔어요",
+    );
+    const announcement = container.querySelector(
+      "[data-chat-announcement]",
+    )!.firstChild;
+    update({ ...refreshed, messages: [...refreshed.messages] });
+    await act(async () => {});
+    expect(
+      container.querySelector("[data-chat-announcement]")!.firstChild,
+    ).toBe(announcement);
+  });
+  it("renders its fixed header and stable composer while block metadata is still unknown", async () => {
+    const client = new QueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <ChannelScreen data={view()} send={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "일반" })).toBeVisible();
+    const input = screen.getByRole("combobox", { name: "메시지" });
+    expect(
+      screen.getByRole("status", {
+        name: "메시지 표시 정보를 불러오고 있어요",
+      }),
+    ).toBeVisible();
+    expect(screen.queryByText("안녕하세요")).not.toBeInTheDocument();
+    await act(async () => {
+      client.setQueryData(["chat", "nav"], {
+        spaces: [],
+        directMessages: [],
+        myStatus: "online",
+        blockedUserIds: [],
+      });
+    });
+    expect(await screen.findByText("안녕하세요")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "메시지" })).toBe(input);
+  });
   it("offers the current channel mute setting in its header and refreshes only after success", async () => {
     setup();
     fireEvent.pointerDown(
