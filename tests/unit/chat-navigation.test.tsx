@@ -37,9 +37,18 @@ const spaces: ChatSpaceNav[] = [
     kind: "team",
     name: "디자인팀",
     initial: "디",
+    unread: false,
     channels: [
-      { id: "22222222-2222-4222-8222-222222222222", name: "일반" },
-      { id: "33333333-3333-4333-8333-333333333333", name: "자료" },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "일반",
+        unread: false,
+      },
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        name: "자료",
+        unread: false,
+      },
     ],
   },
   {
@@ -47,6 +56,7 @@ const spaces: ChatSpaceNav[] = [
     kind: "team",
     name: "그로스팀",
     initial: "그",
+    unread: false,
     channels: [],
   },
 ];
@@ -55,11 +65,14 @@ const room = space.channels[0]!;
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.pathname = "/";
-  vi.stubGlobal("ResizeObserver", class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  });
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
 });
 afterEach(() => {
   vi.restoreAllMocks();

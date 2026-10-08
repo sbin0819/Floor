@@ -53,6 +53,8 @@ const data: ChannelView = {
     },
   ],
   canWrite: true,
+  lastReadSeq: null,
+  firstUnreadSeq: null,
   now: "2026-10-08T03:00:00Z",
 };
 function ChannelStory({

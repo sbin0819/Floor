@@ -14,7 +14,8 @@ export type ChatSpaceNav = {
   kind: "team";
   name: string;
   initial: string;
-  channels: { id: string; name: string }[];
+  unread: boolean;
+  channels: { id: string; name: string; unread: boolean }[];
 };
 
 export type ChannelView = {
@@ -30,6 +31,8 @@ export type ChannelView = {
   user: { id: string; name: string };
   members: { id: string; name: string; admin: boolean }[];
   messages: ChatMessage[];
+  lastReadSeq: number | null;
+  firstUnreadSeq: number | null;
   canWrite: boolean;
   now: string;
 };

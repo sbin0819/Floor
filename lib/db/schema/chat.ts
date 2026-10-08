@@ -5,6 +5,7 @@ import {
   check,
   index,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -104,5 +105,25 @@ export const messages = pgTable(
       "messages_body_length",
       sql`char_length(${table.body}) BETWEEN 1 AND 4000`,
     ),
+  ],
+);
+
+export const chatRoomReads = pgTable(
+  "chat_room_reads",
+  {
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    lastReadSeq: bigint("last_read_seq", { mode: "number" }).notNull(),
+    muted: boolean("muted").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.roomId, table.userId] }),
+    check("chat_room_reads_seq_valid", sql`${table.lastReadSeq} >= 0`),
   ],
 );

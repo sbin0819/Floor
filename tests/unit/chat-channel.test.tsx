@@ -71,6 +71,8 @@ function view(overrides: Partial<ChannelView> = {}): ChannelView {
     ],
     messages: [message()],
     canWrite: true,
+    lastReadSeq: null,
+    firstUnreadSeq: null,
     now,
     ...overrides,
   };

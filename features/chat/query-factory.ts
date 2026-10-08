@@ -31,12 +31,19 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
             kind: "team",
             name: row.spaceName,
             initial: Array.from(row.spaceName)[0] ?? "",
+            unread: false,
             channels: [],
           };
           spaces.set(space.id, space);
         }
-        if (row.roomId && row.roomName)
-          space.channels.push({ id: row.roomId, name: row.roomName });
+        if (row.roomId && row.roomName) {
+          space.channels.push({
+            id: row.roomId,
+            name: row.roomName,
+            unread: row.unread,
+          });
+          space.unread ||= row.unread;
+        }
       }
       return [...spaces.values()];
     },
@@ -76,6 +83,8 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           createdAt: message.createdAt.toISOString(),
         })),
         members,
+        lastReadSeq: room.lastReadSeq,
+        firstUnreadSeq: room.firstUnreadSeq,
         canWrite: writableRoom(room),
         now: (dependencies.now?.() ?? new Date()).toISOString(),
       };

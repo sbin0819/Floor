@@ -4,6 +4,7 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   chatRooms,
+  chatRoomReads,
   chatSpaces,
   messages,
   teamMembers,
@@ -11,6 +12,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { readableTeamSpace } from "./chat-access";
+import { firstUnreadSequence } from "./chat-reads";
 import type { DalDatabase } from "./database";
 
 export function listChatNav(userId: string, database: DalDatabase = getDb()) {
@@ -20,6 +22,7 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
       spaceName: teams.name,
       roomId: chatRooms.id,
       roomName: chatRooms.name,
+      unread: sql<boolean>`${firstUnreadSequence(userId)} is not null`,
     })
     .from(chatSpaces)
     .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
@@ -30,6 +33,13 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
         eq(chatRooms.spaceId, chatSpaces.id),
         eq(chatRooms.kind, "text"),
         isNull(chatRooms.archivedAt),
+      ),
+    )
+    .leftJoin(
+      chatRoomReads,
+      and(
+        eq(chatRoomReads.roomId, chatRooms.id),
+        eq(chatRoomReads.userId, userId),
       ),
     )
     .where(readableTeamSpace(userId))

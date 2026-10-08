@@ -2,7 +2,14 @@ import "server-only";
 
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { chatRooms, chatSpaces, teamMembers, teams } from "@/lib/db/schema";
+import {
+  chatRoomReads,
+  chatRooms,
+  chatSpaces,
+  teamMembers,
+  teams,
+} from "@/lib/db/schema";
+import { firstUnreadSequence } from "./chat-reads";
 import type { DalDatabase } from "./database";
 
 // 같은 JOIN 조건을 조회와 액션·토큰에 사용한다. 운영자 권한은 팀 소속을 대신하지 않는다.
@@ -30,12 +37,21 @@ export async function canReadRoom(
       adminOnly: chatRooms.adminOnly,
       archivedAt: chatRooms.archivedAt,
       lastSeq: chatRooms.lastSeq,
+      lastReadSeq: chatRoomReads.lastReadSeq,
+      firstUnreadSeq: firstUnreadSequence(userId),
       role: teamMembers.role,
     })
     .from(chatRooms)
     .innerJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
     .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
     .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
+    .leftJoin(
+      chatRoomReads,
+      and(
+        eq(chatRoomReads.roomId, chatRooms.id),
+        eq(chatRoomReads.userId, userId),
+      ),
+    )
     .where(
       and(
         eq(chatRooms.id, roomId),
@@ -45,6 +61,21 @@ export async function canReadRoom(
     )
     .limit(1);
   return room ?? null;
+}
+
+export async function canReadSpace(
+  userId: string,
+  spaceId: string,
+  database: DalDatabase = getDb(),
+) {
+  const [space] = await database
+    .select({ id: chatSpaces.id, teamId: teams.id })
+    .from(chatSpaces)
+    .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
+    .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
+    .where(and(eq(chatSpaces.id, spaceId), readableTeamSpace(userId)))
+    .limit(1);
+  return space ?? null;
 }
 
 export function writableRoom(
