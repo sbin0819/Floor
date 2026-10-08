@@ -11,7 +11,11 @@ import {
   formatBookingTime,
 } from "@/features/bookings/format";
 import { useFloorSelection } from "./branch-workspace";
-import { useBookingAttendeeCount, useBookingRange } from "./use-booking-draft";
+import {
+  useBookingAttendeeCount,
+  useBookingRange,
+  useBookingParticipants,
+} from "./use-booking-draft";
 import { FloorNavigationLink } from "./floor-navigation-link";
 import { useFloorPeople } from "./floor-view";
 import { effectiveAttendeeCount } from "../attendee-count";
@@ -19,6 +23,10 @@ import { effectiveAttendeeCount } from "../attendee-count";
 export function BookingStrip({ children }: { children: ReactNode }) {
   const workspace = useFloorSelection();
   const { people } = useFloorPeople();
+  const participants = useBookingParticipants(
+    workspace?.draftStore,
+    workspace?.bookingScope,
+  );
   const sharedRange = useBookingRange(
     workspace?.draftStore,
     workspace?.bookingScope,
@@ -91,6 +99,8 @@ export function BookingStrip({ children }: { children: ReactNode }) {
                 · {duration >= 60 ? `${Math.floor(duration / 60)}시간` : ""}
                 {duration % 60 ? `${duration % 60}분` : ""}
                 {attendeeCount !== null && ` · ${attendeeCount}명`}
+                {participants.length > 0 &&
+                  ` · 참석자 ${participants.length}명`}
               </>
             ) : (
               "시간을 골라 주세요"

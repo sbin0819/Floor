@@ -36,6 +36,11 @@ import {
 } from "./booking-form-fields";
 import { BookingFormLayout } from "./booking-form-layout";
 import { useFloorPeople } from "./floor-view";
+import { BookingParticipantsField } from "./booking-participants-field";
+import {
+  MAX_PARTICIPANTS,
+  type BookingParticipantDraft,
+} from "../participants";
 
 export function BookingForm({
   data,
@@ -86,6 +91,10 @@ export function BookingForm({
   const [localAttendeeCountTouched, setLocalAttendeeCountTouched] =
     useState(false);
   const attendeeInputRef = useRef<HTMLInputElement>(null);
+  const participantInputRef = useRef<HTMLInputElement>(null);
+  const [localParticipants, setLocalParticipants] = useState<
+    BookingParticipantDraft[]
+  >([]);
   const [expanded, setExpanded] = useState(false);
   const [localActorId, setLocalActorId] = useState(
     data.actors[0]?.teamId ?? "personal",
@@ -93,6 +102,11 @@ export function BookingForm({
   const title = workspace ? sharedDraft.title : localTitle;
   const actorId = workspace ? sharedDraft.actorId : localActorId;
   const showAttendeeCount = data.space.bookable && data.space.capacity !== 1;
+  const participants = showAttendeeCount
+    ? workspace
+      ? sharedDraft.participants
+      : localParticipants
+    : [];
   const attendeeCount = showAttendeeCount
     ? effectiveAttendeeCount(
         workspace
@@ -105,7 +119,44 @@ export function BookingForm({
         data.space.capacity,
       )
     : null;
-  const attendeeError = attendeeCountError(attendeeCount, data.space.capacity);
+  const attendeeError = attendeeCountError(
+    attendeeCount,
+    data.space.capacity,
+    participants.length + 1,
+  );
+  const maxParticipants = Math.max(
+    0,
+    Math.min(
+      MAX_PARTICIPANTS,
+      (data.space.capacity ?? MAX_PARTICIPANTS + 1) - 1,
+    ),
+  );
+  const participantError =
+    participants.length > maxParticipants
+      ? `참석자가 정원(${data.space.capacity}명)보다 많아요`
+      : undefined;
+  const setParticipants = (next: BookingParticipantDraft[]) => {
+    const raisedCount =
+      next.length > participants.length &&
+      attendeeCount !== null &&
+      attendeeCount < next.length + 1
+        ? next.length + 1
+        : null;
+    if (workspace)
+      workspace.draftStore.getState().changeDraft(scope, {
+        participants: next,
+        ...(raisedCount !== null
+          ? { attendeeCount: raisedCount, attendeeCountTouched: true }
+          : {}),
+      });
+    else {
+      setLocalParticipants(next);
+      if (raisedCount !== null) {
+        setLocalAttendeeCount(raisedCount);
+        setLocalAttendeeCountTouched(true);
+      }
+    }
+  };
   const setAttendeeCount = (value: number | null) => {
     if (workspace)
       workspace.draftStore.getState().changeDraft(scope, {
@@ -167,6 +218,7 @@ export function BookingForm({
           setLocalTitle("");
           setLocalAttendeeCount(null);
           setLocalAttendeeCountTouched(false);
+          setLocalParticipants([]);
         }
         setExpanded(false);
       }
@@ -177,7 +229,7 @@ export function BookingForm({
   if (previousErrors !== mutation.fieldErrors) {
     setPreviousErrors(mutation.fieldErrors);
     if (
-      ["start", "end", "title", "attendeeCount"].some(
+      ["start", "end", "title", "attendeeCount", "participants"].some(
         (key) => mutation.fieldErrors[key]?.length,
       )
     )
@@ -186,6 +238,8 @@ export function BookingForm({
   useLayoutEffect(() => {
     if (mutation.fieldErrors.attendeeCount?.length)
       attendeeInputRef.current?.focus();
+    else if (mutation.fieldErrors.participants?.length)
+      participantInputRef.current?.focus();
   }, [mutation.fieldErrors, expanded]);
   const disabled =
     mutation.pending || !data.openHours || !data.space.bookable || !actor;
@@ -230,6 +284,7 @@ export function BookingForm({
             {duration >= 60 ? `${Math.floor(duration / 60)}시간` : ""}
             {duration % 60 ? ` ${duration % 60}분` : ""}
             {attendeeCount !== null && ` · ${attendeeCount}명`}
+            {participants.length > 0 && ` · 참석자 ${participants.length}명`}
           </span>
         </>
       ) : (
@@ -275,10 +330,23 @@ export function BookingForm({
       inputRef={attendeeInputRef}
       value={attendeeCount}
       capacity={data.space.capacity}
+      minimum={participants.length + 1}
       disabled={disabled}
       error={mutation.fieldErrors.attendeeCount?.[0]}
       className={variant === "strip" ? "min-w-36" : undefined}
       onChange={setAttendeeCount}
+    />
+  );
+  const participantsInput = showAttendeeCount && (
+    <BookingParticipantsField
+      id={`${id}-participants`}
+      variant={variant}
+      value={participants}
+      onChange={setParticipants}
+      maxParticipants={maxParticipants}
+      disabled={disabled}
+      inputRef={participantInputRef}
+      error={mutation.fieldErrors.participants?.[0] ?? participantError}
     />
   );
   const actorInput = data.hasTeams && (
@@ -301,7 +369,12 @@ export function BookingForm({
       className={
         variant === "panel" ? "min-w-0 flex-1" : "col-span-2 lg:w-auto"
       }
-      disabled={disabled || !selected || Boolean(attendeeError)}
+      disabled={
+        disabled ||
+        !selected ||
+        Boolean(attendeeError) ||
+        Boolean(participantError)
+      }
     >
       {mutation.pending && (
         <LoaderCircle
@@ -342,6 +415,7 @@ export function BookingForm({
       summary={summary}
       times={times}
       attendeeInput={attendeeInput}
+      participantsInput={participantsInput}
       titleInput={titleInput}
       actorInput={actorInput}
       submitButton={submitButton}
@@ -354,7 +428,8 @@ export function BookingForm({
           !selectedStart ||
           !selectedEnd ||
           disabled ||
-          attendeeError
+          attendeeError ||
+          participantError
         )
           return;
         submitted.current = {
@@ -370,6 +445,14 @@ export function BookingForm({
           teamId: actor.teamId,
           title,
           attendeeCount,
+          ...(participants.length > 0
+            ? {
+                participants: participants.map(({ userId, email }) => ({
+                  userId,
+                  ...(email ? { email } : {}),
+                })),
+              }
+            : {}),
         });
       }}
       timeline={

@@ -1,18 +1,21 @@
 import { createStore } from "zustand/vanilla";
 import type { BookingSelection, FloorBookingSelection } from "./selection";
 import type { DeskPart } from "./desk-parts";
+import type { BookingParticipantDraft } from "./participants";
 
 export type BookingDraft = Readonly<{
   title: string;
   actorId: string | null;
   attendeeCount: number | null;
   attendeeCountTouched: boolean;
+  participants: readonly BookingParticipantDraft[];
 }>;
 export const emptyBookingDraft: BookingDraft = {
   title: "",
   actorId: null,
   attendeeCount: null,
   attendeeCountTouched: false,
+  participants: [],
 };
 
 export function bookingDraftScope(
@@ -68,7 +71,8 @@ export function createBookingDraftStore() {
         return draft.title === state.draft.title &&
           draft.actorId === state.draft.actorId &&
           draft.attendeeCount === state.draft.attendeeCount &&
-          draft.attendeeCountTouched === state.draft.attendeeCountTouched
+          draft.attendeeCountTouched === state.draft.attendeeCountTouched &&
+          draft.participants === state.draft.participants
           ? state
           : { draft };
       }),
@@ -88,13 +92,15 @@ export function createBookingDraftStore() {
         state.scope === scope &&
         (state.draft.title !== "" ||
           state.draft.attendeeCount !== null ||
-          state.draft.attendeeCountTouched)
+          state.draft.attendeeCountTouched ||
+          state.draft.participants.length > 0)
           ? {
               draft: {
                 ...state.draft,
                 title: "",
                 attendeeCount: null,
                 attendeeCountTouched: false,
+                participants: emptyBookingDraft.participants,
               },
             }
           : state,

@@ -25,6 +25,17 @@ export function useBookingRange(store?: BookingDraftStore, scope?: string) {
   );
 }
 
+export function useBookingParticipants(
+  store?: BookingDraftStore,
+  scope?: string,
+) {
+  return useStore(useDraftStore(store), (state) =>
+    state.scope === scope
+      ? state.draft.participants
+      : emptyBookingDraft.participants,
+  );
+}
+
 export function useBookingAttendeeCount(
   store?: BookingDraftStore,
   scope?: string,

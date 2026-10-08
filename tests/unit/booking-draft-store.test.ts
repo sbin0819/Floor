@@ -147,6 +147,7 @@ describe("scoped booking draft store", () => {
       actorId: "team",
       attendeeCount: null,
       attendeeCountTouched: false,
+      participants: [],
     });
   });
 
@@ -198,5 +199,31 @@ describe("scoped booking draft store", () => {
     store.getState().changeDesk(first, null);
     store.getState().changeDeskPart(first, "pm");
     expect(store.getState()).toBe(selected);
+  });
+
+  it("keeps participants scope-bound and clears external proof on successful booking or scope change", () => {
+    const store = createBookingDraftStore();
+    const participants = [
+      {
+        userId: "guest",
+        name: "김하은",
+        sharedTeamNames: [],
+        maskedEmail: "ha•••@floor.example",
+        email: "haneul@floor.example",
+      },
+    ];
+    store.getState().activate(first);
+    store.getState().changeDraft(first, { participants, actorId: "team" });
+    expect(store.getState().draft.participants).toBe(participants);
+    store.getState().clearBookingContent(second);
+    expect(store.getState().draft.participants).toBe(participants);
+    store.getState().clearBookingContent(first);
+    expect(store.getState().draft.participants).toEqual([]);
+    expect(store.getState().draft.actorId).toBe("team");
+    store.getState().changeDraft(first, { participants });
+    store.getState().activate(second);
+    expect(store.getState().draft.participants).toEqual([]);
+    store.getState().changeDraft(first, { participants });
+    expect(store.getState().draft.participants).toEqual([]);
   });
 });

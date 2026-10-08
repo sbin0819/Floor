@@ -21,6 +21,7 @@ export function BookingFormLayout({
   summary,
   times,
   attendeeInput,
+  participantsInput,
   titleInput,
   actorInput,
   submitButton,
@@ -42,6 +43,7 @@ export function BookingFormLayout({
   summary: ReactNode;
   times: ReactNode;
   attendeeInput: ReactNode;
+  participantsInput: ReactNode;
   titleInput: ReactNode;
   actorInput: ReactNode;
   submitButton: ReactNode;
@@ -113,6 +115,7 @@ export function BookingFormLayout({
                       {times}
                       {attendeeInput}
                       {titleInput}
+                      {participantsInput}
                     </div>
                     <div className="flex items-center gap-2">
                       {actorInput}
@@ -129,6 +132,7 @@ export function BookingFormLayout({
                 {times}
                 {actorInput}
                 {attendeeInput}
+                {participantsInput}
                 {titleInput}
                 {submitButton}
               </>
