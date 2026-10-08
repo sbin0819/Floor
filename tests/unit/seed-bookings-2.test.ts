@@ -100,13 +100,51 @@ describe("independent booking round two seed source", () => {
     );
   });
 
-  it("validates future section shapes but defers their reference checks to their instructions", () => {
+  it("validates desk references while participant references are still deferred", () => {
     const source = structuredClone(bookingFile);
     source.participants[0]!.bookingId = crypto.randomUUID();
-    source.deskBookings[0]!.deskId = crypto.randomUUID();
-    source.deskBlocks[0]!.spaceId = crypto.randomUUID();
     expect(parseSeedBookings2(source, seed).deskBookings).toHaveLength(9);
     source.deskBookings[0]!.part = "unknown";
     expect(() => parseSeedBookings2(source, seed)).toThrow(z.ZodError);
+  });
+
+  it.each([
+    "desk",
+    "block",
+    "user",
+    "creator",
+    "team",
+    "duplicate",
+    "same-user-overlap",
+    "same-seat-overlap",
+    "block-range",
+  ])("rejects invalid desk seed %s", (kind) => {
+    const source = structuredClone(bookingFile);
+    if (kind === "desk")
+      source.deskBookings[0]!.deskId = seed.spaces.find(
+        ({ type }) => type === "meeting_room",
+      )!.id;
+    if (kind === "block") source.deskBlocks[0]!.spaceId = crypto.randomUUID();
+    if (kind === "user") source.deskBookings[0]!.userKey = "missing";
+    if (kind === "creator") source.deskBlocks[0]!.createdByKey = "missing";
+    if (kind === "team")
+      Object.assign(source.deskBookings[0]!, { teamId: crypto.randomUUID() });
+    if (kind === "duplicate") source.deskBookings[0]!.id = seed.bookings[0]!.id;
+    if (kind === "same-user-overlap")
+      source.deskBookings[1]!.userKey = source.deskBookings[0]!.userKey;
+    if (kind === "same-seat-overlap")
+      source.deskBookings[1]!.deskId = source.deskBookings[0]!.deskId;
+    if (kind === "block-range") source.deskBlocks[0]!.endDayOffset = 0;
+    expect(() => parseSeedBookings2(source, seed)).toThrow(z.ZodError);
+  });
+
+  it("permits one user to occupy adjacent halves but rejects repeated complete-day references", () => {
+    const source = structuredClone(bookingFile);
+    source.deskBookings[0]!.part = "am";
+    source.deskBookings[1]!.part = "pm";
+    source.deskBookings[1]!.userKey = source.deskBookings[0]!.userKey;
+    expect(parseSeedBookings2(source, seed).deskBookings).toHaveLength(9);
+    source.deskBookings[1]!.part = "day";
+    expect(() => parseSeedBookings2(source, seed)).toThrow(/겹쳐요/);
   });
 });

@@ -17,6 +17,7 @@ import {
 } from "@/lib/dal/seed-photos";
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
+import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
 import { SeedError } from "@/lib/seed/errors";
 import { loadSeedPhotos } from "@/lib/seed/photos";
 import { getOperatingDate } from "@/lib/time/open-hours";
@@ -59,7 +60,7 @@ export async function runSeed({
     );
     if (branchIds !== undefined) {
       const ids = validateSeedBranchIds(branchIds, data, resetPasswords);
-      const scope = selectSeedBranches(data, photos, ids);
+      const scope = selectSeedBranches(data, photos, ids, bookingExtras);
       return await withTransaction(
         (database) => addSeedBranches(scope, database, now, bookingExtras),
         db,
@@ -177,8 +178,8 @@ export async function runSeed({
         );
       };
       await seedDal.clearSeedSchedule(
-        data.bookings.map(({ id }) => id),
-        data.spaceBlocks.map(({ id }) => id),
+        [...data.bookings, ...bookingExtras.deskBookings].map(({ id }) => id),
+        [...data.spaceBlocks, ...bookingExtras.deskBlocks].map(({ id }) => id),
         database,
       );
       for (const {
@@ -242,6 +243,15 @@ export async function runSeed({
           database,
         );
       }
+      const deskResult = await insertSeedDeskSchedule({
+        data,
+        extras: bookingExtras,
+        userIds,
+        now,
+        database,
+      });
+      const timeBookings = data.bookings.length - skippedBookings;
+      skippedBookings += deskResult.skippedBookings;
       return {
         counts: {
           users: data.users.length,
@@ -253,8 +263,8 @@ export async function runSeed({
           branchStaff: data.branchStaff.length,
           accessGrants: data.accessGrants.length,
           floorPlans: plans,
-          bookings: data.bookings.length - skippedBookings,
-          spaceBlocks: data.spaceBlocks.length,
+          bookings: timeBookings + deskResult.bookings,
+          spaceBlocks: data.spaceBlocks.length + deskResult.spaceBlocks,
           spacePhotos: photos.spacePhotos.length,
           branchCovers: photos.branchCovers.length,
         },

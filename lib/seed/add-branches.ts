@@ -8,6 +8,7 @@ import { getOperatingDate } from "@/lib/time/open-hours";
 import { zonedDateTime } from "@/lib/time/zoned";
 import { loadSeedData } from "./data";
 import { loadSeedBookings2, type SeedBookings2Data } from "./bookings-2";
+import { insertSeedDeskSchedule, scopedDeskSchedule } from "./desk-schedule";
 import { SeedError } from "./errors";
 import { loadSeedPhotos } from "./photos";
 import type { SeedResult } from "./run-seed";
@@ -34,7 +35,11 @@ function verifyRows<E extends { id: string }, A extends { id: string }>(
   }
 }
 
-async function prepareAddition(scope: SeedBranchScope, db: DalDatabase) {
+async function prepareAddition(
+  scope: SeedBranchScope,
+  db: DalDatabase,
+  bookingExtras?: SeedBookings2Data,
+) {
   const rows = await readSeedScopeRows(scope, db);
   const userIds = new Map<string, string>();
   for (const account of scope.data.users) {
@@ -140,7 +145,12 @@ async function prepareAddition(scope: SeedBranchScope, db: DalDatabase) {
     (exists ? skippedBranchIds : addedBranchIds).push(branch.id);
   }
   return {
-    addition: selectSeedBranches(scope.data, scope.photos, addedBranchIds),
+    addition: selectSeedBranches(
+      scope.data,
+      scope.photos,
+      addedBranchIds,
+      bookingExtras,
+    ),
     userIds,
     addedBranchIds,
     skippedBranchIds,
@@ -157,13 +167,23 @@ export async function preflightSeedBranches({
 }) {
   const data = loadSeedData();
   const photos = loadSeedPhotos(data);
-  loadSeedBookings2(data);
+  const extras = loadSeedBookings2(data);
   const ids = validateSeedBranchIds(branchIds, data);
-  const plan = await prepareAddition(selectSeedBranches(data, photos, ids), db);
+  const plan = await prepareAddition(
+    selectSeedBranches(data, photos, ids, extras),
+    db,
+    extras,
+  );
+  const selected = scopedDeskSchedule(plan.addition.data, extras);
+  const counts = seedBranchCounts(plan.addition);
   return {
     addedBranchIds: plan.addedBranchIds,
     skippedBranchIds: plan.skippedBranchIds,
-    expectedCounts: seedBranchCounts(plan.addition),
+    expectedCounts: {
+      ...counts,
+      bookings: counts.bookings + selected.bookings.length,
+      spaceBlocks: counts.spaceBlocks + selected.blocks.length,
+    },
   };
 }
 
@@ -174,7 +194,7 @@ export async function addSeedBranches(
   bookingExtras?: SeedBookings2Data,
 ): Promise<SeedResult> {
   const { addition, userIds, addedBranchIds, skippedBranchIds } =
-    await prepareAddition(scope, db);
+    await prepareAddition(scope, db, bookingExtras);
   const { data } = addition;
   const attendeeCounts = new Map(
     bookingExtras?.attendeeCounts.map(({ bookingId, attendeeCount }) => [
@@ -241,9 +261,23 @@ export async function addSeedBranches(
       },
       db,
     );
+  const counts = seedBranchCounts(addition);
+  const deskResult = bookingExtras
+    ? await insertSeedDeskSchedule({
+        data,
+        extras: bookingExtras,
+        userIds,
+        now,
+        database: db,
+      })
+    : { bookings: 0, spaceBlocks: 0, skippedBookings: 0 };
   return {
-    counts: seedBranchCounts(addition),
-    skippedBookings: 0,
+    counts: {
+      ...counts,
+      bookings: counts.bookings + deskResult.bookings,
+      spaceBlocks: counts.spaceBlocks + deskResult.spaceBlocks,
+    },
+    skippedBookings: deskResult.skippedBookings,
     accounts: data.users.map(({ email }) => email),
     branchScope: { addedBranchIds, skippedBranchIds },
   };

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { SeedData } from "./data";
 import { SeedError } from "./errors";
 import type { SeedPhotoData } from "./photos";
+import type { SeedBookings2Data } from "./bookings-2";
 
 export function validateSeedBranchIds(
   branchIds: readonly string[],
@@ -28,6 +29,7 @@ export function selectSeedBranches(
   data: SeedData,
   photos: SeedPhotoData,
   branchIds: readonly string[],
+  bookingExtras?: SeedBookings2Data,
 ) {
   const selected = new Set(branchIds);
   const branches = data.branches.filter(({ id }) => selected.has(id));
@@ -49,6 +51,12 @@ export function selectSeedBranches(
     (targetType === "floor" ? floorIds : spaceIds).has(targetId),
   );
   const userKeys = new Set([
+    ...(bookingExtras?.deskBookings
+      .filter(({ deskId }) => spaceIds.has(deskId))
+      .map(({ userKey }) => userKey) ?? []),
+    ...(bookingExtras?.deskBlocks
+      .filter(({ spaceId }) => spaceIds.has(spaceId))
+      .map(({ createdByKey }) => createdByKey) ?? []),
     ...bookings.flatMap(({ userKey, cancelledByKey }) =>
       cancelledByKey ? [userKey, cancelledByKey] : [userKey],
     ),

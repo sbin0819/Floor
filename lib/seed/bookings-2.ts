@@ -51,7 +51,10 @@ const seedBookings2Schema = z.strictObject({
 
 export function parseSeedBookings2(
   input: unknown,
-  seed: Pick<SeedData, "bookings" | "spaces">,
+  seed: Pick<
+    SeedData,
+    "bookings" | "spaces" | "users" | "teams" | "spaceBlocks"
+  >,
 ) {
   return seedBookings2Schema
     .superRefine((data, context) => {
@@ -79,6 +82,74 @@ export function parseSeedBookings2(
         else if (space.capacity !== null && attendeeCount > space.capacity)
           issue("attendeeCount", "사용 인원이 공간의 정원보다 많아요.");
       });
+      const userKeys = new Set(seed.users.map(({ key }) => key));
+      const teamIds = new Set(seed.teams.map(({ id }) => id));
+      const scheduleIds = new Set(
+        [...seed.bookings, ...seed.spaceBlocks].map(({ id }) => id),
+      );
+      const issue = (path: (string | number)[], message: string) =>
+        context.addIssue({ code: "custom", path, message });
+      const validDesk = (spaceId: string) => {
+        const desk = spaces.get(spaceId);
+        const area = desk?.parentId ? spaces.get(desk.parentId) : undefined;
+        return (
+          desk?.type === "desk" &&
+          area?.type === "desk_area" &&
+          !area.bookable &&
+          desk.floorId === area.floorId
+        );
+      };
+      data.deskBookings.forEach((row, index) => {
+        if (!validDesk(row.deskId))
+          issue(
+            ["deskBookings", index, "deskId"],
+            "시드에 없는 좌석이거나 올바른 데스크 구역에 속하지 않아요.",
+          );
+        if (!userKeys.has(row.userKey))
+          issue(["deskBookings", index, "userKey"], "시드에 없는 계정이에요.");
+        if (row.teamId && !teamIds.has(row.teamId))
+          issue(["deskBookings", index, "teamId"], "시드에 없는 팀이에요.");
+        if (scheduleIds.has(row.id))
+          issue(["deskBookings", index, "id"], "시드 일정 ID가 중복돼요.");
+        scheduleIds.add(row.id);
+        if (
+          data.deskBookings
+            .slice(0, index)
+            .some(
+              (previous) =>
+                previous.dayOffset === row.dayOffset &&
+                (previous.userKey === row.userKey ||
+                  previous.deskId === row.deskId) &&
+                (previous.part === row.part ||
+                  previous.part === "day" ||
+                  row.part === "day"),
+            )
+        )
+          issue(
+            ["deskBookings", index, "part"],
+            "같은 좌석이나 같은 사람의 좌석 예약이 겹쳐요.",
+          );
+      });
+      data.deskBlocks.forEach((row, index) => {
+        if (!validDesk(row.spaceId))
+          issue(["deskBlocks", index, "spaceId"], "시드에 없는 좌석이에요.");
+        if (!userKeys.has(row.createdByKey))
+          issue(
+            ["deskBlocks", index, "createdByKey"],
+            "시드에 없는 계정이에요.",
+          );
+        if (scheduleIds.has(row.id))
+          issue(["deskBlocks", index, "id"], "시드 일정 ID가 중복돼요.");
+        scheduleIds.add(row.id);
+        if (
+          row.endDayOffset < row.startDayOffset ||
+          (row.endDayOffset === row.startDayOffset && row.end <= row.start)
+        )
+          issue(
+            ["deskBlocks", index, "end"],
+            "점검의 끝은 시작보다 뒤여야 해요.",
+          );
+      });
     })
     .parse(input);
 }
@@ -86,7 +157,10 @@ export function parseSeedBookings2(
 export type SeedBookings2Data = ReturnType<typeof parseSeedBookings2>;
 
 export function loadSeedBookings2(
-  seed: Pick<SeedData, "bookings" | "spaces">,
+  seed: Pick<
+    SeedData,
+    "bookings" | "spaces" | "users" | "teams" | "spaceBlocks"
+  >,
 ): SeedBookings2Data {
   return parseSeedBookings2(bookingFile, seed);
 }

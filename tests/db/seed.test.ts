@@ -48,8 +48,8 @@ const expectedCounts = {
   branchStaff: 5,
   accessGrants: 2,
   floorPlans: 1,
-  bookings: 21,
-  spaceBlocks: 4,
+  bookings: 30,
+  spaceBlocks: 5,
   spacePhotos: 65,
   branchCovers: 5,
 };
@@ -170,7 +170,7 @@ describe("transactional development seed", () => {
     );
     const rows = await database.db.select().from(bookings);
     expect(rows.filter(({ status }) => status === "confirmed")).toHaveLength(
-      17,
+      26,
     );
     expect(rows.filter(({ status }) => status === "cancelled")).toHaveLength(4);
     for (const fixture of fixtures.bookings) {
@@ -316,7 +316,7 @@ describe("transactional development seed", () => {
       .returning();
     const result = await seed();
     expect(result.skippedBookings).toBe(1);
-    expect(result.counts.bookings).toBe(20);
+    expect(result.counts.bookings).toBe(29);
     expect(
       await database.db
         .select()
