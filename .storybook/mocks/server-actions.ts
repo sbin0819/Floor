@@ -8,6 +8,7 @@ const readOnlyAction: (
 });
 
 export const createBooking = readOnlyAction;
+export const sendMessage = readOnlyAction;
 export const updateBooking = readOnlyAction;
 export const createDeskBooking = readOnlyAction;
 export const cancelBooking = readOnlyAction;

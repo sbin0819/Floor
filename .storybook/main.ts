@@ -2,6 +2,7 @@ import type { StorybookConfig } from "@storybook/nextjs-vite";
 import { fileURLToPath } from "node:url";
 
 const actionModules = [
+  "features/chat/actions",
   "features/notifications/actions",
   "features/bookings/actions",
   "features/bookings/create-booking-actions",
