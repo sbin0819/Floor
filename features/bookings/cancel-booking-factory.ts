@@ -10,32 +10,19 @@ import { canCancelBooking } from "@/features/bookings/visibility";
 import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
 import { getSpaceForAccess } from "@/lib/dal";
-import { recordMeetingMessages } from "@/lib/dal/chat-meeting";
 import {
-  cancelBookingRecord,
   getBookingWithLocation,
   lockBookingCanceller,
 } from "@/lib/dal/bookings";
 import { canAccess } from "@/lib/permissions/can-access";
 import { loadPermissionContext } from "@/lib/permissions/context";
 import {
-  getDeskNotificationAreaName,
   listBookingParticipantIds,
   lockBookingUsers,
   lockParticipantBooking,
 } from "@/lib/dal/booking-participants";
-import {
-  assertParticipantsLocked,
-  withParticipantTransaction,
-} from "./participant-transaction";
-import {
-  buildBookingNotifications,
-  notificationBookingSnapshot,
-} from "@/features/notifications/builders";
-import {
-  deleteBookingReminders,
-  insertNotifications,
-} from "@/lib/dal/notifications";
+import { withParticipantTransaction } from "./participant-transaction";
+import { cancelBookingInTransaction } from "./cancel-booking-core";
 
 export function createCancelBookingAction(
   dependencies: BookingDependencies = {},
@@ -77,6 +64,7 @@ export function createCancelBookingAction(
           const isDesk = row.space.type === "desk";
           const ownDesk = isDesk && row.booking.userId === session.userId;
           let participantIds: string[] = [];
+          let lockedUserIds = [session.userId];
           if (ownDesk) {
             // 본인 좌석 취소에는 참석자와 알림이 없어 기존 잠금 경로를 유지한다.
             if (!(await lockBookingCanceller(session.userId, transaction)))
@@ -85,7 +73,7 @@ export function createCancelBookingAction(
             participantIds = isDesk
               ? []
               : await listBookingParticipantIds(row.booking.id, transaction);
-            const userIds = [
+            lockedUserIds = [
               ...new Set([
                 session.userId,
                 row.booking.userId,
@@ -94,7 +82,10 @@ export function createCancelBookingAction(
             ];
             if (
               !(await lockBookingUsers(
-                userIds.map((userId) => ({ userId, strength: "key share" })),
+                lockedUserIds.map((userId) => ({
+                  userId,
+                  strength: "key share",
+                })),
                 transaction,
               ))
             )
@@ -108,74 +99,18 @@ export function createCancelBookingAction(
             participantIds = isDesk
               ? []
               : await listBookingParticipantIds(row.booking.id, transaction);
-            assertParticipantsLocked(userIds, participantIds);
           }
-          const cancelled = await cancelBookingRecord(
-            { bookingId: input.bookingId, userId: session.userId, now },
+          return cancelBookingInTransaction(
+            {
+              bookingId: input.bookingId,
+              actor: { id: session.userId, name: session.name },
+              now,
+              preparedLocatedBooking: row,
+              lockedUserIds,
+              participantIds,
+            },
             transaction,
           );
-          if (!cancelled) throw new ActionError("NOT_FOUND");
-          if (!isDesk)
-            await deleteBookingReminders(
-              { bookingId: cancelled.id },
-              transaction,
-            );
-          if (!ownDesk) {
-            const areaName = isDesk
-              ? await getDeskNotificationAreaName(
-                  row.space.parentId,
-                  transaction,
-                )
-              : undefined;
-            const snapshot = notificationBookingSnapshot({
-              ...row,
-              booking: cancelled,
-              areaName,
-            });
-            await insertNotifications(
-              buildBookingNotifications({
-                type: "booking_cancelled",
-                booking: snapshot,
-                actor: { id: session.userId, name: session.name },
-                userIds: [
-                  ...participantIds,
-                  ...(session.userId !== cancelled.userId
-                    ? [cancelled.userId]
-                    : []),
-                ],
-                now,
-              }),
-              transaction,
-            );
-          }
-          const memberIds = [cancelled.userId, ...participantIds];
-          const chatEvents = isDesk
-            ? []
-            : await recordMeetingMessages(
-                {
-                  bookingId: cancelled.id,
-                  actorId: memberIds.includes(session.userId)
-                    ? session.userId
-                    : null,
-                  memberIds,
-                  messages: [
-                    { type: "booking_cancelled", actorName: session.name },
-                  ],
-                  changed: true,
-                  now,
-                },
-                transaction,
-              );
-          return {
-            bookingId: cancelled.id,
-            callUserIds: isDesk ? [] : memberIds,
-            chatEvents,
-            floorId: row.floor.id,
-            spaceId:
-              row.space.type === "desk"
-                ? (row.space.parentId ?? row.space.id)
-                : row.space.id,
-          };
         }, db);
         await evictBookingCalls(result.callUserIds, dependencies);
         await publishBookingChange(
