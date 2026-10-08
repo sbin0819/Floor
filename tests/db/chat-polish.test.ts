@@ -132,6 +132,7 @@ describe("message replies and mentions", () => {
       clientId: expect.any(String),
       createdAt: chatNow.toISOString(),
       replyTo: {
+        attachmentSummary: null,
         id: original.id,
         authorName: actors.admin.name,
         excerpt: "검토할 원문이에요",
@@ -202,16 +203,14 @@ describe("message replies and mentions", () => {
       { id: actors.member.userId, name: actors.member.name },
       ...reactingUsers,
     ];
-    await database.db
-      .insert(messageReactions)
-      .values(
-        reactionActors.map(({ id }, index) => ({
-          messageId: reply.id,
-          userId: id,
-          emoji: "heart" as const,
-          createdAt: new Date(chatNow.getTime() + index),
-        })),
-      );
+    await database.db.insert(messageReactions).values(
+      reactionActors.map(({ id }, index) => ({
+        messageId: reply.id,
+        userId: id,
+        emoji: "heart" as const,
+        createdAt: new Date(chatNow.getTime() + index),
+      })),
+    );
     const meter = createQueryMeter(database.client);
     try {
       meter.start();
@@ -247,6 +246,7 @@ describe("message replies and mentions", () => {
         expect(JSON.stringify(page)).not.toContain(actor.email);
       expect(Object.keys(page.messages[1]!).sort()).toEqual(
         [
+          "attachments",
           "id",
           "systemData",
           "seq",

@@ -13,6 +13,7 @@ async function readNavigation() {
   return (await getSession())
     ? getMyChatNav()
     : {
+        filesEnabled: false,
         callsEnabled: false,
         calls: [],
         myCall: null,

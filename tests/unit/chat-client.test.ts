@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatReadError, fetchRoomMessagesPage } from "@/features/chat/client";
+import { emptyMessageDetails } from "@/features/chat/types";
 
 const empty = {
   messages: [],
@@ -14,6 +15,60 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("chat page client", () => {
+  it("parses public attachment and reply metadata without retaining storage keys or email", async () => {
+    const attachment = {
+      id: "00000000-0000-4000-8000-000000000001",
+      name: "자료.pdf",
+      size: 42,
+      kind: "file",
+      width: null,
+      height: null,
+    };
+    const message = {
+      ...emptyMessageDetails(),
+      id: "message",
+      seq: 1,
+      authorId: "author",
+      authorName: "서연",
+      kind: "text",
+      body: "",
+      createdAt: "2026-10-09T00:00:00Z",
+      clientId: null,
+      attachments: [
+        {
+          ...attachment,
+          storageKey: "private-key",
+          uploaderEmail: "private@ai.com",
+        },
+      ],
+      replyTo: {
+        id: "reply",
+        authorName: "민지",
+        excerpt: "사진",
+        deleted: false,
+        attachmentSummary: {
+          images: 1,
+          files: 0,
+          firstName: "사진.jpg",
+          id: "secret-id",
+        },
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ ...empty, messages: [message] })),
+    );
+    const result = await fetchRoomMessagesPage("room", { after: 0 });
+    expect(result.messages[0]?.attachments).toEqual([attachment]);
+    expect(result.messages[0]?.replyTo?.attachmentSummary).toEqual({
+      images: 1,
+      files: 0,
+      firstName: "사진.jpg",
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /private-key|private@ai.com|secret-id/,
+    );
+  });
   it("uses the no-store same-origin GET with the requested cursor and abort signal", async () => {
     const fetcher = vi.fn(async () => Response.json(empty));
     vi.stubGlobal("fetch", fetcher);

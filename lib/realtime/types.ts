@@ -45,6 +45,7 @@ export type RealtimeEvent =
   | { type: "plan.published"; floorId: string; version: number }
   | {
       type: "message.created";
+      attachments: import("@/features/chat/types").ChatAttachment[];
       roomId: string;
       id: string;
       seq: number;

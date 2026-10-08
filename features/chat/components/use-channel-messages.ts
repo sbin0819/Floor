@@ -177,6 +177,7 @@ export function useChannelMessages(
       kind: event.kind,
       systemData: event.systemData,
       body: event.body,
+      attachments: event.attachments,
       createdAt: event.createdAt,
       clientId: event.authorId === userId ? event.clientId : null,
       replyTo: event.replyTo,

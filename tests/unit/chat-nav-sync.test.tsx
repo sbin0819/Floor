@@ -98,6 +98,7 @@ const spaceFixture = (): ChatSpaceNav[] => [
   },
 ];
 const fixture = (): ChatNav => ({
+  filesEnabled: false,
   callsEnabled: false,
   calls: [],
   myCall: null,
@@ -110,6 +111,7 @@ const fixture = (): ChatNav => ({
 });
 function mappedFixture(map: (space: ChatSpaceNav) => ChatSpaceNav): ChatNav {
   return {
+    filesEnabled: false,
     callsEnabled: false,
     calls: [],
     myCall: null,

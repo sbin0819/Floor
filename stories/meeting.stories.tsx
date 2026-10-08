@@ -97,6 +97,7 @@ function MeetingStory({ example = "upcoming" }: { example?: Example }) {
   const [client] = useState(() => {
     const value = new QueryClient();
     value.setQueryData(["chat", "nav"], {
+      filesEnabled: false,
       callsEnabled: false,
       calls: [],
       myCall: null,

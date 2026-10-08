@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { chatDate } from "@/lib/time/chat-format";
 import type { ChatMessage } from "../types";
+import { excerptOf } from "../message-text";
 import {
   isMessageContinuation,
   messageKey,
@@ -58,7 +59,7 @@ const LiveMessages = memo(function LiveMessages({
         text:
           message.authorId && blockedUserIds.includes(message.authorId)
             ? "차단한 사용자의 새 메시지"
-            : `${message.authorName ?? "시스템"}: ${Array.from(message.body).slice(0, 100).join("")}`,
+            : `${message.authorName ?? "시스템"}: ${message.body ? Array.from(message.body).slice(0, 100).join("") : excerptOf(message.body, {}, message.attachments)}`,
       });
     }
   }, [messages, userId, blockedUserIds]);

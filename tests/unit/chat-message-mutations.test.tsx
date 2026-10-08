@@ -218,6 +218,7 @@ describe("message action optimistic state", () => {
         id: "reply",
         seq: 2,
         replyTo: {
+          attachmentSummary: null,
           id: "message",
           authorName: "지훈",
           excerpt: "원문",

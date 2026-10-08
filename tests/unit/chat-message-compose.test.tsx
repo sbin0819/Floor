@@ -89,6 +89,7 @@ describe("reply, editing, and selected mention composition", () => {
 
   it("shows a reply preview and forwards the same reply when sending", () => {
     const reply = {
+      attachmentSummary: null,
       id: "source",
       authorName: "이서연",
       excerpt: "원문 한 줄",
@@ -248,6 +249,7 @@ describe("reply source navigation", () => {
         ...Array.from({ length: 49 }, (_, index) => message(index + 60)),
         message(109, {
           replyTo: {
+            attachmentSummary: null,
             id: "m-1",
             authorName: "이서연",
             excerpt: "메시지 1",
@@ -293,6 +295,7 @@ describe("reply source navigation", () => {
       message(index + 100),
     );
     rows[499]!.replyTo = {
+      attachmentSummary: null,
       id: "m-1",
       authorName: "이서연",
       excerpt: "아주 오래된 원문",

@@ -416,6 +416,7 @@ describe("channel message reconciliation integration", () => {
   it("refreshes loaded reply pages after their off-screen source changes", async () => {
     const reply = message(51, {
       replyTo: {
+        attachmentSummary: null,
         id: "message-1",
         authorName: "이서연",
         excerpt: "기존 원문",

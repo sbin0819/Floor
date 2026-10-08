@@ -68,6 +68,7 @@ describe("memory realtime", () => {
     { type: "space.status_changed", spaceId: "space-a" },
     { type: "plan.published", floorId: "floor-a", version: 2 },
     {
+      attachments: [],
       type: "message.created",
       roomId: "room-a",
       id: "message-a",

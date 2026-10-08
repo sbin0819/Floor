@@ -123,6 +123,7 @@ describe("persisted self status and private navigation metadata", () => {
       const value = await queries.getMyChatNav();
       const measurement = meter.stop();
       expect(value).toEqual({
+        filesEnabled: false,
         callsEnabled: false,
         calls: [],
         myCall: null,

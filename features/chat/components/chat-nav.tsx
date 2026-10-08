@@ -79,6 +79,7 @@ const directNavBase = z.object({
   muted: z.boolean(),
 });
 const navSchema = z.object({
+  filesEnabled: z.boolean(),
   callsEnabled: z.boolean(),
   calls: z.array(
     z.object({

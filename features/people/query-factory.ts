@@ -48,6 +48,7 @@ export function createPeopleQueries(
             [me.userId, me.name],
             [row.other.userId, row.other.name],
           ]),
+          row.attachmentSummary,
         ),
         lastMessageAt: row.lastMessageAt!.toISOString(),
       }));

@@ -1,4 +1,5 @@
 export const MAX_MESSAGE_MENTIONS = 20;
+import type { AttachmentSummary } from "./types";
 
 export type MessageBodyPart =
   | { type: "text" | "code" | "codeBlock"; text: string }
@@ -304,7 +305,44 @@ export function mentionLabel(userId: string, names: MentionNames = {}): string {
   return `@${name ?? "알 수 없는 사용자"}`;
 }
 
-export function excerptOf(body: string, names: MentionNames = {}): string {
+export function summarizeAttachments(
+  attachments: readonly { kind: "image" | "file"; name: string }[],
+): AttachmentSummary | null {
+  if (!attachments.length) return null;
+  return {
+    images: attachments.filter((item) => item.kind === "image").length,
+    files: attachments.filter((item) => item.kind === "file").length,
+    firstName: attachments[0]!.name,
+  };
+}
+
+export function excerptOf(
+  body: string,
+  names: MentionNames = {},
+  attachments?:
+    | readonly { kind: "image" | "file"; name: string }[]
+    | AttachmentSummary
+    | null,
+): string {
+  if (!body.trim() && attachments) {
+    const summary =
+      "images" in attachments
+        ? attachments
+        : {
+            images: attachments.filter((item) => item.kind === "image").length,
+            files: attachments.filter((item) => item.kind === "file").length,
+            firstName: attachments[0]?.name ?? "",
+          };
+    const total = summary.images + summary.files;
+    if (total)
+      return summary.files === 0
+        ? total === 1
+          ? "사진"
+          : `사진 ${total}장`
+        : total === 1
+          ? `파일: ${summary.firstName}`
+          : `파일 ${total}개`;
+  }
   const text = mentionSpans(body)
     .map(({ start, end, part }) =>
       part.type === "mention"

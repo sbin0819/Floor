@@ -6,6 +6,7 @@ export type DisplayMessage = ChatMessage & {
   delivery?: "pending" | "failed";
   errorCode?: ActionErrorCode;
   errorMessage?: string;
+  attachmentUnavailable?: boolean;
   reactionIntents?: Partial<
     Record<ReactionEmoji, { token: string; on: boolean }>
   >;
@@ -87,6 +88,8 @@ export function isMessageContinuation(
 }
 
 export function messageSendError(message: DisplayMessage): string {
+  if (message.attachmentUnavailable)
+    return "첨부의 기한이 지났어요. 다시 올려 주세요";
   if (
     message.errorCode === "LIMIT_EXCEEDED" &&
     message.errorMessage === "send_rate"

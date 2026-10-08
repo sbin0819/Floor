@@ -371,6 +371,7 @@ describe("shared direct message screen", () => {
   it("refreshes the nav after a first saved DM but never sends internal room kind to the action", async () => {
     const { user, client, send } = setup(view({ messages: [] }));
     client.setQueryData(CHAT_NAV_KEY, {
+      filesEnabled: false,
       callsEnabled: false,
       calls: [],
       myCall: null,
@@ -407,6 +408,7 @@ describe("shared direct message screen", () => {
       muted: false,
     };
     client.setQueryData(CHAT_NAV_KEY, {
+      filesEnabled: false,
       callsEnabled: false,
       calls: [],
       myCall: null,

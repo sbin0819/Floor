@@ -19,6 +19,7 @@ export function useChatMetadata() {
     enabled: false,
   });
   return {
+    filesEnabled: data?.filesEnabled ?? false,
     myStatus: data?.myStatus ?? pendingMyStatus(client),
     blockedUserIds: data?.blockedUserIds,
   };

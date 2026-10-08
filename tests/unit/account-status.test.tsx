@@ -24,6 +24,7 @@ function show() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   client.setQueryData<ChatNav>(CHAT_NAV_KEY, {
+    filesEnabled: false,
     callsEnabled: false,
     calls: [],
     myCall: null,

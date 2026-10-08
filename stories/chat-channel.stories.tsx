@@ -85,6 +85,7 @@ function ChannelStory({
   const [client] = useState(() => {
     const client = new QueryClient();
     client.setQueryData(["chat", "nav"], {
+      filesEnabled: false,
       callsEnabled: false,
       calls: [],
       myCall: null,
@@ -124,6 +125,7 @@ function ChannelStory({
       return {
         ...message,
         replyTo: {
+          attachmentSummary: null,
           id: data.messages[0]!.id,
           authorName: "박지훈",
           excerpt: data.messages[0]!.body,

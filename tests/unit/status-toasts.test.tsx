@@ -34,6 +34,7 @@ vi.mock("@/components/realtime-provider", () => ({
   },
 }));
 const nav = (): ChatNav => ({
+  filesEnabled: false,
   callsEnabled: false,
   calls: [],
   myCall: null,

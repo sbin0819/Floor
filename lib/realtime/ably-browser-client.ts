@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { reactionEmojis } from "@/features/chat/types";
 import { parseSystemMessageData } from "@/features/chat/system-messages";
+import {
+  chatAttachmentSchema,
+  attachmentSummarySchema,
+} from "@/features/chat/attachment-schema";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
 export interface RealtimeTokenInput {
@@ -48,6 +52,7 @@ const replySchema = z.object({
   authorName: z.string().nullable(),
   excerpt: z.string(),
   deleted: z.boolean(),
+  attachmentSummary: attachmentSummarySchema.nullable(),
 });
 
 const eventSchema = z.discriminatedUnion("type", [
@@ -117,6 +122,7 @@ const eventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("message.created"),
+    attachments: z.array(chatAttachmentSchema),
     roomId: z.string(),
     id: z.string(),
     seq: z.number().int().positive(),

@@ -12,6 +12,10 @@ import { advanceRoomRead } from "@/lib/dal/chat-reads";
 import { listChannelMembers } from "@/lib/dal/chat-read";
 import { listMeetingMembers } from "@/lib/dal/chat-meeting-read";
 import { getChatMessage } from "@/lib/dal/chat-messages";
+import {
+  attachMessageFiles,
+  lockMessageAttachments,
+} from "@/lib/dal/chat-attachments";
 import * as writes from "@/lib/dal/chat-write";
 import { listDirectMembers } from "@/lib/dal/direct";
 import { directPeerAccess } from "@/lib/dal/direct-permission";
@@ -34,12 +38,9 @@ import type { RealtimeItem } from "@/lib/realtime/types";
 import type { ChatActionDependencies } from "./action-factory";
 import { prepareDirectSend } from "./direct-request-flow";
 import { excerptOf, extractMentions } from "./message-text";
-import { sendMessageSchema } from "./schema";
+import { sendMessageSchema, sendMessageRequestSchema } from "./schema";
 import { groupDisplayName } from "./group-name";
 
-const requestSchema = sendMessageSchema
-  .omit({ roomId: true })
-  .extend({ userId: z.uuid().transform((id) => id.toLowerCase()) });
 type SendInput = z.infer<typeof sendMessageSchema>;
 
 async function requireWritable(
@@ -94,6 +95,19 @@ async function sendLockedMessage(
     if (!message) throw new ActionError("INTERNAL");
     return { message, events: [] as RealtimeItem[] };
   }
+  if (direct && input.attachmentIds.length) {
+    const access = await requireWritable(
+      session.userId,
+      input.roomId,
+      now,
+      database,
+    );
+    if (
+      access.directMembership?.mine !== "active" ||
+      access.directMembership.peer !== "active"
+    )
+      throw new ActionError("FORBIDDEN");
+  }
   const flow = direct
     ? await prepareDirectSend(
         {
@@ -112,6 +126,21 @@ async function sendLockedMessage(
     now,
     database,
   );
+  const files = await lockMessageAttachments(input.attachmentIds, database);
+  if (
+    files.length !== input.attachmentIds.length ||
+    files.some(
+      (file) =>
+        file.uploaderId !== session.userId ||
+        file.roomId !== input.roomId ||
+        !file.uploadedAt ||
+        file.messageId !== null ||
+        file.createdAt.getTime() <= now.getTime() - 24 * 60 * 60 * 1000,
+    )
+  )
+    throw new ActionError("INVALID_INPUT", {
+      fieldErrors: { attachmentIds: ["unavailable"] },
+    });
   if (input.replyToId) {
     const reply = await getChatMessage(
       input.replyToId,
@@ -148,6 +177,7 @@ async function sendLockedMessage(
     { ...input, mentionsEveryone, authorId: session.userId, now },
     database,
   );
+  await attachMessageFiles(input.attachmentIds, inserted.id, database);
   await writes.insertMessageMentions(inserted.id, mentions, now, database);
   await advanceRoomRead(
     { roomId: input.roomId, userId: session.userId, seq: inserted.seq, now },
@@ -201,7 +231,7 @@ async function sendLockedMessage(
               ? {
                   messageId: message.id,
                   authorName: session.name,
-                  excerpt: excerptOf(message.body, names),
+                  excerpt: excerptOf(message.body, names, message.attachments),
                 }
               : null,
           roomId: room.id,
@@ -239,7 +269,7 @@ async function sendLockedMessage(
           messageId: message.id,
           seq: message.seq,
           authorName: session.name,
-          excerpt: excerptOf(message.body, names),
+          excerpt: excerptOf(message.body, names, message.attachments),
         },
       });
   }
@@ -328,7 +358,7 @@ export function createSendActions(
     ),
     sendMessageRequest: createAction(
       {
-        input: requestSchema,
+        input: sendMessageRequestSchema,
         authorize: "none",
         async handler({ session, input }) {
           const parsed = prepare(session.userId, input.body);
@@ -393,7 +423,7 @@ export function createSendActions(
               }
             }
             const sent = await sendLockedMessage(
-              { ...input, roomId: target.roomId },
+              { ...input, roomId: target.roomId, attachmentIds: [] },
               session,
               now,
               tx,

@@ -10,6 +10,7 @@ import type { ChatNav } from "@/features/chat/types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
 const initial = (): ChatNav => ({
+  filesEnabled: false,
   callsEnabled: true,
   calls: [],
   myCall: null,

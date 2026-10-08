@@ -11,6 +11,7 @@ import type { MessageContact } from "@/features/people/types";
 const id = (n: number) =>
   `76000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const data: ChatNav = {
+  filesEnabled: false,
   callsEnabled: false,
   calls: [],
   myCall: null,

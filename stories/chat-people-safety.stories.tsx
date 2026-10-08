@@ -91,6 +91,7 @@ function Frame({ children }: { children: ReactNode }) {
   const [client] = useState(() => {
     const client = new QueryClient();
     client.setQueryData(["chat", "nav"], {
+      filesEnabled: false,
       callsEnabled: false,
       calls: [],
       myCall: null,

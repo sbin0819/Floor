@@ -67,6 +67,57 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe("room send queue", () => {
+  it("preserves attachment order and the client ID across a lost response", async () => {
+    const { queue, connect, confirmed } = setup();
+    const send = vi.fn<QueuedMessage["send"]>();
+    const item = entry("attachments", send);
+    item.message.body = "";
+    item.message.attachments = ["second", "first"].map((id) => ({
+      id,
+      name: `${id}.pdf`,
+      size: 42,
+      kind: "file",
+      width: null,
+      height: null,
+    }));
+    send
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce(success(item));
+    queue.enqueue(item);
+    expect(send).not.toHaveBeenCalled();
+    connect();
+    await flush();
+    expect(queue.pending()).toBe(1);
+    connect();
+    await flush();
+    const input = {
+      roomId: "room",
+      clientId: "attachments",
+      body: "",
+      attachmentIds: ["second", "first"],
+    };
+    expect(send.mock.calls).toEqual([[input], [input]]);
+    expect(queue.pending()).toBe(0);
+    expect(confirmed).toHaveBeenCalledOnce();
+  });
+  it("does not retry an unavailable attachment and forwards its safe field error", async () => {
+    const { queue, connect, failed } = setup();
+    const failure = {
+      ok: false as const,
+      code: "INVALID_INPUT" as const,
+      fieldErrors: { attachmentIds: ["unavailable"] },
+    };
+    const send = vi.fn<QueuedMessage["send"]>().mockResolvedValue(failure);
+    const item = entry("attachments", send);
+    queue.enqueue(item);
+    connect();
+    await flush();
+    connect();
+    await flush();
+    expect(queue.pending()).toBe(0);
+    expect(send).toHaveBeenCalledOnce();
+    expect(failed).toHaveBeenCalledWith(item, failure);
+  });
   it("remembers recovery received before an in-flight network rejection", async () => {
     const { queue, connect } = setup();
     const gate = deferred();

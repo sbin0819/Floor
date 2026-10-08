@@ -6,6 +6,8 @@ import type {
   ChatMention,
   ChatMessage,
   ChatReaction,
+  ChatAttachment,
+  AttachmentSummary,
 } from "@/features/chat/types";
 import { excerptOf } from "@/features/chat/message-text";
 import { parseSystemMessageData } from "@/features/chat/system-messages";
@@ -17,6 +19,7 @@ type ReplyRow = {
   body: string;
   deleted: boolean;
   names: Record<string, string>;
+  attachmentSummary: AttachmentSummary | null;
 };
 
 // 목록·페이지·액션 결과가 같은 집계를 써야 민감 필드와 리액션의 기준이 어긋나지 않는다.
@@ -40,6 +43,7 @@ export function selectChatMessages(userId: string, database: DalDatabase) {
       editedAt: messages.editedAt,
       deletedAt: messages.deletedAt,
       reactions: sql<ChatReaction[]>`message_details.reactions`,
+      attachments: sql<ChatAttachment[]>`message_details.attachments`,
     })
     .from(messages)
     .leftJoin(users, eq(messages.authorId, users.id))
@@ -48,6 +52,11 @@ export function selectChatMessages(userId: string, database: DalDatabase) {
       (select json_build_object(
         'id', original.id, 'authorName', original_author.name,
         'body', original.body, 'deleted', original.deleted_at is not null,
+        'attachmentSummary', case when original.deleted_at is not null then null else
+          (select json_build_object('images', count(*) filter (where attachment.kind = 'image'),
+            'files', count(*) filter (where attachment.kind = 'file'),
+            'firstName', (array_agg(attachment.name order by attachment.position))[1])
+          from message_attachments attachment where attachment.message_id = original.id having count(*) > 0) end,
         'names', coalesce((select jsonb_object_agg(mentioned.id, mentioned.name)
           from message_mentions original_mention join users mentioned on mentioned.id = original_mention.user_id
           where original_mention.message_id = original.id), '{}'::jsonb)
@@ -62,7 +71,12 @@ export function selectChatMessages(userId: string, database: DalDatabase) {
         from (select r.emoji, count(*)::int as count, bool_or(r.user_id = ${userId}) as mine,
           (array_agg(u.name order by r.created_at, r.user_id))[1:10] as names
           from message_reactions r join users u on u.id = r.user_id
-          where r.message_id = ${messages.id} group by r.emoji) reaction), '[]'::json) as reactions
+          where r.message_id = ${messages.id} group by r.emoji) reaction), '[]'::json) as reactions,
+      case when ${messages.deletedAt} is not null then '[]'::json else
+        coalesce((select json_agg(json_build_object('id', attachment.id, 'name', attachment.name,
+          'size', attachment.size, 'kind', attachment.kind, 'width', attachment.width, 'height', attachment.height)
+          order by attachment.position) from message_attachments attachment
+          where attachment.message_id = ${messages.id}), '[]'::json) end as attachments
     ) as message_details`,
       sql`true`,
     )
@@ -84,8 +98,16 @@ export function serializeChatMessage(row: MessageRow): ChatMessage {
           authorName: row.replyTo.authorName,
           excerpt: row.replyTo.deleted
             ? "삭제된 메시지예요"
-            : excerptOf(row.replyTo.body, row.replyTo.names),
+            : excerptOf(
+                row.replyTo.body,
+                row.replyTo.names,
+                row.replyTo.attachmentSummary,
+              ),
           deleted: row.replyTo.deleted,
+          attachmentSummary:
+            row.deletedAt || row.replyTo.deleted
+              ? null
+              : row.replyTo.attachmentSummary,
         }
       : null,
   };

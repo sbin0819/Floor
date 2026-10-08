@@ -2,6 +2,10 @@ import { z } from "zod";
 import type { RoomMessagesPage } from "./types";
 import { reactionEmojis } from "./types";
 import { parseSystemMessageData } from "./system-messages";
+import {
+  chatAttachmentSchema,
+  attachmentSummarySchema,
+} from "./attachment-schema";
 
 export type { RoomMessagesPage } from "./types";
 export type MessagePageQuery =
@@ -18,6 +22,7 @@ const pageSchema = z.object({
       kind: z.enum(["text", "system"]),
       systemData: z.unknown().transform(parseSystemMessageData),
       body: z.string(),
+      attachments: z.array(chatAttachmentSchema),
       createdAt: z.string(),
       clientId: z.string().nullable(),
       replyTo: z
@@ -26,6 +31,7 @@ const pageSchema = z.object({
           authorName: z.string().nullable(),
           excerpt: z.string(),
           deleted: z.boolean(),
+          attachmentSummary: attachmentSummarySchema.nullable(),
         })
         .nullable(),
       mentions: z.array(z.object({ userId: z.string(), name: z.string() })),

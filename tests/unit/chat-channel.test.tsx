@@ -138,6 +138,7 @@ function setup(data = view(), send: SendChatMessage = vi.fn()) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   client.setQueryData(["chat", "nav"], {
+    filesEnabled: false,
     callsEnabled: false,
     calls: [],
     myCall: null,
@@ -272,6 +273,7 @@ describe("chat channel presentation", () => {
     expect(screen.queryByText("안녕하세요")).not.toBeInTheDocument();
     await act(async () => {
       client.setQueryData(["chat", "nav"], {
+        filesEnabled: false,
         callsEnabled: false,
         calls: [],
         myCall: null,

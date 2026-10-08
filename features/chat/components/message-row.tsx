@@ -395,6 +395,7 @@ export const MessageRow = memo(function MessageRow({
                       type="button"
                       variant="ghost"
                       onClick={() => onRetry(message)}
+                      disabled={message.attachmentUnavailable}
                     >
                       다시 보내기
                     </Button>

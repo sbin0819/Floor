@@ -37,7 +37,7 @@ import type {
   MeetingView,
 } from "../types";
 import type { RoomMessageSource } from "../room-message-source";
-import { excerptOf } from "../message-text";
+import { excerptOf, summarizeAttachments } from "../message-text";
 import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
 import { RoomMembersPanel } from "./room-members-panel";
 import { MessageComposer } from "./message-composer";
@@ -380,8 +380,11 @@ function ChatRoomScreen({
       reply: {
         id: message.id,
         authorName: message.authorName,
-        excerpt: excerptOf(message.body, messageNames),
+        excerpt: excerptOf(message.body, messageNames, message.attachments),
         deleted: Boolean(message.deletedAt),
+        attachmentSummary: message.deletedAt
+          ? null
+          : summarizeAttachments(message.attachments),
       },
     });
     setComposerFocus((version) => version + 1);
@@ -589,6 +592,7 @@ function ChatRoomScreen({
                   key={message.id}
                   messageId={message.id}
                   body={message.body}
+                  hasAttachments={message.attachments.length > 0}
                   names={
                     new Map([
                       ...names,

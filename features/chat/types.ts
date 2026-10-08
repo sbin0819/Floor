@@ -10,11 +10,25 @@ export const reactionEmojis = [
 ] as const;
 export type ReactionEmoji = (typeof reactionEmojis)[number];
 export type ChatMention = { userId: string; name: string };
+export type ChatAttachment = {
+  id: string;
+  name: string;
+  size: number;
+  kind: "image" | "file";
+  width: number | null;
+  height: number | null;
+};
+export type AttachmentSummary = {
+  images: number;
+  files: number;
+  firstName: string;
+};
 export type ChatReply = {
   id: string;
   authorName: string | null;
   excerpt: string;
   deleted: boolean;
+  attachmentSummary: AttachmentSummary | null;
 };
 export type ChatReaction = {
   emoji: ReactionEmoji;
@@ -23,6 +37,7 @@ export type ChatReaction = {
   names: string[];
 };
 export type ChatMessageDetails = {
+  attachments: ChatAttachment[];
   systemData: SystemMessageData | null;
   replyTo: ChatReply | null;
   mentions: ChatMention[];
@@ -33,6 +48,7 @@ export type ChatMessageDetails = {
 };
 
 export const emptyMessageDetails = (): ChatMessageDetails => ({
+  attachments: [],
   systemData: null,
   replyTo: null,
   mentions: [],
@@ -86,6 +102,7 @@ export type DirectMessageNav = DirectMessageNavBase &
       }
   );
 export type ChatNav = {
+  filesEnabled: boolean;
   callsEnabled: boolean;
   calls: { roomId: string; participantCount: number }[];
   myCall: import("@/features/calls/types").MyCall | null;

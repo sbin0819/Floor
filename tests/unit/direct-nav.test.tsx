@@ -82,6 +82,7 @@ const direct = (patch: Partial<DirectNav> = {}): DirectNav => ({
   ...patch,
 });
 const fixture = (rows: DirectMessageNav[] = [direct()]): ChatNav => ({
+  filesEnabled: false,
   callsEnabled: false,
   calls: [],
   myCall: null,

@@ -21,7 +21,8 @@ import {
   chatNavRevision,
   clearRoomUnread,
 } from "../nav-state";
-import type { ChatReply } from "../types";
+import type { ChatReply, ChatAttachment } from "../types";
+import { discardUploads } from "../upload-actions";
 import type { RoomMessageSource } from "../room-message-source";
 import { emptyMessageDetails } from "../types";
 import {
@@ -76,6 +77,8 @@ function makeQueue(client: QueryClient) {
                   delivery: "failed",
                   errorCode: result.code,
                   errorMessage: result.message,
+                  attachmentUnavailable:
+                    result.fieldErrors?.attachmentIds?.includes("unavailable"),
                 }
               : row,
           ),
@@ -170,10 +173,15 @@ export function useChatSendQueue(
     };
     queue.enqueue(entry);
   };
-  const submit = (body: string, reply?: ChatReply) => {
+  const submit = (
+    body: string,
+    reply?: ChatReply,
+    attachments: ChatAttachment[] = [],
+  ) => {
     const clientId = crypto.randomUUID();
     const message: DisplayMessage & { clientId: string } = {
       ...emptyMessageDetails(),
+      attachments,
       replyTo: reply ?? null,
       id: clientId,
       clientId,
@@ -195,6 +203,7 @@ export function useChatSendQueue(
     if (
       !message.clientId ||
       message.authorId !== userId ||
+      message.attachmentUnavailable ||
       message.delivery !== "failed"
     )
       return;
@@ -213,6 +222,11 @@ export function useChatSendQueue(
     enqueue(next);
   };
   const remove = (message: DisplayMessage) => {
+    if (message.delivery !== "failed" || message.authorId !== userId) return;
+    if (message.attachments.length)
+      void discardUploads({
+        attachmentIds: message.attachments.map((file) => file.id),
+      });
     client.setQueryData<DisplayMessage[]>(
       roomMessagesKey(roomId),
       (current = []) =>

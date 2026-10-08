@@ -133,6 +133,7 @@ const membersData: SpaceMembersView = {
   ],
 };
 const nav: ChatNav = {
+  filesEnabled: false,
   callsEnabled: false,
   calls: [],
   myCall: null,

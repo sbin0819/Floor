@@ -6,6 +6,7 @@ export type SendChatMessage = (input: {
   clientId: string;
   body: string;
   replyToId?: string;
+  attachmentIds?: string[];
 }) => Promise<ActionResult<ChatMessage>>;
 export type QueuedMessage = {
   roomId: string;
@@ -54,6 +55,13 @@ export function createChatSendQueue({
             roomId: entry.roomId,
             clientId: entry.message.clientId,
             body: entry.message.body,
+            ...(entry.message.attachments.length
+              ? {
+                  attachmentIds: entry.message.attachments.map(
+                    (file) => file.id,
+                  ),
+                }
+              : {}),
             ...(entry.message.replyTo
               ? { replyToId: entry.message.replyTo.id }
               : {}),

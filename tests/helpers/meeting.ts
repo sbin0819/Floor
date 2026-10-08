@@ -88,6 +88,7 @@ export function meetingNav(overrides: Partial<MeetingNav> = {}): MeetingNav {
 }
 export function meetingChatNav(overrides: Partial<ChatNav> = {}): ChatNav {
   return {
+    filesEnabled: false,
     callsEnabled: false,
     calls: [],
     myCall: null,

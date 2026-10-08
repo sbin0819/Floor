@@ -8,12 +8,13 @@ import {
   type MentionCandidate,
 } from "../mention-input";
 import type { MentionNames } from "../message-text";
-import { messageBodySchema } from "../schema";
+import { messageBodySchema, optionalMessageBodySchema } from "../schema";
 import { MentionTextarea } from "./mention-textarea";
 
 export function MessageEditor({
   messageId,
   body,
+  hasAttachments = false,
   names,
   members,
   allowEveryone,
@@ -22,6 +23,7 @@ export function MessageEditor({
 }: {
   messageId: string;
   body: string;
+  hasAttachments?: boolean;
   names: MentionNames;
   members: readonly MentionCandidate[];
   allowEveryone: boolean;
@@ -43,7 +45,9 @@ export function MessageEditor({
     };
   }, []);
   const save = async () => {
-    const result = messageBodySchema.safeParse(toMessageBody(value));
+    const result = (
+      hasAttachments ? optionalMessageBodySchema : messageBodySchema
+    ).safeParse(toMessageBody(value));
     if (!result.success || locked.current) return;
     locked.current = true;
     setBusy(true);
@@ -86,7 +90,10 @@ export function MessageEditor({
         <Button
           type="submit"
           disabled={
-            busy || !messageBodySchema.safeParse(toMessageBody(value)).success
+            busy ||
+            !(
+              hasAttachments ? optionalMessageBodySchema : messageBodySchema
+            ).safeParse(toMessageBody(value)).success
           }
         >
           {busy ? "저장하고 있어요" : "저장"}

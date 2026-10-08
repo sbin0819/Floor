@@ -278,6 +278,7 @@ describe("team chat navigation", () => {
     render(
       <MessagesList
         data={{
+          filesEnabled: false,
           callsEnabled: false,
           calls: [],
           myCall: null,
@@ -308,6 +309,7 @@ describe("team chat navigation", () => {
           calls: [],
           myCall: null,
           spaces,
+          filesEnabled: false,
           directMessages: [],
           myStatus: "online",
           blockedUserIds: [],

@@ -8,6 +8,11 @@ import {
 } from "@/lib/dal/chat-access";
 import * as writes from "@/lib/dal/chat-message-write";
 import { getChatMessage } from "@/lib/dal/chat-messages";
+import {
+  deleteMessageAttachments,
+  messageHasAttachments,
+} from "@/lib/dal/chat-attachments";
+import { getFileStorage } from "@/lib/storage";
 import { listChannelMembers } from "@/lib/dal/chat-read";
 import { listMeetingMembers } from "@/lib/dal/chat-meeting-read";
 import { listDirectMembers } from "@/lib/dal/direct";
@@ -98,6 +103,8 @@ export function createMessageActions(
               original.kind !== "text"
             )
               throw new ActionError("NOT_FOUND");
+            if (!input.body && !(await messageHasAttachments(original.id, tx)))
+              throw new ActionError("INVALID_INPUT");
             const members =
               currentAccess.room.kind === "meeting"
                 ? await listMeetingMembers(
@@ -223,7 +230,11 @@ export function createMessageActions(
                 messageId: message.id,
                 seq: message.seq,
                 authorName: session.name ?? "알 수 없는 사용자",
-                excerpt: excerptOf(message.body, result.names),
+                excerpt: excerptOf(
+                  message.body,
+                  result.names,
+                  message.attachments,
+                ),
               },
             });
           await publish(events);
@@ -271,8 +282,22 @@ export function createMessageActions(
               },
               tx,
             );
-            return { id: original.id, seq: original.seq, changed };
+            const attachments = changed
+              ? await deleteMessageAttachments(original.id, target.roomId, tx)
+              : [];
+            return { id: original.id, seq: original.seq, changed, attachments };
           }, dependencies.database);
+          for (const attachment of result.attachments) {
+            try {
+              await (dependencies.storage ?? getFileStorage()).remove(
+                attachment.storageKey,
+              );
+            } catch {
+              (dependencies.logError ?? console.error)(
+                "Chat attachment cleanup failed.",
+              );
+            }
+          }
           if (result.changed)
             await publish([
               {

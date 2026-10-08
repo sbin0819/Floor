@@ -63,6 +63,7 @@ const actions = (): GroupActions => ({
 async function setup(ui: ReactNode) {
   const client = new QueryClient();
   client.setQueryData(["chat", "nav"], {
+    filesEnabled: false,
     callsEnabled: false,
     calls: [],
     myCall: null,

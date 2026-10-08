@@ -41,6 +41,10 @@ export function applyMessageEvent(
             mentions: [],
             mentionsEveryone: false,
             reactions: [],
+            attachments: [],
+            replyTo: row.replyTo
+              ? { ...row.replyTo, attachmentSummary: null }
+              : null,
             reactionIntents: undefined,
           }
         : {
@@ -56,10 +60,18 @@ export function applyMessageEvent(
         replyTo: {
           ...row.replyTo,
           deleted: deleted || row.replyTo.deleted,
+          attachmentSummary:
+            deleted || row.replyTo.deleted
+              ? null
+              : row.replyTo.attachmentSummary,
           excerpt:
             deleted || row.replyTo.deleted
               ? "삭제된 메시지예요"
-              : excerptOf(event.body, mentionNames),
+              : excerptOf(
+                  event.body,
+                  mentionNames,
+                  row.replyTo.attachmentSummary,
+                ),
         },
       };
     return row;

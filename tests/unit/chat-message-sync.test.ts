@@ -83,6 +83,7 @@ const deleted: RealtimeEvent = {
 const reply = () =>
   message(51, {
     replyTo: {
+      attachmentSummary: null,
       id: "message-1",
       authorName: "이서연",
       excerpt: "원문",
@@ -115,6 +116,52 @@ afterEach(() => {
 });
 
 describe("loaded message page reconciliation", () => {
+  it("clears attachments and reply summaries immediately without reviving them from stale data", () => {
+    const original = message(1, {
+      attachments: [
+        {
+          id: "file",
+          name: "자료.pdf",
+          size: 10,
+          kind: "file",
+          width: null,
+          height: null,
+        },
+      ],
+    });
+    const quoted = reply();
+    quoted.replyTo!.attachmentSummary = {
+      images: 0,
+      files: 1,
+      firstName: "자료.pdf",
+    };
+    const removed = applyMessageEvent([original, quoted], deleted, new Map());
+    expect(removed[0]!.attachments).toEqual([]);
+    expect(removed[1]!.replyTo).toMatchObject({
+      deleted: true,
+      attachmentSummary: null,
+    });
+    const stale = mergeChatMessages(removed, [original, quoted], userId);
+    expect(stale[0]!.attachments).toEqual([]);
+    expect(stale[1]!.replyTo?.attachmentSummary).toBeNull();
+  });
+  it("uses the retained attachment summary when an edit removes a quoted body", () => {
+    const quoted = reply();
+    quoted.replyTo!.attachmentSummary = {
+      images: 2,
+      files: 0,
+      firstName: "사진.png",
+    };
+    const edited = applyMessageEvent(
+      [quoted],
+      updated({ body: "" }),
+      new Map(),
+    );
+    expect(edited[0]!.replyTo).toMatchObject({
+      excerpt: "사진 2장",
+      attachmentSummary: { images: 2 },
+    });
+  });
   it("coalesces changes in the same fixed 50-sequence page for 250ms", async () => {
     const { sync } = setup([message(1), message(50), message(51)]);
     sync.changed(1);

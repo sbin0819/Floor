@@ -38,6 +38,7 @@ import { listDirectMembers, listDirectNav } from "@/lib/dal/direct";
 import { serializeChatMessage } from "@/lib/dal/chat-messages";
 import { requestCooldownMs } from "@/lib/dal/direct-requests";
 import { callsEnabled } from "@/lib/calls/livekit-server";
+import { filesEnabled } from "@/lib/storage";
 import { joinableCall } from "@/lib/dal/call-access";
 import { readCallNavigation } from "@/lib/dal/call-navigation";
 import { listGroupMembers } from "@/lib/dal/group-dm";
@@ -51,6 +52,7 @@ export type ChatQueryDependencies = {
   now?: () => Date;
   limiter?: RateLimiter;
   callsEnabled?: boolean;
+  filesEnabled?: boolean;
 };
 
 export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
@@ -153,6 +155,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
       }
       return {
         callsEnabled: enabled(),
+        filesEnabled: dependencies.filesEnabled ?? filesEnabled(),
         calls: callNavigation.rooms
           .filter((room) => room.call?.kind === "huddle")
           .map((room) => ({

@@ -4,6 +4,7 @@ import {
 } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
 import type { LiveKitServer } from "@/lib/calls/types";
+import type { FileStorage } from "@/lib/storage/types";
 import { canReadRoom } from "@/lib/dal/chat-access";
 import { advanceRoomRead } from "@/lib/dal/chat-reads";
 import type { DalDatabase, TransactionDatabase } from "@/lib/dal/database";
@@ -24,6 +25,7 @@ import { createGroupActions } from "./group-actions";
 
 const limiter = createMemoryRateLimiter();
 export type ChatActionDependencies = Partial<ActionDependencies> & {
+  storage?: FileStorage;
   livekit?: LiveKitServer | null;
   database?: DalDatabase & TransactionDatabase;
   now?: () => Date;

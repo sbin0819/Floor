@@ -36,6 +36,7 @@ const sdk = vi.hoisted(() => ({
 }));
 
 const created: Extract<RealtimeEvent, { type: "message.created" }> = {
+  attachments: [],
   type: "message.created",
   roomId: "a",
   id: "m",
@@ -48,6 +49,7 @@ const created: Extract<RealtimeEvent, { type: "message.created" }> = {
   body: "답장해요",
   createdAt: "2026-10-08T00:00:00Z",
   replyTo: {
+    attachmentSummary: null,
     id: "original",
     authorName: null,
     excerpt: "원문",

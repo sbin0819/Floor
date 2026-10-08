@@ -15,6 +15,7 @@ import {
 } from "./ably-test-client";
 
 const event: RealtimeEvent = {
+  attachments: [],
   type: "message.created",
   roomId: "a",
   id: "message-a",
