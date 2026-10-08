@@ -26,6 +26,7 @@ export function BookingTimeline({
   disabled,
   onSelect,
   renderCancel,
+  selectionLabel = "새 예약",
 }: {
   branchId?: string;
   slots: SelectableSlot[];
@@ -39,6 +40,7 @@ export function BookingTimeline({
   disabled: boolean;
   onSelect: (start: string) => void;
   renderCancel: (bookingId: string) => ReactNode;
+  selectionLabel?: string;
 }) {
   const id = useId();
   const displayNow = useBranchDisplayNow({ branchId, now });
@@ -65,6 +67,9 @@ export function BookingTimeline({
   const hiddenFirst = grid.hiddenSlots[0];
   const hiddenLast = grid.hiddenSlots.at(-1);
   const displayPosition = grid.position(displayNow);
+  const selectionTop = Math.max(0, grid.position(start));
+  const selectionBottom = Math.min(grid.slots.length, grid.position(end));
+  const showSelection = Boolean(start && end) && selectionBottom > selectionTop;
   const currentPosition =
     localDate(new Date(displayNow), timeZone) === date &&
     displayPosition >= 0 &&
@@ -252,15 +257,16 @@ export function BookingTimeline({
               )}
             </article>
           ))}
-          {start && end && (
+          {showSelection && (
             <div
+              data-booking-selection="true"
               className="absolute inset-x-0 rounded-md border border-dashed border-status-mine-border px-2 py-1 text-xs font-semibold text-status-mine-foreground"
               style={{
-                top: offset(grid.position(start)),
-                height: offset(grid.position(end) - grid.position(start)),
+                top: offset(selectionTop),
+                height: offset(selectionBottom - selectionTop),
               }}
             >
-              새 예약{" "}
+              {selectionLabel}{" "}
               <span className="tabular-nums">
                 {formatBookingTime(start, end, timeZone)}
               </span>

@@ -9,6 +9,7 @@ export function bookingErrorMessage(
     restricted?: boolean;
     capacity?: number | null;
     desk?: boolean;
+    edit?: boolean;
   } = {},
 ): string {
   switch (result.code) {
@@ -47,7 +48,9 @@ export function bookingErrorMessage(
         ? "이 공간은 지정된 팀만 예약할 수 있어요"
         : "이 작업을 할 권한이 없어요";
     case "NOT_FOUND":
-      return "찾을 수 없어요. 화면을 새로 고쳐 주세요";
+      return options.edit
+        ? "이 예약은 더 바꿀 수 없어요"
+        : "찾을 수 없어요. 화면을 새로 고쳐 주세요";
     case "INVALID_INPUT":
       return "입력한 내용을 확인해 주세요";
     case "UNAUTHENTICATED":

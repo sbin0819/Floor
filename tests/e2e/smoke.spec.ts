@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 예약 수정 화면은 로그인으로 안내해요", async ({ page }) => {
+  const path = "/bookings/11111111-1111-4111-8111-111111111111/edit";
+  await page.goto(path);
+  await expect(
+    page.getByRole("heading", { name: "Floor에 로그인", exact: true }),
+  ).toBeVisible();
+  const url = new URL(page.url());
+  expect(url.pathname).toBe("/login");
+  expect(url.searchParams.get("next")).toBe(path);
+});
+
 test("비로그인 알림 API는 401이고 알림 화면은 로그인으로 안내해요", async ({
   request,
   page,

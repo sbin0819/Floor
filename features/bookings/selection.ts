@@ -11,7 +11,11 @@ export type SelectableSlot = BookingSlot & {
   block?: SpaceDayData["blocks"][number];
 };
 
-export function selectableSlots(data: SpaceDayData): SelectableSlot[] {
+export function selectableSlots(
+  data: Pick<SpaceDayData, "now" | "date" | "bookings" | "blocks"> & {
+    branch: Pick<SpaceDayData["branch"], "timezone" | "openHours">;
+  },
+): SelectableSlot[] {
   const minimum = currentSlotStart(
     new Date(data.now),
     data.branch.timezone,

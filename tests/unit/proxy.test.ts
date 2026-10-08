@@ -13,6 +13,7 @@ describe("optimistic route protection", () => {
     "/branches",
     "/branches/branch/floors/floor",
     "/bookings",
+    "/bookings/11111111-1111-4111-8111-111111111111/edit",
     "/booking",
     "/notifications",
   ])("matches protected route %s", (url) => {
@@ -42,6 +43,17 @@ describe("optimistic route protection", () => {
     expect(location.pathname).toBe("/login");
     expect(location.searchParams.get("next")).toBe("/invite/token?x=1");
   });
+  it.each(["/bookings", "/bookings/11111111-1111-4111-8111-111111111111/edit"])(
+    "sends anonymous booking route %s to login",
+    (pathname) => {
+      const response = proxy(
+        new NextRequest(`https://floor.example.test${pathname}`),
+      );
+      const location = new URL(response.headers.get("location")!);
+      expect(location.pathname).toBe("/login");
+      expect(location.searchParams.get("next")).toBe(pathname);
+    },
+  );
   it("uses the operator login without redirecting that login itself", () => {
     expect(
       proxy(new NextRequest("https://floor.example.test/admin")).headers.get(

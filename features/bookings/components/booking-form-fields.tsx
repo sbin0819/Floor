@@ -22,6 +22,7 @@ function TimeSelect({
   onChange,
   options,
   error,
+  changeNote,
 }: {
   id: string;
   label: string;
@@ -30,10 +31,21 @@ function TimeSelect({
   onChange: (value: string) => void;
   options: Option[];
   error?: string;
+  changeNote?: string;
 }) {
   return (
     <div className="space-y-1">
-      <Label htmlFor={id}>{label}</Label>
+      <div className="flex flex-wrap items-center gap-x-2">
+        <Label htmlFor={id}>{label}</Label>
+        {changeNote && (
+          <span
+            id={`${id}-change`}
+            className="text-xs text-muted-foreground tabular-nums"
+          >
+            {changeNote}
+          </span>
+        )}
+      </div>
       <Select
         value={value}
         onValueChange={(next) => {
@@ -46,7 +58,11 @@ function TimeSelect({
           id={id}
           className="min-h-11 w-full tabular-nums"
           aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${id}-error` : undefined}
+          aria-describedby={
+            [error ? `${id}-error` : null, changeNote ? `${id}-change` : null]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
         >
           <SelectValue placeholder={`${label} 시각 선택`}>
             {options.find((option) => option.value === value)?.label}
@@ -85,6 +101,9 @@ export function BookingTimeFields({
   endError,
   onStartChange,
   onEndChange,
+  className,
+  startChangeNote,
+  endChangeNote,
 }: {
   id: string;
   variant: BookingFormVariant;
@@ -97,12 +116,16 @@ export function BookingTimeFields({
   endError?: string;
   onStartChange: (value: string) => void;
   onEndChange: (value: string) => void;
+  className?: string;
+  startChangeNote?: string;
+  endChangeNote?: string;
 }) {
   return (
     <div
       className={cn(
         "grid grid-cols-2 gap-3",
         variant === "strip" && "col-span-2 min-w-56 lg:flex-1",
+        className,
       )}
     >
       <TimeSelect
@@ -113,6 +136,7 @@ export function BookingTimeFields({
         onChange={onStartChange}
         options={startOptions}
         error={startError}
+        changeNote={startChangeNote}
       />
       <TimeSelect
         id={`${id}-end`}
@@ -122,6 +146,7 @@ export function BookingTimeFields({
         onChange={onEndChange}
         options={endOptions}
         error={endError}
+        changeNote={endChangeNote}
       />
     </div>
   );

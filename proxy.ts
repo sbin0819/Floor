@@ -23,7 +23,7 @@ export const config = {
     "/teams/:path*",
     "/invite/:path*",
     "/branches/:path*",
-    "/bookings",
+    "/bookings/:path*",
     "/booking",
     "/notifications",
   ],
