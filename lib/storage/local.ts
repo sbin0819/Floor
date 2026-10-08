@@ -43,7 +43,10 @@ async function canonicalPath(path: string): Promise<string> {
     if (!hasCode(error, "ENOENT")) throw error;
     const parent = dirname(path);
     if (parent === path) throw error;
-    return join(await canonicalPath(parent), relative(parent, path));
+    return join(
+      /* turbopackIgnore: true */ await canonicalPath(parent),
+      relative(parent, path),
+    );
   }
 }
 
@@ -64,7 +67,7 @@ export function createLocalFileStorage({
   publicDirectory?: string;
 }): LocalFileStorage {
   const configuredRoot = resolve(directory);
-  const configuredPublic = resolve(publicDirectory);
+  const configuredPublic = resolve(/* turbopackIgnore: true */ publicDirectory);
   let initialized: Promise<string> | undefined;
 
   async function initialize() {
@@ -105,13 +108,13 @@ export function createLocalFileStorage({
     if (
       !rootInfo.isDirectory() ||
       rootInfo.isSymbolicLink() ||
-      (await realpath(root)) !== root
+      (await realpath(/* turbopackIgnore: true */ root)) !== root
     )
       throw new Error("Invalid storage directory.");
     let parent = root;
     // 서비스만 쓰는 폴더가 전제다. 각 요소를 확인해 기존 심볼릭 링크는 따라가지 않는다.
     for (const part of parts.slice(0, -1)) {
-      parent = join(parent, part);
+      parent = join(/* turbopackIgnore: true */ parent, part);
       if (createParents) {
         try {
           await mkdir(parent, { mode: 0o700 });
@@ -133,7 +136,7 @@ export function createLocalFileStorage({
     try {
       const path = await filePath(key, false);
       handle = await open(
-        path,
+        /* turbopackIgnore: true */ path,
         constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
       );
       if (!(await handle.stat()).isFile())

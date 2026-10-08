@@ -25,7 +25,10 @@ export function getFileStorage(
   env: StorageEnvironment = getEnv(),
 ): FileStorage {
   if (!filesEnabled(env)) return disabledFileStorage;
-  const directory = resolve(env.FILE_STORAGE_DIR ?? ".floor-local/uploads");
+  // 업로드 파일은 런타임 데이터이므로 빌드의 파일 추적 대상이 아니다.
+  const directory = resolve(
+    /* turbopackIgnore: true */ env.FILE_STORAGE_DIR ?? ".floor-local/uploads",
+  );
   if (!local || local.directory !== directory)
     local = { directory, storage: createLocalFileStorage({ directory }) };
   return local.storage;
