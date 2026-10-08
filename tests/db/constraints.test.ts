@@ -21,6 +21,7 @@ import {
   friendships,
   floors,
   messages,
+  messageAttachments,
   messageMentions,
   messageReactions,
   reports,
@@ -394,7 +395,7 @@ describe("database constraints from the real migrations", () => {
     },
   );
 
-  it.each([0, 4001])("9. rejects invalid body length %i", async (length) => {
+  it.each([4001])("9. rejects invalid body length %i", async (length) => {
     await expect(
       database.db.insert(messages).values({
         roomId,
@@ -459,14 +460,12 @@ describe("database constraints from the real migrations", () => {
       .insert(chatRooms)
       .values({ kind: "text", spaceId: chatSpaceId, name: "General" });
     await expect(
-      database.db
-        .insert(chatRooms)
-        .values({
-          kind: "voice",
-          voiceCapacity: 10,
-          spaceId: chatSpaceId,
-          name: "gENERAL",
-        }),
+      database.db.insert(chatRooms).values({
+        kind: "voice",
+        voiceCapacity: 10,
+        spaceId: chatSpaceId,
+        name: "gENERAL",
+      }),
     ).rejects.toMatchObject({
       cause: { code: "23505", constraint: "chat_rooms_space_name_unique" },
     });
@@ -882,22 +881,36 @@ describe("database constraints from the real migrations", () => {
     expect(await database.db.select().from(messages)).toHaveLength(0);
   });
 
-  it("25. permits only empty bodies for deleted messages and nonempty live bodies", async () => {
-    for (const value of [
-      { body: "", deletedAt: null },
-      { body: "남은 본문", deletedAt: during.start },
-    ]) {
+  it("25. accepts empty live text bodies but keeps live system bodies nonempty and deleted bodies empty", async () => {
+    for (const kind of ["text", "system"] as const) {
       await expect(
         database.db.insert(messages).values({
           roomId,
-          authorId: userId,
+          kind,
+          authorId: kind === "text" ? userId : null,
+          systemData:
+            kind === "system"
+              ? { type: "group_created", actorName: "테스트 사용자" }
+              : null,
           seq: 1,
-          ...value,
+          body: "남은 본문",
+          deletedAt: during.start,
         }),
       ).rejects.toMatchObject({
         cause: { code: "23514", constraint: "messages_body_length" },
       });
     }
+    await expect(
+      database.db.insert(messages).values({
+        roomId,
+        kind: "system",
+        seq: 1,
+        body: "",
+        systemData: { type: "group_created", actorName: "테스트 사용자" },
+      }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "messages_body_length" },
+    });
     await database.db.insert(messages).values([
       { roomId, authorId: userId, seq: 1, body: "정상 메시지" },
       {
@@ -908,8 +921,226 @@ describe("database constraints from the real migrations", () => {
         deletedAt: during.start,
         deletedBy: userId,
       },
+      { roomId, authorId: userId, seq: 3, body: "" },
+      {
+        roomId,
+        kind: "system",
+        seq: 4,
+        body: "",
+        deletedAt: during.start,
+        systemData: { type: "group_created", actorName: "테스트 사용자" },
+      },
     ]);
-    expect(await database.db.select().from(messages)).toHaveLength(2);
+    expect(await database.db.select().from(messages)).toHaveLength(4);
+  });
+
+  const attachment = (
+    overrides: Partial<typeof messageAttachments.$inferInsert> = {},
+  ): typeof messageAttachments.$inferInsert => ({
+    roomId,
+    uploaderId: userId,
+    storageKey: `chat/2026/10/${crypto.randomUUID()}`,
+    name: "첨부.txt",
+    size: 1,
+    contentType: "application/octet-stream",
+    createdAt: during.start,
+    ...overrides,
+  });
+
+  it("43. rejects a duplicate storage key even before attachment", async () => {
+    const input = attachment();
+    await database.db.insert(messageAttachments).values(input);
+    await expect(
+      database.db.insert(messageAttachments).values(input),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "message_attachments_key_unique" },
+    });
+  });
+
+  it.each([-1, 0, 26214401])("43. rejects attachment size %i", async (size) => {
+    await expect(
+      database.db.insert(messageAttachments).values(attachment({ size })),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "message_attachments_size_range" },
+    });
+  });
+
+  it("43. accepts 1 byte and exactly 25 MiB and reads bigint sizes as numbers", async () => {
+    const rows = await database.db
+      .insert(messageAttachments)
+      .values([attachment({ size: 1 }), attachment({ size: 26214400 })])
+      .returning({ size: messageAttachments.size });
+    expect(rows).toEqual([{ size: 1 }, { size: 26214400 }]);
+  });
+
+  it.each(["", "😀".repeat(201)])(
+    "43. rejects attachment names outside 1–200 Unicode characters (%j)",
+    async (name) => {
+      await expect(
+        database.db.insert(messageAttachments).values(attachment({ name })),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "message_attachments_name_length" },
+      });
+    },
+  );
+
+  it("43. counts astral Unicode characters rather than UTF-16 code units in a name", async () => {
+    const name = "😀".repeat(200);
+    const rows = await database.db
+      .insert(messageAttachments)
+      .values([attachment({ name: "가" }), attachment({ name })])
+      .returning({ name: messageAttachments.name });
+    expect(rows).toEqual([{ name: "가" }, { name }]);
+  });
+
+  it.each([
+    { position: null, uploadedAt: null },
+    { position: null, uploadedAt: during.start },
+    { position: 0, uploadedAt: null },
+  ])(
+    "43. requires both position and uploadedAt once attached: %j",
+    async (value) => {
+      const [message] = await database.db
+        .insert(messages)
+        .values({ roomId, seq: 1, authorId: userId, body: "" })
+        .returning();
+      await expect(
+        database.db
+          .insert(messageAttachments)
+          .values(attachment({ messageId: message!.id, ...value })),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "message_attachments_attached" },
+      });
+    },
+  );
+
+  it.each([-1, 10])(
+    "43. rejects position %i even before attaching",
+    async (position) => {
+      await expect(
+        database.db.insert(messageAttachments).values(attachment({ position })),
+      ).rejects.toMatchObject({
+        cause: {
+          code: "23514",
+          constraint: "message_attachments_position_range",
+        },
+      });
+    },
+  );
+
+  it.each([
+    { kind: "image", width: null, height: null },
+    { kind: "image", width: null, height: 1 },
+    { kind: "image", width: 1, height: null },
+    { kind: "image", width: 0, height: 1 },
+    { kind: "image", width: 1, height: 0 },
+    { kind: "image", width: -1, height: 1 },
+    { kind: "image", width: 1, height: -1 },
+    { kind: "file", width: 1, height: null },
+    { kind: "file", width: null, height: 1 },
+    { kind: "file", width: 1, height: 1 },
+  ] as const)(
+    "44. rejects inconsistent attachment dimensions %j",
+    async (value) => {
+      await expect(
+        database.db.insert(messageAttachments).values(attachment(value)),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "message_attachments_image_size" },
+      });
+    },
+  );
+
+  it("44. permits NULL message positions while enforcing unique positions for each attached message", async () => {
+    const insertedMessages = await database.db
+      .insert(messages)
+      .values(
+        [1, 2].map((seq) => ({ roomId, seq, authorId: userId, body: "" })),
+      )
+      .returning();
+    const input = attachment({
+      messageId: insertedMessages[0]!.id,
+      position: 0,
+      uploadedAt: during.start,
+      kind: "image",
+      width: 1,
+      height: 1,
+    });
+    await database.db
+      .insert(messageAttachments)
+      .values([
+        input,
+        attachment({
+          messageId: insertedMessages[0]!.id,
+          position: 9,
+          uploadedAt: during.start,
+        }),
+        attachment({
+          messageId: insertedMessages[1]!.id,
+          position: 0,
+          uploadedAt: during.start,
+        }),
+        attachment({ messageId: null, position: null }),
+        attachment({ messageId: null, position: null }),
+        attachment({ messageId: null, position: 0 }),
+        attachment({ messageId: null, position: 0 }),
+      ]);
+    expect(await database.db.select().from(messageAttachments)).toHaveLength(7);
+    await expect(
+      database.db
+        .insert(messageAttachments)
+        .values({ ...input, storageKey: "different-key" }),
+    ).rejects.toMatchObject({
+      cause: {
+        code: "23505",
+        constraint: "message_attachments_position_unique",
+      },
+    });
+  });
+
+  it("44. cascades attached files on message deletion and unattached files on room deletion", async () => {
+    const [message] = await database.db
+      .insert(messages)
+      .values({ roomId, seq: 1, authorId: userId, body: "" })
+      .returning();
+    const rows = await database.db
+      .insert(messageAttachments)
+      .values([
+        attachment({
+          messageId: message!.id,
+          position: 0,
+          uploadedAt: during.start,
+        }),
+        attachment(),
+      ])
+      .returning();
+    await database.db.delete(messages).where(eq(messages.id, message!.id));
+    expect(await database.db.select().from(messageAttachments)).toEqual([
+      rows[1],
+    ]);
+    await database.db.delete(chatRooms).where(eq(chatRooms.id, roomId));
+    expect(await database.db.select().from(messageAttachments)).toEqual([]);
+  });
+
+  it("44. restricts deleting an uploader referenced only by a pending attachment", async () => {
+    const [uploader] = await database.db
+      .insert(users)
+      .values({
+        name: "첨부만 올린 사람",
+        email: "uploader@example.test",
+      })
+      .returning();
+    await database.db
+      .insert(messageAttachments)
+      .values(attachment({ uploaderId: uploader!.id }));
+    await expect(
+      database.db.delete(users).where(eq(users.id, uploader!.id)),
+    ).rejects.toMatchObject({
+      cause: {
+        code: "23001",
+        constraint: "message_attachments_uploader_id_users_id_fk",
+      },
+    });
+    expect(await database.db.select().from(messageAttachments)).toHaveLength(1);
   });
 
   it("26. enforces reaction uniqueness and enum and cascades reaction/mention rows", async () => {
@@ -1387,21 +1618,17 @@ describe("call constraints from the real migrations", () => {
     userId = crypto.randomUUID();
     chatSpaceId = crypto.randomUUID();
     roomId = crypto.randomUUID();
-    await database.db
-      .insert(users)
-      .values({
-        id: userId,
-        name: "김하은",
-        email: "call-constraints@example.test",
-      });
-    await database.db
-      .insert(chatSpaces)
-      .values({
-        id: chatSpaceId,
-        kind: "community",
-        name: "가상 커뮤니티",
-        createdBy: userId,
-      });
+    await database.db.insert(users).values({
+      id: userId,
+      name: "김하은",
+      email: "call-constraints@example.test",
+    });
+    await database.db.insert(chatSpaces).values({
+      id: chatSpaceId,
+      kind: "community",
+      name: "가상 커뮤니티",
+      createdBy: userId,
+    });
     await database.db
       .insert(chatRooms)
       .values({ id: roomId, kind: "text", spaceId: chatSpaceId, name: "일반" });
@@ -1411,39 +1638,33 @@ describe("call constraints from the real migrations", () => {
     "40. rejects voice capacity %s",
     async (voiceCapacity) => {
       await expect(
-        database.db
-          .insert(chatRooms)
-          .values({
-            kind: "voice",
-            spaceId: chatSpaceId,
-            name: "음성",
-            voiceCapacity,
-          }),
+        database.db.insert(chatRooms).values({
+          kind: "voice",
+          spaceId: chatSpaceId,
+          name: "음성",
+          voiceCapacity,
+        }),
       ).rejects.toMatchObject({
         cause: { code: "23514", constraint: "chat_rooms_voice_capacity" },
       });
     },
   );
   it("40. allows inclusive voice capacity bounds, rejects a capacity on non-voice rooms and enforces updates", async () => {
-    await database.db
-      .insert(chatRooms)
-      .values(
-        [2, 25].map((voiceCapacity) => ({
-          kind: "voice" as const,
-          spaceId: chatSpaceId,
-          name: `음성-${voiceCapacity}`,
-          voiceCapacity,
-        })),
-      );
+    await database.db.insert(chatRooms).values(
+      [2, 25].map((voiceCapacity) => ({
+        kind: "voice" as const,
+        spaceId: chatSpaceId,
+        name: `음성-${voiceCapacity}`,
+        voiceCapacity,
+      })),
+    );
     await expect(
-      database.db
-        .insert(chatRooms)
-        .values({
-          kind: "text",
-          spaceId: chatSpaceId,
-          name: "다른 텍스트",
-          voiceCapacity: 10,
-        }),
+      database.db.insert(chatRooms).values({
+        kind: "text",
+        spaceId: chatSpaceId,
+        name: "다른 텍스트",
+        voiceCapacity: 10,
+      }),
     ).rejects.toMatchObject({
       cause: { code: "23514", constraint: "chat_rooms_voice_capacity" },
     });
@@ -1491,15 +1712,13 @@ describe("call constraints from the real migrations", () => {
   });
   it("42. permits only one open participant per user across sessions, permits reentry and cascades session deletion", async () => {
     const otherRoomId = crypto.randomUUID();
-    await database.db
-      .insert(chatRooms)
-      .values({
-        id: otherRoomId,
-        kind: "voice",
-        spaceId: chatSpaceId,
-        name: "음성",
-        voiceCapacity: 10,
-      });
+    await database.db.insert(chatRooms).values({
+      id: otherRoomId,
+      kind: "voice",
+      spaceId: chatSpaceId,
+      name: "음성",
+      voiceCapacity: 10,
+    });
     const sessions = await database.db
       .insert(callSessions)
       .values([

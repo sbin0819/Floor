@@ -30,6 +30,7 @@
     "cmdk": "1.1.1",
     "cn": "^0.4.0",
     "drizzle-orm": "^0.45.3",
+    "image-size": "2.0.4",
     "livekit-client": "2.22.3",
     "livekit-server-sdk": "2.19.1",
     "lucide-react": "^1.52.0",

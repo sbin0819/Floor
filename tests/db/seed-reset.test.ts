@@ -22,6 +22,8 @@ import {
   chatSpaces,
   chatSpaceMembers,
   chatSpaceInvites,
+  messageAttachments,
+  messages,
   users,
 } from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
@@ -189,7 +191,7 @@ describe("explicit full development reset", () => {
     expect(await snapshot()).toEqual(before);
   }, 60000);
 
-  it("explicitly resets call sessions and participants without recreating simulated calls", async () => {
+  it("explicitly resets calls and attachments and restores them on transaction failure", async () => {
     const [user] = await database.db.select().from(users).limit(1);
     const [room] = await database.db
       .select()
@@ -205,14 +207,34 @@ describe("explicit full development reset", () => {
         startedAt: now,
       })
       .returning();
-    await database.db
-      .insert(callParticipants)
-      .values({
-        sessionId: session!.id,
-        userId: user!.id,
-        joinedAt: now,
-        lastSeenAt: now,
-      });
+    await database.db.insert(callParticipants).values({
+      sessionId: session!.id,
+      userId: user!.id,
+      joinedAt: now,
+      lastSeenAt: now,
+    });
+    const [message] = await database.db.select().from(messages).limit(1);
+    await database.db.insert(messageAttachments).values([
+      {
+        roomId: message!.roomId,
+        uploaderId: user!.id,
+        messageId: message!.id,
+        position: 0,
+        uploadedAt: now,
+        storageKey: "chat/2026/10/reset-attached",
+        name: "초기화할 첨부.txt",
+        size: 10,
+        contentType: "application/octet-stream",
+      },
+      {
+        roomId: message!.roomId,
+        uploaderId: user!.id,
+        storageKey: "chat/2026/10/reset-uploading",
+        name: "올리는 중인 첨부.txt",
+        size: 20,
+        contentType: "application/octet-stream",
+      },
+    ]);
     const before = await snapshot();
     vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
       new Error("injected later failure"),
@@ -221,13 +243,15 @@ describe("explicit full development reset", () => {
     expect(await snapshot()).toEqual(before);
     vi.restoreAllMocks();
     const result = await reset();
-    expect(Object.keys(result.reset!.counts)).toHaveLength(35);
+    expect(Object.keys(result.reset!.counts)).toHaveLength(36);
     expect(result.reset!.counts).toMatchObject({
       call_sessions: 1,
       call_participants: 1,
+      message_attachments: 2,
     });
     expect(await database.db.select().from(callSessions)).toEqual([]);
     expect(await database.db.select().from(callParticipants)).toEqual([]);
+    expect(await database.db.select().from(messageAttachments)).toEqual([]);
   }, 60000);
 
   it("repopulates public tables even when a temporary table shadows the user table", async () => {

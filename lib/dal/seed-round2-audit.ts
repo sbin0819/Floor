@@ -32,6 +32,7 @@ const protectedTables = {
   notifications: ["id"],
   chat_rooms: ["id"],
   messages: ["id"],
+  message_attachments: ["id"],
   chat_spaces: ["id"],
   chat_space_members: ["space_id", "user_id"],
   chat_space_invites: ["id"],

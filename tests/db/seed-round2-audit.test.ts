@@ -29,6 +29,7 @@ import {
   chatSpaceMembers,
   chatSpaceInvites,
   messages,
+  messageAttachments,
   floors,
   notifications,
   roleSettings,
@@ -63,6 +64,84 @@ describe("read-only booking round2 preservation audit", () => {
   });
   const capture = (allowSeedAttendeeCounts = false) =>
     captureSeedRound2Audit({ allowSeedAttendeeCounts }, database.db);
+
+  it("detects changed and removed attachments without exposing storage keys or filenames", async () => {
+    const [space] = await database.db
+      .insert(chatSpaces)
+      .values({
+        kind: "team",
+        teamId: actors.teamId,
+      })
+      .returning();
+    const [room] = await database.db
+      .insert(chatRooms)
+      .values({
+        kind: "text",
+        name: "일반",
+        spaceId: space!.id,
+      })
+      .returning();
+    const [message] = await database.db
+      .insert(messages)
+      .values({
+        roomId: room!.id,
+        seq: 1,
+        authorId: actors.person.userId,
+        body: "",
+      })
+      .returning();
+    const base = {
+      roomId: room!.id,
+      uploaderId: actors.person.userId,
+      name: "private-original-filename.txt",
+      contentType: "application/octet-stream",
+      size: 10,
+    };
+    const [attached, pending] = await database.db
+      .insert(messageAttachments)
+      .values([
+        {
+          ...base,
+          messageId: message!.id,
+          position: 0,
+          uploadedAt: bookingNow,
+          storageKey: "private-attached-storage-key",
+        },
+        { ...base, storageKey: "private-pending-storage-key" },
+      ])
+      .returning();
+    const before = await capture();
+    expect(JSON.stringify(before)).not.toContain("private-original-filename");
+    expect(JSON.stringify(before)).not.toContain(
+      "private-attached-storage-key",
+    );
+    expect(JSON.stringify(before)).not.toContain("private-pending-storage-key");
+    expect(compareSeedRound2Audit(before, await capture()).ok).toBe(true);
+    await database.db
+      .update(messageAttachments)
+      .set({ size: 11 })
+      .where(eq(messageAttachments.id, attached!.id));
+    await database.db
+      .delete(messageAttachments)
+      .where(eq(messageAttachments.id, pending!.id));
+    const comparison = compareSeedRound2Audit(before, await capture());
+    expect(comparison.ok).toBe(false);
+    expect(comparison.issues).toHaveLength(2);
+    expect(comparison.issues).toEqual(
+      expect.arrayContaining([
+        {
+          table: "message_attachments",
+          key: JSON.stringify([attached!.id]),
+          kind: "changed_row",
+        },
+        {
+          table: "message_attachments",
+          key: JSON.stringify([pending!.id]),
+          kind: "missing_row",
+        },
+      ]),
+    );
+  });
 
   it("detects changed or removed call rows without returning participant data", async () => {
     const [space] = await database.db
@@ -188,7 +267,7 @@ describe("read-only booking round2 preservation audit", () => {
     });
     const before = await capture();
     expect(await capture()).toEqual(before);
-    expect(before.tables).toHaveLength(27);
+    expect(before.tables).toHaveLength(28);
     expect(before.tables.every((table) => table.exists)).toBe(true);
     const account = before.tables.find(
       ({ table }) => table === "auth_accounts",

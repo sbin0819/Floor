@@ -12,6 +12,11 @@ const envSchema = z
     LIVEKIT_URL: optionalValue,
     LIVEKIT_API_KEY: optionalValue,
     LIVEKIT_API_SECRET: optionalValue,
+    FILE_STORAGE: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.enum(["local", "disabled"]).optional(),
+    ),
+    FILE_STORAGE_DIR: optionalValue,
     AUTH_SECRET: optionalValue.refine(
       (value) =>
         value === undefined || new TextEncoder().encode(value).length >= 32,

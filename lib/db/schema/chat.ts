@@ -236,7 +236,7 @@ export const messages = pgTable(
     ),
     check(
       "messages_body_length",
-      sql`(${table.deletedAt} IS NULL AND char_length(${table.body}) BETWEEN 1 AND 4000) OR (${table.deletedAt} IS NOT NULL AND ${table.body} = '')`,
+      sql`(${table.deletedAt} IS NULL AND ((${table.kind} = 'text' AND char_length(${table.body}) BETWEEN 0 AND 4000) OR (${table.kind} = 'system' AND char_length(${table.body}) BETWEEN 1 AND 4000))) OR (${table.deletedAt} IS NOT NULL AND ${table.body} = '')`,
     ),
     check(
       "messages_system_data",

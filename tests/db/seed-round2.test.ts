@@ -65,6 +65,7 @@ const protectedTables = [
   "floor_plans",
   "chat_rooms",
   "messages",
+  "message_attachments",
   "chat_spaces",
   "chat_room_reads",
   "chat_room_members",
@@ -222,14 +223,40 @@ describe("receipt-backed booking round 2 additions", () => {
         startedAt: now,
       })
       .returning();
-    await database.db
-      .insert(schema.callParticipants)
-      .values({
-        sessionId: call!.id,
-        userId: person.id,
-        joinedAt: now,
-        lastSeenAt: now,
-      });
+    await database.db.insert(schema.callParticipants).values({
+      sessionId: call!.id,
+      userId: person.id,
+      joinedAt: now,
+      lastSeenAt: now,
+    });
+    const [message] = await database.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.authorId, person.id))
+      .limit(1);
+    await database.db.insert(schema.messageAttachments).values([
+      {
+        roomId: message!.roomId,
+        uploaderId: person.id,
+        messageId: message!.id,
+        position: 0,
+        uploadedAt: previousSeedAt,
+        storageKey: "chat/2026/10/preserve-attached",
+        name: "보존할 첨부.txt",
+        size: 10,
+        contentType: "application/octet-stream",
+        createdAt: previousSeedAt,
+      },
+      {
+        roomId: message!.roomId,
+        uploaderId: person.id,
+        storageKey: "chat/2026/10/preserve-uploading",
+        name: "아직 올리는 첨부.txt",
+        size: 20,
+        contentType: "application/octet-stream",
+        createdAt: now,
+      },
+    ]);
     const before = await preserved();
     const authRead = vi.spyOn(authModule, "getAuth").mockImplementation(() => {
       throw new Error("must not initialize auth");
@@ -259,7 +286,7 @@ describe("receipt-backed booking round 2 additions", () => {
       statements
         .slice(beforeSeed)
         .filter(({ sql: query }) =>
-          /\b(?:from|into|update|join)\s+"(?:chat_|call_|messages)/iu.test(
+          /\b(?:from|into|update|join)\s+"(?:chat_|call_|message)/iu.test(
             query,
           ),
         ),

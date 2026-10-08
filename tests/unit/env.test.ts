@@ -58,6 +58,24 @@ describe("environment", () => {
   it("rejects an invalid application URL", () => {
     expect(() => parseEnv({ NEXT_PUBLIC_APP_URL: "not-a-url" })).toThrow();
   });
+  it("accepts optional local storage settings without enabling them in the parser", () => {
+    expect(parseEnv({}).FILE_STORAGE).toBeUndefined();
+    expect(parseEnv({ FILE_STORAGE: "", FILE_STORAGE_DIR: "" })).toMatchObject({
+      FILE_STORAGE: undefined,
+      FILE_STORAGE_DIR: undefined,
+    });
+    expect(
+      parseEnv({ FILE_STORAGE: "local", FILE_STORAGE_DIR: "/private/uploads" }),
+    ).toMatchObject({
+      FILE_STORAGE: "local",
+      FILE_STORAGE_DIR: "/private/uploads",
+    });
+    expect(parseEnv({ FILE_STORAGE: "disabled" }).FILE_STORAGE).toBe(
+      "disabled",
+    );
+    for (const value of ["s3", "LOCAL", " local "])
+      expect(() => parseEnv({ FILE_STORAGE: value })).toThrow();
+  });
   it("preserves the exact optional seed hostname for the CLI allowlist", () => {
     expect(
       parseEnv({ SEED_ALLOW_HOST: "dev-db.example.test" }).SEED_ALLOW_HOST,
