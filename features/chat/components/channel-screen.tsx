@@ -25,6 +25,12 @@ import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
 import { ChannelMembers } from "./channel-members";
 import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
+import { MessageDeleteDialog } from "./message-delete-dialog";
+import {
+  useMessageMutations,
+  withReactionIntents,
+} from "./use-message-mutations";
+import type { DisplayMessage } from "./message-state";
 import { useMessageHistory } from "./use-message-history";
 import { useRoomRead } from "./use-room-read";
 import {
@@ -60,6 +66,27 @@ export function ChannelScreen({
   send?: SendChatMessage;
 }) {
   const messages = useChannelMessages(data, send);
+  const mutations = useMessageMutations({
+    roomId: data.room.id,
+    userId: data.user.id,
+    members: data.members,
+  });
+  const [deleting, setDeleting] = useState<DisplayMessage | null>(null);
+  const deleteOrigin = useRef<string | null>(null);
+  const channelRef = useRef<HTMLElement>(null);
+  const admin = data.members.some(
+    (member) => member.id === data.user.id && member.admin,
+  );
+  const returnMessageFocus = (id: string | null) => {
+    [
+      ...(channelRef.current?.querySelectorAll<HTMLElement>(
+        "[data-message-id]",
+      ) ?? []),
+    ]
+      .find((element) => element.dataset.messageId === id)
+      ?.querySelector<HTMLElement>("article")
+      ?.focus();
+  };
   const client = useQueryClient();
   const sendingCount = useIsMutating({ mutationKey: ["chat", "send"] });
   const resetVersion = messages.historyReset?.version ?? 0;
@@ -111,6 +138,7 @@ export function ChannelScreen({
   const trigger = useRef<HTMLButtonElement>(null);
   return (
     <section
+      ref={channelRef}
       data-chat-screen
       className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col bg-background"
     >
@@ -157,7 +185,7 @@ export function ChannelScreen({
             channelName={data.room.name}
             now={data.now}
             userId={data.user.id}
-            messages={messages.messages}
+            messages={messages.messages.map(withReactionIntents)}
             firstUnreadSeq={
               messages.historyReset
                 ? messages.historyReset.firstUnreadSeq
@@ -171,6 +199,18 @@ export function ChannelScreen({
             onViewport={onViewport}
             onRetry={messages.retry}
             onRemove={messages.remove}
+            actions={{
+              userId: data.user.id,
+              canWrite: data.canWrite,
+              canReact: !data.room.archived,
+              admin,
+              names: new Map(data.members.map(({ id, name }) => [id, name])),
+              react: mutations.react,
+              onDelete: (message) => {
+                deleteOrigin.current = message.id;
+                setDeleting(message);
+              },
+            }}
           />
           {data.canWrite ? (
             <MessageComposer
@@ -199,6 +239,13 @@ export function ChannelScreen({
           </aside>
         )}
       </div>
+      <MessageDeleteDialog
+        message={deleting}
+        userId={data.user.id}
+        onClose={() => setDeleting(null)}
+        onDelete={mutations.remove}
+        onReturnFocus={() => returnMessageFocus(deleteOrigin.current)}
+      />
       <Sheet open={!wide && membersOpen} onOpenChange={setMembersOpen}>
         <SheetContent
           id={membersId}

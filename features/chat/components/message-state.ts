@@ -1,11 +1,14 @@
 import type { ActionErrorCode } from "@/lib/actions/result";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, ReactionEmoji } from "../types";
 import { chatDate } from "@/lib/time/chat-format";
 
 export type DisplayMessage = ChatMessage & {
   delivery?: "pending" | "failed";
   errorCode?: ActionErrorCode;
   errorMessage?: string;
+  reactionIntents?: Partial<
+    Record<ReactionEmoji, { token: string; on: boolean }>
+  >;
 };
 
 export const roomMessagesKey = (roomId: string) =>
@@ -33,7 +36,31 @@ export function mergeChatMessages(
           row.clientId === message.clientId),
     );
     if (index === -1) rows.push(message);
-    else rows[index] = message;
+    else {
+      const previous = rows[index]!;
+      if (previous.deletedAt && !message.deletedAt) continue;
+      const newerEdit =
+        !message.deletedAt &&
+        (previous.editedAt ?? "") > (message.editedAt ?? "");
+      rows[index] = {
+        ...message,
+        ...(previous.replyTo?.deleted &&
+        previous.replyTo.id === message.replyTo?.id
+          ? { replyTo: previous.replyTo }
+          : {}),
+        ...(newerEdit
+          ? {
+              body: previous.body,
+              mentions: previous.mentions,
+              mentionsEveryone: previous.mentionsEveryone,
+              editedAt: previous.editedAt,
+            }
+          : {}),
+        ...(previous.reactionIntents && !message.deletedAt
+          ? { reactionIntents: previous.reactionIntents }
+          : {}),
+      };
+    }
   }
   return rows.sort((a, b) => {
     if (a.delivery && b.delivery) return 0;

@@ -7,11 +7,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { chatDate } from "@/lib/time/chat-format";
 import type { ChatMessage } from "../types";
 import {
@@ -19,7 +21,7 @@ import {
   messageKey,
   type DisplayMessage,
 } from "./message-state";
-import { MessageRow } from "./message-row";
+import { MessageRow, type MessageActions } from "./message-row";
 
 const emptyLiveMessages: ChatMessage[] = [];
 const noViewport = () => {};
@@ -81,6 +83,10 @@ export const MessageList = memo(function MessageList({
   onViewport = noViewport,
   onRetry,
   onRemove,
+  actions,
+  editingId,
+  renderEditor,
+  focusMessageId,
 }: {
   messages: readonly DisplayMessage[];
   channelName: string;
@@ -95,12 +101,22 @@ export const MessageList = memo(function MessageList({
   onViewport?: (atBottom: boolean, seq: number | null) => void;
   onRetry: (message: DisplayMessage) => void;
   onRemove: (message: DisplayMessage) => void;
+  actions?: MessageActions;
+  editingId?: string | null;
+  renderEditor?: (message: DisplayMessage) => ReactNode;
+  focusMessageId?: string | null;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // 읽음 응답은 경계선을 지우지 않는다. 방이나 복구 세대가 바뀔 때만 다시 만든다.
   const [unreadSeq, setUnreadSeq] = useState(firstUnreadSeq);
   const [initialized, setInitialized] = useState(false);
   const [seenThrough, setSeenThrough] = useState(0);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [pendingFocus, setPendingFocus] = useState<string | null>(null);
+  const [jumpId, setJumpId] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [jumpError, setJumpError] = useState("");
+  const focusedIndex = messages.findIndex(({ id }) => id === focusedId);
   const getItemKey = useCallback(
     (index: number) => messageKey(messages[index]!, userId),
     [messages, userId],
@@ -116,6 +132,13 @@ export const MessageList = memo(function MessageList({
     anchorTo: "end",
     followOnAppend: initialized,
     scrollEndThreshold: 120,
+    rangeExtractor: (range) =>
+      [
+        ...new Set([
+          ...defaultRangeExtractor(range),
+          ...(focusedIndex >= 0 ? [focusedIndex] : []),
+        ]),
+      ].sort((a, b) => a - b),
   });
   const rows = virtualizer.getVirtualItems();
   const offset = virtualizer.scrollOffset ?? 0;
@@ -135,6 +158,63 @@ export const MessageList = memo(function MessageList({
     0,
   );
   const confirmedCount = messages.filter((message) => !message.delivery).length;
+
+  const focusRow = (index: number) => {
+    const message = messages[index];
+    if (!message) return;
+    setFocusedId(message.id);
+    setPendingFocus(message.id);
+    virtualizer.scrollToIndex(index, { align: "auto" });
+  };
+  useLayoutEffect(() => {
+    if (!pendingFocus) return;
+    const row = [
+      ...(scrollRef.current?.querySelectorAll<HTMLElement>(
+        "[data-message-id]",
+      ) ?? []),
+    ]
+      .find((element) => element.dataset.messageId === pendingFocus)
+      ?.querySelector<HTMLElement>("article");
+    if (row) {
+      row.focus({ preventScroll: true });
+      setPendingFocus(null);
+    }
+  }, [pendingFocus, rows]);
+  useEffect(() => {
+    if (!focusMessageId) return;
+    const index = messages.findIndex(({ id }) => id === focusMessageId);
+    if (index < 0) return;
+    setFocusedId(focusMessageId);
+    virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [focusMessageId, messages, virtualizer]);
+  useEffect(() => {
+    if (!jumpId) return;
+    const index = messages.findIndex(({ id }) => id === jumpId);
+    if (index >= 0) {
+      setFocusedId(jumpId);
+      setPendingFocus(jumpId);
+      virtualizer.scrollToIndex(index, { align: "center" });
+      setHighlighted(jumpId);
+      setJumpId(null);
+    } else if (!hasMore || confirmedCount >= 500) {
+      setJumpError("원문이 너무 멀리 있어요");
+      setJumpId(null);
+    } else if (!loadingOlder && !historyError) void onLoadOlder(500);
+  }, [
+    jumpId,
+    messages,
+    hasMore,
+    confirmedCount,
+    loadingOlder,
+    historyError,
+    onLoadOlder,
+    virtualizer,
+  ]);
+  useEffect(() => {
+    if (!highlighted) return;
+    const timeout = setTimeout(() => setHighlighted(null), 2000);
+    return () => clearTimeout(timeout);
+  }, [highlighted]);
 
   useLayoutEffect(() => {
     if (initialized || !height) return;
@@ -201,84 +281,144 @@ export const MessageList = memo(function MessageList({
         ).length
       : 0;
   return (
-    <div className="relative min-h-0 flex-1">
-      <LiveMessages messages={liveMessages} userId={userId} />
-      <div
-        ref={scrollRef}
-        role="region"
-        aria-live="off"
-        aria-label={`${channelName} 메시지`}
-        tabIndex={0}
-        className="h-full overflow-y-auto overscroll-contain px-4 focus-visible:outline-2 focus-visible:outline-ring md:px-6"
-        style={{ overflowAnchor: "none" }}
-      >
-        <div
-          className="relative w-full"
-          style={{ height: virtualizer.getTotalSize() }}
-          data-message-list
-        >
-          <div className="absolute inset-x-0 top-0 flex h-11 items-center justify-center text-xs text-muted-foreground">
-            {loadingOlder ? (
-              <Skeleton
-                aria-label="이전 메시지를 불러오고 있어요"
-                className="h-4 w-44"
-              />
-            ) : historyError ? (
-              <Button variant="ghost" onClick={() => void onLoadOlder()}>
-                이전 메시지 다시 불러오기
-              </Button>
-            ) : !hasMore ? (
-              `#${channelName}의 처음이에요`
-            ) : null}
-          </div>
-          {rows.map((row) => {
-            const message = messages[row.index]!;
-            const previous = messages[row.index - 1];
-            return (
-              <div
-                key={row.key}
-                data-index={row.index}
-                ref={virtualizer.measureElement}
-                data-message-id={message.id}
-                data-message-key={messageKey(message, userId)}
-                className="absolute inset-x-0 top-0"
-                style={{ transform: `translateY(${row.start}px)` }}
-              >
-                <MessageRow
-                  message={message}
-                  grouped={isMessageContinuation(previous, message)}
-                  dateDivider={
-                    !previous ||
-                    chatDate(previous.createdAt) !== chatDate(message.createdAt)
-                  }
-                  unread={message.seq === unreadSeq}
-                  now={now}
-                  onRetry={onRetry}
-                  onRemove={onRemove}
-                />
-              </div>
-            );
-          })}
-        </div>
-        {!messages.length && (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            #{channelName}의 첫 메시지를 보내 보세요
+    <TooltipProvider>
+      <div className="relative min-h-0 flex-1">
+        <LiveMessages messages={liveMessages} userId={userId} />
+        {jumpError && (
+          <p
+            role="status"
+            className="absolute inset-x-0 top-0 z-20 bg-muted px-4 py-2 text-sm"
+          >
+            {jumpError}
           </p>
         )}
-      </div>
-      {newBelow > 0 && (
-        <Button
-          type="button"
-          variant="secondary"
-          className="absolute right-4 bottom-3 shadow-pop"
-          onClick={() => {
-            virtualizer.scrollToEnd();
-            setSeenThrough(lastSeq);
+        <div
+          ref={scrollRef}
+          role="region"
+          aria-live="off"
+          aria-label={`${channelName} 메시지`}
+          tabIndex={focusedIndex >= 0 ? -1 : 0}
+          onKeyDown={(event) => {
+            if (
+              event.target !== event.currentTarget ||
+              !["ArrowUp", "ArrowDown"].includes(event.key)
+            )
+              return;
+            event.preventDefault();
+            focusRow(
+              event.key === "ArrowUp"
+                ? messages.length - 1
+                : (visibleRows[0]?.index ?? 0),
+            );
           }}
+          className="h-full overflow-y-auto overscroll-contain px-4 focus-visible:outline-2 focus-visible:outline-ring md:px-6"
+          style={{ overflowAnchor: "none" }}
         >
-          새 메시지 {newBelow}개 <ArrowDown aria-hidden="true" />
-        </Button>
-      )}
-    </div>
+          <div
+            className="relative w-full"
+            style={{ height: virtualizer.getTotalSize() }}
+            data-message-list
+          >
+            <div className="absolute inset-x-0 top-0 flex h-11 items-center justify-center text-xs text-muted-foreground">
+              {loadingOlder ? (
+                <Skeleton
+                  aria-label="이전 메시지를 불러오고 있어요"
+                  className="h-4 w-44"
+                />
+              ) : historyError ? (
+                <Button variant="ghost" onClick={() => void onLoadOlder()}>
+                  이전 메시지 다시 불러오기
+                </Button>
+              ) : !hasMore ? (
+                `#${channelName}의 처음이에요`
+              ) : null}
+            </div>
+            {rows.map((row) => {
+              const message = messages[row.index]!;
+              const previous = messages[row.index - 1];
+              return (
+                <div
+                  key={row.key}
+                  data-index={row.index}
+                  ref={virtualizer.measureElement}
+                  data-message-id={message.id}
+                  data-message-key={messageKey(message, userId)}
+                  className="absolute inset-x-0 top-0"
+                  style={{ transform: `translateY(${row.start}px)` }}
+                >
+                  <MessageRow
+                    message={message}
+                    grouped={isMessageContinuation(previous, message)}
+                    dateDivider={
+                      !previous ||
+                      chatDate(previous.createdAt) !==
+                        chatDate(message.createdAt)
+                    }
+                    unread={message.seq === unreadSeq}
+                    now={now}
+                    onRetry={onRetry}
+                    onRemove={onRemove}
+                    actions={
+                      actions
+                        ? {
+                            ...actions,
+                            onJump: (id) => {
+                              setJumpError("");
+                              setJumpId(id);
+                            },
+                          }
+                        : undefined
+                    }
+                    tabIndex={focusedId === message.id ? 0 : -1}
+                    onFocus={() => setFocusedId(message.id)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.target !== event.currentTarget ||
+                        !["ArrowUp", "ArrowDown"].includes(event.key)
+                      )
+                        return;
+                      event.preventDefault();
+                      focusRow(
+                        Math.max(
+                          0,
+                          Math.min(
+                            messages.length - 1,
+                            row.index + (event.key === "ArrowUp" ? -1 : 1),
+                          ),
+                        ),
+                      );
+                    }}
+                    highlighted={highlighted === message.id}
+                    editor={
+                      editingId === message.id
+                        ? renderEditor?.(message)
+                        : undefined
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+          {!messages.length && (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              #{channelName}의 첫 메시지를 보내 보세요
+            </p>
+          )}
+        </div>
+        {newBelow > 0 && (
+          <Button
+            type="button"
+            variant="secondary"
+            className="absolute right-4 bottom-3 shadow-pop"
+            onClick={() => {
+              virtualizer.scrollToEnd();
+              setSeenThrough(lastSeq);
+            }}
+          >
+            새 메시지 {newBelow}개 <ArrowDown aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+    </TooltipProvider>
   );
 });

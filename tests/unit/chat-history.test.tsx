@@ -4,6 +4,7 @@ import {
   render,
   renderHook,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,7 +87,7 @@ describe("older message pages", () => {
     result.rerender(tree(false));
     expect(screen.getByRole("button")).toBeEnabled();
     fireEvent.click(screen.getByRole("button"));
-    expect(fetchRoomMessagesPage).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(fetchRoomMessagesPage).toHaveBeenCalledTimes(2));
   });
   it("limits automatic unread seeking even when a page would cross the cap", async () => {
     vi.mocked(fetchRoomMessagesPage).mockResolvedValue(

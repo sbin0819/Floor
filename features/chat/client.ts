@@ -47,7 +47,10 @@ const pageSchema = z.object({
 });
 
 export class ChatReadError extends Error {
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly retryAfterMs = 1_000,
+  ) {
     super("메시지를 불러오지 못했어요.");
   }
 }
@@ -80,7 +83,7 @@ function waitForRetry(delay: number, signal?: AbortSignal) {
 export async function fetchRoomMessagesPage(
   roomId: string,
   query: MessagePageQuery,
-  { signal }: { signal?: AbortSignal } = {},
+  { signal, retry = true }: { signal?: AbortSignal; retry?: boolean } = {},
 ): Promise<RoomMessagesPage> {
   const search =
     "before" in query ? `before=${query.before}` : `after=${query.after}`;
@@ -91,11 +94,15 @@ export async function fetchRoomMessagesPage(
       signal,
     });
   let response = await request();
-  if (response.status === 429) {
+  if (response.status === 429 && retry) {
     await waitForRetry(retryDelay(response), signal);
     response = await request();
   }
-  if (!response.ok) throw new ChatReadError(response.status);
+  if (!response.ok)
+    throw new ChatReadError(
+      response.status,
+      response.status === 429 ? retryDelay(response) : 1_000,
+    );
   const result = pageSchema.safeParse(await response.json());
   if (!result.success) throw new ChatReadError(502);
   return result.data;

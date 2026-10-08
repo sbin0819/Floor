@@ -16,6 +16,7 @@ import {
 import { roomChannel } from "@/lib/realtime/channels";
 import { createRoomCatchUp } from "../catch-up";
 import type { ChannelView } from "../types";
+import { requestMessagePage } from "../message-requests";
 import {
   mergeChatMessages,
   roomMessagesKey,
@@ -31,6 +32,8 @@ export function useChannelCatchUp(data: ChannelView) {
     () =>
       createRoomCatchUp({
         roomId,
+        loadPage: (room, query, options) =>
+          requestMessagePage(client, room, query, options),
         merge(messages) {
           client.setQueryData<DisplayMessage[]>(
             roomMessagesKey(roomId),

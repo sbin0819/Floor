@@ -36,6 +36,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/features/chat/actions", () => ({
   sendMessage: vi.fn(),
+  setReaction: vi.fn(),
+  editMessage: vi.fn(),
+  deleteMessage: vi.fn(),
   markRoomRead: vi.fn(async ({ seq }: { seq: number }) => ({
     ok: true,
     data: { lastReadSeq: seq },

@@ -1,14 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRealtimeChannel } from "@/components/realtime-provider";
+import {
+  useRealtimeChannel,
+  useRealtimeLifecycle,
+} from "@/components/realtime-provider";
 import { roomChannel } from "@/lib/realtime/channels";
 import { sendMessage } from "@/features/chat/actions";
 import type { ChannelView, ChatMessage } from "../types";
 import { useChannelCatchUp } from "./use-channel-catch-up";
 import { useChatSendQueue } from "./use-chat-send-queue";
 import type { SendChatMessage } from "../send-queue";
+import { applyMessageEvent, createMessageSync } from "../message-sync";
+import { withReactionIntents } from "./use-message-mutations";
 import {
   mergeChatMessages,
   roomMessagesKey,
@@ -26,6 +31,26 @@ export function useChannelMessages(
   const client = useQueryClient();
   const roomId = data.room.id;
   const userId = data.user.id;
+  const sync = useMemo(
+    () => createMessageSync(client, roomId, userId),
+    [client, roomId, userId],
+  );
+  useEffect(() => {
+    sync.start();
+    return () => sync.stop();
+  }, [sync]);
+  const wasDisconnected = useRef(false);
+  useRealtimeLifecycle((event) => {
+    if (event.type === "connection") {
+      if (["disconnected", "suspended", "failed"].includes(event.current))
+        wasDisconnected.current = true;
+      else if (event.current === "connected" && wasDisconnected.current) {
+        wasDisconnected.current = false;
+        sync.revalidate();
+      }
+    } else if (event.channel === roomChannel(roomId) && !event.resumed)
+      sync.revalidate();
+  });
   const catchUp = useChannelCatchUp(data);
   const sending = useChatSendQueue(data, send);
   const liveBuffer = useRef<{
@@ -69,6 +94,28 @@ export function useChannelMessages(
     merge(data.messages);
   }, [data.messages, merge]);
   useRealtimeChannel(roomChannel(roomId), (event) => {
+    if (event.type === "message.updated" || event.type === "message.deleted") {
+      if (event.roomId !== roomId) return;
+      client.setQueryData<DisplayMessage[]>(
+        roomMessagesKey(roomId),
+        (rows = []) =>
+          applyMessageEvent(
+            rows,
+            event,
+            new Map(data.members.map((member) => [member.id, member.name])),
+          ),
+      );
+      sync.changed(event.seq, event.id);
+      return;
+    }
+    if (event.type === "reaction.changed") {
+      if (event.roomId !== roomId) return;
+      const message = client
+        .getQueryData<DisplayMessage[]>(roomMessagesKey(roomId))
+        ?.find((row) => row.id === event.messageId);
+      if (message) sync.changed(message.seq);
+      return;
+    }
     if (event.type !== "message.created" || event.roomId !== roomId) return;
     const current =
       client.getQueryData<DisplayMessage[]>(roomMessagesKey(roomId)) ?? [];
@@ -89,7 +136,9 @@ export function useChannelMessages(
       deletedAt: event.deletedAt,
       reactions: event.reactions,
     };
-    merge([message]);
+    // created 재전송은 이미 고치거나 지운 서버 행을 되살리지 않는다.
+    if (!current.some((row) => row.id === event.id && !row.delivery))
+      merge([message]);
     catchUp.receive(event.seq);
     if (
       event.authorId !== userId &&
@@ -108,7 +157,8 @@ export function useChannelMessages(
   });
   const messages: DisplayMessage[] = query.data ?? data.messages;
   return {
-    messages,
+    messages: messages.map(withReactionIntents),
+    reportVisible: sync.visible,
     submit: sending.submit,
     retry: sending.retry,
     remove: sending.remove,

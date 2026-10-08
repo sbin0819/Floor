@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { fetchRoomMessagesPage } from "../client";
+import { requestMessagePage } from "../message-requests";
 import {
   mergeChatMessages,
   roomMessagesKey,
@@ -73,7 +73,8 @@ export function useMessageHistory(
       current.request = request;
       setState({ key, loading: true, exhausted: false, error: false });
       try {
-        const page = await fetchRoomMessagesPage(
+        const page = await requestMessagePage(
+          client,
           roomId,
           { before: oldestSeq },
           { signal: request.signal },
