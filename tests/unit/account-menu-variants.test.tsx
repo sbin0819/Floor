@@ -83,8 +83,10 @@ describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
     await user.tab();
     await user.keyboard("{Enter}");
     await waitFor(() =>
-      expect(screen.getByRole("menuitem", { name: "로그아웃" })).toHaveFocus(),
+      expect(screen.getByRole("menuitem", { name: "설정" })).toHaveFocus(),
     );
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("menuitem", { name: "로그아웃" })).toHaveFocus();
     await user.keyboard("{Enter}");
     await waitFor(() =>
       expect(mocks.documentRedirect).toHaveBeenCalledExactlyOnceWith("/login"),

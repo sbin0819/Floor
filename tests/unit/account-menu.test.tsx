@@ -56,6 +56,10 @@ describe("account menu", () => {
       screen.queryByRole("menuitem", { name: "운영자 화면" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "로그아웃" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: "설정" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
   });
 
   it("shows the operator destination only for the server-supplied operator flag", async () => {
@@ -70,6 +74,10 @@ describe("account menu", () => {
     render(<AccountMenu {...profile} isOperator={false} />);
     await user.tab();
     await user.keyboard("{Enter}");
+    await waitFor(() =>
+      expect(screen.getByRole("menuitem", { name: "설정" })).toHaveFocus(),
+    );
+    await user.keyboard("{ArrowDown}");
     const item = screen.getByRole("menuitem", { name: "로그아웃" });
     await waitFor(() => expect(item).toHaveFocus());
     await user.keyboard("{Enter}");

@@ -86,6 +86,15 @@ export function AccountMenu({
           {email}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem
+          asChild
+          className="min-h-11 px-3 focus:bg-muted focus:text-foreground"
+        >
+          <Link href="/settings">
+            <Settings aria-hidden="true" />
+            설정
+          </Link>
+        </DropdownMenuItem>
         {isOperator && (
           <DropdownMenuItem
             asChild

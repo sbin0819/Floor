@@ -91,7 +91,10 @@ describe("member shell streaming", () => {
     mocks.session.mockResolvedValue(null);
     expect(await ShellRealtimeSession()).toBeNull();
     for (const slot of [ChatRailSlot, ChatSidebarSlot, ChatSidebarTitleSlot]) {
-      expect((await slot()).props.spaces).toEqual([]);
+      expect((await slot()).props.data).toEqual({
+        spaces: [],
+        directMessages: [],
+      });
     }
     expect(mocks.nav).not.toHaveBeenCalled();
   });
@@ -159,7 +162,7 @@ describe("member shell streaming", () => {
     expect(mocks.summary).toHaveBeenCalledOnce();
   });
 
-  it("reserves four 44px menu rows and matching account/bell dimensions", () => {
+  it("reserves five 44px menu rows and matching account/bell dimensions", () => {
     const shell = frame();
     for (const [slot, expectedClass] of [
       ["accountCard", "h-14"],
@@ -171,7 +174,7 @@ describe("member shell streaming", () => {
       cleanup();
     }
     const { container } = render(shell.props.menu.props.fallback);
-    expect(container.querySelectorAll('[aria-hidden="true"]')).toHaveLength(4);
+    expect(container.querySelectorAll('[aria-hidden="true"]')).toHaveLength(5);
     for (const row of container.querySelectorAll('[aria-hidden="true"]'))
       expect(row).toHaveClass("h-11");
   });

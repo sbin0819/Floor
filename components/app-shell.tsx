@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from "react";
+import { PeopleRealtimeSync } from "@/features/people/components/people-realtime-sync";
 import { AppShellFrame } from "@/components/app-shell-frame";
 import {
   ChatRailSlot,
@@ -43,7 +44,7 @@ export function MemberNavPlaceholder() {
       <span role="status" className="sr-only">
         불러오고 있어요
       </span>
-      {[0, 1, 2, 3].map((key) => (
+      {[0, 1, 2, 3, 4].map((key) => (
         <span
           key={key}
           aria-hidden="true"
@@ -98,6 +99,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <ChatNavSyncSlot />
       </Suspense>
       <ChatQueueConnection />
+      <Suspense fallback={null}>
+        <ShellPeopleSync />
+      </Suspense>
     </RealtimeProvider>
   );
 }
@@ -105,4 +109,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 export async function ShellRealtimeSession() {
   const session = await getSession();
   return session ? <RealtimeSession userId={session.userId} /> : null;
+}
+
+async function ShellPeopleSync() {
+  const session = await getSession();
+  return session ? <PeopleRealtimeSync userId={session.userId} /> : null;
 }
