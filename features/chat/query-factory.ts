@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
 import type { DalDatabase } from "@/lib/dal/database";
@@ -7,18 +8,73 @@ import {
   listChatMembers,
   listChatNav,
   listRecentMessages,
+  listMessagesPage,
 } from "@/lib/dal/chat-read";
-import type { ChannelView, ChatSpaceNav } from "./types";
+import {
+  createMemoryRateLimiter,
+  RateLimitError,
+  type RateLimiter,
+} from "@/lib/rate-limit/memory";
+import { messagePageQuerySchema } from "./schema";
+import type { ChannelView, ChatSpaceNav, RoomMessagesPage } from "./types";
+
+const pageLimiter = createMemoryRateLimiter();
 
 export type ChatQueryDependencies = {
   database?: DalDatabase;
   requireSession?: () => Promise<Session>;
   now?: () => Date;
+  limiter?: RateLimiter;
 };
 
 export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
   const readSession = dependencies.requireSession ?? requireSession;
   return {
+    async getRoomMessagesPage(
+      roomId: string,
+      query: unknown,
+    ): Promise<RoomMessagesPage> {
+      const session = await readSession();
+      const input =
+        query instanceof URLSearchParams
+          ? Object.fromEntries(
+              [...new Set(query.keys())].map((key) => {
+                const values = query.getAll(key);
+                return [key, values.length === 1 ? values[0] : values];
+              }),
+            )
+          : query;
+      const parsed = messagePageQuerySchema.safeParse(input);
+      if (!parsed.success) throw new ActionError("INVALID_INPUT");
+      const rate = (dependencies.limiter ?? pageLimiter).consume(
+        `chat:page:${session.userId}`,
+        60,
+        60_000,
+      );
+      if (!rate.allowed) throw new RateLimitError(rate.retryAfter);
+      if (!z.uuid().safeParse(roomId).success)
+        throw new ActionError("NOT_FOUND");
+      const [room, page] = await Promise.all([
+        canReadRoom(session.userId, roomId, dependencies.database),
+        listMessagesPage(
+          roomId,
+          session.userId,
+          parsed.data,
+          dependencies.database,
+        ),
+      ]);
+      if (!room) throw new ActionError("NOT_FOUND");
+      return {
+        messages: page.messages.map((message) => ({
+          ...message,
+          createdAt: message.createdAt.toISOString(),
+        })),
+        hasMore: page.hasMore,
+        lastSeq: room.lastSeq,
+        lastReadSeq: room.lastReadSeq,
+        firstUnreadSeq: room.firstUnreadSeq,
+      };
+    },
     async getMyChatNav(): Promise<ChatSpaceNav[]> {
       const session = await readSession();
       const rows = await listChatNav(session.userId, dependencies.database);

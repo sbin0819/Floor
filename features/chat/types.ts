@@ -9,6 +9,14 @@ export type ChatMessage = {
   clientId: string | null;
 };
 
+export type RoomMessagesPage = {
+  messages: ChatMessage[];
+  hasMore: boolean;
+  lastSeq: number;
+  lastReadSeq: number | null;
+  firstUnreadSeq: number | null;
+};
+
 export type ChatSpaceNav = {
   id: string;
   kind: "team";

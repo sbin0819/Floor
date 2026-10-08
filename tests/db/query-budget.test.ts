@@ -91,6 +91,10 @@ describe("authenticated query execution budgets", () => {
   const cases: [string, () => Promise<unknown>][] = [
     ["chat.getMyChatNav", () => chatQueries().getMyChatNav()],
     [
+      "chat.getRoomMessagesPage",
+      () => chatQueries().getRoomMessagesPage(chat.roomId, { after: "0" }),
+    ],
+    [
       "chat.getChannelView",
       () => chatQueries().getChannelView(chat.spaceId, chat.roomId),
     ],
@@ -208,7 +212,7 @@ describe("authenticated query execution budgets", () => {
           : 2,
       );
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
-      if (name === "chat.getMyChatNav") {
+      if (name === "chat.getMyChatNav" || name === "chat.getRoomMessagesPage") {
         expect(result.stages).toBe(1);
         expect(result.statements).toBeLessThanOrEqual(3);
       }

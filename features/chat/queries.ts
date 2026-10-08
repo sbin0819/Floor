@@ -7,3 +7,7 @@ export const getMyChatNav = cache(async () =>
 export async function getChannelView(spaceId: string, roomId: string) {
   return createChatQueries().getChannelView(spaceId, roomId);
 }
+
+export async function getRoomMessagesPage(roomId: string, query: unknown) {
+  return createChatQueries().getRoomMessagesPage(roomId, query);
+}

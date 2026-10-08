@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   chatRooms,
@@ -95,4 +95,40 @@ export function listChatMembers(
     .innerJoin(users, eq(teamMembers.userId, users.id))
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(asc(users.name), asc(users.id));
+}
+
+export async function listMessagesPage(
+  roomId: string,
+  userId: string,
+  cursor: { before: number } | { after: number },
+  database: DalDatabase = getDb(),
+) {
+  const before = "before" in cursor;
+  const limit = before ? 50 : 200;
+  // 방 메타데이터와 병렬로 실행되므로 이 SQL도 직접 소속을 확인한 행만 읽는다.
+  const rows = await database
+    .select(chatMessageFields(userId))
+    .from(messages)
+    .innerJoin(chatRooms, eq(messages.roomId, chatRooms.id))
+    .innerJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
+    .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
+    .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
+    .leftJoin(users, eq(messages.authorId, users.id))
+    .where(
+      and(
+        eq(chatRooms.id, roomId),
+        eq(chatRooms.kind, "text"),
+        readableTeamSpace(userId),
+        before
+          ? lt(messages.seq, cursor.before)
+          : gt(messages.seq, cursor.after),
+      ),
+    )
+    .orderBy(before ? desc(messages.seq) : asc(messages.seq))
+    .limit(limit + 1);
+  const page = rows.slice(0, limit);
+  return {
+    messages: before ? page.reverse() : page,
+    hasMore: rows.length > limit,
+  };
 }

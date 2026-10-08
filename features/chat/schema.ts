@@ -17,3 +17,14 @@ export const markRoomReadSchema = z.strictObject({
   roomId: z.uuid(),
   seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
 });
+
+const messageSequenceQuerySchema = z
+  .string()
+  .regex(/^\d+$/)
+  .transform(Number)
+  .refine(Number.isSafeInteger);
+export const messagePageQuerySchema = z.union([
+  z.strictObject({ before: messageSequenceQuerySchema }),
+  z.strictObject({ after: messageSequenceQuerySchema }),
+]);
+export type MessagePageCursor = z.output<typeof messagePageQuerySchema>;
