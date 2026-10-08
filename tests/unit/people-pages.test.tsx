@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import FriendsPage from "@/app/(app)/friends/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import { requirePageSession } from "@/lib/auth/session";
-import { getFriendsView, getUsernameSettings } from "@/features/people/queries";
+import {
+  getFriendsView,
+  getUsernameSettings,
+  getMessageRequests,
+} from "@/features/people/queries";
 import { resolvePageContent } from "./page-test-utils";
 
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("@/features/people/queries", () => ({
   getFriendsView: vi.fn(),
   getUsernameSettings: vi.fn(),
+  getMessageRequests: vi.fn(),
 }));
 vi.mock("@/features/people/components/friends-screen", () => ({
   FriendsScreen: () => null,
@@ -41,9 +46,11 @@ beforeEach(() => {
     email: "own@example.test",
   });
   vi.mocked(getUsernameSettings).mockResolvedValue(settings);
+  vi.mocked(getMessageRequests).mockResolvedValue([]);
   vi.mocked(getFriendsView).mockResolvedValue({
     settings,
     receivedCount: 0,
+    messageRequestCount: 0,
     rows: [],
   });
 });
@@ -61,12 +68,14 @@ describe("people pages maintain direct guards and static shells", () => {
       expect(result.props.tab).toBe("all");
     },
   );
-  it.each(["received", "sent"])(
+  it.each(["received", "sent", "requests", "blocked"])(
     "preserves the valid %s return path",
     async (tab) => {
       await content(FriendsPage({ searchParams: Promise.resolve({ tab }) }));
       expect(requirePageSession).toHaveBeenCalledWith(`/friends?tab=${tab}`);
       expect(getFriendsView).toHaveBeenCalledWith(tab);
+      if (tab === "requests") expect(getMessageRequests).toHaveBeenCalledOnce();
+      else expect(getMessageRequests).not.toHaveBeenCalled();
     },
   );
   it("guards settings before loading its data and takes the display name from the session", async () => {

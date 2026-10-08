@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PersonSearchResult } from "../types";
-import { FriendControls, type FriendActions } from "./friend-controls";
+import type { FriendActions } from "./friend-controls";
+import { SearchPersonActions } from "./person-actions";
 import { PersonSummary } from "./person-summary";
 
 const responseSchema = z.strictObject({
@@ -16,7 +17,9 @@ const responseSchema = z.strictObject({
       name: z.string(),
       username: z.string().nullable(),
       sharedTeamNames: z.array(z.string()),
-      relation: z.enum(["none", "incoming", "outgoing", "friend"]),
+      relation: z.enum(["none", "incoming", "outgoing", "friend", "blocked"]),
+      directRoomId: z.uuid().nullable(),
+      canDirectMessage: z.boolean(),
     }),
   ),
 });
@@ -141,9 +144,8 @@ export function PeopleSearch({
               className="flex flex-wrap items-center gap-3 py-3"
             >
               <PersonSummary person={person} />
-              <FriendControls
-                person={{ ...person, directRoomId: null }}
-                relation={person.relation}
+              <SearchPersonActions
+                person={person}
                 actions={actions}
                 onRelation={(relation) =>
                   setResults(

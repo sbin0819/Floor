@@ -32,6 +32,8 @@ export function PeopleSkeleton({ settings = false }: { settings?: boolean }) {
             <span>모두</span>
             <span>받은 요청</span>
             <span>보낸 요청</span>
+            <span>메시지 요청</span>
+            <span>차단</span>
           </div>
           {[0, 1, 2].map((index) => (
             <Skeleton key={index} className="h-20 w-full" />

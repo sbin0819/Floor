@@ -71,7 +71,12 @@ const person: FriendRow = {
   sharedTeamNames: ["디자인 팀"],
   directRoomId: null,
 };
-const data: FriendsView = { settings, receivedCount: 2, rows: [person] };
+const data: FriendsView = {
+  settings,
+  receivedCount: 2,
+  messageRequestCount: 0,
+  rows: [person],
+};
 const actions: FriendActions = {
   send: vi.fn(async () => ({
     ok: true as const,
@@ -191,7 +196,7 @@ describe("username form and settings", () => {
 describe("friends search, tabs and actions", () => {
   it("searches only on submit and displays safe result identity without a profile trigger", async () => {
     const search = vi.fn(async () => [
-      { ...person, relation: "none" as const },
+      { ...person, relation: "none" as const, canDirectMessage: false },
     ]);
     const { user } = setup(
       <FriendsScreen
@@ -234,7 +239,9 @@ describe("friends search, tabs and actions", () => {
           data={{ ...data, rows: [] }}
           tab="all"
           actions={actions}
-          search={async () => [{ ...person, relation }]}
+          search={async () => [
+            { ...person, relation, canDirectMessage: relation === "friend" },
+          ]}
         />,
       );
       await user.type(
@@ -302,7 +309,9 @@ describe("friends search, tabs and actions", () => {
     );
   });
   it("normalizes unsupported and repeated tab values to all", () => {
-    expect(friendsTab("blocked")).toBe("all");
+    expect(friendsTab("blocked")).toBe("blocked");
+    expect(friendsTab("requests")).toBe("requests");
+    expect(friendsTab("unknown")).toBe("all");
     expect(friendsTab(["sent"])).toBe("all");
     expect(friendsTab(undefined)).toBe("all");
   });
@@ -375,7 +384,9 @@ describe("friends search, tabs and actions", () => {
           ...actions,
           send: async () => ({ ok: false, code: "LIMIT_EXCEEDED", message }),
         }}
-        search={async () => [{ ...person, relation: "none" }]}
+        search={async () => [
+          { ...person, relation: "none", canDirectMessage: false },
+        ]}
       />,
     );
     await user.type(screen.getByLabelText("사용자 이름이나 이메일"), "person");
@@ -438,6 +449,8 @@ describe("fixed shell and safe search client", () => {
                 username: person.username,
                 sharedTeamNames: [],
                 relation: "none",
+                directRoomId: null,
+                canDirectMessage: false,
               },
             ],
           }),
@@ -447,7 +460,12 @@ describe("fixed shell and safe search client", () => {
         new Response(
           JSON.stringify({
             results: [
-              { ...person, relation: "none", email: "private@example.test" },
+              {
+                ...person,
+                relation: "none",
+                canDirectMessage: false,
+                email: "private@example.test",
+              },
             ],
           }),
         ),

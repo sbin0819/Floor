@@ -28,7 +28,7 @@ import {
   removeFriend,
 } from "../actions";
 import type { FriendRow, PersonRelation } from "../types";
-import { usePeopleMutation } from "./people-mutation";
+import { peopleError, usePeopleMutation } from "./people-mutation";
 
 export type FriendActions = {
   send: (input: unknown) => Promise<ActionResult<{ relation: PersonRelation }>>;
@@ -55,7 +55,11 @@ export function MessagePersonButton({
   disabled?: boolean;
 }) {
   const router = useRouter();
-  const mutation = usePeopleMutation(action);
+  const mutation = usePeopleMutation(action, undefined, (result) =>
+    result.code === "FORBIDDEN"
+      ? "메시지를 보낼 수 없어요"
+      : peopleError(result),
+  );
   if (person.directRoomId)
     return (
       <Button asChild variant="outline">
@@ -82,6 +86,7 @@ export function FriendControls({
   actions = defaultFriendActions,
   list = false,
   profile = false,
+  hideMenu = false,
   onRelation,
 }: {
   person: Pick<FriendRow, "userId" | "name" | "directRoomId">;
@@ -89,6 +94,7 @@ export function FriendControls({
   actions?: FriendActions;
   list?: boolean;
   profile?: boolean;
+  hideMenu?: boolean;
   onRelation?: (relation: PersonRelation) => void;
 }) {
   const locked = useRef(false);
@@ -172,7 +178,7 @@ export function FriendControls({
           disabled={pending}
         />
       )}
-      {(list || profile) && (
+      {(list || profile) && !hideMenu && (
         <>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

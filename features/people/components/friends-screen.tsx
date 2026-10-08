@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
-import type { FriendsTab, FriendsView } from "../types";
+import type { FriendsTab, FriendsView, MessageRequestRow } from "../types";
 import { UsernameForm, type SaveUsername } from "./username-form";
 import { PeopleSearch, type SearchPeople } from "./people-search";
 import { FriendControls, type FriendActions } from "./friend-controls";
 import { PersonSummary } from "./person-summary";
 import { PersonCard } from "./person-card";
+import { UnblockButton } from "./person-actions";
+import { PendingMessageRequests } from "./message-requests-list";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function FriendsScreen({
   data,
@@ -16,15 +19,23 @@ export function FriendsScreen({
   actions,
   search,
   saveUsername,
+  requests,
 }: {
   data: FriendsView;
   tab: FriendsTab;
   actions?: FriendActions;
   search?: SearchPeople;
   saveUsername?: SaveUsername;
+  requests?: Promise<MessageRequestRow[]>;
 }) {
   const [savedUsername, setSavedUsername] = useState<string | null>(null);
-  const labels = { all: "모두", received: "받은 요청", sent: "보낸 요청" };
+  const labels = {
+    all: "모두",
+    received: "받은 요청",
+    sent: "보낸 요청",
+    requests: "메시지 요청",
+    blocked: "차단",
+  };
   return (
     <div className="space-y-6">
       {!data.settings.username && !savedUsername && (
@@ -49,29 +60,52 @@ export function FriendsScreen({
       )}
       <PeopleSearch actions={actions} search={search} />
       <SegmentedLinks label="친구 목록">
-        {(["all", "received", "sent"] as const).map((item) => (
-          <SegmentedLink asChild key={item} selected={tab === item}>
-            <Link
-              href={item === "all" ? "/friends" : `/friends?tab=${item}`}
-              aria-label={
-                item === "received" && data.receivedCount > 0
-                  ? `${labels[item]} ${data.receivedCount}`
-                  : labels[item]
-              }
-            >
-              {labels[item]}
-              {item === "received" && data.receivedCount > 0 && (
-                <span className="tabular-nums"> {data.receivedCount}</span>
-              )}
-            </Link>
-          </SegmentedLink>
-        ))}
+        {(["all", "received", "sent", "requests", "blocked"] as const).map(
+          (item) => (
+            <SegmentedLink asChild key={item} selected={tab === item}>
+              <Link
+                href={item === "all" ? "/friends" : `/friends?tab=${item}`}
+                aria-label={
+                  item === "received" && data.receivedCount > 0
+                    ? `${labels[item]} ${data.receivedCount}`
+                    : item === "requests" && data.messageRequestCount > 0
+                      ? `${labels[item]} ${data.messageRequestCount}`
+                      : labels[item]
+                }
+              >
+                {labels[item]}
+                {item === "received" && data.receivedCount > 0 && (
+                  <span className="tabular-nums"> {data.receivedCount}</span>
+                )}
+                {item === "requests" && data.messageRequestCount > 0 && (
+                  <span className="tabular-nums">
+                    {" "}
+                    {data.messageRequestCount}
+                  </span>
+                )}
+              </Link>
+            </SegmentedLink>
+          ),
+        )}
       </SegmentedLinks>
       <section
         aria-label={labels[tab]}
         className="overflow-hidden rounded-xl border border-border bg-card"
       >
-        {data.rows.length > 0 ? (
+        {tab === "requests" ? (
+          <Suspense
+            fallback={
+              <Skeleton
+                aria-label="메시지 요청을 불러오고 있어요"
+                className="h-32 w-full"
+              />
+            }
+          >
+            {requests && (
+              <PendingMessageRequests data={requests} now={data.settings.now} />
+            )}
+          </Suspense>
+        ) : data.rows.length > 0 ? (
           <ul className="divide-y divide-border">
             {data.rows.map((person) => (
               <li
@@ -91,18 +125,22 @@ export function FriendsScreen({
                     <PersonSummary person={person} />
                   </button>
                 </PersonCard>
-                <FriendControls
-                  person={person}
-                  relation={
-                    tab === "all"
-                      ? "friend"
-                      : tab === "received"
-                        ? "incoming"
-                        : "outgoing"
-                  }
-                  actions={actions}
-                  list
-                />
+                {tab === "blocked" ? (
+                  <UnblockButton userId={person.userId} />
+                ) : (
+                  <FriendControls
+                    person={person}
+                    relation={
+                      tab === "all"
+                        ? "friend"
+                        : tab === "received"
+                          ? "incoming"
+                          : "outgoing"
+                    }
+                    actions={actions}
+                    list
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -112,7 +150,9 @@ export function FriendsScreen({
               ? "아직 친구가 없어요. 위에서 사용자 이름이나 이메일로 찾아 보세요"
               : tab === "received"
                 ? "받은 요청이 없어요"
-                : "보낸 요청이 없어요"}
+                : tab === "blocked"
+                  ? "차단한 사람이 없어요"
+                  : "보낸 요청이 없어요"}
           </p>
         )}
       </section>
