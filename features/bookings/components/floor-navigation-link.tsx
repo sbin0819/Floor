@@ -33,7 +33,8 @@ export function FloorNavigationLink({
         event.preventDefault();
         if (
           location.spaceId !== null &&
-          location.spaceId !== navigation.location.spaceId
+          (location.spaceId !== navigation.location.spaceId ||
+            (location.detail && !navigation.location.detail))
         ) {
           navigation.rememberSpaceTrigger(
             event.currentTarget,
@@ -42,7 +43,8 @@ export function FloorNavigationLink({
         }
         navigation.change(location, destination, { replace });
         if (
-          location.spaceId === null &&
+          (location.spaceId === null ||
+            (navigation.location.detail && !location.detail)) &&
           location.floorId === navigation.location.floorId &&
           location.date === navigation.location.date
         )

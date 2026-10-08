@@ -57,7 +57,14 @@ describe("floor timetable", () => {
       within(grid).getByRole("link", { name: /회의실 A/ }),
     ).toHaveAttribute(
       "href",
-      "/branches/branch/floors/floor?date=2026-10-07&space=a&view=timeline",
+      "/branches/branch/floors/floor?date=2026-10-07&space=a&detail=1&view=timeline",
+    );
+    expect(
+      within(grid).getByRole("link", { name: /회의실 A/ }),
+    ).toHaveAttribute("aria-haspopup", "dialog");
+    expect(within(grid).getByRole("link", { name: /라운지/ })).toHaveAttribute(
+      "href",
+      "/branches/branch/floors/floor?date=2026-10-07&space=lounge&detail=1&view=timeline",
     );
     expect(
       within(grid).getByRole("rowheader", {
@@ -88,6 +95,18 @@ describe("floor timetable", () => {
     expect(row.textContent).toBe("전용 공간다른 팀이 쓰는 공간이에요");
     expect(container.querySelectorAll("[data-timetable-block]")).toHaveLength(
       1,
+    );
+  });
+  it("keeps detail out of free-slot navigation", () => {
+    const select = vi.fn();
+    render(<FloorTimetable data={timetableFixture()} onSelectSlot={select} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "회의실 A, 10:00, 비어 있음" }),
+    );
+    expect(select).toHaveBeenCalledWith(
+      expect.objectContaining({
+        href: "/branches/branch/floors/floor?date=2026-10-07&space=a&view=timeline",
+      }),
     );
   });
   it("exposes free cells only, and uses static guidance for nonbookable rows", () => {

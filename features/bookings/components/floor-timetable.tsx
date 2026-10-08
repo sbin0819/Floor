@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { LockKeyhole } from "lucide-react";
+import { ChevronRight, LockKeyhole } from "lucide-react";
 import { SpacePhoto } from "@/components/photos/space-photo";
 import { Button } from "@/components/ui/button";
 import {
@@ -277,6 +277,14 @@ export function FloorTimetable({
                 view,
               );
               const isSelected = chosenSpace === space.id;
+              const detailHref = floorHref(
+                data.branch.id,
+                data.floor.id,
+                data.date,
+                space.id,
+                view,
+                true,
+              );
               const height = Math.max(76, row.laneCount * 44 + 16);
               const selected =
                 selection?.spaceId === space.id ? selection : null;
@@ -307,14 +315,16 @@ export function FloorTimetable({
                     <FloorNavigationLink
                       {...focusProps({ spaceId: space.id, target: "space" })}
                       data-space-id={space.id}
-                      href={href}
+                      href={detailHref}
                       location={{
                         floorId: data.floor.id,
                         date: data.date,
                         spaceId: space.id,
+                        detail: true,
                       }}
                       aria-current={isSelected ? "true" : undefined}
-                      className="flex h-full min-h-11 items-center gap-3 px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+                      aria-haspopup="dialog"
+                      className="flex h-full min-h-11 items-center gap-3 px-3 py-2 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
                     >
                       <span className="hidden shrink-0 lg:block">
                         <SpacePhoto
@@ -324,7 +334,7 @@ export function FloorTimetable({
                           decorative
                         />
                       </span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">
                           {visible.name}
                         </span>
@@ -340,6 +350,13 @@ export function FloorTimetable({
                             .join("")}
                         </span>
                       </span>
+                      <ChevronRight
+                        aria-hidden="true"
+                        className={cn(
+                          "hidden size-4 shrink-0 lg:block",
+                          isSelected ? "text-primary" : "text-muted-foreground",
+                        )}
+                      />
                     </FloorNavigationLink>
                   </div>
                   <div
