@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createChatQueries } from "./query-factory";
+import { createFileQueries } from "./file-query-factory";
 
 export const getMyChatNav = cache(async () =>
   createChatQueries().getMyChatNav(),
@@ -16,4 +17,8 @@ export async function getDirectMessageView(roomId: string) {
 }
 export async function getMeetingView(bookingId: string) {
   return createChatQueries().getMeetingView(bookingId);
+}
+
+export async function getRoomFiles(roomId: string, query: unknown) {
+  return createFileQueries().getRoomFiles(roomId, query);
 }
