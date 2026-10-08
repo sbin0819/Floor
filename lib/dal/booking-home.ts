@@ -27,6 +27,7 @@ export async function listMyWeekBookings(
   { userId, start, end }: { userId: string; start: Date; end: Date },
   database: DalDatabase = getDb(),
 ) {
+  const area = alias(spaces, "week_desk_area");
   return database
     .select({
       id: bookings.id,
@@ -34,11 +35,20 @@ export async function listMyWeekBookings(
       timezone: branches.timezone,
       branchId: branches.id,
       floorId: floors.id,
-      spaceId: spaces.id,
-      spaceName: spaces.name,
+      spaceId: sql<string>`case when ${spaces.type} = 'desk' then ${area.id} else ${spaces.id} end`,
+      spaceName: sql<string>`case when ${spaces.type} = 'desk' then ${area.name} else ${spaces.name} end`,
     })
     .from(bookings)
     .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
+    .leftJoin(
+      area,
+      and(
+        eq(spaces.type, "desk"),
+        eq(area.id, spaces.parentId),
+        eq(area.type, "desk_area"),
+        eq(area.floorId, spaces.floorId),
+      ),
+    )
     .innerJoin(floors, eq(floors.id, spaces.floorId))
     .innerJoin(branches, eq(branches.id, floors.branchId))
     .where(

@@ -2,7 +2,8 @@ import { defaultLimits } from "@/lib/permissions/defaults";
 import type { PermissionContext, RoleLimits } from "@/lib/permissions/types";
 
 export type BookingLimitRole = "user" | "team_member" | "operator";
-export type BookingLimitReason = "per_booking" | "days_ahead" | "per_day";
+export type BookingLimitReason =
+  "per_booking" | "days_ahead" | "per_day" | "desk_per_person";
 
 export function bookingLimitRole(
   context: PermissionContext,

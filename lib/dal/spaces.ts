@@ -30,6 +30,7 @@ async function readSpaceAccess(
         id: spaces.id,
         floorId: spaces.floorId,
         type: spaces.type,
+        bookable: spaces.bookable,
         access: spaces.access,
       },
       teamId: accessGrants.teamId,
@@ -62,9 +63,10 @@ async function readSpaceAccess(
 
 async function readFloorSpaceAccess(floorId: string, database?: DalDatabase) {
   return (await readSpaceAccess(eq(spaces.floorId, floorId), database)).map(
-    ({ id, type, access, allowedTeamIds }) => ({
+    ({ id, type, bookable, access, allowedTeamIds }) => ({
       id,
       type,
+      bookable,
       access,
       allowedTeamIds,
     }),

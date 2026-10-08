@@ -116,7 +116,7 @@ export function createAction<Input, Output>(
         code,
         ...(error instanceof ActionError &&
         ((code === "LIMIT_EXCEEDED" &&
-          ["per_booking", "per_day", "days_ahead"].includes(
+          ["per_booking", "per_day", "days_ahead", "desk_per_person"].includes(
             error.details.message ?? "",
           )) ||
           (code === "OVER_CAPACITY" &&

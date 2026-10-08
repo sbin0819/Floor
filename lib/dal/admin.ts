@@ -11,6 +11,7 @@ import {
   max,
   ne,
   notInArray,
+  or,
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -200,9 +201,13 @@ export async function countActiveBookings(
   const [row] = await database
     .select({ value: count() })
     .from(bookings)
+    .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
     .where(
       and(
-        eq(bookings.spaceId, spaceId),
+        or(
+          eq(bookings.spaceId, spaceId),
+          and(eq(spaces.type, "desk"), eq(spaces.parentId, spaceId)),
+        ),
         eq(bookings.status, "confirmed"),
         sql`upper(${bookings.during}) > ${now.toISOString()}::timestamptz`,
       ),

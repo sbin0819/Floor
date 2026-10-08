@@ -224,6 +224,7 @@ describe("booking data access", () => {
       expect(Object.keys(row).sort()).toEqual([
         "access",
         "allowedTeamIds",
+        "bookable",
         "id",
         "type",
       ]);

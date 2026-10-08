@@ -8,9 +8,11 @@ import {
   getTableColumns,
   inArray,
   isNull,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
 import { serializeTimeRange, type TimeRange } from "@/lib/db/range";
@@ -121,6 +123,7 @@ export async function sumBookedMinutes(
     .where(
       and(
         eq(floors.branchId, branchId),
+        ne(spaces.type, "desk"),
         eq(bookings.status, "confirmed"),
         sql`lower(${bookings.during}) >= ${during.start.toISOString()}::timestamptz`,
         sql`lower(${bookings.during}) < ${during.end.toISOString()}::timestamptz`,
@@ -163,6 +166,7 @@ export async function sumActorBookedMinutes(
     .where(
       and(
         eq(floors.branchId, branchId),
+        ne(spaces.type, "desk"),
         eq(bookings.status, "confirmed"),
         sql`lower(${bookings.during}) >= ${during.start.toISOString()}::timestamptz`,
         sql`lower(${bookings.during}) < ${during.end.toISOString()}::timestamptz`,
@@ -205,10 +209,12 @@ export async function cancelBookingRecord(
 }
 
 function locatedBookings(database: DalDatabase) {
+  const area = alias(spaces, "booking_desk_area");
   return database
     .select({
       booking: bookings,
       space: spaces,
+      area,
       floor: floors,
       branch: branches,
       userName: users.name,
@@ -218,8 +224,23 @@ function locatedBookings(database: DalDatabase) {
     .from(bookings)
     .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
     .leftJoin(
+      area,
+      and(
+        eq(spaces.type, "desk"),
+        eq(area.id, spaces.parentId),
+        eq(area.type, "desk_area"),
+        eq(area.floorId, spaces.floorId),
+      ),
+    )
+    .leftJoin(
       spacePhotos,
-      and(eq(spacePhotos.spaceId, spaces.id), eq(spacePhotos.sortOrder, 0)),
+      and(
+        eq(
+          spacePhotos.spaceId,
+          sql`case when ${spaces.type} = 'desk' then ${area.id} else ${spaces.id} end`,
+        ),
+        eq(spacePhotos.sortOrder, 0),
+      ),
     )
     .innerJoin(floors, eq(floors.id, spaces.floorId))
     .innerJoin(branches, eq(branches.id, floors.branchId))
