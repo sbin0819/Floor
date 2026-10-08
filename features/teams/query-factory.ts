@@ -33,6 +33,7 @@ import {
 } from "@/lib/dal";
 import { canSendEmail } from "@/lib/email";
 import { normalizeTeamName } from "@/lib/teams/normalize";
+import type { TeamStartMode } from "./start-mode";
 
 export type TeamQueryDependencies = {
   database?: DalDatabase;
@@ -115,18 +116,31 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
         isOperator: branches.length > 0,
       };
     },
-    async getTeamStartData(query?: unknown): Promise<TeamStartData> {
+    async getTeamStartData(
+      query?: unknown,
+      mode?: TeamStartMode,
+    ): Promise<TeamStartData> {
       const session = await readSession();
       const normalized =
         typeof query === "string" ? normalizeTeamName(query) : "";
       const parsed = teamSearchSchema.safeParse(normalized);
+      const searchRequested =
+        (mode === undefined || mode === "join") && parsed.success;
       const [branches, invites, myTeams, requests, results] = await Promise.all(
         [
-          listBranches(database),
-          receivedInvites(session),
-          listMyTeams(session.userId, database),
-          listMyJoinRequests(session.userId, database),
-          parsed.success ? searchTeams(parsed.data, database) : [],
+          mode === undefined || mode === "create" ? listBranches(database) : [],
+          mode === undefined || mode === "choose" || searchRequested
+            ? receivedInvites(session)
+            : [],
+          mode === undefined || searchRequested
+            ? listMyTeams(session.userId, database)
+            : [],
+          mode === undefined || searchRequested
+            ? listMyJoinRequests(session.userId, database)
+            : [],
+          searchRequested && parsed.success
+            ? searchTeams(parsed.data, database)
+            : [],
         ],
       );
       return {
