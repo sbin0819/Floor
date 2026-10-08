@@ -14,7 +14,7 @@ async function SpaceContent({ params }: SpacePageProps) {
   const { spaceId } = await params;
   await requirePageSession(`/s/${encodeURIComponent(spaceId)}`);
   if (!z.uuid().safeParse(spaceId).success) notFound();
-  const spaces = await getMyChatNav();
+  const { spaces } = await getMyChatNav();
   const channel = spaces.find(({ id }) => id === spaceId.toLowerCase())
     ?.channels[0];
   if (!channel) notFound();

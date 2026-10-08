@@ -21,7 +21,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useRealtimeConnectionState } from "@/components/realtime-provider";
-import type { ChannelView, ChatReply } from "../types";
+import type { ChannelView, ChatReply, DirectMessageView } from "../types";
+import type { RoomMessageSource } from "../room-message-source";
 import { excerptOf } from "../message-text";
 import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
 import { ChannelMembers } from "./channel-members";
@@ -36,6 +37,7 @@ import { useTyping } from "./use-typing";
 import type { DisplayMessage } from "./message-state";
 import { useMessageHistory } from "./use-message-history";
 import { useRoomRead } from "./use-room-read";
+import { useDirectPeerRead } from "./use-direct-peer-read";
 import {
   useChannelMessages,
   type SendChatMessage,
@@ -68,7 +70,66 @@ export function ChannelScreen({
   data: ChannelView;
   send?: SendChatMessage;
 }) {
-  const messages = useChannelMessages(data, send);
+  return (
+    <ChatRoomScreen
+      data={data}
+      send={send}
+      presentation={{
+        kind: "channel",
+        name: data.room.name,
+        topic: data.room.topic,
+      }}
+    />
+  );
+}
+
+export function DirectMessageScreen({
+  data,
+  send,
+}: {
+  data: DirectMessageView;
+  send?: SendChatMessage;
+}) {
+  return (
+    <ChatRoomScreen
+      data={data}
+      send={send}
+      presentation={{
+        kind: "dm",
+        other: data.other,
+        peerReadSeq: data.peerReadSeq,
+      }}
+    />
+  );
+}
+
+function ChatRoomScreen({
+  data,
+  send,
+  presentation,
+}: {
+  data: RoomMessageSource;
+  send?: SendChatMessage;
+  presentation:
+    | { kind: "channel"; name: string; topic: string | null }
+    | { kind: "dm"; other: DirectMessageView["other"]; peerReadSeq: number };
+}) {
+  const direct = presentation.kind === "dm" ? presentation : null;
+  const roomName =
+    presentation.kind === "channel"
+      ? presentation.name
+      : presentation.other.name;
+  const peerRead = useDirectPeerRead(
+    data.room.id,
+    direct?.other.userId ?? null,
+    direct?.peerReadSeq ?? 0,
+  );
+  const messages = useChannelMessages(
+    data,
+    send,
+    direct ? peerRead.receivePage : undefined,
+    Boolean(direct),
+  );
   const { reportVisible } = messages;
   const typing = useTyping({
     roomId: data.room.id,
@@ -90,9 +151,9 @@ export function ChannelScreen({
     deleteState?.roomId === data.room.id ? deleteState.message : null;
   const deleteOrigin = useRef<string | null>(null);
   const channelRef = useRef<HTMLElement>(null);
-  const admin = data.members.some(
-    (member) => member.id === data.user.id && member.admin,
-  );
+  const admin =
+    !direct &&
+    data.members.some((member) => member.id === data.user.id && member.admin);
   const [replyState, setReply] = useState<{
     roomId: string;
     reply: ChatReply;
@@ -108,7 +169,21 @@ export function ChannelScreen({
       ? editState.messageId
       : null;
   const names = new Map(data.members.map(({ id, name }) => [id, name]));
-  const candidates = data.members.map(({ id, name }) => ({ userId: id, name }));
+  const candidates = data.members
+    .filter(({ id }) => !direct || id === direct.other.userId)
+    .map(({ id, name }) => ({ userId: id, name }));
+  const latestOwnMessage = direct
+    ? messages.messages.findLast(
+        (message) =>
+          message.authorId === data.user.id &&
+          !message.delivery &&
+          message.seq > 0,
+      )
+    : undefined;
+  const readReceiptMessageId =
+    latestOwnMessage && peerRead.seq >= latestOwnMessage.seq
+      ? latestOwnMessage.id
+      : null;
   const edit = (message: DisplayMessage) =>
     setEditing({ roomId: data.room.id, messageId: message.id });
   const replyTo = (message: DisplayMessage) => {
@@ -193,34 +268,63 @@ export function ChannelScreen({
       className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col bg-background"
     >
       <header className="flex min-h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:px-6">
-        <Hash
-          aria-hidden="true"
-          className="size-5 shrink-0 text-muted-foreground"
-        />
-        <h1 className="truncate text-lg font-bold">{data.room.name}</h1>
-        {data.room.topic && (
-          <p className="hidden min-w-0 flex-1 truncate border-l border-border pl-3 text-sm text-muted-foreground sm:block">
-            {data.room.topic}
-          </p>
+        {direct ? (
+          <>
+            <span
+              aria-hidden="true"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted font-semibold"
+            >
+              {Array.from(direct.other.name.trim())[0] ?? "?"}
+            </span>
+            <h1 className="min-w-0 truncate text-lg font-bold">
+              <button
+                type="button"
+                className="min-h-11 max-w-full truncate rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
+                aria-label={`${direct.other.name} 프로필`}
+              >
+                {direct.other.name}
+              </button>
+            </h1>
+            {direct.other.username && (
+              <span className="hidden truncate text-sm text-muted-foreground sm:block">
+                @{direct.other.username}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <Hash
+              aria-hidden="true"
+              className="size-5 shrink-0 text-muted-foreground"
+            />
+            <h1 className="truncate text-lg font-bold">{roomName}</h1>
+            {presentation.kind === "channel" && presentation.topic && (
+              <p className="hidden min-w-0 flex-1 truncate border-l border-border pl-3 text-sm text-muted-foreground sm:block">
+                {presentation.topic}
+              </p>
+            )}
+          </>
         )}
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <ChatMuteButton
             id={data.room.id}
-            name={data.room.name}
+            name={roomName}
             muted={data.room.muted}
           />
-          <Button
-            ref={trigger}
-            type="button"
-            variant="ghost"
-            aria-label={`멤버 ${data.members.length}명`}
-            aria-expanded={membersOpen}
-            aria-controls={membersId}
-            onClick={() => setMembersOpen((open) => !open)}
-          >
-            <Users aria-hidden="true" />
-            <span className="tabular-nums">{data.members.length}</span>
-          </Button>
+          {!direct && (
+            <Button
+              ref={trigger}
+              type="button"
+              variant="ghost"
+              aria-label={`멤버 ${data.members.length}명`}
+              aria-expanded={membersOpen}
+              aria-controls={membersId}
+              onClick={() => setMembersOpen((open) => !open)}
+            >
+              <Users aria-hidden="true" />
+              <span className="tabular-nums">{data.members.length}</span>
+            </Button>
+          )}
         </div>
       </header>
       {(connection === "disconnected" ||
@@ -238,7 +342,11 @@ export function ChannelScreen({
         <div className="flex min-w-0 flex-1 flex-col">
           <MessageList
             key={`${data.room.id}:${resetVersion}`}
-            channelName={data.room.name}
+            channelName={roomName}
+            introduction={
+              direct ? <DirectIntroduction other={direct.other} /> : undefined
+            }
+            readReceiptMessageId={readReceiptMessageId}
             now={data.now}
             userId={data.user.id}
             messages={messages.messages}
@@ -272,7 +380,7 @@ export function ChannelScreen({
                   ])
                 }
                 members={candidates}
-                allowEveryone={admin}
+                allowEveryone={Boolean(direct) || admin}
                 onSave={mutations.edit}
                 onCancel={() => {
                   setEditing(null);
@@ -283,7 +391,7 @@ export function ChannelScreen({
             actions={{
               userId: data.user.id,
               canWrite: data.canWrite,
-              canReact: !data.room.archived,
+              canReact: direct ? data.canWrite : !data.room.archived,
               admin,
               names,
               react: mutations.react,
@@ -298,14 +406,17 @@ export function ChannelScreen({
           {data.canWrite ? (
             <MessageComposer
               key={data.room.id}
-              channelName={data.room.name}
+              channelName={roomName}
+              placeholder={
+                direct ? `${roomName} 님에게 메시지 보내기` : undefined
+              }
               onSend={(body, reply) => {
                 messages.submit(body, reply);
                 typing.stopTyping();
               }}
               onInput={typing.onInput}
               members={candidates}
-              allowEveryone={admin}
+              allowEveryone={Boolean(direct) || admin}
               reply={reply}
               onClearReply={() => setReply(null)}
               focusVersion={composerFocus}
@@ -322,14 +433,16 @@ export function ChannelScreen({
             />
           ) : (
             <p className="shrink-0 border-t border-border p-5 text-center text-sm text-muted-foreground">
-              {data.room.archived
-                ? "보관된 채널이에요"
-                : "이 채널에는 관리자만 쓸 수 있어요"}
+              {direct
+                ? "이 대화에는 메시지를 보낼 수 없어요"
+                : data.room.archived
+                  ? "보관된 채널이에요"
+                  : "이 채널에는 관리자만 쓸 수 있어요"}
             </p>
           )}
           <TypingIndicator label={typing.label} />
         </div>
-        {wide && membersOpen && (
+        {!direct && wide && membersOpen && (
           <aside
             id={membersId}
             aria-label="채널 멤버"
@@ -350,36 +463,58 @@ export function ChannelScreen({
         onDelete={mutations.remove}
         onReturnFocus={() => returnMessageFocus(deleteOrigin.current)}
       />
-      <Sheet open={!wide && membersOpen} onOpenChange={setMembersOpen}>
-        <SheetContent
-          id={membersId}
-          side="right"
-          showCloseButton={false}
-          aria-describedby={undefined}
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            trigger.current?.focus();
-          }}
-        >
-          <SheetHeader>
-            <SheetTitle>채널 멤버</SheetTitle>
-          </SheetHeader>
-          <SheetClose asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2"
-              aria-label="멤버 목록 닫기"
-            >
-              <X aria-hidden="true" />
-            </Button>
-          </SheetClose>
-          <div className="overflow-y-auto">
-            <ChannelMembers members={data.members} />
-          </div>
-        </SheetContent>
-      </Sheet>
+      {!direct && (
+        <Sheet open={!wide && membersOpen} onOpenChange={setMembersOpen}>
+          <SheetContent
+            id={membersId}
+            side="right"
+            showCloseButton={false}
+            aria-describedby={undefined}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              trigger.current?.focus();
+            }}
+          >
+            <SheetHeader>
+              <SheetTitle>채널 멤버</SheetTitle>
+            </SheetHeader>
+            <SheetClose asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2"
+                aria-label="멤버 목록 닫기"
+              >
+                <X aria-hidden="true" />
+              </Button>
+            </SheetClose>
+            <div className="overflow-y-auto">
+              <ChannelMembers members={data.members} />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </section>
+  );
+}
+
+function DirectIntroduction({ other }: { other: DirectMessageView["other"] }) {
+  return (
+    <div className="flex flex-col items-center gap-1 text-center">
+      <span
+        aria-hidden="true"
+        className="mb-2 flex size-16 items-center justify-center rounded-full bg-muted text-xl font-semibold"
+      >
+        {Array.from(other.name.trim())[0] ?? "?"}
+      </span>
+      <p className="font-bold text-foreground">{other.name}</p>
+      {other.username && (
+        <p className="text-xs text-muted-foreground">@{other.username}</p>
+      )}
+      <p className="text-sm text-muted-foreground">
+        {other.name} 님과 나눈 대화의 처음이에요
+      </p>
+    </div>
   );
 }

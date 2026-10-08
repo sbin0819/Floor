@@ -47,6 +47,7 @@ function page(messages: DisplayMessage[]): RoomMessagesPage {
     messages,
     hasMore: false,
     lastSeq: 999,
+    peerReadSeq: null,
     lastReadSeq: 9,
     firstUnreadSeq: 10,
   };

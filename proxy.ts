@@ -27,6 +27,9 @@ export const config = {
     "/booking",
     "/notifications",
     "/s/:path*",
-    "/messages",
+    "/messages/:path*",
+    "/dm/:path*",
+    "/friends",
+    "/settings",
   ],
 };

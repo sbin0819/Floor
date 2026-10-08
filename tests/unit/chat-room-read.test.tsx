@@ -23,26 +23,29 @@ function setup(
   })),
 ) {
   const client = new QueryClient();
-  client.setQueryData(CHAT_NAV_KEY, [
-    {
-      id: "space",
-      name: "팀",
-      initial: "팀",
-      kind: "team",
-      unread: true,
-      muted: false,
-      unreadMentions: 0,
-      channels: [
-        {
-          id: "room",
-          name: "일반",
-          unread: true,
-          muted: false,
-          unreadMentions: 0,
-        },
-      ],
-    },
-  ]);
+  client.setQueryData(CHAT_NAV_KEY, {
+    spaces: [
+      {
+        id: "space",
+        name: "팀",
+        initial: "팀",
+        kind: "team",
+        unread: true,
+        muted: false,
+        unreadMentions: 0,
+        channels: [
+          {
+            id: "room",
+            name: "일반",
+            unread: true,
+            muted: false,
+            unreadMentions: 0,
+          },
+        ],
+      },
+    ],
+    directMessages: [],
+  });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -104,9 +107,10 @@ describe("room read cursor", () => {
       roomId: "room",
       seq: 8,
     });
-    expect(result.client.getQueryData(CHAT_NAV_KEY)).toMatchObject([
-      { unread: false, channels: [{ unread: false }] },
-    ]);
+    expect(result.client.getQueryData(CHAT_NAV_KEY)).toMatchObject({
+      spaces: [{ unread: false, channels: [{ unread: false }] }],
+      directMessages: [],
+    });
     result.rerender({ ...initial, visibleSeq: 6 });
     await act(() => vi.advanceTimersByTimeAsync(2_000));
     expect(result.mark).toHaveBeenCalledOnce();

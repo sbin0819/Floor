@@ -15,7 +15,7 @@ import {
   reportRoomViewport,
   releaseRoomViewport,
 } from "@/features/chat/nav-state";
-import type { ChatSpaceNav } from "@/features/chat/types";
+import type { ChatNav, ChatSpaceNav } from "@/features/chat/types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
 const spaceId = "11111111-1111-4111-8111-111111111111";
@@ -55,7 +55,7 @@ vi.mock("@/components/realtime-provider", () => ({
     mocks.event = event;
   },
 }));
-const fixture = (): ChatSpaceNav[] => [
+const spaceFixture = (): ChatSpaceNav[] => [
   {
     id: spaceId,
     kind: "team",
@@ -82,8 +82,20 @@ const fixture = (): ChatSpaceNav[] => [
     ],
   },
 ];
+const fixture = (): ChatNav => ({ spaces: spaceFixture(), directMessages: [] });
+function mappedFixture(map: (space: ChatSpaceNav) => ChatSpaceNav): ChatNav {
+  return { spaces: spaceFixture().map(map), directMessages: [] };
+}
 function activity(id = roomId, authorId: string | null = "other") {
-  mocks.event({ type: "room.activity", spaceId, roomId: id, seq: 2, authorId });
+  mocks.event({
+    type: "room.activity",
+    roomKind: "text",
+    preview: null,
+    spaceId,
+    roomId: id,
+    seq: 2,
+    authorId,
+  });
 }
 function setup(read = vi.fn(async () => fixture())) {
   const client = new QueryClient({
@@ -94,8 +106,8 @@ function setup(read = vi.fn(async () => fixture())) {
     <QueryClientProvider client={client}>
       <TooltipProvider>
         <ChatNavSync initialData={data} userId="me" read={read} />
-        <LiveChatRail spaces={data} />
-        <LiveChatSidebar spaces={data} />
+        <LiveChatRail data={data} />
+        <LiveChatSidebar data={data} />
       </TooltipProvider>
     </QueryClientProvider>
   );
@@ -128,6 +140,7 @@ describe("chat unread navigation", () => {
     const { client, rerender, node } = setup();
     const event = {
       type: "mention.created" as const,
+      roomKind: "text" as const,
       spaceId,
       roomId: secondId,
       roomName: "자료",
@@ -143,7 +156,7 @@ describe("chat unread navigation", () => {
     });
     await advance(251);
     expect(
-      client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unreadMentions,
+      client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unreadMentions,
     ).toBe(1);
     expect(
       screen.getByRole("link", { name: "자료, 멘션 1개" }),
@@ -169,15 +182,17 @@ describe("chat unread navigation", () => {
   it("retains muted mention badges and groups bursts but excludes the visible bottom", async () => {
     const { client } = setup();
     act(() =>
-      client.setQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY, (rows) =>
-        rows!.map((space) => ({ ...space, muted: true })),
-      ),
+      client.setQueryData<ChatNav>(CHAT_NAV_KEY, (rows) => ({
+        ...rows!,
+        spaces: rows!.spaces.map((space) => ({ ...space, muted: true })),
+      })),
     );
     act(() => {
       activity();
       for (let i = 0; i < 4; i++)
         mocks.mention({
           type: "mention.created",
+          roomKind: "text",
           spaceId,
           roomId: secondId,
           roomName: "자료",
@@ -189,6 +204,7 @@ describe("chat unread navigation", () => {
       reportRoomViewport(client, roomId, true);
       mocks.mention({
         type: "mention.created",
+        roomKind: "text",
         spaceId,
         roomId,
         roomName: "일반",
@@ -199,7 +215,7 @@ describe("chat unread navigation", () => {
       });
     });
     await advance(251);
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]).toMatchObject(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]).toMatchObject(
       { unread: false, unreadMentions: 4 },
     );
     expect(mocks.toast).toHaveBeenCalledOnce();
@@ -210,7 +226,7 @@ describe("chat unread navigation", () => {
   });
   it("preserves a newer unread poll while a send acknowledgment was in flight", async () => {
     const read = vi.fn(async () =>
-      fixture().map((space) => ({
+      mappedFixture((space) => ({
         ...space,
         unread: true,
         channels: space.channels.map((room) => ({ ...room, unread: true })),
@@ -220,7 +236,7 @@ describe("chat unread navigation", () => {
     const sendingAt = chatNavRevision(client);
     await advance(60_001);
     act(() => clearRoomUnread(client, roomId, 5, sendingAt));
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unread).toBe(
       true,
     );
   });
@@ -229,6 +245,8 @@ describe("chat unread navigation", () => {
     act(() => {
       mocks.event({
         type: "room.activity",
+        roomKind: "text",
+        preview: null,
         spaceId,
         roomId,
         seq: 6,
@@ -237,14 +255,14 @@ describe("chat unread navigation", () => {
       clearRoomUnread(client, roomId, 5);
     });
     await advance(1);
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unread).toBe(
       true,
     );
     act(() => {
       clearRoomUnread(client, roomId, 6);
       activity();
     });
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unread).toBe(
       false,
     );
   });
@@ -264,7 +282,7 @@ describe("chat unread navigation", () => {
   it("does not subscribe from home and shows an 8px unread bar on another space", async () => {
     mocks.pathname = "/";
     const read = vi.fn(async () =>
-      fixture().map((space) => ({
+      mappedFixture((space) => ({
         ...space,
         unread: true,
         channels: space.channels.map((room) => ({ ...room, unread: true })),
@@ -283,7 +301,7 @@ describe("chat unread navigation", () => {
       activity();
     });
     await advance(1);
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)?.[0]?.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)?.spaces[0]?.unread).toBe(
       false,
     );
     act(() => {
@@ -291,7 +309,7 @@ describe("chat unread navigation", () => {
       activity(roomId, null);
     });
     await advance(1);
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)?.[0]?.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)?.spaces[0]?.unread).toBe(
       true,
     );
     act(() => {
@@ -303,7 +321,7 @@ describe("chat unread navigation", () => {
       value: "hidden",
     });
     act(() => activity());
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)?.[0]?.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)?.spaces[0]?.unread).toBe(
       true,
     );
   });
@@ -315,19 +333,19 @@ describe("chat unread navigation", () => {
       clearRoomUnread(client, roomId);
     });
     await advance(1);
-    const space = client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!;
+    const space = client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!;
     expect(space.unread).toBe(true);
     expect(space.channels.map((room) => room.unread)).toEqual([false, true]);
     act(() => clearRoomUnread(client, secondId));
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unread).toBe(
       false,
     );
   });
   it("preserves activity and reads newer than a poll, while the next poll repairs failed optimistic reads", async () => {
-    let resolve!: (value: ChatSpaceNav[]) => void;
+    let resolve!: (value: ChatNav) => void;
     const read = vi.fn(
       () =>
-        new Promise<ChatSpaceNav[]>((done) => {
+        new Promise<ChatNav>((done) => {
           resolve = done;
         }),
     );
@@ -340,7 +358,7 @@ describe("chat unread navigation", () => {
     });
     await act(async () =>
       resolve(
-        fixture().map((space) => ({
+        mappedFixture((space) => ({
           ...space,
           channels: space.channels.map((room) => ({
             ...room,
@@ -351,13 +369,13 @@ describe("chat unread navigation", () => {
     );
     expect(
       client
-        .getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!
-        .channels.map((room) => room.unread),
+        .getQueryData<ChatNav>(CHAT_NAV_KEY)!
+        .spaces[0]!.channels.map((room) => room.unread),
     ).toEqual([true, false]);
     await advance(60_000);
     await act(async () =>
       resolve(
-        fixture().map((space) => ({
+        mappedFixture((space) => ({
           ...space,
           channels: space.channels.map((room) => ({
             ...room,
@@ -368,8 +386,8 @@ describe("chat unread navigation", () => {
     );
     expect(
       client
-        .getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!
-        .channels.map((room) => room.unread),
+        .getQueryData<ChatNav>(CHAT_NAV_KEY)!
+        .spaces[0]!.channels.map((room) => room.unread),
     ).toEqual([false, true]);
   });
   it("does not let delayed SSR navigation erase a recent event", async () => {
@@ -377,14 +395,14 @@ describe("chat unread navigation", () => {
     act(() => activity());
     rerender(node(fixture()));
     await advance(1);
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unread).toBe(
       true,
     );
   });
 
   it("keeps a fresh poll's unread value when older SSR props arrive later", async () => {
     const read = vi.fn(async () =>
-      fixture().map((space) => ({
+      mappedFixture((space) => ({
         ...space,
         unread: true,
         channels: space.channels.map((room) => ({ ...room, unread: true })),
@@ -394,7 +412,7 @@ describe("chat unread navigation", () => {
     await advance(60_001);
     rerender(node(fixture()));
     await advance(1);
-    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unread).toBe(
+    expect(client.getQueryData<ChatNav>(CHAT_NAV_KEY)!.spaces[0]!.unread).toBe(
       true,
     );
   });
@@ -433,7 +451,7 @@ describe("chat unread navigation", () => {
   it("fetches privately with cancellation and strips unexpected response fields", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json(
-        fixture().map((space) => ({ ...space, email: "private@example.test" })),
+        mappedFixture((space) => ({ ...space, email: "private@example.test" })),
       ),
     );
     vi.stubGlobal("fetch", fetchMock);

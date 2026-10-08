@@ -12,6 +12,7 @@ export type QueuedMessage = {
   message: ChatMessage & { clientId: string };
   send: SendChatMessage;
   navigationRevision?: number;
+  roomKind?: "dm";
 };
 type RoomQueue = {
   entries: QueuedMessage[];

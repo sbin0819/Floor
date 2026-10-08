@@ -15,7 +15,7 @@ import {
 } from "@/components/realtime-provider";
 import { roomChannel } from "@/lib/realtime/channels";
 import { createRoomCatchUp } from "../catch-up";
-import type { ChannelView } from "../types";
+import type { RoomMessageSource } from "../room-message-source";
 import { requestMessagePage } from "../message-requests";
 import {
   mergeChatMessages,
@@ -23,7 +23,10 @@ import {
   type DisplayMessage,
 } from "./message-state";
 
-export function useChannelCatchUp(data: ChannelView) {
+export function useChannelCatchUp(
+  data: RoomMessageSource,
+  onPageRead?: (roomId: string, seq: number) => void,
+) {
   const client = useQueryClient();
   const roomId = data.room.id;
   const userId = data.user.id;
@@ -32,8 +35,16 @@ export function useChannelCatchUp(data: ChannelView) {
     () =>
       createRoomCatchUp({
         roomId,
-        loadPage: (room, query, options) =>
-          requestMessagePage(client, room, query, options),
+        loadPage: async (room, query, options) => {
+          const page = await requestMessagePage(client, room, query, options);
+          if (
+            !options?.signal?.aborted &&
+            page.peerReadSeq !== null &&
+            page.peerReadSeq !== undefined
+          )
+            onPageRead?.(room, page.peerReadSeq);
+          return page;
+        },
         merge(messages) {
           client.setQueryData<DisplayMessage[]>(
             roomMessagesKey(roomId),
@@ -52,7 +63,7 @@ export function useChannelCatchUp(data: ChannelView) {
           );
         },
       }),
-    [client, roomId, userId],
+    [client, roomId, userId, onPageRead],
   );
   const start = useEffectEvent(() => {
     catchUp.start(

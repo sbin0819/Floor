@@ -63,6 +63,7 @@ describe("member navigation", () => {
     ["/bookings", "내 예약"],
     ["/bookings/past", "내 예약"],
     ["/teams", "팀 관리"],
+    ["/friends", "친구"],
     ["/teams/start", "팀 관리"],
     ["/teams/team-a", "팀 관리"],
     ["/invite/private-token", "팀 관리"],
@@ -72,7 +73,7 @@ describe("member navigation", () => {
     expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
       label,
     );
-    expect(screen.getAllByRole("link")).toHaveLength(4);
+    expect(screen.getAllByRole("link")).toHaveLength(5);
     expect(screen.getByRole("link", { name: "공간 예약" })).toHaveAttribute(
       "href",
       "/booking",
@@ -178,21 +179,24 @@ describe("member navigation", () => {
     },
   );
 
-  it.each(["/messages", "/s/space/room"])(
-    "selects messages in the bottom tab at %s",
-    (pathname) => {
-      mocks.pathname = pathname;
-      render(<MemberNav mobile />);
-      expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
-        "메시지",
-      );
-    },
-  );
+  it.each([
+    "/messages",
+    "/messages/new",
+    "/s/space/room",
+    "/dm/room",
+    "/friends",
+  ])("selects messages in the bottom tab at %s", (pathname) => {
+    mocks.pathname = pathname;
+    render(<MemberNav mobile />);
+    expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
+      "메시지",
+    );
+  });
 
   it("shows a pending hint without changing the destination or dimensions", () => {
     mocks.pending = true;
     const { container } = render(<MemberNav />);
-    expect(container.querySelectorAll('[data-pending="true"]')).toHaveLength(4);
+    expect(container.querySelectorAll('[data-pending="true"]')).toHaveLength(5);
     for (const hint of container.querySelectorAll('[data-pending="true"]'))
       expect(hint).toHaveClass("absolute", "inset-0", "opacity-100");
     expect(screen.getByRole("link", { name: "공간 예약" })).toHaveAttribute(

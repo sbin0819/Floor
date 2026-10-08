@@ -269,7 +269,7 @@ describe("team chat navigation", () => {
   });
 
   it("shows the real empty state with the team management link", () => {
-    render(<MessagesList spaces={[]} />);
+    render(<MessagesList data={{ spaces: [], directMessages: [] }} />);
     expect(
       screen.getByText(
         "아직 참여한 스페이스가 없어요. 팀에 들어가면 팀 스페이스가 생겨요",
@@ -281,7 +281,7 @@ describe("team chat navigation", () => {
   });
 
   it("lists each permitted space and its channels as real links", () => {
-    render(<MessagesList spaces={spaces} />);
+    render(<MessagesList data={{ spaces, directMessages: [] }} />);
     const section = screen.getByRole("region", { name: "디자인팀" });
     expect(within(section).getByRole("link", { name: "일반" })).toHaveAttribute(
       "href",

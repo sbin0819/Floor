@@ -24,6 +24,7 @@ export function MessageComposer({
   onEditLast,
   onInput,
   focusVersion = 0,
+  placeholder,
 }: {
   channelName: string;
   onSend: (body: string, reply?: ChatReply) => void;
@@ -34,6 +35,7 @@ export function MessageComposer({
   onEditLast?: () => void;
   onInput?: (body: string) => void;
   focusVersion?: number;
+  placeholder?: string;
 }) {
   const [value, setValue] = useState<MentionInputValue>({
     text: "",
@@ -106,7 +108,7 @@ export function MessageComposer({
           aria-label="메시지"
           aria-describedby={count > 3500 ? descriptionId : undefined}
           aria-invalid={count > 4000 || undefined}
-          placeholder={`#${channelName}에 메시지 보내기`}
+          placeholder={placeholder ?? `#${channelName}에 메시지 보내기`}
           value={value}
           onChange={(next) => {
             setValue(next);

@@ -9,7 +9,7 @@ import {
 
 async function MessagesContent() {
   await requirePageSession("/messages");
-  return <MessagesList spaces={await getMyChatNav()} />;
+  return <MessagesList data={await getMyChatNav()} />;
 }
 
 export default function MessagesPage() {

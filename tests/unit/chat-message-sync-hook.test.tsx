@@ -98,6 +98,7 @@ function page(messages: ChatMessage[]): RoomMessagesPage {
     messages,
     hasMore: false,
     lastSeq: Math.max(1, ...messages.map((message) => message.seq)),
+    peerReadSeq: null,
     lastReadSeq: null,
     firstUnreadSeq: null,
   };

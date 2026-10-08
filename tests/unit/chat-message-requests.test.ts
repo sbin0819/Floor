@@ -14,6 +14,7 @@ const page: RoomMessagesPage = {
   messages: [],
   hasMore: false,
   lastSeq: 1,
+  peerReadSeq: null,
   lastReadSeq: null,
   firstUnreadSeq: null,
 };

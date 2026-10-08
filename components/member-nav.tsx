@@ -28,6 +28,7 @@ const icons = {
   spaces: LayoutGrid,
   bookings: CalendarDays,
   teams: Users,
+  friends: Users,
   messages: MessageSquare,
 };
 
@@ -48,7 +49,8 @@ export function MemberNav({
     activeMemberNav(pathname),
     navigateAction ?? navigate,
   );
-  const active = navigation.value;
+  const active =
+    mobile && navigation.value === "friends" ? "messages" : navigation.value;
   return (
     <nav
       aria-label={mobile ? "하단 회원 메뉴" : "회원 메뉴"}

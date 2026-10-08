@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { ChatSpaceNav } from "./types";
+import type { ChatNav, DirectMessageNav } from "./types";
 
 export const CHAT_NAV_KEY = ["chat", "nav"] as const;
 type NavChanges = {
@@ -7,7 +7,7 @@ type NavChanges = {
   rooms: Map<string, number>;
   activitySeq: Map<string, number>;
   readThrough: Map<string, number>;
-  incoming: WeakSet<ChatSpaceNav[]>;
+  incoming: WeakSet<ChatNav>;
   viewport: { roomId: string; atBottom: boolean } | null;
   mentions: Set<string>;
 };
@@ -44,24 +44,39 @@ export function releaseRoomViewport(client: QueryClient, roomId: string) {
 function setUnread(client: QueryClient, roomId: string, unread: boolean) {
   const snapshot = state(client);
   snapshot.rooms.set(roomId, ++snapshot.revision);
-  client.setQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY, (current) =>
-    current?.map((space) => {
-      const channels = space.channels.map((room) =>
-        room.id === roomId
-          ? { ...room, unread, ...(!unread ? { unreadMentions: 0 } : {}) }
-          : room,
-      );
-      return {
-        ...space,
-        channels,
-        unread:
-          !space.muted && channels.some((room) => room.unread && !room.muted),
-        unreadMentions: channels.reduce(
-          (sum, room) => sum + room.unreadMentions,
-          0,
+  client.setQueryData<ChatNav>(
+    CHAT_NAV_KEY,
+    (current) =>
+      current && {
+        ...current,
+        directMessages: current.directMessages.map((room) =>
+          room.roomId === roomId
+            ? {
+                ...room,
+                unread,
+                ...(!unread ? { unreadCount: 0, unreadMentions: 0 } : {}),
+              }
+            : room,
         ),
-      };
-    }),
+        spaces: current.spaces.map((space) => {
+          const channels = space.channels.map((room) =>
+            room.id === roomId
+              ? { ...room, unread, ...(!unread ? { unreadMentions: 0 } : {}) }
+              : room,
+          );
+          return {
+            ...space,
+            channels,
+            unread:
+              !space.muted &&
+              channels.some((room) => room.unread && !room.muted),
+            unreadMentions: channels.reduce(
+              (sum, room) => sum + room.unreadMentions,
+              0,
+            ),
+          };
+        }),
+      },
   );
 }
 
@@ -126,6 +141,10 @@ export function isViewingRoom(
   );
 }
 
+export function hasReadThrough(client: QueryClient, roomId: string, seq: number) {
+  return (state(client).readThrough.get(roomId) ?? 0) >= seq;
+}
+
 export function applyMention(
   client: QueryClient,
   event: { roomId: string; messageId: string; seq: number },
@@ -143,22 +162,32 @@ export function applyMention(
     event.roomId,
     Math.max(snapshot.activitySeq.get(event.roomId) ?? 0, event.seq),
   );
-  client.setQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY, (current) =>
-    current?.map((space) => {
-      const channels = space.channels.map((room) =>
-        room.id === event.roomId
-          ? { ...room, unreadMentions: room.unreadMentions + 1 }
-          : room,
-      );
-      return {
-        ...space,
-        channels,
-        unreadMentions: channels.reduce(
-          (sum, room) => sum + room.unreadMentions,
-          0,
+  client.setQueryData<ChatNav>(
+    CHAT_NAV_KEY,
+    (current) =>
+      current && {
+        ...current,
+        directMessages: current.directMessages.map((room) =>
+          room.roomId === event.roomId
+            ? { ...room, unreadMentions: room.unreadMentions + 1 }
+            : room,
         ),
-      };
-    }),
+        spaces: current.spaces.map((space) => {
+          const channels = space.channels.map((room) =>
+            room.id === event.roomId
+              ? { ...room, unreadMentions: room.unreadMentions + 1 }
+              : room,
+          );
+          return {
+            ...space,
+            channels,
+            unreadMentions: channels.reduce(
+              (sum, room) => sum + room.unreadMentions,
+              0,
+            ),
+          };
+        }),
+      },
   );
   return true;
 }
@@ -166,13 +195,13 @@ export function applyMention(
 // 요청 이후 바뀐 방만 현재 값을 남긴다. 다음 정상 폴링은 실패한 읽음도 바로잡는다.
 export function mergeChatNav(
   client: QueryClient,
-  incoming: ChatSpaceNav[],
+  incoming: ChatNav,
   requestedAt: number | null,
 ) {
   const snapshot = state(client);
-  const current = client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY);
+  const current = client.getQueryData<ChatNav>(CHAT_NAV_KEY);
   const unread = new Map(
-    current?.flatMap((space) =>
+    current?.spaces.flatMap((space) =>
       space.channels.map(
         (room) =>
           [
@@ -182,7 +211,7 @@ export function mergeChatNav(
       ),
     ),
   );
-  return incoming.map((space) => {
+  const spaces = incoming.spaces.map((space) => {
     const channels = space.channels.map((room) => {
       const protect =
         requestedAt === null
@@ -205,14 +234,89 @@ export function mergeChatNav(
       ),
     };
   });
+  const existing = new Map(
+    current?.directMessages.map((room) => [room.roomId, room]),
+  );
+  const protect = (id: string) =>
+    requestedAt === null
+      ? existing.has(id)
+      : (snapshot.rooms.get(id) ?? 0) > requestedAt;
+  const directMessages = incoming.directMessages.map((room) => {
+    const old = existing.get(room.roomId);
+    if (old && protect(room.roomId)) return old;
+    if (requestedAt !== null)
+      snapshot.rooms.set(room.roomId, ++snapshot.revision);
+    return room;
+  });
+  for (const [id, room] of existing) {
+    if (protect(id) && !directMessages.some((row) => row.roomId === id))
+      directMessages.push(room);
+  }
+  return { spaces, directMessages: sortDirectMessages(directMessages) };
 }
 
-export function mergeInitialChatNav(
-  client: QueryClient,
-  incoming: ChatSpaceNav[],
-) {
+export function mergeInitialChatNav(client: QueryClient, incoming: ChatNav) {
   const snapshot = state(client);
   if (snapshot.incoming.has(incoming)) return;
   snapshot.incoming.add(incoming);
   client.setQueryData(CHAT_NAV_KEY, mergeChatNav(client, incoming, null));
+}
+
+function sortDirectMessages(rows: DirectMessageNav[]) {
+  return rows
+    .sort(
+      (a, b) =>
+        b.lastMessageAt.localeCompare(a.lastMessageAt) ||
+        a.roomId.localeCompare(b.roomId),
+    )
+    .slice(0, 50);
+}
+
+// 멘션보다 먼저 저장된 번호만 비교해 이벤트 순서가 달라도 일반 메시지 수를 한 번만 올린다.
+export function applyDirectActivity(
+  client: QueryClient,
+  event: { roomId: string; seq: number; authorId: string | null },
+  userId: string,
+  at = new Date().toISOString(),
+) {
+  const current = client.getQueryData<ChatNav>(CHAT_NAV_KEY);
+  const room = current?.directMessages.find(
+    (room) => room.roomId === event.roomId,
+  );
+  if (!room) return "missing" as const;
+  if (event.seq <= room.lastSeq) return "duplicate" as const;
+  const snapshot = state(client);
+  const unread =
+    event.authorId !== userId &&
+    event.seq > (snapshot.readThrough.get(event.roomId) ?? 0) &&
+    !isViewingRoom(client, event.roomId, true);
+  snapshot.rooms.set(event.roomId, ++snapshot.revision);
+  snapshot.activitySeq.set(
+    event.roomId,
+    Math.max(snapshot.activitySeq.get(event.roomId) ?? 0, event.seq),
+  );
+  client.setQueryData<ChatNav>(CHAT_NAV_KEY, {
+    ...current!,
+    directMessages: sortDirectMessages(
+      current!.directMessages.map((row) =>
+        row.roomId === event.roomId
+          ? {
+              ...row,
+              lastSeq: event.seq,
+              lastMessageAt: at,
+              unread: row.unread || unread,
+              unreadCount: Math.min(100, row.unreadCount + (unread ? 1 : 0)),
+            }
+          : row,
+      ),
+    ),
+  });
+  return "applied" as const;
+}
+
+export function directUnreadCount(data: ChatNav) {
+  return data.directMessages.reduce(
+    (sum, room) => sum + (room.muted ? room.unreadMentions : room.unreadCount),
+    0,
+  );
 }

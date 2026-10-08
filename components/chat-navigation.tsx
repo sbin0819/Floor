@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Grid2X2, Hash } from "lucide-react";
 import { cn } from "cn";
-import type { ChatSpaceNav } from "@/features/chat/types";
+import type { ChatSpaceNav, DirectMessageNav } from "@/features/chat/types";
+import { DirectMessageList } from "@/features/chat/components/direct-message-list";
 import { MemberNav } from "@/components/member-nav";
 import { LinkPending } from "@/components/link-pending";
 import { ChatMuteButton } from "@/features/chat/components/chat-mute-button";
@@ -28,7 +29,13 @@ function chatLocation(pathname: string) {
     : { spaceId: null, roomId: null };
 }
 
-export function ChatRailNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
+export function ChatRailNavigation({
+  spaces,
+  directMessages = [],
+}: {
+  spaces: ChatSpaceNav[];
+  directMessages?: DirectMessageNav[];
+}) {
   const pathname = usePathname();
   const navigation = useRouterOptimisticNavigation(
     chatLocation(pathname).spaceId,
@@ -37,11 +44,15 @@ export function ChatRailNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
     {
       id: null,
       name: "홈",
-      label: "Floor 홈",
+      label: `Floor 홈${directMessages.some((room) => (room.muted ? room.unreadMentions : room.unreadCount) > 0) ? `, 읽지 않은 메시지 ${directMessages.reduce((sum, room) => sum + (room.muted ? room.unreadMentions : room.unreadCount), 0)}개` : ""}`,
       href: "/",
       initial: null,
       unread: false,
-      unreadMentions: 0,
+      unreadMentions: directMessages.reduce(
+        (sum, room) =>
+          sum + (room.muted ? room.unreadMentions : room.unreadCount),
+        0,
+      ),
     },
     ...spaces.map((space) => ({
       ...space,
@@ -144,11 +155,23 @@ export function ChatSidebarTitle({ spaces }: { spaces: ChatSpaceNav[] }) {
   );
 }
 
-export function ChatSidebarNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
+export function ChatSidebarNavigation({
+  spaces,
+  directMessages = [],
+}: {
+  spaces: ChatSpaceNav[];
+  directMessages?: DirectMessageNav[];
+}) {
   const { spaceId, roomId } = chatLocation(usePathname());
   const navigation = useRouterOptimisticNavigation(roomId);
   const space = spaces.find(({ id }) => id === spaceId);
-  if (!space) return <MemberNav />;
+  if (!space)
+    return (
+      <div className="space-y-6">
+        <MemberNav />
+        <DirectMessageList rows={directMessages} limit={10} />
+      </div>
+    );
   return (
     <nav aria-label={`${space.name} 텍스트 채널`} className="space-y-2">
       <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">

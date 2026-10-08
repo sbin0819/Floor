@@ -34,6 +34,7 @@ function page(messages: ChatMessage[], hasMore = false): RoomMessagesPage {
     messages,
     hasMore,
     lastSeq: 101,
+    peerReadSeq: null,
     firstUnreadSeq: 75,
     lastReadSeq: 74,
   };

@@ -547,6 +547,7 @@ describe("optimistic sending and streamed updates", () => {
     });
     vi.mocked(fetchRoomMessagesPage).mockResolvedValue({
       messages: [second, third],
+      peerReadSeq: null,
       hasMore: false,
       lastSeq: 3,
       lastReadSeq: null,

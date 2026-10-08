@@ -88,6 +88,8 @@ export const MessageList = memo(function MessageList({
   renderEditor,
   focusMessageId,
   jumpToId,
+  introduction,
+  readReceiptMessageId,
 }: {
   messages: readonly DisplayMessage[];
   channelName: string;
@@ -111,6 +113,8 @@ export const MessageList = memo(function MessageList({
   renderEditor?: (message: DisplayMessage) => ReactNode;
   focusMessageId?: string | null;
   jumpToId?: string | null;
+  introduction?: ReactNode;
+  readReceiptMessageId?: string | null;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // 읽음 응답은 경계선을 지우지 않는다. 방이나 복구 세대가 바뀔 때만 다시 만든다.
@@ -140,7 +144,13 @@ export const MessageList = memo(function MessageList({
     getItemKey,
     estimateSize: () => 80,
     overscan: 6,
-    paddingStart: 44,
+    paddingStart: introduction
+      ? messages.length
+        ? !hasMore
+          ? 176
+          : 44
+        : 0
+      : 44,
     paddingEnd: 24,
     anchorTo: "end",
     followOnAppend: initialized,
@@ -341,20 +351,24 @@ export const MessageList = memo(function MessageList({
             style={{ height: virtualizer.getTotalSize() }}
             data-message-list
           >
-            <div className="absolute inset-x-0 top-0 flex h-11 items-center justify-center text-xs text-muted-foreground">
-              {loadingOlder ? (
-                <Skeleton
-                  aria-label="이전 메시지를 불러오고 있어요"
-                  className="h-4 w-44"
-                />
-              ) : historyError ? (
-                <Button variant="ghost" onClick={() => void onLoadOlder()}>
-                  이전 메시지 다시 불러오기
-                </Button>
-              ) : !hasMore ? (
-                `#${channelName}의 처음이에요`
-              ) : null}
-            </div>
+            {!(introduction && !messages.length) && (
+              <div
+                className={`absolute inset-x-0 top-0 flex items-center justify-center text-xs text-muted-foreground ${introduction && !hasMore ? "h-44" : "h-11"} ${introduction && !messages.length ? "hidden" : ""}`}
+              >
+                {loadingOlder ? (
+                  <Skeleton
+                    aria-label="이전 메시지를 불러오고 있어요"
+                    className="h-4 w-44"
+                  />
+                ) : historyError ? (
+                  <Button variant="ghost" onClick={() => void onLoadOlder()}>
+                    이전 메시지 다시 불러오기
+                  </Button>
+                ) : !hasMore ? (
+                  (introduction ?? `#${channelName}의 처음이에요`)
+                ) : null}
+              </div>
+            )}
             {rows.map((row) => {
               const message = messages[row.index]!;
               const previous = messages[row.index - 1];
@@ -416,16 +430,20 @@ export const MessageList = memo(function MessageList({
                         ? renderEditor?.(message)
                         : undefined
                     }
+                    read={readReceiptMessageId === message.id}
                   />
                 </div>
               );
             })}
           </div>
-          {!messages.length && (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              #{channelName}의 첫 메시지를 보내 보세요
-            </p>
-          )}
+          {!messages.length &&
+            (introduction ? (
+              <div className="py-8">{introduction}</div>
+            ) : (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                #{channelName}의 첫 메시지를 보내 보세요
+              </p>
+            ))}
         </div>
         {newBelow > 0 && (
           <Button

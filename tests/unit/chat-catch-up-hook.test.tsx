@@ -89,6 +89,7 @@ function page(seqs: number[], extra: Partial<RoomMessagesPage> = {}) {
     messages: seqs.map((seq) => message(seq)),
     hasMore: false,
     lastSeq: Math.max(1, ...seqs),
+    peerReadSeq: null,
     lastReadSeq: null,
     firstUnreadSeq: null,
     ...extra,

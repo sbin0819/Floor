@@ -5,6 +5,7 @@ const empty = {
   messages: [],
   hasMore: false,
   lastSeq: 0,
+  peerReadSeq: null,
   lastReadSeq: null,
   firstUnreadSeq: null,
 };

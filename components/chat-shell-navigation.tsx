@@ -10,19 +10,21 @@ import { getSession } from "@/lib/auth/session";
 import { getMyChatNav } from "@/features/chat/queries";
 
 async function readNavigation() {
-  return (await getSession()) ? getMyChatNav() : [];
+  return (await getSession())
+    ? getMyChatNav()
+    : { spaces: [], directMessages: [] };
 }
 
 export async function ChatRailSlot() {
-  return <LiveChatRail spaces={await readNavigation()} />;
+  return <LiveChatRail data={await readNavigation()} />;
 }
 
 export async function ChatSidebarSlot() {
-  return <LiveChatSidebar spaces={await readNavigation()} />;
+  return <LiveChatSidebar data={await readNavigation()} />;
 }
 
 export async function ChatSidebarTitleSlot() {
-  return <LiveChatSidebarTitle spaces={await readNavigation()} />;
+  return <LiveChatSidebarTitle data={await readNavigation()} />;
 }
 
 export async function ChatNavSyncSlot() {

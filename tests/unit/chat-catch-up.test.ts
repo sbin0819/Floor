@@ -23,6 +23,7 @@ const page = (
 ): RoomMessagesPage => ({
   messages: seqs.map(message),
   lastSeq: Math.max(0, ...seqs),
+  peerReadSeq: null,
   hasMore: false,
   lastReadSeq: null,
   firstUnreadSeq: null,

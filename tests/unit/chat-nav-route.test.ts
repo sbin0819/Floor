@@ -9,10 +9,10 @@ beforeEach(() => {
   mocks.connection.mockResolvedValue(undefined);
 });
 it("returns the private navigation after the request boundary", async () => {
-  mocks.query.mockResolvedValue([]);
+  mocks.query.mockResolvedValue({ spaces: [], directMessages: [] });
   const result = await GET();
   expect(result.status).toBe(200);
-  expect(await result.json()).toEqual([]);
+  expect(await result.json()).toEqual({ spaces: [], directMessages: [] });
   expect(result.headers.get("Cache-Control")).toBe("private, no-store");
   expect(mocks.connection.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.query.mock.invocationCallOrder[0]!,

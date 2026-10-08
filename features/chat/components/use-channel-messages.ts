@@ -8,7 +8,8 @@ import {
 } from "@/components/realtime-provider";
 import { roomChannel } from "@/lib/realtime/channels";
 import { sendMessage } from "@/features/chat/actions";
-import type { ChannelView, ChatMessage } from "../types";
+import type { ChatMessage } from "../types";
+import type { RoomMessageSource } from "../room-message-source";
 import { useChannelCatchUp } from "./use-channel-catch-up";
 import { useChatSendQueue } from "./use-chat-send-queue";
 import type { SendChatMessage } from "../send-queue";
@@ -25,8 +26,10 @@ export type { SendChatMessage } from "../send-queue";
 const noLiveMessages: ChatMessage[] = [];
 
 export function useChannelMessages(
-  data: ChannelView,
+  data: RoomMessageSource,
   send: SendChatMessage = sendMessage,
+  onPageRead?: (roomId: string, seq: number) => void,
+  isDirect = false,
 ) {
   const client = useQueryClient();
   const roomId = data.room.id;
@@ -51,8 +54,8 @@ export function useChannelMessages(
     } else if (event.channel === roomChannel(roomId) && !event.resumed)
       sync.revalidate();
   });
-  const catchUp = useChannelCatchUp(data);
-  const sending = useChatSendQueue(data, send);
+  const catchUp = useChannelCatchUp(data, onPageRead);
+  const sending = useChatSendQueue(data, send, isDirect);
   const liveBuffer = useRef<{
     roomId: string;
     messages: ChatMessage[];

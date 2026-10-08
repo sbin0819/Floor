@@ -3,7 +3,8 @@ import { Hash } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageContainer, PageHeading } from "@/components/page-container";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ChatSpaceNav } from "@/features/chat/types";
+import type { ChatNav, ChatSpaceNav } from "@/features/chat/types";
+import { LiveDirectMessages } from "./chat-nav";
 
 export function MessagesShell({ children }: { children: ReactNode }) {
   return (
@@ -12,12 +13,34 @@ export function MessagesShell({ children }: { children: ReactNode }) {
         title="메시지"
         description="팀 스페이스의 채널에서 함께 이야기해요"
       />
+      <nav aria-label="메시지 메뉴" className="flex gap-4">
+        <Link
+          href="/friends"
+          className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4"
+        >
+          친구
+        </Link>
+        <Link
+          href="/messages/new"
+          className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4"
+        >
+          새 메시지
+        </Link>
+      </nav>
       {children}
     </PageContainer>
   );
 }
 
-export function MessagesList({ spaces }: { spaces: ChatSpaceNav[] }) {
+export function MessagesList({ data }: { data: ChatNav }) {
+  return (
+    <div className="space-y-8">
+      <LiveDirectMessages data={data} />
+      <SpaceList spaces={data.spaces} />
+    </div>
+  );
+}
+function SpaceList({ spaces }: { spaces: ChatSpaceNav[] }) {
   if (spaces.length === 0) {
     return (
       <div className="space-y-3 rounded-xl border bg-card p-5">

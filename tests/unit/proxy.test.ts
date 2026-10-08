@@ -17,6 +17,10 @@ describe("optimistic route protection", () => {
     "/booking",
     "/notifications",
     "/messages",
+    "/messages/new",
+    "/dm/11111111-1111-4111-8111-111111111111",
+    "/friends",
+    "/settings",
     "/s/11111111-1111-4111-8111-111111111111",
     "/s/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222",
   ])("matches protected route %s", (url) => {
@@ -32,6 +36,8 @@ describe("optimistic route protection", () => {
     "/api/participants/search",
     "/api/notifications",
     "/api/realtime/token",
+    "/api/people/search",
+    "/api/people/11111111-1111-4111-8111-111111111111",
     "/favicon.ico",
     "/_next/static/test.js",
   ])("does not touch public route %s", (url) => {

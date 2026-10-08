@@ -53,6 +53,7 @@ export const MessageRow = memo(function MessageRow({
   onKeyDown,
   highlighted = false,
   editor,
+  read = false,
 }: {
   message: DisplayMessage;
   grouped: boolean;
@@ -67,6 +68,7 @@ export const MessageRow = memo(function MessageRow({
   onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
   highlighted?: boolean;
   editor?: ReactNode;
+  read?: boolean;
 }) {
   const article = useRef<HTMLElement>(null);
   const tools = useRef<HTMLDivElement>(null);
@@ -287,6 +289,14 @@ export const MessageRow = memo(function MessageRow({
             ))}
           {message.editedAt && !message.deletedAt && (
             <span className="text-xs text-muted-foreground">(수정됨)</span>
+          )}
+          {read && (
+            <p
+              className="text-right text-xs text-muted-foreground"
+              data-chat-read-receipt
+            >
+              읽음
+            </p>
           )}
           {!message.deletedAt && (
             <ReactionPills

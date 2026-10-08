@@ -15,8 +15,14 @@ import {
   type SendChatMessage,
   type QueuedMessage,
 } from "../send-queue";
-import { chatNavRevision, clearRoomUnread } from "../nav-state";
-import type { ChannelView, ChatReply } from "../types";
+import {
+  CHAT_NAV_KEY,
+  applyDirectActivity,
+  chatNavRevision,
+  clearRoomUnread,
+} from "../nav-state";
+import type { ChatReply } from "../types";
+import type { RoomMessageSource } from "../room-message-source";
 import { emptyMessageDetails } from "../types";
 import {
   mergeChatMessages,
@@ -36,6 +42,20 @@ function makeQueue(client: QueryClient) {
         (current = []) =>
           mergeChatMessages(current, [message], entry.message.authorId!),
       );
+      if (entry.roomKind === "dm") {
+        const changed = applyDirectActivity(
+          client,
+          {
+            roomId: entry.roomId,
+            seq: message.seq,
+            authorId: message.authorId,
+          },
+          entry.message.authorId!,
+          message.createdAt,
+        );
+        if (changed === "missing")
+          void client.invalidateQueries({ queryKey: CHAT_NAV_KEY });
+      }
       clearRoomUnread(
         client,
         entry.roomId,
@@ -112,7 +132,11 @@ export function ChatQueueConnection() {
   return null;
 }
 
-export function useChatSendQueue(data: ChannelView, send: SendChatMessage) {
+export function useChatSendQueue(
+  data: RoomMessageSource,
+  send: SendChatMessage,
+  isDirect = false,
+) {
   const client = useQueryClient();
   const queue = getQueue(client);
   const roomId = data.room.id;
@@ -137,6 +161,7 @@ export function useChatSendQueue(data: ChannelView, send: SendChatMessage) {
     client.setQueryDefaults(roomMessagesKey(roomId), { gcTime: Infinity });
     const entry: QueuedMessage = {
       roomId,
+      ...(isDirect ? { roomKind: "dm" as const } : {}),
       message,
       send(input) {
         entry.navigationRevision = chatNavRevision(client);

@@ -19,10 +19,11 @@ import {
   mergeChatNav,
   mergeInitialChatNav,
 } from "../nav-state";
-import type { ChatSpaceNav } from "../types";
+import type { ChatNav } from "../types";
 import { ChatMentions } from "./chat-mentions";
+import { DirectMessageList } from "./direct-message-list";
 
-const navSchema = z.array(
+const spaceSchema = z.array(
   z.object({
     id: z.uuid(),
     kind: z.literal("team"),
@@ -42,9 +43,26 @@ const navSchema = z.array(
     ),
   }),
 );
-export async function fetchChatNav(
-  signal: AbortSignal,
-): Promise<ChatSpaceNav[]> {
+const navSchema = z.object({
+  spaces: spaceSchema,
+  directMessages: z.array(
+    z.object({
+      roomId: z.uuid(),
+      other: z.object({
+        userId: z.uuid(),
+        name: z.string(),
+        username: z.string().nullable(),
+      }),
+      lastSeq: z.number().int().nonnegative(),
+      lastMessageAt: z.iso.datetime({ offset: true }),
+      unread: z.boolean(),
+      unreadCount: z.number().int().min(0).max(100),
+      unreadMentions: z.number().int().nonnegative(),
+      muted: z.boolean(),
+    }),
+  ),
+});
+export async function fetchChatNav(signal: AbortSignal): Promise<ChatNav> {
   const response = await fetch("/api/chat/nav", {
     signal,
     cache: "no-store",
@@ -54,7 +72,7 @@ export async function fetchChatNav(
   return navSchema.parse(await response.json());
 }
 
-function useIncoming(initialData: ChatSpaceNav[]) {
+function useIncoming(initialData: ChatNav) {
   const client = useQueryClient();
   useEffect(
     () => mergeInitialChatNav(client, initialData),
@@ -62,7 +80,7 @@ function useIncoming(initialData: ChatSpaceNav[]) {
   );
 }
 
-function useNavSnapshot(initialData: ChatSpaceNav[]) {
+function useNavSnapshot(initialData: ChatNav) {
   useIncoming(initialData);
   const { data } = useQuery({
     queryKey: CHAT_NAV_KEY,
@@ -72,14 +90,29 @@ function useNavSnapshot(initialData: ChatSpaceNav[]) {
   });
   return data ?? initialData;
 }
-export function LiveChatRail({ spaces }: { spaces: ChatSpaceNav[] }) {
-  return <ChatRailNavigation spaces={useNavSnapshot(spaces)} />;
+export function LiveChatRail({ data }: { data: ChatNav }) {
+  const nav = useNavSnapshot(data);
+  return (
+    <ChatRailNavigation
+      spaces={nav.spaces}
+      directMessages={nav.directMessages}
+    />
+  );
 }
-export function LiveChatSidebar({ spaces }: { spaces: ChatSpaceNav[] }) {
-  return <ChatSidebarNavigation spaces={useNavSnapshot(spaces)} />;
+export function LiveChatSidebar({ data }: { data: ChatNav }) {
+  const nav = useNavSnapshot(data);
+  return (
+    <ChatSidebarNavigation
+      spaces={nav.spaces}
+      directMessages={nav.directMessages}
+    />
+  );
 }
-export function LiveChatSidebarTitle({ spaces }: { spaces: ChatSpaceNav[] }) {
-  return <ChatSidebarTitle spaces={useNavSnapshot(spaces)} />;
+export function LiveChatSidebarTitle({ data }: { data: ChatNav }) {
+  return <ChatSidebarTitle spaces={useNavSnapshot(data).spaces} />;
+}
+export function LiveDirectMessages({ data }: { data: ChatNav }) {
+  return <DirectMessageList rows={useNavSnapshot(data).directMessages} />;
 }
 
 export function ChatNavSync({
@@ -87,7 +120,7 @@ export function ChatNavSync({
   userId,
   read = fetchChatNav,
 }: {
-  initialData: ChatSpaceNav[];
+  initialData: ChatNav;
   userId: string;
   read?: typeof fetchChatNav;
 }) {
@@ -113,7 +146,7 @@ export function ChatNavSync({
   const [, section, spaceId] = pathname.split("/");
   const selected =
     section === "s" &&
-    query.data.some((space) => space.id === spaceId?.toLowerCase())
+    query.data.spaces.some((space) => space.id === spaceId?.toLowerCase())
       ? spaceId!.toLowerCase()
       : null;
   useRealtimeChannel(selected ? spaceChannel(selected) : null, (event) => {
@@ -130,7 +163,18 @@ export function ChatNavSync({
   return (
     <ChatMentions
       userId={userId}
-      count={query.data.reduce((sum, space) => sum + space.unreadMentions, 0)}
+      count={
+        query.data.spaces.reduce(
+          (sum, space) => sum + space.unreadMentions,
+          0,
+        ) +
+        query.data.directMessages.reduce(
+          (sum, room) =>
+            sum + (room.muted ? room.unreadMentions : room.unreadCount),
+          0,
+        )
+      }
+      refresh={async () => (await refetch({ cancelRefetch: true })).data}
     />
   );
 }
