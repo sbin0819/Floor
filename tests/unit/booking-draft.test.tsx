@@ -28,6 +28,8 @@ const route = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
+  usePathname: () => "/branches/branch/floors/floor",
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   useSearchParams: () => new URLSearchParams(route.query),
   useRouter: () => ({
@@ -100,7 +102,7 @@ function Frame({
   const search = new URLSearchParams(route.query);
   return (
     <QueryClientProvider client={client}>
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Controls data={data} />
         <ResolvedSpaceSelection
           selectionKey={floorSelectionKey(

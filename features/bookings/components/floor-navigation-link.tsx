@@ -17,7 +17,8 @@ export function FloorNavigationLink({
   location: FloorLocation;
 }) {
   const navigation = useFloorSelection();
-  const search = useSearchParams();
+  const currentSearch = useSearchParams();
+  const search = navigation?.search ?? currentSearch;
   const view = search.get("view");
   const target = new URL(href, "http://floor.local");
   if (view && !target.searchParams.has("view"))
@@ -31,6 +32,7 @@ export function FloorNavigationLink({
       onClick={(event) => {
         if (!navigation || !shouldInterceptNavigation(event)) return;
         event.preventDefault();
+        if (!navigation.isCurrentRoute()) return;
         if (
           location.spaceId !== null &&
           (location.spaceId !== navigation.location.spaceId ||

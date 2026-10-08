@@ -4,6 +4,8 @@ import { BranchNavigation } from "@/features/bookings/components/branch-navigati
 import { floorDayFixture } from "./booking-ui-fixtures";
 
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
+  usePathname: () => "/branches/branch/floors/floor",
   useParams: () => ({ floorId: "floor" }),
   useSearchParams: () => new URLSearchParams("date=2026-10-11"),
 }));

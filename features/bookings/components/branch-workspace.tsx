@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { FloorDayData } from "@/features/bookings/types";
 import {
   useOptimisticNavigation,
@@ -30,10 +30,19 @@ import {
   searchValue,
   type FloorLocation,
 } from "@/features/bookings/floor-selection";
+import {
+  useBranchRouteScope,
+  type FloorSearchParams,
+} from "./use-branch-route-scope";
+import { useSpaceTriggerFocus } from "./use-space-trigger-focus";
 
 type BookingDraft = { title: string; actorId: string | null };
 const emptyDraft: BookingDraft = { title: "", actorId: null };
 type SelectionContext = {
+  branchId: string;
+  search: FloorSearchParams;
+  routeActive: boolean;
+  isCurrentRoute: () => boolean;
   draft: BookingDraft;
   changeDraft: (spaceId: string, patch: Partial<BookingDraft>) => void;
   clearDraftTitle: (spaceId: string) => void;
@@ -72,34 +81,21 @@ type SelectionContext = {
   restoreSpaceTrigger: () => void;
 };
 const FloorSelectionContext = createContext<SelectionContext | null>(null);
-function isVisibleLink(element: HTMLElement) {
-  for (
-    let node: HTMLElement | null = element;
-    node;
-    node = node.parentElement
-  ) {
-    if (
-      node.hidden ||
-      getComputedStyle(node).display === "none" ||
-      getComputedStyle(node).visibility === "hidden"
-    )
-      return false;
-  }
-  return true;
-}
 export function useFloorSelection() {
   return useContext(FloorSelectionContext);
 }
 
 export function BranchWorkspace({
+  branchId: sourceBranchId,
   children,
   navigateAction,
 }: {
+  branchId: string;
   children: ReactNode;
   navigateAction?: NavigateAction;
 }) {
-  const params = useParams<{ branchId: string; floorId?: string }>();
-  const search = useSearchParams();
+  const { branchId, floorId, search, isActive, isCurrentRoute } =
+    useBranchRouteScope(sourceBranchId);
   const router = useRouter();
   const route = useCallback<NavigateAction>(
     (href, { replace }) => {
@@ -109,41 +105,15 @@ export function BranchWorkspace({
     [router],
   );
   const locationKey = floorSelectionKey(
-    params.branchId,
-    params.floorId ?? "",
+    branchId,
+    floorId,
     searchValue(search, "date"),
     searchValue(search, "space"),
   );
   const requested = requestedSpaceId(searchValue(search, "space"));
   const detailRequested = requestedDetail(searchValue(search, "detail"));
-  const branchId = params.branchId.toLowerCase();
-  const trigger = useRef<HTMLElement | null>(null);
-  const lastSpace = useRef<string | null>(null);
-  const rememberSpaceTrigger = useCallback(
-    (element: HTMLElement, spaceId: string) => {
-      trigger.current = element;
-      lastSpace.current = spaceId;
-    },
-    [],
-  );
-  const restoreSpaceTrigger = useCallback(() => {
-    const previous = trigger.current;
-    if (previous?.isConnected && isVisibleLink(previous)) {
-      previous.focus();
-      return;
-    }
-    if (lastSpace.current === null) return;
-    const link = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>(
-        '[aria-label="공간 목록"] a[href], [data-floor-timetable] a[data-space-id]',
-      ),
-    ).find(
-      (link) =>
-        isVisibleLink(link) &&
-        new URL(link.href).searchParams.get("space") === lastSpace.current,
-    );
-    link?.focus();
-  }, []);
+  const { rememberConfirmedSpace, rememberSpaceTrigger, restoreSpaceTrigger } =
+    useSpaceTriggerFocus(isCurrentRoute);
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   if (dismissedKey !== null && dismissedKey !== locationKey)
     setDismissedKey(null);
@@ -151,17 +121,13 @@ export function BranchWorkspace({
     branchId: string;
     today: string;
     now: string;
-    registration: symbol;
   } | null>(null);
   const registerNavigation = useCallback(
     (sourceBranchId: string, today: string, now: string) => {
       if (sourceBranchId.toLowerCase() !== branchId) return () => {};
-      const registration = Symbol();
-      setClock({ branchId, today, now, registration });
-      return () =>
-        setClock((current) =>
-          current?.registration === registration ? null : current,
-        );
+      setClock({ branchId, today, now });
+      // 숨김은 날짜 변경이 아니다. 복귀할 때까지 마지막 서버 날짜를 유지한다.
+      return () => {};
     },
     [branchId],
   );
@@ -180,7 +146,7 @@ export function BranchWorkspace({
       if (key !== locationKey || (spaceId !== null && spaceId !== requested))
         return () => {};
       const registration = Symbol();
-      if (spaceId !== null) lastSpace.current = spaceId;
+      if (spaceId !== null) rememberConfirmedSpace(spaceId);
       setSelection({ key, spaceId, registration });
       setPendingSelection((current) => (current?.key === key ? null : current));
       return () =>
@@ -188,7 +154,7 @@ export function BranchWorkspace({
           current?.registration === registration ? null : current,
         );
     },
-    [locationKey, requested],
+    [locationKey, requested, rememberConfirmedSpace],
   );
   const selectedSpaceId =
     selection?.key === locationKey && dismissedKey !== locationKey
@@ -206,7 +172,6 @@ export function BranchWorkspace({
   const date = today
     ? normalizeBookingDateForToday(searchValue(search, "date"), today)
     : "";
-  const floorId = params.floorId?.toLowerCase() ?? "";
   const base = useMemo<FloorLocation>(
     () => ({
       floorId,
@@ -310,6 +275,7 @@ export function BranchWorkspace({
   );
   const change = useCallback<SelectionContext["change"]>(
     (next, href, options) => {
+      if (!isCurrentRoute()) return;
       next = { ...next, detail: next.spaceId !== null && next.detail === true };
       setDismissedKey(next.spaceId === null ? locationKey : null);
       rememberPending(next, href);
@@ -324,7 +290,13 @@ export function BranchWorkspace({
       }
       changeLocation(next, href, options);
     },
-    [locationKey, changeLocation, navigation.value, rememberPending],
+    [
+      locationKey,
+      changeLocation,
+      navigation.value,
+      rememberPending,
+      isCurrentRoute,
+    ],
   );
   const currentNavigation = useRef({ location: navigation.value, change });
   useEffect(() => {
@@ -332,6 +304,7 @@ export function BranchWorkspace({
   }, [navigation.value, change]);
   const closeAfterBooking = useCallback(
     (spaceId: string, bookedDate: string) => {
+      if (!isCurrentRoute()) return;
       const current = currentNavigation.current;
       // 늦게 끝난 이전 예약은 새 공간이나 날짜의 상세를 닫지 않는다.
       if (
@@ -350,7 +323,7 @@ export function BranchWorkspace({
       );
       restoreSpaceTrigger();
     },
-    [restoreSpaceTrigger],
+    [restoreSpaceTrigger, isCurrentRoute],
   );
   const changeRange = useCallback<SelectionContext["changeRange"]>(
     (spaceId, next) => {
@@ -368,6 +341,7 @@ export function BranchWorkspace({
   );
   const selectSlot = useCallback<SelectionContext["selectSlot"]>(
     ({ spaceId, slots, start, href, trigger: element }) => {
+      if (!isCurrentRoute()) return;
       if (!slots.some((slot) => slot.start === start && slot.state === "free"))
         return;
       const next = selectFloorBookingSlot(
@@ -393,6 +367,7 @@ export function BranchWorkspace({
       navigation.value,
       changeLocation,
       rememberPending,
+      isCurrentRoute,
     ],
   );
   const floorChanged = navigation.value.floorId !== base.floorId;
@@ -409,6 +384,10 @@ export function BranchWorkspace({
     (detailChanged && navigation.value.spaceId === null);
   const value = useMemo(
     () => ({
+      branchId,
+      search,
+      routeActive: isActive,
+      isCurrentRoute,
       draft: visibleDraft,
       changeDraft,
       clearDraftTitle,
@@ -433,6 +412,10 @@ export function BranchWorkspace({
       restoreSpaceTrigger,
     }),
     [
+      branchId,
+      search,
+      isActive,
+      isCurrentRoute,
       visibleDraft,
       changeDraft,
       clearDraftTitle,

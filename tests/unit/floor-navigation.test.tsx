@@ -23,6 +23,10 @@ const navigation = vi.hoisted(() => ({
   router: { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () =>
+    navigation.floorId ? ["floors", navigation.floorId] : [],
+  usePathname: () =>
+    `/branches/${navigation.branchId}${navigation.floorId ? `/floors/${navigation.floorId}` : ""}`,
   useParams: () => ({
     branchId: navigation.branchId,
     floorId: navigation.floorId,
@@ -73,7 +77,7 @@ function page(
   detail.space.id = actualSpaceId ?? spaceId;
   detail.space.name = actualSpaceId === otherSpaceId ? "회의실 D" : "회의실 C";
   return (
-    <BranchWorkspace navigateAction={navigateAction}>
+    <BranchWorkspace branchId="branch" navigateAction={navigateAction}>
       <BranchNavigation
         data={{
           branch: list.branch,

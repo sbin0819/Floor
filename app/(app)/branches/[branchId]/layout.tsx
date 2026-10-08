@@ -57,7 +57,7 @@ async function BranchRequestLayout({
   return (
     <BranchDisplayClockProvider branchId={branchId.toLowerCase()}>
       <FloorViewProvider cookieView={cookieView}>
-        <BranchWorkspace>
+        <BranchWorkspace branchId={branchId}>
           <Suspense fallback={<NavigationFallback />}>
             <NavigationContent params={params} />
           </Suspense>

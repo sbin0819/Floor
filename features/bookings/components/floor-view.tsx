@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { List, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shouldInterceptNavigation } from "@/components/optimistic-navigation";
@@ -46,7 +46,9 @@ export function FloorViewProvider({
   );
 }
 export function useFloorView(initialView?: FloorView | null) {
-  const search = useSearchParams();
+  const currentSearch = useSearchParams();
+  const selection = useFloorSelection();
+  const search = selection?.search ?? currentSearch;
   const preference = useContext(ViewPreference);
   const wide = useWideScreen();
   const view =
@@ -73,22 +75,33 @@ function pushViewHistory(view: FloorView) {
   );
 }
 export function FloorViewControl({ className }: { className?: string }) {
-  const params = useParams<{ branchId: string; floorId?: string }>();
-  const search = useSearchParams();
   const selection = useFloorSelection();
+  const currentSearch = useSearchParams();
+  const search = selection?.search ?? currentSearch;
   const { effectiveView, setPreference, override, setOverride } =
     useFloorView();
   const queuedView = useRef<FloorView | null>(null);
   const pending = selection?.navigationPending ?? false;
   const currentView = searchValue(search, "view");
+  const isCurrentRoute = selection?.isCurrentRoute;
   useEffect(() => {
+    if (!isCurrentRoute?.()) {
+      queuedView.current = null;
+      return;
+    }
     if (pending || queuedView.current === null) return;
     // Next의 native history 복원은 진행 중인 라우터 이동을 버릴 수 있다.
     // 완료된 주소에서 보기만 바꾸고, 서버가 읽은 날짜·공간 키는 보존한다.
     const view = queuedView.current;
     queuedView.current = null;
     pushViewHistory(view);
-  }, [pending, override]);
+  }, [pending, override, isCurrentRoute]);
+  useEffect(
+    () => () => {
+      queuedView.current = null;
+    },
+    [],
+  );
   useEffect(() => {
     if (
       !pending &&
@@ -98,8 +111,8 @@ export function FloorViewControl({ className }: { className?: string }) {
     )
       setOverride?.(null);
   }, [pending, override, currentView, setOverride]);
-  const floorId = params.floorId;
-  if (!floorId) return null;
+  const floorId = selection?.location.floorId;
+  if (!selection || !floorId) return null;
   return (
     <SegmentedLinks label="보기 선택" className={className}>
       {(["list", "timeline"] as const).map((view) => {
@@ -107,7 +120,7 @@ export function FloorViewControl({ className }: { className?: string }) {
         const label = view === "list" ? "목록" : "시간표";
         const query = new URLSearchParams(search.toString());
         query.set("view", view);
-        const href = `${floorHref(params.branchId, floorId)}?${query}`;
+        const href = `${floorHref(selection.branchId, floorId)}?${query}`;
         return (
           <SegmentedLink key={view} selected={view === effectiveView} asChild>
             <a
@@ -117,6 +130,7 @@ export function FloorViewControl({ className }: { className?: string }) {
               onClick={(event) => {
                 if (!shouldInterceptNavigation(event)) return;
                 event.preventDefault();
+                if (!selection.isCurrentRoute()) return;
                 document.cookie = `floor_view=${view}; Path=/; Max-Age=31536000; SameSite=Lax`;
                 setPreference?.(view);
                 setOverride?.(view);

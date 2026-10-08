@@ -46,6 +46,8 @@ const path = "/branches/branch/floors/floor";
 const selectedHref = `${path}?date=${date}&space=${id}&detail=1&view=timeline`;
 
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
+  usePathname: () => "/branches/branch/floors/floor",
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   useSearchParams: () => new URLSearchParams(route.query),
   useRouter: () => ({ push: route.push, replace: route.replace }),
@@ -147,7 +149,7 @@ async function serverHost() {
 }
 function frame(host: ReactElement, navigate?: NavigateAction) {
   return (
-    <BranchWorkspace navigateAction={navigate}>
+    <BranchWorkspace branchId="branch" navigateAction={navigate}>
       <RegisterFloor />
       <section aria-label="공간 목록">
         <FloorNavigationLink

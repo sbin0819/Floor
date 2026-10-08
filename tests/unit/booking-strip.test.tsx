@@ -54,6 +54,9 @@ const href = (spaceId?: string, detail = false) =>
   floorHref(branchId, floorId, date, spaceId, "timeline", detail);
 
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => (floorId ? ["floors", floorId] : []),
+  usePathname: () =>
+    `/branches/${branchId}${floorId ? `/floors/${floorId}` : ""}`,
   useParams: () => ({ branchId, floorId }),
   useSearchParams: () => new URLSearchParams(route.query),
   useRouter: () => ({
@@ -133,7 +136,7 @@ function Frame({
   const query = new URLSearchParams(route.query);
   return (
     <QueryClientProvider client={client}>
-      <BranchWorkspace navigateAction={navigateAction}>
+      <BranchWorkspace branchId={branchId} navigateAction={navigateAction}>
         <ClockAndSelection />
         <FloorViews data={floorData} initialView="timeline" />
         <ResolvedSpaceSelection

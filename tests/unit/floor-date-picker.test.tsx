@@ -22,6 +22,8 @@ vi.mock("@/features/bookings/components/use-wide-screen", () => ({
 }));
 vi.mock("@/features/bookings/components/branch-workspace", () => ({
   useFloorSelection: () => ({
+    branchId: "branch",
+    isCurrentRoute: () => true,
     location: {
       floorId: "floor",
       date: new URLSearchParams(context.query).get("date"),
@@ -31,6 +33,8 @@ vi.mock("@/features/bookings/components/branch-workspace", () => ({
   }),
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
+  usePathname: () => "/branches/branch/floors/floor",
   useParams: () => ({ floorId: "floor" }),
   useSearchParams: () => new URLSearchParams(context.query),
 }));

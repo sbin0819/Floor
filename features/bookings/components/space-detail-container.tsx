@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useParams, useSearchParams } from "next/navigation";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { floorHref } from "@/features/bookings/format";
 import { useFloorSelection } from "./branch-workspace";
@@ -22,8 +21,6 @@ export function SpaceDetailContainer({
 }) {
   const wide = useWideScreen(matchMedia);
   const navigation = useFloorSelection();
-  const params = useParams<{ branchId: string }>();
-  const search = useSearchParams();
   const { effectiveView } = useFloorView();
   const rightDetail =
     wide &&
@@ -75,11 +72,11 @@ export function SpaceDetailContainer({
           navigation.change(
             location,
             floorHref(
-              params.branchId,
+              navigation.branchId,
               location.floorId,
               location.date,
               location.spaceId ?? undefined,
-              search.get("view") ?? undefined,
+              navigation.search.get("view") ?? undefined,
             ),
             { replace: true },
           );

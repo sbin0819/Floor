@@ -16,6 +16,8 @@ const navigation = vi.hoisted(() => ({
   router: { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
+  usePathname: () => "/branches/branch/floors/floor",
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   useSearchParams: () => new URLSearchParams(navigation.query),
   useRouter: () => navigation.router,
@@ -54,7 +56,7 @@ function Page({
   detailNow?: string;
 }) {
   return (
-    <BranchWorkspace>
+    <BranchWorkspace branchId="branch">
       <BranchDisplayClockProvider branchId="branch">
         <BranchNavigation data={data} />
         {detailNow && <FreshDetail now={detailNow} />}

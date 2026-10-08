@@ -17,6 +17,10 @@ const navigation = vi.hoisted(() => ({
   router: { push: vi.fn(), replace: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () =>
+    navigation.floorId ? ["floors", navigation.floorId] : [],
+  usePathname: () =>
+    `/branches/${navigation.branchId}${navigation.floorId ? `/floors/${navigation.floorId}` : ""}`,
   useParams: () => ({
     branchId: navigation.branchId,
     floorId: navigation.floorId,
@@ -62,7 +66,7 @@ beforeEach(() => {
 describe("server-confirmed floor selection", () => {
   it("does not treat a URL parameter as confirmation until the detail registers", () => {
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Selection />
       </BranchWorkspace>,
     );
@@ -70,7 +74,7 @@ describe("server-confirmed floor selection", () => {
   });
   it("synchronizes a directly entered, server-confirmed selection", () => {
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Selection />
         {resolved()}
       </BranchWorkspace>,
@@ -82,7 +86,7 @@ describe("server-confirmed floor selection", () => {
     navigation.floorId = "FLOOR";
     navigation.query = `date=${date}&space=${spaceId.toUpperCase()}`;
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Selection />
         {resolved()}
       </BranchWorkspace>,
@@ -93,7 +97,7 @@ describe("server-confirmed floor selection", () => {
     "ignores a retained detail after %s changes",
     (change) => {
       const view = render(
-        <BranchWorkspace>
+        <BranchWorkspace branchId="branch">
           <Selection />
           {resolved()}
         </BranchWorkspace>,
@@ -104,7 +108,7 @@ describe("server-confirmed floor selection", () => {
       if (change === "requested-space")
         navigation.query = `date=${date}&space=${otherId}`;
       view.rerender(
-        <BranchWorkspace>
+        <BranchWorkspace branchId="branch">
           <Selection />
           {resolved()}
         </BranchWorkspace>,
@@ -114,7 +118,7 @@ describe("server-confirmed floor selection", () => {
   );
   it("rejects a result for a different space even if its registration key matches", () => {
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Selection />
         {resolved(selectionKey, otherId)}
       </BranchWorkspace>,
@@ -123,7 +127,7 @@ describe("server-confirmed floor selection", () => {
   });
   it("keeps an inaccessible direct link unselected after the server returns null", () => {
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Selection />
         {resolved(selectionKey, null)}
       </BranchWorkspace>,
@@ -132,7 +136,7 @@ describe("server-confirmed floor selection", () => {
   });
   it("does not let an older registration cleanup erase its replacement", () => {
     const view = render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Selection />
         <ResolvedSpaceSelection
           key="old"
@@ -151,7 +155,7 @@ describe("server-confirmed floor selection", () => {
       </BranchWorkspace>,
     );
     view.rerender(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <Selection />
         <ResolvedSpaceSelection
           key="new"
@@ -169,7 +173,7 @@ describe("server-confirmed floor selection", () => {
 describe("persistent branch controls", () => {
   it("retains only confirmed selection on date links and drops it on floor links", () => {
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         {resolved()}
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
@@ -189,7 +193,7 @@ describe("persistent branch controls", () => {
   it("drops an invalid selection from generated links and normalizes an out-of-range date", () => {
     navigation.query = "date=2099-01-01&space=invalid";
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
     );
@@ -201,7 +205,7 @@ describe("persistent branch controls", () => {
   it("renders no date row or selected floor on the branch entry route", () => {
     navigation.floorId = undefined;
     render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
     );
@@ -215,13 +219,13 @@ describe("persistent branch controls", () => {
   });
   it("updates controls from the current URL while retaining the server-provided today", () => {
     const view = render(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
     );
     navigation.query = "date=2026-10-08";
     view.rerender(
-      <BranchWorkspace>
+      <BranchWorkspace branchId="branch">
         <BranchNavigation data={fixture()} />
       </BranchWorkspace>,
     );

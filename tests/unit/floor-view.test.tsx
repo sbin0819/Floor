@@ -40,6 +40,8 @@ vi.mock("@/features/bookings/components/floor-timetable", () => ({
   FloorTimetable: () => <p>층 시간표 보기</p>,
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
+  usePathname: () => window.location.pathname,
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   useSearchParams: () => new URLSearchParams(window.location.search),
   useRouter: () => ({ push: route.push }),
@@ -50,8 +52,10 @@ function Selected() {
 }
 const tree = () => (
   <FloorViewProvider cookieView={null}>
-    <FloorViewControl />
-    <Selected />
+    <BranchWorkspace branchId="branch">
+      <FloorViewControl />
+      <Selected />
+    </BranchWorkspace>
   </FloorViewProvider>
 );
 const first = "abcdefab-1234-4abc-9def-123456789ab2";
@@ -121,7 +125,7 @@ function WorkspaceView({
 }) {
   return (
     <FloorViewProvider cookieView={null}>
-      <BranchWorkspace navigateAction={navigateAction}>
+      <BranchWorkspace branchId="branch" navigateAction={navigateAction}>
         <WorkspaceControls />
         <FloorViewControl />
         <Selected />
@@ -252,6 +256,8 @@ describe("floor view preference", () => {
       const range = workspaceState().selection;
       expect(range).toMatchObject({ spaceId: first, start: firstStart });
       fireEvent.click(screen.getByRole("link", { name: "목록 보기" }));
+      // Next의 history 연동이 갱신하는 부모의 searchParams도 같이 반영한다.
+      view.rerender(<WorkspaceView serverDate={rawDate} />);
       expect(
         new URLSearchParams(window.location.search).getAll("date"),
       ).toEqual(query.getAll("date"));

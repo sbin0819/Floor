@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useSearchParams, useSelectedLayoutSegments } from "next/navigation";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { useFloorSelection } from "./branch-workspace";
 import { FloorNavigationLink } from "./floor-navigation-link";
 import { FloorDatePicker } from "./floor-date-picker";
 import { useBranchDisplayNow } from "./branch-display-clock";
+import { floorIdFromSegments } from "./use-branch-route-scope";
 
 export function BranchNavigation({
   data,
@@ -36,9 +37,10 @@ export function BranchNavigation({
   data: BranchNavigationData;
   viewControl?: ReactNode;
 }) {
-  const params = useParams<{ floorId?: string }>();
-  const search = useSearchParams();
+  const segments = useSelectedLayoutSegments();
+  const currentSearch = useSearchParams();
   const navigation = useFloorSelection();
+  const search = navigation?.search ?? currentSearch;
   const displayNow = useBranchDisplayNow({
     branchId: data.branch.id,
     now: data.now,
@@ -48,7 +50,7 @@ export function BranchNavigation({
     () => registerNavigation?.(data.branch.id, data.today, data.now),
     [registerNavigation, data.branch.id, data.today, data.now],
   );
-  const floorId = navigation?.location.floorId || params.floorId?.toLowerCase();
+  const floorId = navigation?.location.floorId ?? floorIdFromSegments(segments);
   const dates = getBookingDateWindow(
     data.today,
     navigation?.location.date || searchValue(search, "date"),

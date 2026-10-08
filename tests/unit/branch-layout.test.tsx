@@ -64,8 +64,9 @@ async function navigationBoundary() {
     throw new Error("Missing floor view provider");
   expect(provider.type).toBe(FloorViewProvider);
   const workspace = provider.props.children;
-  if (!isValidElement<{ children: ReactNode }>(workspace))
+  if (!isValidElement<{ branchId: string; children: ReactNode }>(workspace))
     throw new Error("Missing workspace");
+  expect(workspace.props.branchId).toBe("branch");
   const [navigation, child] = Children.toArray(workspace.props.children);
   if (!isValidElement<SuspenseProps>(navigation))
     throw new Error("Missing navigation boundary");

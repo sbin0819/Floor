@@ -2,7 +2,6 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
-import { useParams, useSearchParams } from "next/navigation";
 import { PhotoViewer } from "@/components/photos/photo-viewer";
 import { SpacePhoto } from "@/components/photos/space-photo";
 import { Button } from "@/components/ui/button";
@@ -16,8 +15,6 @@ import { FloorNavigationLink } from "./floor-navigation-link";
 
 export function BookingStrip({ children }: { children: ReactNode }) {
   const workspace = useFloorSelection();
-  const params = useParams<{ branchId: string }>();
-  const search = useSearchParams();
   const [photoOpen, setPhotoOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const data = workspace?.floorData;
@@ -59,11 +56,7 @@ export function BookingStrip({ children }: { children: ReactNode }) {
           className="shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-ring"
           onClick={() => setPhotoOpen(true)}
         >
-          <SpacePhoto
-            photo={space.photo}
-            type={space.type}
-            decorative
-          />
+          <SpacePhoto photo={space.photo} type={space.type} decorative />
         </button>
         <div className="min-w-0 space-y-1">
           <h2 className="truncate font-bold">{space.name}</h2>
@@ -97,11 +90,11 @@ export function BookingStrip({ children }: { children: ReactNode }) {
       >
         <FloorNavigationLink
           href={floorHref(
-            params.branchId,
+            workspace.branchId,
             workspace.location.floorId,
             workspace.location.date,
             undefined,
-            search.get("view") ?? undefined,
+            workspace.search.get("view") ?? undefined,
           )}
           location={{ ...workspace.location, spaceId: null }}
           replace

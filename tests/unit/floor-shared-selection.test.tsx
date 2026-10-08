@@ -20,6 +20,10 @@ const route = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () =>
+    route.floorId ? ["floors", route.floorId] : [],
+  usePathname: () =>
+    `/branches/${"branch"}${route.floorId ? `/floors/${route.floorId}` : ""}`,
   useParams: () => ({ branchId: "branch", floorId: route.floorId }),
   useSearchParams: () => new URLSearchParams(route.query),
   useRouter: () => ({ push: route.push, replace: route.replace }),
@@ -124,7 +128,7 @@ function Frame({
 }) {
   const search = new URLSearchParams(route.query);
   return (
-    <BranchWorkspace navigateAction={navigateAction}>
+    <BranchWorkspace branchId="branch" navigateAction={navigateAction}>
       <Controls />
       <ResolvedSpaceSelection
         selectionKey={floorSelectionKey(

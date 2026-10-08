@@ -37,6 +37,10 @@ vi.mock("@/features/bookings/components/floor-view", () => ({
   useFloorView: () => ({ effectiveView: "list" }),
 }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () =>
+    navigation.floorId ? ["floors", navigation.floorId] : [],
+  usePathname: () =>
+    `/branches/${navigation.branchId}${navigation.floorId ? `/floors/${navigation.floorId}` : ""}`,
   useParams: () => ({
     branchId: navigation.branchId,
     floorId: navigation.floorId,
@@ -112,7 +116,7 @@ function frame({
     search.get("space") ?? undefined,
   );
   return (
-    <BranchWorkspace navigateAction={navigateAction}>
+    <BranchWorkspace branchId="branch" navigateAction={navigateAction}>
       <Clock />
       <a href={href(spaceId)}>오늘 날짜 링크</a>
       <section aria-label="공간 목록" key={listKey}>
@@ -508,7 +512,7 @@ describe("single responsive space detail", () => {
     const key = floorSelectionKey("branch", "floor", today, spaceId);
     function overlapping(oldVisible: boolean) {
       return (
-        <BranchWorkspace>
+        <BranchWorkspace branchId="branch">
           <Clock />
           <Activity mode={oldVisible ? "visible" : "hidden"}>
             <ResolvedSpaceSelection selectionKey={key} spaceId={spaceId}>
@@ -535,7 +539,7 @@ describe("single responsive space detail", () => {
     const media = viewport(false);
     function preserved(active: string) {
       return (
-        <BranchWorkspace>
+        <BranchWorkspace branchId="branch">
           <Clock />
           <section aria-label="공간 목록">
             <FloorNavigationLink
