@@ -16,6 +16,7 @@ import {
   attachMessageFiles,
   lockMessageAttachments,
 } from "@/lib/dal/chat-attachments";
+import { totalUploadBytes } from "@/lib/dal/chat-uploads";
 import * as writes from "@/lib/dal/chat-write";
 import { listDirectMembers } from "@/lib/dal/direct";
 import { directPeerAccess } from "@/lib/dal/direct-permission";
@@ -40,6 +41,7 @@ import { prepareDirectSend } from "./direct-request-flow";
 import { excerptOf, extractMentions } from "./message-text";
 import { sendMessageSchema, sendMessageRequestSchema } from "./schema";
 import { groupDisplayName } from "./group-name";
+import { MAX_STORAGE_BYTES, UPLOAD_LIFETIME_MS } from "./upload-types";
 
 type SendInput = z.infer<typeof sendMessageSchema>;
 
@@ -141,6 +143,17 @@ async function sendLockedMessage(
     throw new ActionError("INVALID_INPUT", {
       fieldErrors: { attachmentIds: ["unavailable"] },
     });
+  // 먼저 시작한 전송이 만료 경계 뒤의 새 할당보다 늦게 잠길 수 있다.
+  // 할당과 같은 사용자 잠금 아래 다시 세어, 이미 제외된 예약 용량이 되살아나지 않게 한다.
+  if (
+    files.length &&
+    (await totalUploadBytes(
+      session.userId,
+      new Date(now.getTime() - UPLOAD_LIFETIME_MS),
+      database,
+    )) > MAX_STORAGE_BYTES
+  )
+    throw new ActionError("LIMIT_EXCEEDED", { message: "storage_quota" });
   if (input.replyToId) {
     const reply = await getChatMessage(
       input.replyToId,
@@ -328,10 +341,13 @@ export function createSendActions(
             dependencies.database,
           );
           const result = await withTransaction(async (tx) => {
-            if (room.kind === "dm")
+            if (room.kind === "dm" || input.attachmentIds.length)
               await writes.lockMessageUsers(
                 session.userId,
-                [...parsed.userIds, room.peer!.userId],
+                [
+                  ...parsed.userIds,
+                  ...(room.kind === "dm" ? [room.peer!.userId] : []),
+                ],
                 tx,
               );
             else
