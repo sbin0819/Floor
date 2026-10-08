@@ -2,12 +2,14 @@
 
 import {
   useCallback,
+  useEffect,
   useId,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { Hash, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +21,12 @@ import {
 } from "@/components/ui/sheet";
 import { useRealtimeConnectionState } from "@/components/realtime-provider";
 import type { ChannelView } from "../types";
+import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
 import { ChannelMembers } from "./channel-members";
 import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
+import { useMessageHistory } from "./use-message-history";
+import { useRoomRead } from "./use-room-read";
 import {
   useChannelMessages,
   type SendChatMessage,
@@ -55,6 +60,50 @@ export function ChannelScreen({
   send?: SendChatMessage;
 }) {
   const messages = useChannelMessages(data, send);
+  const client = useQueryClient();
+  const sendingCount = useIsMutating({ mutationKey: ["chat", "send"] });
+  const resetVersion = messages.historyReset?.version ?? 0;
+  const oldestSeq =
+    messages.messages.find((message) => message.seq > 0)?.seq ?? null;
+  const history = useMessageHistory(
+    data.room.id,
+    data.user.id,
+    oldestSeq,
+    resetVersion,
+  );
+  const [visible, setVisible] = useState<{
+    roomId: string;
+    seq: number | null;
+  }>({ roomId: data.room.id, seq: null });
+  const onViewport = useCallback(
+    (atBottom: boolean, seq: number | null) => {
+      reportRoomViewport(client, data.room.id, atBottom);
+      setVisible((previous) =>
+        previous.roomId === data.room.id && previous.seq === seq
+          ? previous
+          : { roomId: data.room.id, seq },
+      );
+    },
+    [client, data.room.id],
+  );
+  useEffect(
+    () => () => releaseRoomViewport(client, data.room.id),
+    [client, data.room.id],
+  );
+  const knownReadSeq = messages.messages.reduce(
+    (seq, message) =>
+      message.authorId === data.user.id ? Math.max(seq, message.seq) : seq,
+    Math.max(data.lastReadSeq ?? 0, messages.historyReset?.lastReadSeq ?? 0),
+  );
+  useRoomRead({
+    roomId: data.room.id,
+    visibleSeq: visible.roomId === data.room.id ? visible.seq : null,
+    knownReadSeq,
+    blocked:
+      sendingCount > 0 ||
+      messages.sending ||
+      messages.messages.some((message) => message.delivery === "pending"),
+  });
   const connection = useRealtimeConnectionState();
   const [membersOpen, setMembersOpen] = useState(false);
   const wide = useWideMembers();
@@ -92,7 +141,8 @@ export function ChannelScreen({
       </header>
       {(connection === "disconnected" ||
         connection === "suspended" ||
-        connection === "failed") && (
+        connection === "failed" ||
+        (messages.reconnecting && connection !== "disabled")) && (
         <p
           role="status"
           className="shrink-0 border-b border-border bg-muted px-4 py-2 text-sm text-muted-foreground"
@@ -103,10 +153,22 @@ export function ChannelScreen({
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           <MessageList
+            key={`${data.room.id}:${resetVersion}`}
             channelName={data.room.name}
             now={data.now}
             userId={data.user.id}
             messages={messages.messages}
+            firstUnreadSeq={
+              messages.historyReset
+                ? messages.historyReset.firstUnreadSeq
+                : data.firstUnreadSeq
+            }
+            liveMessages={messages.liveMessages}
+            hasMore={history.hasMore}
+            loadingOlder={history.loading}
+            historyError={history.error}
+            onLoadOlder={history.loadOlder}
+            onViewport={onViewport}
             onRetry={messages.retry}
             onRemove={messages.remove}
           />

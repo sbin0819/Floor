@@ -20,23 +20,33 @@ import {
   type DisplayMessage,
 } from "@/features/chat/components/message-state";
 import type { SendChatMessage } from "@/features/chat/components/use-channel-messages";
+import { installChatViewport } from "../helpers/chat-viewport";
+import { fetchRoomMessagesPage } from "@/features/chat/client";
 
 const realtime = vi.hoisted(() => ({
   event: vi.fn<(event: RealtimeEvent) => void>() as (
     event: RealtimeEvent,
   ) => void,
-  connection: "connected",
+  connection: "disabled",
   refresh: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: realtime.refresh }),
 }));
-vi.mock("@/features/chat/actions", () => ({ sendMessage: vi.fn() }));
+vi.mock("@/features/chat/actions", () => ({
+  sendMessage: vi.fn(),
+  markRoomRead: vi.fn(async ({ seq }: { seq: number }) => ({
+    ok: true,
+    data: { lastReadSeq: seq },
+  })),
+}));
+vi.mock("@/features/chat/client", () => ({ fetchRoomMessagesPage: vi.fn() }));
 vi.mock("@/components/realtime-provider", () => ({
   useRealtimeChannel: (_channel: string, onEvent: typeof realtime.event) => {
     realtime.event = onEvent;
   },
   useRealtimeConnectionState: () => realtime.connection,
+  useRealtimeLifecycle: () => {},
 }));
 
 const now = "2026-10-08T03:00:00Z";
@@ -101,11 +111,17 @@ function setup(data = view(), send: SendChatMessage = vi.fn()) {
   };
 }
 
+let restoreViewport: () => void;
 beforeEach(() => {
+  restoreViewport = installChatViewport();
   realtime.refresh.mockReset();
-  realtime.connection = "connected";
+  realtime.connection = "disabled";
+  vi.mocked(fetchRoomMessagesPage).mockReset();
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  restoreViewport();
+  vi.unstubAllGlobals();
+});
 
 describe("chat message composer", () => {
   it("sends trimmed text on Enter, clears the draft and leaves Shift+Enter alone", () => {
@@ -176,9 +192,9 @@ describe("chat channel presentation", () => {
     expect(container.querySelector("[data-chat-screen]")).toHaveClass(
       "h-[calc(100dvh-3.5rem)]",
     );
-    expect(screen.getByRole("log", { name: "일반 메시지" })).toHaveAttribute(
+    expect(screen.getByRole("region", { name: "일반 메시지" })).toHaveAttribute(
       "aria-live",
-      "polite",
+      "off",
     );
     fireEvent.click(screen.getByRole("button", { name: "멤버 2명" }));
     const members = screen.getByRole("list", { name: "팀원 목록" });
@@ -215,7 +231,7 @@ describe("chat channel presentation", () => {
         ],
       }),
     );
-    const log = screen.getByRole("log");
+    const log = screen.getByRole("region", { name: "일반 메시지" });
     expect(log.querySelector("script")).toBeNull();
     expect(log.querySelectorAll("strong")).toHaveLength(2);
     expect(log.textContent).toContain("<script>bad()</script>\n둘째 줄");
@@ -241,14 +257,37 @@ describe("chat channel presentation", () => {
   it("shows disconnected feedback, but no banner when realtime is disabled", () => {
     realtime.connection = "disconnected";
     const result = setup();
-    expect(screen.getByRole("status")).toHaveTextContent("연결이 끊겼어요");
+    expect(
+      screen.getByText("연결이 끊겼어요. 다시 연결하고 있어요"),
+    ).toBeVisible();
     realtime.connection = "disabled";
     result.update(view());
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("연결이 끊겼어요. 다시 연결하고 있어요"),
+    ).not.toBeInTheDocument();
   });
 });
 
 describe("optimistic sending and streamed updates", () => {
+  it("keeps an expired-session failure with a login link instead of replaying it", async () => {
+    const send = vi
+      .fn<SendChatMessage>()
+      .mockResolvedValue({ ok: false, code: "UNAUTHENTICATED" });
+    setup(view({ messages: [] }), send);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "세션 만료 메시지" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "보내기" }));
+    expect(await screen.findByText("로그인이 풀렸어요")).toBeVisible();
+    expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    expect(
+      screen.queryByRole("button", { name: "다시 보내기" }),
+    ).not.toBeInTheDocument();
+    expect(send).toHaveBeenCalledOnce();
+  });
   it("applies a late send result only to the room where it was submitted", async () => {
     const pending = deferred<ActionResult<ChatMessage>>();
     const send = vi.fn<SendChatMessage>(() => pending.promise);
@@ -365,8 +404,7 @@ describe("optimistic sending and streamed updates", () => {
       .fn<SendChatMessage>()
       .mockResolvedValueOnce({
         ok: false,
-        code: "LIMIT_EXCEEDED",
-        message: "send_rate",
+        code: "INTERNAL",
       })
       .mockImplementation(async (input) => ({
         ok: true,
@@ -377,16 +415,14 @@ describe("optimistic sending and streamed updates", () => {
       target: { value: "다시 보낼 내용" },
     });
     fireEvent.click(screen.getByRole("button", { name: "보내기" }));
-    expect(await screen.findByText("잠시 뒤에 다시 보내 주세요")).toBeVisible();
+    expect(await screen.findByText("보내지 못했어요")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "다시 보내기" }));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
     expect(send.mock.calls[1]![0].clientId).toBe(
       send.mock.calls[0]![0].clientId,
     );
     await waitFor(() =>
-      expect(
-        screen.queryByText("잠시 뒤에 다시 보내 주세요"),
-      ).not.toBeInTheDocument(),
+      expect(screen.queryByText("보내지 못했어요")).not.toBeInTheDocument(),
     );
   });
   it("lets failed messages be removed and hides retry for inaccessible channels", async () => {
@@ -413,7 +449,7 @@ describe("optimistic sending and streamed updates", () => {
       expect(screen.queryByText("보낼 수 없는 내용")).not.toBeInTheDocument(),
     );
   });
-  it("merges refreshed server rows and realtime order, deduplicates, and refreshes a sequence gap", async () => {
+  it("merges refreshed server rows and realtime order, deduplicates, and fills a sequence gap", async () => {
     const result = setup();
     const third = message({
       id: "third",
@@ -421,19 +457,33 @@ describe("optimistic sending and streamed updates", () => {
       body: "세 번째",
       authorId: "other",
     });
-    act(() =>
-      realtime.event({ type: "message.created", roomId: "room", ...third }),
-    );
-    expect(realtime.refresh).toHaveBeenCalledOnce();
-    act(() =>
-      realtime.event({ type: "message.created", roomId: "room", ...third }),
-    );
     const second = message({
       id: "second",
       seq: 2,
       body: "두 번째",
       authorId: "other",
     });
+    vi.mocked(fetchRoomMessagesPage).mockResolvedValue({
+      messages: [second, third],
+      hasMore: false,
+      lastSeq: 3,
+      lastReadSeq: null,
+      firstUnreadSeq: 2,
+    });
+    act(() =>
+      realtime.event({ type: "message.created", roomId: "room", ...third }),
+    );
+    await waitFor(() =>
+      expect(fetchRoomMessagesPage).toHaveBeenCalledWith(
+        "room",
+        { after: 1 },
+        expect.any(Object),
+      ),
+    );
+    expect(realtime.refresh).not.toHaveBeenCalled();
+    act(() =>
+      realtime.event({ type: "message.created", roomId: "room", ...third }),
+    );
     result.update(view({ messages: [second, third] }));
     await waitFor(() => expect(screen.getByText("두 번째")).toBeVisible());
     expect(screen.getAllByText("세 번째")).toHaveLength(1);
@@ -443,7 +493,7 @@ describe("optimistic sending and streamed updates", () => {
         ?.map(({ seq }) => seq),
     ).toEqual([1, 2, 3]);
   });
-  it("only follows new messages at the bottom and offers an explicit jump otherwise", () => {
+  it("only follows new messages at the bottom and offers a counted explicit jump otherwise", async () => {
     const props = {
       channelName: "일반",
       now,
@@ -451,25 +501,27 @@ describe("optimistic sending and streamed updates", () => {
       onRetry: vi.fn(),
       onRemove: vi.fn(),
     };
-    const result = render(<MessageList {...props} messages={[message()]} />);
-    const log = screen.getByRole("log");
-    Object.defineProperties(log, {
-      scrollHeight: { configurable: true, value: 1000 },
-      clientHeight: { configurable: true, value: 300 },
-      scrollTop: { configurable: true, writable: true, value: 0 },
-    });
-    fireEvent.scroll(log);
+    const initial = Array.from({ length: 30 }, (_, index) =>
+      message({ id: `initial-${index}`, seq: index + 1, authorId: "other" }),
+    );
+    const result = render(<MessageList {...props} messages={initial} />);
+    const log = screen.getByRole("region", { name: "일반 메시지" });
+    await waitFor(() => expect(log.scrollTop).toBeGreaterThan(1000));
+    fireEvent.scroll(log, { target: { scrollTop: 0 } });
     result.rerender(
       <MessageList
         {...props}
-        messages={[message(), message({ id: "second", seq: 2 })]}
+        messages={[
+          ...initial,
+          message({ id: "second", seq: 31, authorId: "other" }),
+        ]}
       />,
     );
     expect(log.scrollTop).toBe(0);
-    fireEvent.click(screen.getByRole("button", { name: "새 메시지" }));
-    expect(log.scrollTop).toBe(1000);
+    fireEvent.click(screen.getByRole("button", { name: "새 메시지 1개" }));
+    await waitFor(() => expect(log.scrollTop).toBeGreaterThan(1000));
     expect(
-      screen.queryByRole("button", { name: "새 메시지" }),
+      screen.queryByRole("button", { name: /새 메시지 \d+개/ }),
     ).not.toBeInTheDocument();
   });
 });

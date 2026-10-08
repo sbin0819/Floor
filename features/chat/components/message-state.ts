@@ -66,6 +66,6 @@ export function messageSendError(message: DisplayMessage): string {
   )
     return "잠시 뒤에 다시 보내 주세요";
   if (message.errorCode === "NOT_FOUND") return "이 채널을 더 볼 수 없어요";
-  if (message.errorCode === "UNAUTHENTICATED") return "다시 로그인해 주세요";
+  if (message.errorCode === "UNAUTHENTICATED") return "로그인이 풀렸어요";
   return "보내지 못했어요";
 }

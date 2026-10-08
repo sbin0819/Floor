@@ -9,6 +9,10 @@ const readOnlyAction: (
 
 export const createBooking = readOnlyAction;
 export const sendMessage = readOnlyAction;
+export const markRoomRead = async (input: { seq: number }) => ({
+  ok: true as const,
+  data: { lastReadSeq: input.seq },
+});
 export const updateBooking = readOnlyAction;
 export const createDeskBooking = readOnlyAction;
 export const cancelBooking = readOnlyAction;
