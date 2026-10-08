@@ -5,9 +5,14 @@ import {
   type BrowserRealtime,
 } from "@/lib/realtime/ably-browser";
 import { RealtimeTokenError } from "@/lib/realtime/ably-browser-client";
+import type { BrowserAuthCallback } from "@/lib/realtime/ably-browser-client";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
-import { createFakeAblyBrowser, fakeTokenRequest } from "./ably-test-client";
+import {
+  createFakeAblyBrowser,
+  fakeTokenFor,
+  fakeTokenRequest,
+} from "./ably-test-client";
 
 const event: RealtimeEvent = {
   type: "message.created",
@@ -25,7 +30,9 @@ const cleanup: BrowserRealtime[] = [];
 
 function setup() {
   const fake = createFakeAblyBrowser();
-  const requestToken = vi.fn(async () => fakeTokenRequest);
+  const requestToken = vi.fn(
+    async (input: Parameters<typeof fakeTokenFor>[0]) => fakeTokenFor(input),
+  );
   const realtime = createAblyBrowserRealtime({
     loadClient: fake.loadClient,
     requestToken,
@@ -41,6 +48,122 @@ afterEach(() => {
 });
 
 describe("Ably browser connection ownership", () => {
+  it("does not reuse a preflight token when the room changes before the SDK starts authentication", async () => {
+    const { realtime, client, loadClient, requestToken, emitConnection } =
+      setup();
+    const originalLoad = loadClient.getMockImplementation()!;
+    const authorized: string[] = [];
+    let finishLoad: (() => void) | undefined;
+    loadClient.mockImplementation(async (callback: BrowserAuthCallback) => {
+      const sdk = await originalLoad((reply) =>
+        callback((error, token) => {
+          if (token) authorized.push(token.capability);
+          reply(error, token);
+        }),
+      );
+      await new Promise<void>((resolve) => {
+        finishLoad = resolve;
+      });
+      return sdk;
+    });
+    // 실제 SDK도 connect 뒤의 작업을 다음 틱에 시작하므로 authorize가 먼저 올 수 있다.
+    client.connect.mockImplementation(() => {
+      setTimeout(
+        () => emitConnection({ previous: "connecting", current: "connected" }),
+        0,
+      );
+    });
+    realtime.subscribe("user:user-a", vi.fn());
+    realtime.start();
+    await vi.advanceTimersByTimeAsync(25);
+    realtime.subscribe("room:late", vi.fn());
+    finishLoad?.();
+    await vi.runAllTimersAsync();
+    expect(requestToken.mock.calls).toEqual([
+      [{ rooms: [], spaces: [] }],
+      [{ rooms: ["late"], spaces: [] }],
+    ]);
+    expect(authorized).toEqual([fakeTokenFor({ rooms: ["late"] }).capability]);
+    expect(client.channel("room:late").subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("subscribes only to exact granted channels and does not repeatedly request denied rooms", async () => {
+    const { realtime, client, requestToken } = setup();
+    requestToken.mockResolvedValue({
+      ...fakeTokenRequest,
+      capability: JSON.stringify({
+        "user:user-a": ["subscribe"],
+        "room:a": ["presence"],
+        "room:*": ["subscribe"],
+      }),
+    });
+    realtime.subscribe("user:user-a", vi.fn());
+    realtime.subscribe("room:a", vi.fn());
+    realtime.subscribe("room:b", vi.fn());
+    realtime.start();
+    await vi.runAllTimersAsync();
+    expect(client.channel("user:user-a").subscribe).toHaveBeenCalledTimes(1);
+    expect(client.channel("room:a").subscribe).not.toHaveBeenCalled();
+    expect(client.channel("room:b").subscribe).not.toHaveBeenCalled();
+    expect(requestToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("recreates the SDK when a failed channel rejects detach and continues to the next room", async () => {
+    const { realtime, client, loadClient, requestToken } = setup();
+    const stop = realtime.subscribe("room:a", vi.fn());
+    realtime.start();
+    await vi.runAllTimersAsync();
+    client
+      .channel("room:a")
+      .detach.mockRejectedValue(new Error("failed channel"));
+    stop();
+    const receive = vi.fn();
+    realtime.subscribe("room:b", receive);
+    await vi.runAllTimersAsync();
+    expect(client.close).toHaveBeenCalledTimes(1);
+    expect(loadClient).toHaveBeenCalledTimes(2);
+    expect(client.channel("room:a").detach).toHaveBeenCalledTimes(1);
+    expect(client.channel("room:b").subscribe).toHaveBeenCalledTimes(1);
+    expect(requestToken).toHaveBeenLastCalledWith({ rooms: ["b"], spaces: [] });
+    client.channel("room:b").emit({ ...event, roomId: "b" });
+    expect(receive).toHaveBeenCalledExactlyOnceWith({ ...event, roomId: "b" });
+  });
+
+  it("retries a rejected subscription with a fresh connection without retaining its old listener", async () => {
+    const { realtime, client, loadClient } = setup();
+    client
+      .channel("room:a")
+      .subscribe.mockRejectedValueOnce(new Error("failed channel"));
+    const receive = vi.fn();
+    realtime.subscribe("room:a", receive);
+    realtime.start();
+    await vi.runAllTimersAsync();
+    expect(client.close).toHaveBeenCalledTimes(1);
+    expect(loadClient).toHaveBeenCalledTimes(2);
+    expect(client.channel("room:a").subscribe).toHaveBeenCalledTimes(2);
+    client.channel("room:a").emit(event);
+    expect(receive).toHaveBeenCalledExactlyOnceWith(event);
+  });
+
+  it("bounds permanent subscription failures and still releases that room on navigation", async () => {
+    const { realtime, client, loadClient } = setup();
+    const bad = client.channel("room:a");
+    bad.subscribe.mockRejectedValue(new Error("failed channel"));
+    bad.detach.mockRejectedValue(new Error("already failed"));
+    const stop = realtime.subscribe("room:a", vi.fn());
+    realtime.start();
+    await vi.runAllTimersAsync();
+    expect(loadClient).toHaveBeenCalledTimes(2);
+    expect(bad.subscribe).toHaveBeenCalledTimes(2);
+    expect(realtime.getSnapshot()).toBe("disconnected");
+    stop();
+    realtime.subscribe("room:b", vi.fn());
+    await vi.runAllTimersAsync();
+    expect(loadClient).toHaveBeenCalledTimes(3);
+    expect(bad.detach).toHaveBeenCalledTimes(1);
+    expect(client.channel("room:b").subscribe).toHaveBeenCalledTimes(1);
+  });
+
   it("switches the single selected space by detaching before reauthorization", async () => {
     const { realtime, client, requestToken, calls } = setup();
     const stopSpace = realtime.subscribe("space:a", vi.fn());
@@ -68,15 +191,13 @@ describe("Ably browser connection ownership", () => {
     expect(calls.indexOf("detach:room:one")).toBeLessThan(
       calls.indexOf("authorize"),
     );
-    client
-      .channel("space:b")
-      .emit({
-        type: "room.activity",
-        spaceId: "b",
-        roomId: "two",
-        seq: 1,
-        authorId: "other",
-      });
+    client.channel("space:b").emit({
+      type: "room.activity",
+      spaceId: "b",
+      roomId: "two",
+      seq: 1,
+      authorId: "other",
+    });
     expect(onEvent).toHaveBeenCalledExactlyOnceWith({
       type: "room.activity",
       spaceId: "b",
@@ -276,7 +397,7 @@ describe("Ably browser connection ownership", () => {
     expect(requestToken).toHaveBeenLastCalledWith({ rooms: ["b"], spaces: [] });
     stopB();
     realtime.subscribe("room:c", vi.fn());
-    finishB?.(fakeTokenRequest);
+    finishB?.(fakeTokenFor({ rooms: ["b"], spaces: [] }));
     await vi.runAllTimersAsync();
     expect(calls).not.toContain("subscribe:room:b");
     expect(client.channel("room:c").subscribe).toHaveBeenCalledTimes(1);

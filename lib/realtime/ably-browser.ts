@@ -32,6 +32,27 @@ type Binding = {
   stopAttached: () => void;
 };
 
+function grantedChannels(token: TokenRequest): Set<string> {
+  const capability: unknown = JSON.parse(token.capability);
+  if (
+    !capability ||
+    typeof capability !== "object" ||
+    Array.isArray(capability)
+  )
+    throw new RealtimeTokenError(502);
+  const channels = new Set<string>();
+  for (const [name, operations] of Object.entries(capability)) {
+    if (
+      !Array.isArray(operations) ||
+      !operations.every((operation) => typeof operation === "string")
+    )
+      throw new RealtimeTokenError(502);
+    if (!name.includes("*") && operations.includes("subscribe"))
+      channels.add(name);
+  }
+  return channels;
+}
+
 export function createAblyBrowserRealtime({
   loadClient = loadAblyBrowserClient,
   requestToken = fetchRealtimeToken,
@@ -53,8 +74,10 @@ export function createAblyBrowserRealtime({
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
   let dirty = false;
-  let tokenInput: RealtimeTokenInput = { rooms: [], spaces: [] };
-  let authorizedChannels: string | undefined;
+  let authorization: { scope: string; channels: Set<string> } | undefined;
+  let failureScope: string | undefined;
+  let recoveredFailure = false;
+  const failedChannels = new Set<string>();
 
   const setState = (next: RealtimeConnectionState) => {
     if (next === state) return;
@@ -74,8 +97,7 @@ export function createAblyBrowserRealtime({
     spaces: channelIds("space:"),
   });
 
-  function close() {
-    active = false;
+  function resetClient() {
     generation += 1;
     clearTimeout(timer);
     timer = undefined;
@@ -88,8 +110,21 @@ export function createAblyBrowserRealtime({
     bindings.clear();
     client?.close();
     client = undefined;
-    authorizedChannels = undefined;
+    authorization = undefined;
+  }
+
+  function close() {
+    active = false;
+    resetClient();
+    failureScope = undefined;
+    failedChannels.clear();
     setState("closed");
+  }
+
+  function recoverClient() {
+    resetClient();
+    setState("connecting");
+    schedule();
   }
 
   function stopForAuth(error: unknown) {
@@ -114,12 +149,14 @@ export function createAblyBrowserRealtime({
   }
 
   async function initialize(version: number) {
-    let firstToken: TokenRequest | undefined;
-    tokenInput = currentChannels();
+    const firstInput = currentChannels();
+    let firstToken: { token: TokenRequest; scope: string } | undefined;
     try {
       // 키가 없는 환경에서는 SDK를 불러오거나 Ably에 연결하지 않는다.
-      firstToken = await requestToken(tokenInput);
-      authorizedChannels = JSON.stringify(tokenInput);
+      firstToken = {
+        token: await requestToken(firstInput),
+        scope: JSON.stringify(firstInput),
+      };
     } catch (error) {
       if (version !== generation || !active || stopForAuth(error)) return;
     }
@@ -129,22 +166,28 @@ export function createAblyBrowserRealtime({
         callback("실시간 연결이 종료되었어요.", null);
         return;
       }
-      if (firstToken) {
-        const token = firstToken;
-        firstToken = undefined;
-        callback(null, token);
-        return;
-      }
-      void requestToken(tokenInput).then(
-        (token) => {
-          if (active && version === generation) callback(null, token);
-          else callback("실시간 연결이 종료되었어요.", null);
-        },
-        (error: unknown) => {
-          if (version === generation) stopForAuth(error);
-          callback("실시간 인증을 완료하지 못했어요.", null);
-        },
-      );
+      const provideToken = async () => {
+        while (active && version === generation) {
+          const input = currentChannels();
+          const scope = JSON.stringify(input);
+          const cached = firstToken;
+          firstToken = undefined;
+          // SDK 로딩·연결을 기다리는 동안 바뀐 선택에 이전 토큰을 넘기지 않는다.
+          const token =
+            cached?.scope === scope ? cached.token : await requestToken(input);
+          if (!active || version !== generation) break;
+          if (JSON.stringify(currentChannels()) !== scope) continue;
+          authorization = { scope, channels: grantedChannels(token) };
+          callback(null, token);
+          schedule();
+          return;
+        }
+        callback("실시간 연결이 종료되었어요.", null);
+      };
+      void provideToken().catch((error: unknown) => {
+        if (version === generation) stopForAuth(error);
+        callback("실시간 인증을 완료하지 못했어요.", null);
+      });
     });
     if (version !== generation || !active) {
       nextClient.close();
@@ -171,28 +214,45 @@ export function createAblyBrowserRealtime({
     try {
       if (!client) await initialize(version);
       if (!client || !active || version !== generation) return;
+      const desiredChannels = JSON.stringify(currentChannels());
+      if (failureScope !== desiredChannels) {
+        failureScope = desiredChannels;
+        recoveredFailure = false;
+        failedChannels.clear();
+      }
       // 제거할 채널이 붙어 있는 채로 권한을 줄이지 않도록 먼저 뗀다.
       for (const [name, binding] of bindings) {
-        if (listeners.has(name)) continue;
+        if (listeners.has(name) && authorization?.channels.has(name)) continue;
         binding.channel.unsubscribe(binding.listener);
         binding.stopAttached();
-        await binding.channel.detach();
         bindings.delete(name);
+        try {
+          await binding.channel.detach();
+        } catch {
+          // failed 채널은 detach도 실패한다. SDK 객체를 버려 다음 방을 막지 않게 한다.
+          if (active && version === generation) recoverClient();
+          return;
+        }
       }
       if (!active || version !== generation) return;
-      tokenInput = currentChannels();
-      const desiredChannels = JSON.stringify(tokenInput);
-      if (authorizedChannels !== desiredChannels) {
+      if (authorization?.scope !== desiredChannels) {
         await client.authorize();
-        authorizedChannels = desiredChannels;
       }
       if (!active || version !== generation) return;
-      if (JSON.stringify(currentChannels()) !== desiredChannels) {
+      if (
+        JSON.stringify(currentChannels()) !== desiredChannels ||
+        authorization?.scope !== desiredChannels
+      ) {
         dirty = true;
         return;
       }
       for (const name of listeners.keys()) {
-        if (bindings.has(name)) continue;
+        if (
+          bindings.has(name) ||
+          failedChannels.has(name) ||
+          !authorization.channels.has(name)
+        )
+          continue;
         const channel = client.channel(name);
         const listener = (event: RealtimeEvent) => {
           for (const notify of [...(listeners.get(name) ?? [])]) notify(event);
@@ -200,9 +260,26 @@ export function createAblyBrowserRealtime({
         const stopAttached = channel.onAttached((resumed) => {
           emit({ type: "channel", channel: name, state: "attached", resumed });
         });
-        bindings.set(name, { channel, listener, stopAttached });
-        // 연결 재시도는 SDK가 맡고, 구독 해제는 연결 완료를 기다리지 않는다.
-        void channel.subscribe(listener).catch(() => {});
+        const binding = { channel, listener, stopAttached };
+        bindings.set(name, binding);
+        void channel.subscribe(listener).catch(() => {
+          if (
+            !active ||
+            version !== generation ||
+            bindings.get(name) !== binding
+          )
+            return;
+          channel.unsubscribe(listener);
+          stopAttached();
+          // 같은 권한으로 계속 실패할 때 무한 재연결하지 않는다.
+          if (!recoveredFailure) {
+            recoveredFailure = true;
+            recoverClient();
+          } else {
+            failedChannels.add(name);
+            setState("disconnected");
+          }
+        });
       }
     } catch {
       if (active && version === generation) setState("disconnected");

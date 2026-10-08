@@ -6,6 +6,7 @@ import type {
   BrowserAuthCallback,
   BrowserChannel,
   BrowserConnectionChange,
+  RealtimeTokenInput,
 } from "@/lib/realtime/ably-browser-client";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
@@ -18,6 +19,21 @@ export const fakeTokenRequest: TokenRequest = {
   timestamp: 1,
   ttl: 600_000,
 };
+
+export function fakeTokenFor(input: RealtimeTokenInput): TokenRequest {
+  return {
+    ...fakeTokenRequest,
+    capability: JSON.stringify({
+      "user:user-a": ["subscribe"],
+      ...Object.fromEntries(
+        input.rooms.map((id) => [`room:${id}`, ["subscribe", "presence"]]),
+      ),
+      ...Object.fromEntries(
+        (input.spaces ?? []).map((id) => [`space:${id}`, ["subscribe"]]),
+      ),
+    }),
+  };
+}
 
 export function createFakeAblyBrowser() {
   const calls: string[] = [];

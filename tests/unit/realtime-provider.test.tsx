@@ -13,11 +13,13 @@ import {
 import { createAblyBrowserRealtime } from "@/lib/realtime/ably-browser";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
-import { createFakeAblyBrowser, fakeTokenRequest } from "./ably-test-client";
+import { createFakeAblyBrowser, fakeTokenFor } from "./ably-test-client";
 
 function setup() {
   const fake = createFakeAblyBrowser();
-  const requestToken = vi.fn(async () => fakeTokenRequest);
+  const requestToken = vi.fn(
+    async (input: Parameters<typeof fakeTokenFor>[0]) => fakeTokenFor(input),
+  );
   const createRealtime = vi.fn(() =>
     createAblyBrowserRealtime({ loadClient: fake.loadClient, requestToken }),
   );
