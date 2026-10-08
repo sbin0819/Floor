@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PersonCard } from "@/features/people/components/person-card";
 import { formatChatDate, formatChatTime } from "@/lib/time/chat-format";
 import { messageSendError, type DisplayMessage } from "./message-state";
 import { MessageBody } from "./message-body";
@@ -231,23 +232,49 @@ export const MessageRow = memo(function MessageRow({
         className={`relative flex gap-3 rounded-md py-1 outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${mentioned ? "bg-status-pending" : highlighted ? "bg-accent" : ""} ${!grouped ? "mt-4" : ""} ${message.delivery === "pending" ? "opacity-50" : ""}`}
       >
         <div className="w-10 shrink-0">
-          {!grouped && message.kind === "text" && (
-            <span
-              aria-hidden="true"
-              className="flex size-10 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground"
+          {!grouped && message.kind === "text" && message.authorId && (
+            <PersonCard
+              userId={message.authorId}
+              name={message.authorName ?? "알 수 없는 사람"}
             >
-              {Array.from(message.authorName ?? "?")[0]}
-            </span>
+              <button
+                type="button"
+                aria-label={`${message.authorName ?? "알 수 없는 사람"} 아바타 프로필`}
+                className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-10 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground"
+                >
+                  {Array.from(message.authorName ?? "?")[0]}
+                </span>
+              </button>
+            </PersonCard>
           )}
         </div>
         <div className="min-w-0 flex-1">
           {!grouped && (
             <div className="mb-1 flex items-baseline gap-2">
-              <strong className="text-sm font-semibold">
-                {message.kind === "system"
-                  ? "시스템"
-                  : (message.authorName ?? "알 수 없는 사람")}
-              </strong>
+              {message.kind === "text" && message.authorId ? (
+                <PersonCard
+                  userId={message.authorId}
+                  name={message.authorName ?? "알 수 없는 사람"}
+                >
+                  <button
+                    type="button"
+                    className="rounded-sm text-left text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                    aria-label={`${message.authorName ?? "알 수 없는 사람"} 프로필`}
+                  >
+                    <strong>{message.authorName ?? "알 수 없는 사람"}</strong>
+                  </button>
+                </PersonCard>
+              ) : (
+                <strong className="text-sm font-semibold">
+                  {message.kind === "system"
+                    ? "시스템"
+                    : (message.authorName ?? "알 수 없는 사람")}
+                </strong>
+              )}
               <time
                 dateTime={message.createdAt}
                 className="text-xs text-muted-foreground tabular-nums"

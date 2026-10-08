@@ -13,6 +13,7 @@ import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { Hash, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PersonCard } from "@/features/people/components/person-card";
 import {
   Sheet,
   SheetClose,
@@ -277,13 +278,15 @@ function ChatRoomScreen({
               {Array.from(direct.other.name.trim())[0] ?? "?"}
             </span>
             <h1 className="min-w-0 truncate text-lg font-bold">
-              <button
-                type="button"
-                className="min-h-11 max-w-full truncate rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
-                aria-label={`${direct.other.name} 프로필`}
-              >
-                {direct.other.name}
-              </button>
+              <PersonCard userId={direct.other.userId} name={direct.other.name}>
+                <button
+                  type="button"
+                  className="min-h-11 max-w-full truncate rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
+                  aria-label={`${direct.other.name} 프로필`}
+                >
+                  {direct.other.name}
+                </button>
+              </PersonCard>
             </h1>
             {direct.other.username && (
               <span className="hidden truncate text-sm text-muted-foreground sm:block">

@@ -38,11 +38,11 @@ export type FriendActions = {
   openDirect: (input: unknown) => Promise<ActionResult<{ roomId: string }>>;
 };
 export const defaultFriendActions: FriendActions = {
-  send: sendFriendRequest,
-  respond: respondFriendRequest,
-  cancel: cancelFriendRequest,
-  remove: removeFriend,
-  openDirect: openDirectMessage,
+  send: (input) => sendFriendRequest(input),
+  respond: (input) => respondFriendRequest(input),
+  cancel: (input) => cancelFriendRequest(input),
+  remove: (input) => removeFriend(input),
+  openDirect: (input) => openDirectMessage(input),
 };
 
 export function MessagePersonButton({
@@ -81,12 +81,14 @@ export function FriendControls({
   relation,
   actions = defaultFriendActions,
   list = false,
+  profile = false,
   onRelation,
 }: {
   person: Pick<FriendRow, "userId" | "name" | "directRoomId">;
   relation: PersonRelation;
   actions?: FriendActions;
   list?: boolean;
+  profile?: boolean;
   onRelation?: (relation: PersonRelation) => void;
 }) {
   const locked = useRef(false);
@@ -111,7 +113,7 @@ export function FriendControls({
           if (result) onRelation?.(result.data.relation);
         }}
       >
-        친구 요청
+        {profile ? "친구 추가" : "친구 요청"}
       </Button>
     );
   if (relation === "outgoing")
@@ -143,7 +145,7 @@ export function FriendControls({
             if (result) onRelation?.("friend");
           }}
         >
-          수락
+          {profile ? "요청 수락" : "수락"}
         </Button>
         {list && (
           <Button
@@ -163,12 +165,14 @@ export function FriendControls({
     );
   return (
     <div className="flex items-center gap-2">
-      <MessagePersonButton
-        person={person}
-        action={actions.openDirect}
-        disabled={pending}
-      />
-      {list && (
+      {!profile && (
+        <MessagePersonButton
+          person={person}
+          action={actions.openDirect}
+          disabled={pending}
+        />
+      )}
+      {(list || profile) && (
         <>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -8,6 +8,7 @@ import { UsernameForm, type SaveUsername } from "./username-form";
 import { PeopleSearch, type SearchPeople } from "./people-search";
 import { FriendControls, type FriendActions } from "./friend-controls";
 import { PersonSummary } from "./person-summary";
+import { PersonCard } from "./person-card";
 
 export function FriendsScreen({
   data,
@@ -77,7 +78,19 @@ export function FriendsScreen({
                 key={person.userId}
                 className="flex flex-wrap items-center gap-3 p-4"
               >
-                <PersonSummary person={person} />
+                <PersonCard
+                  userId={person.userId}
+                  name={person.name}
+                  actions={actions}
+                >
+                  <button
+                    type="button"
+                    aria-label={`${person.name} 프로필`}
+                    className="flex min-h-11 min-w-0 flex-1 rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <PersonSummary person={person} />
+                  </button>
+                </PersonCard>
                 <FriendControls
                   person={person}
                   relation={
