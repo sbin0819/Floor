@@ -119,8 +119,11 @@ describe("shared meeting screen", () => {
       screen.queryByRole("link", { name: "예약 바꾸기" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /통화|파일|영상/ }),
+      screen.queryByRole("button", { name: /통화|영상/ }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "파일 공유는 준비 중이에요" }),
+    ).toBeDisabled();
   });
   it("allows every meeting member to mention everyone and uses the meeting placeholder", async () => {
     await setup(

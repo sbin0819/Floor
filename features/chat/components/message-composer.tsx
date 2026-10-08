@@ -1,18 +1,40 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { Send, X } from "lucide-react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+} from "react";
+import { Plus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { messageBodySchema } from "../schema";
+import { optionalMessageBodySchema } from "../schema";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { AttachmentStrip } from "./attachment-strip";
+import {
+  uploadErrors,
+  type UploadController,
+  type UploadItem,
+} from "../upload-controller";
 import {
   toMessageBody,
   type MentionCandidate,
   type MentionInputValue,
 } from "../mention-input";
 import { MentionTextarea } from "./mention-textarea";
-import type { ChatReply } from "../types";
+import type { ChatAttachment, ChatReply } from "../types";
 
 const noMembers: readonly MentionCandidate[] = [];
+const noUploads: UploadItem[] = [];
+const noUploadSnapshot = () => noUploads;
+const noSubscription = () => () => {};
 
 export function MessageComposer({
   channelName,
@@ -25,9 +47,15 @@ export function MessageComposer({
   onInput,
   focusVersion = 0,
   placeholder,
+  uploads,
+  uploadUnavailable = uploadErrors.disabled,
 }: {
   channelName: string;
-  onSend: (body: string, reply?: ChatReply) => void;
+  onSend: (
+    body: string,
+    reply?: ChatReply,
+    attachments?: ChatAttachment[],
+  ) => void;
   members?: readonly MentionCandidate[];
   allowEveryone?: boolean;
   reply?: ChatReply | null;
@@ -36,7 +64,15 @@ export function MessageComposer({
   onInput?: (body: string) => void;
   focusVersion?: number;
   placeholder?: string;
+  uploads?: UploadController;
+  uploadUnavailable?: string | null;
 }) {
+  const items = useSyncExternalStore(
+    uploads?.subscribe ?? noSubscription,
+    uploads?.getSnapshot ?? noUploadSnapshot,
+    noUploadSnapshot,
+  );
+  const fileInput = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState<MentionInputValue>({
     text: "",
     mentions: [],
@@ -48,11 +84,20 @@ export function MessageComposer({
   const body = toMessageBody(value);
   const descriptionId = useId();
   const count = Array.from(body.trim()).length;
-  const valid = messageBodySchema.safeParse(body).success;
+  const hasPending = items.some((item) => item.status !== "ready");
+  const uploading = items.some(
+    (item) => !["ready", "failed"].includes(item.status),
+  );
+  const valid =
+    optionalMessageBodySchema.safeParse(body).success &&
+    (!!body.trim() || items.length > 0) &&
+    !hasPending;
   const submit = () => {
-    const input = messageBodySchema.safeParse(body);
-    if (!input.success) return;
-    if (reply) onSend(input.data, reply);
+    const input = optionalMessageBodySchema.safeParse(body);
+    if (!input.success || !valid) return;
+    const attachments = uploads?.take() ?? [];
+    if (attachments.length) onSend(input.data, reply ?? undefined, attachments);
+    else if (reply) onSend(input.data, reply);
     else onSend(input.data);
     setValue({ text: "", mentions: [] });
     onClearReply?.();
@@ -83,6 +128,13 @@ export function MessageComposer({
       }}
       className="shrink-0 border-t border-border bg-background px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6"
     >
+      {uploads && (
+        <AttachmentStrip
+          items={items}
+          onRemove={uploads.remove}
+          onRetry={uploads.retry}
+        />
+      )}
       {reply && (
         <div className="mb-2 flex items-center gap-2 rounded-md border-l-2 border-border bg-muted px-3 text-sm">
           <div className="min-w-0 flex-1">
@@ -103,6 +155,40 @@ export function MessageComposer({
         </div>
       )}
       <div className="flex items-end gap-2 rounded-xl border border-input bg-card p-2 shadow-card">
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          className="sr-only"
+          tabIndex={-1}
+          aria-label="첨부 파일 선택"
+          disabled={!!uploadUnavailable}
+          onChange={(event) => {
+            uploads?.add(Array.from(event.target.files ?? []));
+            event.target.value = "";
+          }}
+        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={!!uploadUnavailable}
+                  aria-label={uploadUnavailable ?? "파일 올리기"}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Plus aria-hidden />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {uploadUnavailable ?? "파일 올리기"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <MentionTextarea
           inputRef={inputRef}
           aria-label="메시지"
@@ -117,10 +203,24 @@ export function MessageComposer({
           members={members}
           allowEveryone={allowEveryone}
           onKeyDown={onKeyDown}
+          onPaste={(event) => {
+            const files = Array.from(event.clipboardData.files).filter((file) =>
+              file.type.startsWith("image/"),
+            );
+            if (files.length) {
+              event.preventDefault();
+              uploads?.add(files);
+            }
+          }}
           rows={1}
           className="max-h-54 min-h-11 resize-none overflow-y-auto border-0 py-3 leading-6 shadow-none"
         />
-        <Button type="submit" aria-label="보내기" size="icon" disabled={!valid}>
+        <Button
+          type="submit"
+          aria-label={uploading ? "올리는 중…" : "보내기"}
+          size="icon"
+          disabled={!valid}
+        >
           <Send aria-hidden="true" />
         </Button>
       </div>

@@ -41,6 +41,9 @@ import { excerptOf, summarizeAttachments } from "../message-text";
 import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
 import { RoomMembersPanel } from "./room-members-panel";
 import { MessageComposer } from "./message-composer";
+import { useRoomUploads, useUploadOnline } from "./use-room-uploads";
+import { UploadDropArea } from "./upload-drop-area";
+import { uploadErrors } from "../upload-controller";
 import { MessageList } from "./message-list";
 import { MessageDeleteDialog } from "./message-delete-dialog";
 import { MessageEditor } from "./message-editor";
@@ -446,6 +449,18 @@ function ChatRoomScreen({
       messages.messages.some((message) => message.delivery === "pending"),
   });
   const connection = useRealtimeConnectionState();
+  const uploadOnline = useUploadOnline();
+  const uploadUnavailable = !metadata.filesEnabled
+    ? uploadErrors.disabled
+    : direct?.request
+      ? uploadErrors.request
+      : !canWrite || denied
+        ? "이 대화에는 파일을 보낼 수 없어요"
+        : !uploadOnline ||
+            ["disconnected", "suspended", "failed"].includes(connection)
+          ? uploadErrors.offline
+          : null;
+  const uploads = useRoomUploads(data.room.id, uploadUnavailable);
   const [membersOpen, setMembersOpen] = useState(false);
   const wide = useWideMembers();
   const membersId = useId();
@@ -499,282 +514,293 @@ function ChatRoomScreen({
           : "flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col bg-background"
       }
     >
-      {presentation.kind === "meeting" ? (
-        <MeetingHeader
-          data={presentation.data}
-          compact={compact}
-          actions={presentation.actions}
-          trigger={trigger}
-          membersOpen={membersOpen}
-          membersId={membersId}
-          onToggleMembers={() => setMembersOpen((open) => !open)}
-        />
-      ) : (
-        <ChatRoomHeader
-          data={data}
-          presentation={presentation}
-          roomName={roomName}
-          trigger={trigger}
-          membersOpen={membersOpen}
-          membersId={membersId}
-          onToggleMembers={() => setMembersOpen((open) => !open)}
-          groupMenu={groupMenu}
-          groupDialogOpen={groupDialog !== null}
-          onRename={() => {
-            groupDialogOrigin.current = groupMenu.current;
-            setGroupDialog("rename");
-          }}
-        />
-      )}
-      {meeting && <MeetingBookingCard data={meeting.data} compact={compact} />}
-      {direct?.request && !direct.blockedByMe && (
-        <MessageRequestBanner
-          roomId={data.room.id}
-          other={direct.other}
-          request={direct.request}
-          respond={(input) => respondMessageRequest(input)}
-          block={defaultModerationActions.block}
-        />
-      )}
-      {(connection === "disconnected" ||
-        connection === "suspended" ||
-        connection === "failed" ||
-        (messages.reconnecting && connection !== "disabled")) && (
-        <p
-          role="status"
-          className="shrink-0 border-b border-border bg-muted px-4 py-2 text-sm text-muted-foreground"
-        >
-          연결이 끊겼어요. 다시 연결하고 있어요
-        </p>
-      )}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {metadata.blockedUserIds === undefined && !direct ? (
-            <div
-              role="status"
-              aria-label="메시지 표시 정보를 불러오고 있어요"
-              className="min-h-0 flex-1 space-y-4 p-6"
-            >
-              <Skeleton className="h-14 w-2/3" />
-              <Skeleton className="h-14 w-3/4" />
-              <Skeleton className="h-14 w-1/2" />
-            </div>
-          ) : (
-            <MessageList
-              key={`${data.room.id}:${resetVersion}`}
-              channelName={roomName}
-              introduction={
-                direct ? <DirectIntroduction other={direct.other} /> : undefined
-              }
-              readReceiptMessageId={readReceiptMessageId}
-              now={data.now}
-              userId={data.user.id}
-              messages={messages.messages}
-              blockedUserIds={!direct ? metadata.blockedUserIds : undefined}
-              firstUnreadSeq={
-                messages.historyReset
-                  ? messages.historyReset.firstUnreadSeq
-                  : data.firstUnreadSeq
-              }
-              liveMessages={messages.liveMessages}
-              hasMore={history.hasMore}
-              loadingOlder={history.loading}
-              historyError={history.error}
-              onLoadOlder={history.loadOlder}
-              onViewport={onViewport}
-              onRetry={messages.retry}
-              onRemove={messages.remove}
-              editingId={editingId}
-              focusMessageId={editingId}
-              jumpToId={selectedMessage}
-              renderEditor={(message) => (
-                <MessageEditor
-                  key={message.id}
-                  messageId={message.id}
-                  body={message.body}
-                  hasAttachments={message.attachments.length > 0}
-                  names={
-                    new Map([
-                      ...names,
-                      ...message.mentions.map(
-                        ({ userId, name }) => [userId, name] as const,
-                      ),
-                    ])
-                  }
-                  members={candidates}
-                  allowEveryone={Boolean(direct || group || meeting) || admin}
-                  onSave={mutations.edit}
-                  onCancel={() => {
-                    setEditing(null);
-                    requestAnimationFrame(() => returnMessageFocus(message.id));
-                  }}
-                />
-              )}
-              actions={{
-                userId: data.user.id,
-                canWrite,
-                canReact: direct || meeting ? canWrite : !archived,
-                admin,
-                names,
-                react: mutations.react,
-                onDelete: (message) => {
-                  deleteOrigin.current = message.id;
-                  setDeleting({ roomId: data.room.id, message });
-                },
-                onEdit: edit,
-                onReply: replyTo,
-                onReport: (message) => {
-                  reportOrigin.current = message.id;
-                  setReporting({ roomId: data.room.id, message });
-                },
-              }}
-            />
-          )}
-          {canWrite ? (
-            <MessageComposer
-              key={data.room.id}
-              channelName={roomName}
-              placeholder={
-                direct?.request?.role === "recipient"
-                  ? "답장하면 요청을 수락해요"
-                  : direct
-                    ? `${roomName} 님에게 메시지 보내기`
-                    : group || meeting
-                      ? `${roomName}에 메시지 보내기`
-                      : undefined
-              }
-              onSend={(body, reply) => {
-                messages.submit(body, reply);
-                typing.stopTyping();
-              }}
-              onInput={typing.onInput}
-              members={candidates}
-              allowEveryone={Boolean(direct || group || meeting) || admin}
-              reply={reply}
-              onClearReply={() => setReply(null)}
-              focusVersion={composerFocus}
-              onEditLast={() => {
-                const last = messages.messages.findLast(
-                  (message) =>
-                    message.authorId === data.user.id &&
-                    message.kind === "text" &&
-                    !message.deletedAt &&
-                    !message.delivery,
-                );
-                if (last) edit(last);
-              }}
-            />
-          ) : (
-            <div className="shrink-0 space-y-2 border-t border-border p-5 text-center text-sm text-muted-foreground">
-              <p>
-                {direct?.blockedByMe
-                  ? "차단한 사용자예요"
-                  : requestLimit
-                    ? "상대가 수락하면 더 보낼 수 있어요"
-                    : meeting
-                      ? meeting.data.readOnlyReason === "cancelled"
-                        ? "취소된 예약이라 읽기 전용이에요"
-                        : "회의가 끝나고 24시간이 지나 읽기 전용이에요"
-                      : direct || group
-                        ? "이 대화에는 메시지를 보낼 수 없어요"
-                        : archived
-                          ? "보관된 채널이에요"
-                          : "이 채널에는 관리자만 쓸 수 있어요"}
-              </p>
-              {direct?.blockedByMe && (
-                <UnblockButton userId={direct.other.userId} />
-              )}
-            </div>
-          )}
-          <TypingIndicator label={typing.label} />
-        </div>
-        {!direct && !compact && wide && membersOpen && (
-          <aside
-            id={membersId}
-            aria-label={
-              meeting ? "회의 멤버" : group ? "그룹 멤버" : "채널 멤버"
-            }
-            className="w-60 shrink-0 overflow-y-auto border-l border-border bg-sidebar"
-          >
-            <h2 className="px-4 pt-5 text-xs font-semibold text-muted-foreground">
-              멤버 · {data.members.length}
-            </h2>
-            {memberPanel}
-          </aside>
-        )}
-      </div>
-      <MessageDeleteDialog
-        key={`${data.room.id}:${deleting?.id ?? "none"}`}
-        message={deleting}
-        userId={data.user.id}
-        onClose={() => setDeleting(null)}
-        onDelete={mutations.remove}
-        onReturnFocus={() => returnMessageFocus(deleteOrigin.current)}
-      />
-      {reporting?.authorId && (
-        <ReportDialog
-          key={reporting.id}
-          target={{
-            userId: reporting.authorId,
-            name: reporting.authorName ?? "사용자",
-            messageId: reporting.id,
-          }}
-          open
-          onOpenChange={(open) => {
-            if (!open) setReporting(null);
-          }}
-          report={defaultModerationActions.reportMessage}
-          block={defaultModerationActions.block}
-          onReturnFocus={() => returnMessageFocus(reportOrigin.current)}
-        />
-      )}
-      {group?.contacts && (
-        <GroupDialogs
-          roomId={data.room.id}
-          name={group.originalName}
-          memberIds={data.members.map((member) => member.id)}
-          contacts={group.contacts}
-          dialog={groupDialog}
-          onClose={() => setGroupDialog(null)}
-          onReturnFocus={() => {
-            if (groupDialogOrigin.current?.isConnected)
-              groupDialogOrigin.current.focus();
-            else trigger.current?.focus();
-          }}
-        />
-      )}
-      {!direct && !compact && (
-        <Sheet open={!wide && membersOpen} onOpenChange={setMembersOpen}>
-          <SheetContent
-            id={membersId}
-            side="right"
-            showCloseButton={false}
-            aria-describedby={undefined}
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              trigger.current?.focus();
+      <UploadDropArea uploads={uploads}>
+        {presentation.kind === "meeting" ? (
+          <MeetingHeader
+            data={presentation.data}
+            compact={compact}
+            actions={presentation.actions}
+            trigger={trigger}
+            membersOpen={membersOpen}
+            membersId={membersId}
+            onToggleMembers={() => setMembersOpen((open) => !open)}
+          />
+        ) : (
+          <ChatRoomHeader
+            data={data}
+            presentation={presentation}
+            roomName={roomName}
+            trigger={trigger}
+            membersOpen={membersOpen}
+            membersId={membersId}
+            onToggleMembers={() => setMembersOpen((open) => !open)}
+            groupMenu={groupMenu}
+            groupDialogOpen={groupDialog !== null}
+            onRename={() => {
+              groupDialogOrigin.current = groupMenu.current;
+              setGroupDialog("rename");
             }}
+          />
+        )}
+        {meeting && (
+          <MeetingBookingCard data={meeting.data} compact={compact} />
+        )}
+        {direct?.request && !direct.blockedByMe && (
+          <MessageRequestBanner
+            roomId={data.room.id}
+            other={direct.other}
+            request={direct.request}
+            respond={(input) => respondMessageRequest(input)}
+            block={defaultModerationActions.block}
+          />
+        )}
+        {(connection === "disconnected" ||
+          connection === "suspended" ||
+          connection === "failed" ||
+          (messages.reconnecting && connection !== "disabled")) && (
+          <p
+            role="status"
+            className="shrink-0 border-b border-border bg-muted px-4 py-2 text-sm text-muted-foreground"
           >
-            <SheetHeader>
-              <SheetTitle>
-                {meeting ? "회의 멤버" : group ? "그룹 멤버" : "채널 멤버"}
-              </SheetTitle>
-            </SheetHeader>
-            <SheetClose asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2"
-                aria-label="멤버 목록 닫기"
+            연결이 끊겼어요. 다시 연결하고 있어요
+          </p>
+        )}
+        <div className="flex min-h-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col">
+            {metadata.blockedUserIds === undefined && !direct ? (
+              <div
+                role="status"
+                aria-label="메시지 표시 정보를 불러오고 있어요"
+                className="min-h-0 flex-1 space-y-4 p-6"
               >
-                <X aria-hidden="true" />
-              </Button>
-            </SheetClose>
-            <div className="overflow-y-auto">{memberPanel}</div>
-          </SheetContent>
-        </Sheet>
-      )}
+                <Skeleton className="h-14 w-2/3" />
+                <Skeleton className="h-14 w-3/4" />
+                <Skeleton className="h-14 w-1/2" />
+              </div>
+            ) : (
+              <MessageList
+                key={`${data.room.id}:${resetVersion}`}
+                channelName={roomName}
+                introduction={
+                  direct ? (
+                    <DirectIntroduction other={direct.other} />
+                  ) : undefined
+                }
+                readReceiptMessageId={readReceiptMessageId}
+                now={data.now}
+                userId={data.user.id}
+                messages={messages.messages}
+                blockedUserIds={!direct ? metadata.blockedUserIds : undefined}
+                firstUnreadSeq={
+                  messages.historyReset
+                    ? messages.historyReset.firstUnreadSeq
+                    : data.firstUnreadSeq
+                }
+                liveMessages={messages.liveMessages}
+                hasMore={history.hasMore}
+                loadingOlder={history.loading}
+                historyError={history.error}
+                onLoadOlder={history.loadOlder}
+                onViewport={onViewport}
+                onRetry={messages.retry}
+                onRemove={messages.remove}
+                editingId={editingId}
+                focusMessageId={editingId}
+                jumpToId={selectedMessage}
+                renderEditor={(message) => (
+                  <MessageEditor
+                    key={message.id}
+                    messageId={message.id}
+                    body={message.body}
+                    hasAttachments={message.attachments.length > 0}
+                    names={
+                      new Map([
+                        ...names,
+                        ...message.mentions.map(
+                          ({ userId, name }) => [userId, name] as const,
+                        ),
+                      ])
+                    }
+                    members={candidates}
+                    allowEveryone={Boolean(direct || group || meeting) || admin}
+                    onSave={mutations.edit}
+                    onCancel={() => {
+                      setEditing(null);
+                      requestAnimationFrame(() =>
+                        returnMessageFocus(message.id),
+                      );
+                    }}
+                  />
+                )}
+                actions={{
+                  userId: data.user.id,
+                  canWrite,
+                  canReact: direct || meeting ? canWrite : !archived,
+                  filesEnabled: metadata.filesEnabled,
+                  admin,
+                  names,
+                  react: mutations.react,
+                  onDelete: (message) => {
+                    deleteOrigin.current = message.id;
+                    setDeleting({ roomId: data.room.id, message });
+                  },
+                  onEdit: edit,
+                  onReply: replyTo,
+                  onReport: (message) => {
+                    reportOrigin.current = message.id;
+                    setReporting({ roomId: data.room.id, message });
+                  },
+                }}
+              />
+            )}
+            {canWrite ? (
+              <MessageComposer
+                key={data.room.id}
+                channelName={roomName}
+                uploads={uploads}
+                uploadUnavailable={uploadUnavailable}
+                placeholder={
+                  direct?.request?.role === "recipient"
+                    ? "답장하면 요청을 수락해요"
+                    : direct
+                      ? `${roomName} 님에게 메시지 보내기`
+                      : group || meeting
+                        ? `${roomName}에 메시지 보내기`
+                        : undefined
+                }
+                onSend={(body, reply, attachments) => {
+                  messages.submit(body, reply, attachments);
+                  typing.stopTyping();
+                }}
+                onInput={typing.onInput}
+                members={candidates}
+                allowEveryone={Boolean(direct || group || meeting) || admin}
+                reply={reply}
+                onClearReply={() => setReply(null)}
+                focusVersion={composerFocus}
+                onEditLast={() => {
+                  const last = messages.messages.findLast(
+                    (message) =>
+                      message.authorId === data.user.id &&
+                      message.kind === "text" &&
+                      !message.deletedAt &&
+                      !message.delivery,
+                  );
+                  if (last) edit(last);
+                }}
+              />
+            ) : (
+              <div className="shrink-0 space-y-2 border-t border-border p-5 text-center text-sm text-muted-foreground">
+                <p>
+                  {direct?.blockedByMe
+                    ? "차단한 사용자예요"
+                    : requestLimit
+                      ? "상대가 수락하면 더 보낼 수 있어요"
+                      : meeting
+                        ? meeting.data.readOnlyReason === "cancelled"
+                          ? "취소된 예약이라 읽기 전용이에요"
+                          : "회의가 끝나고 24시간이 지나 읽기 전용이에요"
+                        : direct || group
+                          ? "이 대화에는 메시지를 보낼 수 없어요"
+                          : archived
+                            ? "보관된 채널이에요"
+                            : "이 채널에는 관리자만 쓸 수 있어요"}
+                </p>
+                {direct?.blockedByMe && (
+                  <UnblockButton userId={direct.other.userId} />
+                )}
+              </div>
+            )}
+            <TypingIndicator label={typing.label} />
+          </div>
+          {!direct && !compact && wide && membersOpen && (
+            <aside
+              id={membersId}
+              aria-label={
+                meeting ? "회의 멤버" : group ? "그룹 멤버" : "채널 멤버"
+              }
+              className="w-60 shrink-0 overflow-y-auto border-l border-border bg-sidebar"
+            >
+              <h2 className="px-4 pt-5 text-xs font-semibold text-muted-foreground">
+                멤버 · {data.members.length}
+              </h2>
+              {memberPanel}
+            </aside>
+          )}
+        </div>
+        <MessageDeleteDialog
+          key={`${data.room.id}:${deleting?.id ?? "none"}`}
+          message={deleting}
+          userId={data.user.id}
+          onClose={() => setDeleting(null)}
+          onDelete={mutations.remove}
+          onReturnFocus={() => returnMessageFocus(deleteOrigin.current)}
+        />
+        {reporting?.authorId && (
+          <ReportDialog
+            key={reporting.id}
+            target={{
+              userId: reporting.authorId,
+              name: reporting.authorName ?? "사용자",
+              messageId: reporting.id,
+            }}
+            open
+            onOpenChange={(open) => {
+              if (!open) setReporting(null);
+            }}
+            report={defaultModerationActions.reportMessage}
+            block={defaultModerationActions.block}
+            onReturnFocus={() => returnMessageFocus(reportOrigin.current)}
+          />
+        )}
+        {group?.contacts && (
+          <GroupDialogs
+            roomId={data.room.id}
+            name={group.originalName}
+            memberIds={data.members.map((member) => member.id)}
+            contacts={group.contacts}
+            dialog={groupDialog}
+            onClose={() => setGroupDialog(null)}
+            onReturnFocus={() => {
+              if (groupDialogOrigin.current?.isConnected)
+                groupDialogOrigin.current.focus();
+              else trigger.current?.focus();
+            }}
+          />
+        )}
+        {!direct && !compact && (
+          <Sheet open={!wide && membersOpen} onOpenChange={setMembersOpen}>
+            <SheetContent
+              id={membersId}
+              side="right"
+              showCloseButton={false}
+              aria-describedby={undefined}
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                trigger.current?.focus();
+              }}
+            >
+              <SheetHeader>
+                <SheetTitle>
+                  {meeting ? "회의 멤버" : group ? "그룹 멤버" : "채널 멤버"}
+                </SheetTitle>
+              </SheetHeader>
+              <SheetClose asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2"
+                  aria-label="멤버 목록 닫기"
+                >
+                  <X aria-hidden="true" />
+                </Button>
+              </SheetClose>
+              <div className="overflow-y-auto">{memberPanel}</div>
+            </SheetContent>
+          </Sheet>
+        )}
+      </UploadDropArea>
     </section>
   );
   return callContext ? (

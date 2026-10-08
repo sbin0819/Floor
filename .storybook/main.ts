@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 const actionModules = [
   "features/calls/actions",
   "features/chat/actions",
+  "features/chat/upload-actions",
   "features/chat/space-actions",
   "features/people/actions",
   "features/notifications/actions",

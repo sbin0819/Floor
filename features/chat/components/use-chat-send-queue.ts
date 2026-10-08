@@ -38,6 +38,10 @@ function makeQueue(client: QueryClient) {
   const queue = createChatSendQueue({
     online: () => navigator.onLine !== false,
     confirmed(entry, message) {
+      if (message.attachments.length)
+        void client.invalidateQueries({
+          queryKey: ["chat", "room", entry.roomId, "files"],
+        });
       client.setQueryData<DisplayMessage[]>(
         roomMessagesKey(entry.roomId),
         (current = []) =>
@@ -226,6 +230,8 @@ export function useChatSendQueue(
     if (message.attachments.length)
       void discardUploads({
         attachmentIds: message.attachments.map((file) => file.id),
+      }).catch(() => {
+        console.error("Chat attachment cleanup failed.");
       });
     client.setQueryData<DisplayMessage[]>(
       roomMessagesKey(roomId),

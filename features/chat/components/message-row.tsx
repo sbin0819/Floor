@@ -23,11 +23,13 @@ import {
 import { ReactionPills } from "./reaction-pills";
 import { SystemMessageContent } from "./system-message-content";
 import type { ChatMessage, ReactionEmoji } from "../types";
+import { MessageAttachments } from "./message-attachments";
 
 export type MessageActions = {
   userId: string;
   canWrite: boolean;
   canReact: boolean;
+  filesEnabled?: boolean;
   admin: boolean;
   names: ReadonlyMap<string, string>;
   react: (
@@ -351,6 +353,12 @@ export const MessageRow = memo(function MessageRow({
                 ))}
               {message.editedAt && !message.deletedAt && (
                 <span className="text-xs text-muted-foreground">(수정됨)</span>
+              )}
+              {!message.deletedAt && (
+                <MessageAttachments
+                  attachments={message.attachments}
+                  enabled={actions?.filesEnabled ?? false}
+                />
               )}
               {read && (
                 <p
