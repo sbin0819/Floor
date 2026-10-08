@@ -345,7 +345,9 @@ describe("transactional team chat seed", () => {
     await database.db
       .update(chatRooms)
       .set({ name: "보존할 채널 이름" })
-      .where(eq(chatRooms.spaceId, teamSpace!.id));
+      .where(
+        and(eq(chatRooms.spaceId, teamSpace!.id), eq(chatRooms.kind, "text")),
+      );
     const before = await state();
     await expect(seed()).rejects.toThrow(
       "시드 팀의 기본 채널을 찾을 수 없어요",

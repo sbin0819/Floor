@@ -20,7 +20,7 @@ describe("branch lounge provisioning", () => {
     await database.db.execute(sql`TRUNCATE users, branches CASCADE`);
   });
 
-  it("creates the lounge and announcement atomically and preserves renamed/archived defaults", async () => {
+  it("creates lounge text and voice channels atomically and preserves renamed/archived defaults", async () => {
     const branch = await database.db.transaction((tx) =>
       createBranch("새 지점", tx),
     );
@@ -32,10 +32,21 @@ describe("branch lounge provisioning", () => {
       .from(chatRooms)
       .orderBy(chatRooms.name);
     expect(
-      rooms.map(({ name, kind, adminOnly }) => ({ name, kind, adminOnly })),
+      rooms.map(({ name, kind, adminOnly, voiceCapacity }) => ({
+        name,
+        kind,
+        adminOnly,
+        voiceCapacity,
+      })),
     ).toEqual([
-      { name: "공지", kind: "text", adminOnly: true },
-      { name: "라운지", kind: "text", adminOnly: false },
+      { name: "공지", kind: "text", adminOnly: true, voiceCapacity: null },
+      { name: "라운지", kind: "text", adminOnly: false, voiceCapacity: null },
+      {
+        name: "라운지-음성",
+        kind: "voice",
+        adminOnly: false,
+        voiceCapacity: 10,
+      },
     ]);
     expect(await database.db.select().from(chatSpaces)).toHaveLength(1);
     await database.db
@@ -56,6 +67,10 @@ describe("branch lounge provisioning", () => {
     expect(
       await database.db.select().from(chatRooms).orderBy(chatRooms.id),
     ).toEqual(before);
+    const voice = rooms.find(({ kind }) => kind === "voice")!;
+    await database.db.delete(chatRooms).where(eq(chatRooms.id, voice.id));
+    await database.db.transaction((tx) => createBranchLounge(branch.id, tx));
+    expect(await database.db.select().from(chatRooms)).toHaveLength(2);
   });
 
   it("does not recreate a renamed, archived, or removed team default channel", async () => {
@@ -71,6 +86,15 @@ describe("branch lounge provisioning", () => {
       createTeamSpace(team!.id, tx),
     );
     if (!first.roomId) throw new Error("Expected a new default channel.");
+    const [voice] = await database.db
+      .select()
+      .from(chatRooms)
+      .where(eq(chatRooms.kind, "voice"));
+    expect(voice).toMatchObject({
+      spaceId: first.spaceId,
+      name: "회의실",
+      voiceCapacity: 10,
+    });
     await database.db
       .update(chatRooms)
       .set({ archivedAt: new Date("2026-10-09T00:00:00Z") })
@@ -85,11 +109,14 @@ describe("branch lounge provisioning", () => {
     expect(
       await database.db.transaction((tx) => createTeamSpace(team!.id, tx)),
     ).toEqual({ spaceId: first.spaceId, roomId: null });
-    expect(await database.db.select().from(chatRooms)).toHaveLength(1);
+    expect(await database.db.select().from(chatRooms)).toHaveLength(2);
     await database.db.delete(chatRooms).where(eq(chatRooms.id, first.roomId));
     expect(
       await database.db.transaction((tx) => createTeamSpace(team!.id, tx)),
     ).toEqual({ spaceId: first.spaceId, roomId: null });
+    expect(await database.db.select().from(chatRooms)).toEqual([voice]);
+    await database.db.delete(chatRooms).where(eq(chatRooms.id, voice!.id));
+    await database.db.transaction((tx) => createTeamSpace(team!.id, tx));
     expect(await database.db.select().from(chatRooms)).toEqual([]);
   });
 });
@@ -135,7 +162,7 @@ describe("branch lounge migration", () => {
         "SELECT * FROM chat_rooms WHERE space_id = $1",
         [existing],
       );
-      await apply(migrations.slice(index));
+      await apply(migrations.slice(index, index + 1));
       const spaces = await client.query(
         "SELECT branch_id, icon_color FROM chat_spaces WHERE kind = 'branch' ORDER BY branch_id",
       );
@@ -167,6 +194,11 @@ describe("branch lounge migration", () => {
             { branch_id, name: "라운지", kind: "text", admin_only: false },
           ]),
       );
+      await apply(migrations.slice(index + 1));
+      expect(
+        (await client.query("SELECT id FROM chat_rooms WHERE kind = 'voice'"))
+          .rows,
+      ).toHaveLength(3);
     } finally {
       await client.close();
     }

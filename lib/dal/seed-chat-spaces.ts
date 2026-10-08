@@ -11,7 +11,7 @@ import {
   messages,
   notifications,
 } from "@/lib/db/schema";
-import type { SeedSpacesData } from "@/lib/seed/spaces";
+import { seedCommunityVoiceId, type SeedSpacesData } from "@/lib/seed/spaces";
 import { SeedError } from "@/lib/seed/errors";
 import { createBranchLounge } from "./chat-write";
 import type { DalDatabase } from "./database";
@@ -248,14 +248,22 @@ export async function syncSeedChatSpaces(
       })),
     );
     spaceMembers += memberRows.length;
-    await database.insert(chatRooms).values(
-      community.channels.map((channel) => ({
+    await database.insert(chatRooms).values([
+      ...community.channels.map((channel) => ({
         ...channel,
         kind: "text" as const,
         spaceId: community.id,
         createdAt,
       })),
-    );
+      {
+        id: seedCommunityVoiceId(community.id),
+        kind: "voice",
+        name: "음성",
+        spaceId: community.id,
+        voiceCapacity: 10,
+        createdAt,
+      },
+    ]);
     for (const room of community.channels)
       await writeMessages(
         room.id,

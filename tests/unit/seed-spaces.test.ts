@@ -5,6 +5,7 @@ import { SeedError } from "@/lib/seed/errors";
 import {
   loadSeedSpaces,
   parseSeedSpaces,
+  seedCommunityVoiceId,
   selectSeedLounges,
 } from "@/lib/seed/spaces";
 
@@ -12,6 +13,16 @@ const seed = loadSeedData();
 type Input = typeof file;
 
 describe("strict lounge and community seed", () => {
+  it("derives the same UUID v5 voice channel from the community ID", () => {
+    const id = file.communities[0]!.id;
+    const voice = seedCommunityVoiceId(id);
+    expect(voice).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(seedCommunityVoiceId(id.toUpperCase())).toBe(voice);
+    expect(seedCommunityVoiceId(crypto.randomUUID())).not.toBe(voice);
+    expect(() => seedCommunityVoiceId("not-a-uuid")).toThrow();
+  });
   it("loads six members and six messages without the documentation note", () => {
     const data = loadSeedSpaces(seed);
     expect(data.loungeMembers[0]?.userKeys).toHaveLength(3);
@@ -59,6 +70,20 @@ describe("strict lounge and community seed", () => {
   });
 
   const invalid: { name: string; change: (raw: Input) => void }[] = [
+    {
+      name: "default voice ID used by a text channel",
+      change: (raw) => {
+        raw.communities[0]!.channels[0]!.id = seedCommunityVoiceId(
+          raw.communities[0]!.id,
+        );
+      },
+    },
+    {
+      name: "default voice name used by a text channel",
+      change: (raw) => {
+        raw.communities[0]!.channels[1]!.name = "음성";
+      },
+    },
     {
       name: "unknown root key",
       change: (raw) => {

@@ -478,7 +478,7 @@ describe("operator provisioning", () => {
           ...provisioning,
           createVerifiedUser: async () => {
             expect(await input.db.select().from(chatSpaces)).toHaveLength(1);
-            expect(await input.db.select().from(chatRooms)).toHaveLength(2);
+            expect(await input.db.select().from(chatRooms)).toHaveLength(3);
             throw new Error("Injected account creation failure");
           },
         };

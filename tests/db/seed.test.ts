@@ -13,6 +13,8 @@ import {
   bookings,
   branches,
   branchStaff,
+  callParticipants,
+  callSessions,
   chatSpaces,
   chatSpaceMembers,
   chatRooms,
@@ -191,6 +193,11 @@ describe("transactional development seed", () => {
     const result = await seed();
     expect(result.counts).toEqual(expectedCounts);
     expect(await counts()).toEqual(expectedCounts);
+    const rooms = await database.db.select().from(chatRooms);
+    expect(rooms).toHaveLength(47);
+    expect(rooms.filter(({ kind }) => kind === "voice")).toHaveLength(8);
+    expect(await database.db.select().from(callSessions)).toEqual([]);
+    expect(await database.db.select().from(callParticipants)).toEqual([]);
     expect(result.skippedBookings).toBe(0);
     expect(result.accounts).toEqual(fixtures.users.map(({ email }) => email));
     for (const input of fixtures.users) {

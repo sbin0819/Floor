@@ -14,6 +14,12 @@ describe("chat foundation migration", () => {
         ),
       );
       expect(removalIndex).toBeGreaterThan(0);
+      const foundationIndex = migrations.findIndex(({ sql }) =>
+        sql.some((statement) =>
+          statement.includes('CREATE TABLE "chat_spaces"'),
+        ),
+      );
+      expect(foundationIndex).toBeGreaterThan(removalIndex);
       const apply = async (entries: typeof migrations) => {
         for (const migration of entries) {
           await client.transaction(async (transaction) => {
@@ -34,7 +40,12 @@ describe("chat foundation migration", () => {
         "INSERT INTO teams (id, name, created_by) VALUES ($1, $2, $3), ($4, $5, $3)",
         [firstTeamId, "기존 디자인팀", userId, secondTeamId, "기존 개발팀"],
       );
-      await apply(migrations.slice(removalIndex));
+      await apply(migrations.slice(removalIndex, removalIndex + 1));
+      const legacy = await client.query<{ table_name: string | null }>(
+        "SELECT to_regclass('public.call_sessions')::text AS table_name",
+      );
+      expect(legacy.rows).toEqual([{ table_name: null }]);
+      await apply(migrations.slice(removalIndex + 1, foundationIndex + 1));
 
       const spaces = await client.query<{
         team_id: string;
@@ -55,19 +66,13 @@ describe("chat foundation migration", () => {
         "SELECT s.team_id, r.kind, r.name, r.last_seq::int FROM chat_rooms r JOIN chat_spaces s ON s.id = r.space_id ORDER BY s.team_id",
       );
       expect(rooms.rows).toEqual(
-        [firstTeamId, secondTeamId]
-          .sort()
-          .map((teamId) => ({
-            team_id: teamId,
-            kind: "text",
-            name: "일반",
-            last_seq: 0,
-          })),
+        [firstTeamId, secondTeamId].sort().map((teamId) => ({
+          team_id: teamId,
+          kind: "text",
+          name: "일반",
+          last_seq: 0,
+        })),
       );
-      const legacy = await client.query<{ table_name: string | null }>(
-        "SELECT to_regclass('public.call_sessions')::text AS table_name",
-      );
-      expect(legacy.rows).toEqual([{ table_name: null }]);
       const kinds = await client.query<{ kind: string }>(
         "SELECT unnest(enum_range(NULL::chat_room_kind))::text AS kind",
       );
@@ -84,6 +89,14 @@ describe("chat foundation migration", () => {
       expect(columns.rows.map(({ column_name }) => column_name)).not.toContain(
         "space_ref",
       );
+      await apply(migrations.slice(foundationIndex + 1));
+      expect(
+        (
+          await client.query(
+            "SELECT to_regclass('public.call_sessions')::text AS table_name",
+          )
+        ).rows,
+      ).toEqual([{ table_name: "call_sessions" }]);
     } finally {
       await client.close();
     }

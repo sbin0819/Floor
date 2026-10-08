@@ -132,6 +132,7 @@ export const chatRooms = pgTable(
     }),
     name: text("name"),
     topic: text("topic"),
+    voiceCapacity: integer("voice_capacity"),
     adminOnly: boolean("admin_only").notNull().default(false),
     lastSeq: bigint("last_seq", { mode: "number" }).notNull().default(0),
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
@@ -148,6 +149,10 @@ export const chatRooms = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
+    check(
+      "chat_rooms_voice_capacity",
+      sql`(${table.kind} = 'voice' AND ${table.voiceCapacity} IS NOT NULL AND ${table.voiceCapacity} BETWEEN 2 AND 25) OR (${table.kind} <> 'voice' AND ${table.voiceCapacity} IS NULL)`,
+    ),
     check(
       "chat_rooms_kind_ref",
       sql`(${table.kind} IN ('text', 'voice') AND ${table.spaceId} IS NOT NULL AND ${table.name} IS NOT NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL AND ${table.bookingId} IS NULL) OR (${table.kind} = 'dm' AND ${table.dmLowUserId} IS NOT NULL AND ${table.dmHighUserId} IS NOT NULL AND ${table.dmLowUserId} < ${table.dmHighUserId} AND ${table.spaceId} IS NULL AND ${table.name} IS NULL AND ${table.bookingId} IS NULL) OR (${table.kind} = 'group_dm' AND ${table.spaceId} IS NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL AND ${table.bookingId} IS NULL) OR (${table.kind} = 'meeting' AND ${table.bookingId} IS NOT NULL AND ${table.spaceId} IS NULL AND ${table.name} IS NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL)`,

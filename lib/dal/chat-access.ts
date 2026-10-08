@@ -135,7 +135,7 @@ export function readableRoomCondition(
 ) {
   return sql<boolean>`exists (select 1 from chat_rooms readable_room
     where readable_room.id = ${roomId} and (
-      (readable_room.kind = 'text' and ${readableSpaceCondition(userId, sql`readable_room.space_id`)}) or (readable_room.kind = 'dm' and exists (
+      (readable_room.kind in ('text', 'voice') and ${readableSpaceCondition(userId, sql`readable_room.space_id`)}) or (readable_room.kind = 'dm' and exists (
         select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status in ('active', 'requested')
       )) or (readable_room.kind = 'group_dm' and exists (
         select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status = 'active'
@@ -184,6 +184,7 @@ async function readRoom(userId: string, target: SQL, database: DalDatabase) {
       name: chatRooms.name,
       topic: chatRooms.topic,
       adminOnly: chatRooms.adminOnly,
+      voiceCapacity: chatRooms.voiceCapacity,
       archivedAt: chatRooms.archivedAt,
       lastSeq: chatRooms.lastSeq,
       lastReadSeq: chatRoomReads.lastReadSeq,

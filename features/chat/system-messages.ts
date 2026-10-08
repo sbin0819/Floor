@@ -45,6 +45,11 @@ export const systemMessageDataSchema = z.discriminatedUnion("type", [
     type: z.literal("booking_cancelled"),
     actorName: personName,
   }),
+  z.strictObject({ type: z.literal("huddle_started"), actorName: personName }),
+  z.strictObject({
+    type: z.literal("huddle_ended"),
+    durationMinutes: z.number().int().nonnegative(),
+  }),
 ]);
 
 export type SystemMessageData = z.infer<typeof systemMessageDataSchema>;
@@ -94,6 +99,10 @@ export function systemMessageText(data: SystemMessageData): string {
       return `${data.name} 님이 참석하지 않기로 했어요`;
     case "booking_cancelled":
       return `${data.actorName} 님이 예약을 취소했어요`;
+    case "huddle_started":
+      return `${data.actorName} 님이 통화를 시작했어요`;
+    case "huddle_ended":
+      return `통화가 끝났어요 · ${data.durationMinutes === 0 ? "1분 미만" : `${data.durationMinutes}분`}`;
   }
 }
 

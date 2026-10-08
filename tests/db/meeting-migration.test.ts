@@ -16,6 +16,12 @@ describe("meeting channel backfill", () => {
         ),
       );
       expect(index).toBeGreaterThan(0);
+      const loungeIndex = migrations.findIndex(({ sql }) =>
+        sql.some((statement) =>
+          statement.includes('CREATE TABLE "chat_space_members"'),
+        ),
+      );
+      expect(loungeIndex).toBeGreaterThan(index);
       const apply = async (entries: typeof migrations) => {
         for (const migration of entries)
           await client.transaction(async (tx) => {
@@ -116,7 +122,7 @@ describe("meeting channel backfill", () => {
         [rows[0]!.id, guest],
       );
       const before = new Date();
-      await apply(migrations.slice(index));
+      await apply(migrations.slice(index, index + 1));
       const after = new Date();
       const result = await client.query<{
         title: string;
@@ -153,6 +159,7 @@ describe("meeting channel backfill", () => {
           )
         ).rows,
       ).toHaveLength(5);
+      await apply(migrations.slice(index + 1, loungeIndex + 1));
       const loungeChannels = await client.query<{
         branch_id: string;
         kind: string;
@@ -184,6 +191,11 @@ describe("meeting channel backfill", () => {
       expect(
         (await client.query("SELECT id FROM chat_rooms")).rows,
       ).toHaveLength(7);
+      await apply(migrations.slice(loungeIndex + 1));
+      expect(
+        (await client.query("SELECT id FROM chat_rooms WHERE kind = 'meeting'"))
+          .rows,
+      ).toHaveLength(5);
     } finally {
       await client.close();
     }

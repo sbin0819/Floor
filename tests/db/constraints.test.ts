@@ -9,6 +9,8 @@ import {
   bookings,
   branches,
   branchStaff,
+  callSessions,
+  callParticipants,
   chatRooms,
   chatRoomMembers,
   chatSpaces,
@@ -423,7 +425,9 @@ describe("database constraints from the real migrations", () => {
     "10. rejects %s rooms missing their required reference",
     async (kind) => {
       await expect(
-        database.db.insert(chatRooms).values({ kind }),
+        database.db
+          .insert(chatRooms)
+          .values({ kind, voiceCapacity: kind === "voice" ? 10 : null }),
       ).rejects.toMatchObject({
         cause: { code: "23514", constraint: "chat_rooms_kind_ref" },
       });
@@ -434,8 +438,12 @@ describe("database constraints from the real migrations", () => {
     "10. requires both space and name for a %s channel",
     async (kind) => {
       for (const value of [
-        { kind, spaceId: chatSpaceId },
-        { kind, name: "새 채널" },
+        {
+          kind,
+          spaceId: chatSpaceId,
+          voiceCapacity: kind === "voice" ? 10 : null,
+        },
+        { kind, name: "새 채널", voiceCapacity: kind === "voice" ? 10 : null },
       ]) {
         await expect(
           database.db.insert(chatRooms).values(value),
@@ -453,7 +461,12 @@ describe("database constraints from the real migrations", () => {
     await expect(
       database.db
         .insert(chatRooms)
-        .values({ kind: "voice", spaceId: chatSpaceId, name: "gENERAL" }),
+        .values({
+          kind: "voice",
+          voiceCapacity: 10,
+          spaceId: chatSpaceId,
+          name: "gENERAL",
+        }),
     ).rejects.toMatchObject({
       cause: { code: "23505", constraint: "chat_rooms_space_name_unique" },
     });
@@ -493,6 +506,7 @@ describe("database constraints from the real migrations", () => {
   it("10. accepts 30-character channel names and 200-character topics", async () => {
     await database.db.insert(chatRooms).values({
       kind: "voice",
+      voiceCapacity: 10,
       spaceId: chatSpaceId,
       name: "😀".repeat(30),
       topic: "가".repeat(200),
@@ -1094,6 +1108,7 @@ describe("database constraints from the real migrations", () => {
       {
         ...room,
         kind: "voice" as const,
+        voiceCapacity: 10,
         spaceId: chatSpaceId,
         name: "금지 음성",
       },
@@ -1356,6 +1371,176 @@ describe("database constraints from the real migrations", () => {
   );
 });
 
+describe("call constraints from the real migrations", () => {
+  let database: TestDatabase;
+  let userId: string;
+  let chatSpaceId: string;
+  let roomId: string;
+  beforeAll(async () => {
+    database = await createTestDatabase();
+  });
+  afterAll(async () => {
+    await database?.client.close();
+  });
+  beforeEach(async () => {
+    await database.db.execute(sql`TRUNCATE TABLE users, branches CASCADE`);
+    userId = crypto.randomUUID();
+    chatSpaceId = crypto.randomUUID();
+    roomId = crypto.randomUUID();
+    await database.db
+      .insert(users)
+      .values({
+        id: userId,
+        name: "김하은",
+        email: "call-constraints@example.test",
+      });
+    await database.db
+      .insert(chatSpaces)
+      .values({
+        id: chatSpaceId,
+        kind: "community",
+        name: "가상 커뮤니티",
+        createdBy: userId,
+      });
+    await database.db
+      .insert(chatRooms)
+      .values({ id: roomId, kind: "text", spaceId: chatSpaceId, name: "일반" });
+  });
+
+  it.each([null, 1, 26])(
+    "40. rejects voice capacity %s",
+    async (voiceCapacity) => {
+      await expect(
+        database.db
+          .insert(chatRooms)
+          .values({
+            kind: "voice",
+            spaceId: chatSpaceId,
+            name: "음성",
+            voiceCapacity,
+          }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "chat_rooms_voice_capacity" },
+      });
+    },
+  );
+  it("40. allows inclusive voice capacity bounds, rejects a capacity on non-voice rooms and enforces updates", async () => {
+    await database.db
+      .insert(chatRooms)
+      .values(
+        [2, 25].map((voiceCapacity) => ({
+          kind: "voice" as const,
+          spaceId: chatSpaceId,
+          name: `음성-${voiceCapacity}`,
+          voiceCapacity,
+        })),
+      );
+    await expect(
+      database.db
+        .insert(chatRooms)
+        .values({
+          kind: "text",
+          spaceId: chatSpaceId,
+          name: "다른 텍스트",
+          voiceCapacity: 10,
+        }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "chat_rooms_voice_capacity" },
+    });
+    await expect(
+      database.db
+        .update(chatRooms)
+        .set({ kind: "voice" })
+        .where(eq(chatRooms.id, roomId)),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "chat_rooms_voice_capacity" },
+    });
+  });
+  it("41. allows one open session per room, permits reopening, validates time and cascades room deletion", async () => {
+    const values = {
+      roomId,
+      kind: "huddle" as const,
+      startedBy: userId,
+      startedAt: during.start,
+    };
+    const [first] = await database.db
+      .insert(callSessions)
+      .values(values)
+      .returning();
+    await expect(
+      database.db.insert(callSessions).values(values),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "call_sessions_one_open" },
+    });
+    await expect(
+      database.db
+        .update(callSessions)
+        .set({ endedAt: new Date(during.start.getTime() - 1) })
+        .where(eq(callSessions.id, first!.id)),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "call_sessions_time" },
+    });
+    await database.db
+      .update(callSessions)
+      .set({ endedAt: during.start })
+      .where(eq(callSessions.id, first!.id));
+    await database.db.insert(callSessions).values(values);
+    expect(await database.db.select().from(callSessions)).toHaveLength(2);
+    await database.db.delete(chatRooms).where(eq(chatRooms.id, roomId));
+    expect(await database.db.select().from(callSessions)).toHaveLength(0);
+  });
+  it("42. permits only one open participant per user across sessions, permits reentry and cascades session deletion", async () => {
+    const otherRoomId = crypto.randomUUID();
+    await database.db
+      .insert(chatRooms)
+      .values({
+        id: otherRoomId,
+        kind: "voice",
+        spaceId: chatSpaceId,
+        name: "음성",
+        voiceCapacity: 10,
+      });
+    const sessions = await database.db
+      .insert(callSessions)
+      .values([
+        { roomId, kind: "huddle", startedAt: during.start },
+        { roomId: otherRoomId, kind: "voice", startedAt: during.start },
+      ])
+      .returning();
+    const first = {
+      userId,
+      sessionId: sessions[0]!.id,
+      joinedAt: during.start,
+      lastSeenAt: during.start,
+    };
+    const [participant] = await database.db
+      .insert(callParticipants)
+      .values(first)
+      .returning();
+    for (const session of sessions) {
+      await expect(
+        database.db
+          .insert(callParticipants)
+          .values({ ...first, sessionId: session.id }),
+      ).rejects.toMatchObject({
+        cause: { code: "23505", constraint: "call_participants_one_active" },
+      });
+    }
+    await database.db
+      .update(callParticipants)
+      .set({ leftAt: during.end })
+      .where(eq(callParticipants.id, participant!.id));
+    await database.db
+      .insert(callParticipants)
+      .values({ ...first, joinedAt: during.end, lastSeenAt: during.end });
+    expect(await database.db.select().from(callParticipants)).toHaveLength(2);
+    await database.db
+      .delete(callSessions)
+      .where(eq(callSessions.id, sessions[0]!.id));
+    expect(await database.db.select().from(callParticipants)).toHaveLength(0);
+  });
+});
+
 describe("space membership and invitation constraints", () => {
   let database: TestDatabase;
   let spaceId: string;
@@ -1370,15 +1555,13 @@ describe("space membership and invitation constraints", () => {
   beforeEach(async () => {
     await database.db.execute(sql`TRUNCATE users, branches CASCADE`);
     userIds = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
-    await database.db
-      .insert(users)
-      .values(
-        userIds.map((id) => ({
-          id,
-          name: "검사 회원",
-          email: `${id}@example.test`,
-        })),
-      );
+    await database.db.insert(users).values(
+      userIds.map((id) => ({
+        id,
+        name: "검사 회원",
+        email: `${id}@example.test`,
+      })),
+    );
     const [branch] = await database.db
       .insert(branches)
       .values({ name: "검사 지점" })
@@ -1456,14 +1639,12 @@ describe("space membership and invitation constraints", () => {
     { useCount: 2, maxUses: 1 },
   ])("38. rejects invalid invitation counters %j", async (values) => {
     await expect(
-      database.db
-        .insert(chatSpaceInvites)
-        .values({
-          spaceId,
-          code: crypto.randomUUID(),
-          createdBy: userIds[0]!,
-          ...values,
-        }),
+      database.db.insert(chatSpaceInvites).values({
+        spaceId,
+        code: crypto.randomUUID(),
+        createdBy: userIds[0]!,
+        ...values,
+      }),
     ).rejects.toMatchObject({
       cause: { code: "23514", constraint: "chat_space_invites_uses" },
     });

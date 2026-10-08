@@ -4,6 +4,8 @@ import {
   Clock,
   LogOut,
   Pencil,
+  Phone,
+  PhoneOff,
   UserMinus,
   UserPlus,
   Users,
@@ -26,6 +28,8 @@ const systemIcons: Record<SystemMessageData["type"], typeof Users> = {
   participants_added: UserPlus,
   participant_removed: UserMinus,
   participant_left: LogOut,
+  huddle_started: Phone,
+  huddle_ended: PhoneOff,
 };
 
 export function SystemMessageContent({

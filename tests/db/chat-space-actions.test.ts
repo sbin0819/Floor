@@ -111,7 +111,7 @@ describe("space lifecycle actions", () => {
         )
     )[0];
   }
-  it("creates an owner and exactly one default channel, then reauthorizes", async () => {
+  it("creates an owner and default text and voice channels, then reauthorizes", async () => {
     const result = await community();
     expect(
       await membership(result.spaceId, actors.member.userId),
@@ -120,8 +120,12 @@ describe("space lifecycle actions", () => {
       await database.db
         .select()
         .from(chatRooms)
-        .where(eq(chatRooms.spaceId, result.spaceId)),
-    ).toMatchObject([{ id: result.roomId, name: "일반", kind: "text" }]);
+        .where(eq(chatRooms.spaceId, result.spaceId))
+        .orderBy(chatRooms.kind),
+    ).toMatchObject([
+      { id: result.roomId, name: "일반", kind: "text", voiceCapacity: null },
+      { name: "음성", kind: "voice", voiceCapacity: 10 },
+    ]);
     expect(events).toEqual([
       {
         channel: `user:${actors.member.userId}`,

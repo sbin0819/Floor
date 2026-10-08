@@ -35,9 +35,10 @@ export async function createTeamSpace(teamId: string, database: DalDatabase) {
     )[0];
   if (!space) throw new ActionError("INTERNAL");
   if (inserted)
-    await database
-      .insert(chatRooms)
-      .values({ kind: "text", spaceId: space.id, name: "일반" });
+    await database.insert(chatRooms).values([
+      { kind: "text", spaceId: space.id, name: "일반" },
+      { kind: "voice", spaceId: space.id, name: "회의실", voiceCapacity: 10 },
+    ]);
   const [room] = await database
     .select({ id: chatRooms.id })
     .from(chatRooms)
@@ -66,6 +67,12 @@ export async function createBranchLounge(
     await database.insert(chatRooms).values([
       { kind: "text", spaceId: inserted.id, name: "라운지" },
       { kind: "text", spaceId: inserted.id, name: "공지", adminOnly: true },
+      {
+        kind: "voice",
+        spaceId: inserted.id,
+        name: "라운지-음성",
+        voiceCapacity: 10,
+      },
     ]);
     return { spaceId: inserted.id };
   }

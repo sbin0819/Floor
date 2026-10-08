@@ -70,6 +70,8 @@ const protectedTables = [
   "chat_room_members",
   "chat_space_members",
   "chat_space_invites",
+  "call_sessions",
+  "call_participants",
 ];
 
 describe("receipt-backed booking round 2 additions", () => {
@@ -205,6 +207,29 @@ describe("receipt-backed booking round 2 additions", () => {
         name: `시드 외 회원 ${index}`,
         emailVerified: true,
       });
+    const person = await user("member");
+    const [room] = await database.db
+      .select()
+      .from(schema.chatRooms)
+      .where(eq(schema.chatRooms.kind, "voice"))
+      .limit(1);
+    const [call] = await database.db
+      .insert(schema.callSessions)
+      .values({
+        roomId: room!.id,
+        kind: "voice",
+        startedBy: person.id,
+        startedAt: now,
+      })
+      .returning();
+    await database.db
+      .insert(schema.callParticipants)
+      .values({
+        sessionId: call!.id,
+        userId: person.id,
+        joinedAt: now,
+        lastSeenAt: now,
+      });
     const before = await preserved();
     const authRead = vi.spyOn(authModule, "getAuth").mockImplementation(() => {
       throw new Error("must not initialize auth");
@@ -234,7 +259,9 @@ describe("receipt-backed booking round 2 additions", () => {
       statements
         .slice(beforeSeed)
         .filter(({ sql: query }) =>
-          /\b(?:from|into|update|join)\s+"(?:chat_|messages)/iu.test(query),
+          /\b(?:from|into|update|join)\s+"(?:chat_|call_|messages)/iu.test(
+            query,
+          ),
         ),
     ).toEqual([]);
     expect(await preserved()).toEqual(before);

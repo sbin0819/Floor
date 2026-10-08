@@ -318,6 +318,18 @@ describe("transactional additive-only branch seed", () => {
       "floorPlans",
     ])
       expect(after[table]).toEqual(before[table]);
+    expect(
+      await database.db
+        .select({ name: chatRooms.name, capacity: chatRooms.voiceCapacity })
+        .from(chatRooms)
+        .innerJoin(
+          schema.chatSpaces,
+          eq(chatRooms.spaceId, schema.chatSpaces.id),
+        )
+        .where(
+          sql`${schema.chatSpaces.branchId} = ${ids.branch} and ${chatRooms.kind} = 'voice'`,
+        ),
+    ).toEqual([{ name: "라운지-음성", capacity: 10 }]);
     const newRooms = await database.db
       .select()
       .from(chatRooms)

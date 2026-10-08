@@ -16,6 +16,9 @@ import {
   authSessions,
   authVerifications,
   branches,
+  callParticipants,
+  callSessions,
+  chatRooms,
   chatSpaces,
   chatSpaceMembers,
   chatSpaceInvites,
@@ -184,6 +187,47 @@ describe("explicit full development reset", () => {
     );
     await expect(reset()).rejects.toThrow("완료 여부를 확인하지 못했어요");
     expect(await snapshot()).toEqual(before);
+  }, 60000);
+
+  it("explicitly resets call sessions and participants without recreating simulated calls", async () => {
+    const [user] = await database.db.select().from(users).limit(1);
+    const [room] = await database.db
+      .select()
+      .from(chatRooms)
+      .where(eq(chatRooms.kind, "voice"))
+      .limit(1);
+    const [session] = await database.db
+      .insert(callSessions)
+      .values({
+        roomId: room!.id,
+        kind: "voice",
+        startedBy: user!.id,
+        startedAt: now,
+      })
+      .returning();
+    await database.db
+      .insert(callParticipants)
+      .values({
+        sessionId: session!.id,
+        userId: user!.id,
+        joinedAt: now,
+        lastSeenAt: now,
+      });
+    const before = await snapshot();
+    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+      new Error("injected later failure"),
+    );
+    await expect(reset()).rejects.toThrow("완료 여부를 확인하지 못했어요");
+    expect(await snapshot()).toEqual(before);
+    vi.restoreAllMocks();
+    const result = await reset();
+    expect(Object.keys(result.reset!.counts)).toHaveLength(35);
+    expect(result.reset!.counts).toMatchObject({
+      call_sessions: 1,
+      call_participants: 1,
+    });
+    expect(await database.db.select().from(callSessions)).toEqual([]);
+    expect(await database.db.select().from(callParticipants)).toEqual([]);
   }, 60000);
 
   it("repopulates public tables even when a temporary table shadows the user table", async () => {

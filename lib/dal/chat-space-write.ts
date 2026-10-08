@@ -85,26 +85,34 @@ export async function insertCommunity(
     })
     .returning({ id: chatSpaces.id });
   if (!space) throw new ActionError("INTERNAL");
-  await database
-    .insert(chatSpaceMembers)
-    .values({
-      spaceId: space.id,
-      userId: input.userId,
-      role: "owner",
-      status: "active",
-      joinedAt: input.now,
-      statusChangedAt: input.now,
-      createdAt: input.now,
-    });
-  const [room] = await database
+  await database.insert(chatSpaceMembers).values({
+    spaceId: space.id,
+    userId: input.userId,
+    role: "owner",
+    status: "active",
+    joinedAt: input.now,
+    statusChangedAt: input.now,
+    createdAt: input.now,
+  });
+  const rooms = await database
     .insert(chatRooms)
-    .values({
-      kind: "text",
-      spaceId: space.id,
-      name: "일반",
-      createdAt: input.now,
-    })
-    .returning({ id: chatRooms.id });
+    .values([
+      {
+        kind: "text",
+        spaceId: space.id,
+        name: "일반",
+        createdAt: input.now,
+      },
+      {
+        kind: "voice",
+        spaceId: space.id,
+        name: "음성",
+        voiceCapacity: 10,
+        createdAt: input.now,
+      },
+    ])
+    .returning({ id: chatRooms.id, kind: chatRooms.kind });
+  const room = rooms.find(({ kind }) => kind === "text");
   if (!room) throw new ActionError("INTERNAL");
   return { spaceId: space.id, roomId: room.id };
 }
@@ -139,17 +147,15 @@ export async function joinBranchLounge(
   if (member?.status === "active") return { spaceId, changed: false };
   if (member) throw new ActionError("NOT_FOUND");
   await requireSpaceJoinCapacity(userId, database);
-  await database
-    .insert(chatSpaceMembers)
-    .values({
-      spaceId,
-      userId,
-      role: "member",
-      status: "active",
-      joinedAt: now,
-      statusChangedAt: now,
-      createdAt: now,
-    });
+  await database.insert(chatSpaceMembers).values({
+    spaceId,
+    userId,
+    role: "member",
+    status: "active",
+    joinedAt: now,
+    statusChangedAt: now,
+    createdAt: now,
+  });
   return { spaceId, changed: true };
 }
 

@@ -22,6 +22,8 @@ import {
   bookingParticipants,
   bookings,
   branches,
+  callParticipants,
+  callSessions,
   chatRooms,
   chatSpaces,
   chatSpaceMembers,
@@ -62,6 +64,63 @@ describe("read-only booking round2 preservation audit", () => {
   const capture = (allowSeedAttendeeCounts = false) =>
     captureSeedRound2Audit({ allowSeedAttendeeCounts }, database.db);
 
+  it("detects changed or removed call rows without returning participant data", async () => {
+    const [space] = await database.db
+      .insert(chatSpaces)
+      .values({ kind: "team", teamId: actors.teamId })
+      .returning();
+    const [room] = await database.db
+      .insert(chatRooms)
+      .values({
+        kind: "voice",
+        name: "회의실",
+        spaceId: space!.id,
+        voiceCapacity: 10,
+      })
+      .returning();
+    const [call] = await database.db
+      .insert(callSessions)
+      .values({
+        roomId: room!.id,
+        kind: "voice",
+        startedBy: actors.person.userId,
+        startedAt: bookingNow,
+      })
+      .returning();
+    const [participant] = await database.db
+      .insert(callParticipants)
+      .values({
+        sessionId: call!.id,
+        userId: actors.person.userId,
+        joinedAt: bookingNow,
+        lastSeenAt: bookingNow,
+      })
+      .returning();
+    const before = await capture();
+    expect(
+      before.tables.filter(({ table }) => table.startsWith("call_")),
+    ).toHaveLength(2);
+    await database.db
+      .update(callSessions)
+      .set({ endedAt: bookingNow })
+      .where(eq(callSessions.id, call!.id));
+    await database.db
+      .delete(callParticipants)
+      .where(eq(callParticipants.id, participant!.id));
+    expect(compareSeedRound2Audit(before, await capture()).issues).toEqual([
+      {
+        table: "call_sessions",
+        key: JSON.stringify([call!.id]),
+        kind: "changed_row",
+      },
+      {
+        table: "call_participants",
+        key: JSON.stringify([participant!.id]),
+        kind: "missing_row",
+      },
+    ]);
+  });
+
   it("protects space members and invitation counters without exposing invitation codes", async () => {
     const [space] = await database.db
       .insert(chatSpaces)
@@ -71,15 +130,13 @@ describe("read-only booking round2 preservation audit", () => {
         createdBy: actors.person.userId,
       })
       .returning();
-    await database.db
-      .insert(chatSpaceMembers)
-      .values({
-        spaceId: space!.id,
-        userId: actors.person.userId,
-        role: "owner",
-        joinedAt: bookingNow,
-        statusChangedAt: bookingNow,
-      });
+    await database.db.insert(chatSpaceMembers).values({
+      spaceId: space!.id,
+      userId: actors.person.userId,
+      role: "owner",
+      joinedAt: bookingNow,
+      statusChangedAt: bookingNow,
+    });
     const [invite] = await database.db
       .insert(chatSpaceInvites)
       .values({
@@ -131,7 +188,7 @@ describe("read-only booking round2 preservation audit", () => {
     });
     const before = await capture();
     expect(await capture()).toEqual(before);
-    expect(before.tables).toHaveLength(25);
+    expect(before.tables).toHaveLength(27);
     expect(before.tables.every((table) => table.exists)).toBe(true);
     const account = before.tables.find(
       ({ table }) => table === "auth_accounts",

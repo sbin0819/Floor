@@ -9,6 +9,9 @@ const envSchema = z
     DATABASE_URL: optionalValue,
     SEED_ALLOW_HOST: optionalValue,
     ABLY_API_KEY: optionalValue,
+    LIVEKIT_URL: optionalValue,
+    LIVEKIT_API_KEY: optionalValue,
+    LIVEKIT_API_SECRET: optionalValue,
     AUTH_SECRET: optionalValue.refine(
       (value) =>
         value === undefined || new TextEncoder().encode(value).length >= 32,

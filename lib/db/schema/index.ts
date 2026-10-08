@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./bookings";
 export * from "./booking-participants";
 export * from "./branches";
+export * from "./calls";
 export * from "./chat";
 export * from "./enums";
 export * from "./floor-plans";

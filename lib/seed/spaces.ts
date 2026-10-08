@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import spacesFile from "@/docs/spec/examples/seed-spaces.json";
 import {
@@ -9,6 +10,20 @@ import type { SeedData } from "./data";
 import { SeedError } from "./errors";
 
 const id = z.uuid().transform((value) => value.toLowerCase());
+
+export function seedCommunityVoiceId(spaceId: string): string {
+  const namespace = Buffer.from(id.parse(spaceId).replaceAll("-", ""), "hex");
+  const bytes = createHash("sha1")
+    .update(namespace)
+    .update("floor:seed:community:voice")
+    .digest()
+    .subarray(0, 16);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x50;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 const userKey = z.string().min(1);
 const body = z
   .string()
@@ -103,7 +118,9 @@ export function parseSeedSpaces(
         previous.set(row.branchId, row.minutesAgo);
       });
       const spaceIds = new Set<string>();
-      const roomIds = new Set<string>();
+      const roomIds = new Set(
+        data.communities.map(({ id }) => seedCommunityVoiceId(id)),
+      );
       data.communities.forEach((community, index) => {
         const path = ["communities", index];
         if (spaceIds.has(community.id))
@@ -130,6 +147,11 @@ export function parseSeedSpaces(
             issue(
               [...path, "channels", channelIndex, "name"],
               "채널 이름이 중복돼요.",
+            );
+          if (channel.name === "음성")
+            issue(
+              [...path, "channels", channelIndex, "name"],
+              "기본 음성 채널과 이름이 겹쳐요.",
             );
           roomIds.add(channel.id);
           channels.add(channel.name);

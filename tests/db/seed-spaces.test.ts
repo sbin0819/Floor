@@ -14,6 +14,8 @@ import { syncSeedChatSpaces } from "@/lib/dal/seed-chat-spaces";
 import { createBranchLounge } from "@/lib/dal/chat-write";
 import {
   branches,
+  callParticipants,
+  callSessions,
   chatRoomReads,
   chatRooms,
   chatSpaceInvites,
@@ -32,7 +34,11 @@ import * as seedSpacesDal from "@/lib/dal/seed-chat-spaces";
 import { runSeed } from "@/lib/seed/run-seed";
 import * as schema from "@/lib/db/schema";
 import { SeedError } from "@/lib/seed/errors";
-import { loadSeedSpaces, selectSeedLounges } from "@/lib/seed/spaces";
+import {
+  loadSeedSpaces,
+  seedCommunityVoiceId,
+  selectSeedLounges,
+} from "@/lib/seed/spaces";
 import { createTestDatabase, type TestDatabase } from "./helper";
 
 const now = new Date("2026-10-09T03:00:00.000Z");
@@ -116,8 +122,18 @@ describe("transactional lounge and community seed", () => {
     });
     const state = await snapshot();
     expect(state.spaces).toHaveLength(6);
-    expect(state.rooms).toHaveLength(12);
-    expect(state.rooms.filter(({ kind }) => kind === "voice")).toEqual([]);
+    expect(state.rooms).toHaveLength(18);
+    const voices = state.rooms.filter(({ kind }) => kind === "voice");
+    expect(voices).toHaveLength(6);
+    expect(
+      voices.every(
+        ({ voiceCapacity, lastSeq, lastMessageAt }) =>
+          voiceCapacity === 10 && lastSeq === 0 && lastMessageAt === null,
+      ),
+    ).toBe(true);
+    expect(
+      voices.find(({ spaceId }) => spaceId === community.id),
+    ).toMatchObject({ id: seedCommunityVoiceId(community.id), name: "음성" });
     expect(state.members).toHaveLength(6);
     expect(state.messages).toHaveLength(6);
     expect(state.spaces.find(({ id }) => id === community.id)).toMatchObject({
@@ -364,17 +380,80 @@ describe("transactional lounge and community seed", () => {
     expect(await snapshot()).toEqual(before);
   });
 
-  it("rolls back lounge changes when a community channel ID conflicts", async () => {
+  it.each([community.channels[0]!.id, seedCommunityVoiceId(community.id)])(
+    "rolls back lounge changes when community channel ID %s conflicts",
+    async (roomId) => {
+      const lounge = await loungeRoom();
+      await database.db.insert(chatRooms).values({
+        id: roomId,
+        kind: "text",
+        name: "다른-방",
+        spaceId: lounge.spaceId,
+      });
+      const before = await snapshot();
+      await expect(apply()).rejects.toThrow();
+      expect(await snapshot()).toEqual(before);
+    },
+  );
+
+  it("preserves a lounge voice channel, its conversation and ongoing call during synchronization", async () => {
     const lounge = await loungeRoom();
-    await database.db.insert(chatRooms).values({
-      id: community.channels[0]!.id,
-      kind: "text",
-      name: "다른-방",
-      spaceId: lounge.spaceId,
-    });
-    const before = await snapshot();
-    await expect(apply()).rejects.toThrow();
-    expect(await snapshot()).toEqual(before);
+    const [voice] = await database.db
+      .select()
+      .from(chatRooms)
+      .where(
+        and(eq(chatRooms.spaceId, lounge.spaceId), eq(chatRooms.kind, "voice")),
+      );
+    const [room] = await database.db
+      .update(chatRooms)
+      .set({ name: "기존-음성", lastSeq: 1, lastMessageAt: now })
+      .where(eq(chatRooms.id, voice!.id))
+      .returning();
+    const [message] = await database.db
+      .insert(messages)
+      .values({
+        roomId: room!.id,
+        authorId: ids.get("member")!,
+        seq: 1,
+        body: "음성 채널에서 나눈 이야기",
+        createdAt: now,
+      })
+      .returning();
+    const [call] = await database.db
+      .insert(callSessions)
+      .values({
+        roomId: room!.id,
+        kind: "voice",
+        startedBy: ids.get("member")!,
+        startedAt: now,
+      })
+      .returning();
+    const [participant] = await database.db
+      .insert(callParticipants)
+      .values({
+        sessionId: call!.id,
+        userId: ids.get("member")!,
+        joinedAt: now,
+        lastSeenAt: now,
+      })
+      .returning();
+    await apply();
+    expect(
+      await database.db
+        .select()
+        .from(chatRooms)
+        .where(eq(chatRooms.id, room!.id)),
+    ).toEqual([room]);
+    expect(
+      await database.db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, message!.id)),
+    ).toEqual([message]);
+    expect(await database.db.select().from(callSessions)).toEqual([call]);
+    expect(await database.db.select().from(callParticipants)).toEqual([
+      participant,
+    ]);
   });
 
   it("rejects another kind at the fixed community ID without touching it", async () => {

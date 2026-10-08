@@ -35,6 +35,8 @@ const protectedTables = {
   chat_spaces: ["id"],
   chat_space_members: ["space_id", "user_id"],
   chat_space_invites: ["id"],
+  call_sessions: ["id"],
+  call_participants: ["id"],
 } as const;
 type ProtectedTable = keyof typeof protectedTables;
 type RowFingerprint = { key: string; hash: string };

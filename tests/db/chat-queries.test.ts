@@ -143,7 +143,7 @@ describe("team chat access and queries", () => {
     expect(requireSession).toHaveBeenCalledTimes(2);
   });
 
-  it("hides deleted spaces and non-text rooms; archived rooms remain readable but not writable", async () => {
+  it("hides deleted spaces and excludes voice from text navigation; archived rooms remain readable but not writable", async () => {
     await database.db
       .update(chatRooms)
       .set({ archivedAt: chatNow })
@@ -158,11 +158,20 @@ describe("team chat access and queries", () => {
     ).toBe(false);
     await database.db
       .update(chatRooms)
-      .set({ kind: "voice" })
+      .set({ kind: "voice", voiceCapacity: 10 })
       .where(eq(chatRooms.id, actors.roomId));
     expect(
       await canReadRoom(actors.member.userId, actors.roomId, database.db),
-    ).toBeNull();
+    ).toMatchObject({ kind: "voice", voiceCapacity: 10 });
+    expect(
+      (await canWriteRoom(actors.member.userId, actors.roomId, database.db))
+        .canWrite,
+    ).toBe(false);
+    expect(
+      (await queries().getMyChatNav()).spaces[0]!.channels.some(
+        ({ id }) => id === actors.roomId,
+      ),
+    ).toBe(false);
     await database.db
       .update(chatSpaces)
       .set({ deletedAt: chatNow })
