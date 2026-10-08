@@ -35,7 +35,7 @@
 | `chat.team` | 팀 채널 읽기·쓰기 | team_member |
 | `booking.manage_team` | 팀원 예약 변경·취소 | team_admin |
 | `chat.team.moderate` | 팀 채널 메시지 삭제 | team_admin |
-| `team.manage_members` | 팀원 초대·내보내기 | team_admin |
+| `team.manage_members` | 팀원 초대·내보내기, 역할·남의 직함 바꾸기, 팀 정보 수정, 팀 지우기 (지시서 31에서 넓힘. `docs/spec/teams.md`) | team_admin |
 | `booking.manage_all` | 모든 예약 변경·취소 | operator |
 | `branch.announce` | 공지 보내기, 라운지 메시지 삭제 | operator |
 | `space.manage` | 공간 상태·점검 관리 | operator |
@@ -44,7 +44,7 @@
 | `roles.manage` | 역할과 권한 설정 | operator |
 
 - 운영자는 팀 채널을 읽을 수 없다 (`chat.team` 없음). 팀의 사적인 공간이기 때문이다.
-- 채팅(지시서 20부터)에서 권한 키는 지점 라운지에만 쓴다 (`chat.lounge`, `branch.announce`). 팀 스페이스는 그 팀의 팀원인지, DM·커뮤니티·회의 채널은 멤버인지만 본다 (`docs/spec/chat.md`의 "역할"). `chat.team`, `chat.team.moderate`는 팀 스페이스의 읽기·쓰기와 관리의 뜻으로 남지만, 지점마다 켜고 끄는 설정은 팀 스페이스에 영향을 주지 않는다.
+- 채팅(지시서 20부터)에서 권한 키는 지점 라운지에만 쓴다 (`chat.lounge`, `branch.announce`). 라운지에 참여한 사람 가운데 그 지점에서 `chat.lounge`가 있으면 쓰고, `branch.announce`가 있으면 그 라운지의 관리자다 (`# 공지` 쓰기, 채널 관리, 남의 메시지 지우기, `@모두`. 지시서 26). 팀 스페이스는 그 팀의 팀원인지, DM·커뮤니티·회의 채널은 멤버인지만 본다 (`docs/spec/chat.md`의 "역할"). `chat.team`, `chat.team.moderate`는 팀 스페이스의 읽기·쓰기와 관리의 뜻으로 남지만, 지점마다 켜고 끄는 설정은 팀 스페이스에 영향을 주지 않는다.
 - 운영자는 기본으로 `booking.team`이 없다.
 - `operator`의 `roles.manage`는 끌 수 없다. 스스로 잠그는 사고를 막기 위해서다. 저장할 때 서버가 강제로 넣는다.
 - 사람별·채널별 예외는 두지 않는다. 권한은 역할에만 붙인다.

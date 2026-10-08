@@ -491,6 +491,7 @@ data: { bookingId: string }
 - 알림은 그 일을 한 액션의 트랜잭션 안에서 넣는다. 액션이 실패하면 알림도 없다. 받는 사람이 여럿이면 한 문장으로 넣는다.
 - 인원이나 제목만 바뀐 것은 알리지 않는다.
 - 메일은 보내지 않는다.
+- 지시서 31부터 팀 알림(`team_removed`, `team_role_changed`, `team_deleted`)도 들어온다 (`docs/spec/teams.md`의 "알림"). 지시서 30부터 미리 알림은 사람마다 끈 분(`users.reminder_minutes`)을 빼고 보인다 (`docs/spec/settings.md`).
 - 지시서 23부터 종에는 사람 알림(`friend_request`, `friend_accepted`)도 들어온다. 데이터는 `{ actorName }`뿐이고, 받은 지 얼마인지는 `Asia/Seoul`로 계산한다. 예약 알림의 규칙은 그대로다 (`docs/codex/23-people-and-dm.md`의 4단계).
 
 ### 미리 알림

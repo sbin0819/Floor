@@ -250,9 +250,11 @@ pnpm admin:create --email ops@example.com --name "운영자 이름" --branch "�
 | 초대 보내기·취소, 가입 요청 승인·거절 | `can(ctx, 'team.manage_members', { teamId })`. `teamId`는 클라이언트가 보낸 값이 아니라 초대·요청 행에서 읽는다 |
 | 팀 화면 보기 | 그 팀의 팀원 |
 
-역할 변경, 내보내기, 팀 나가기는 이번 범위가 아니다 (PFQV-59).
+역할 변경, 내보내기, 팀 나가기, 팀 정보 수정, 팀 지우기는 `docs/spec/teams.md`가 정한다 (지시서 31, PFQV-59). 팀 이름의 유일은 지시서 31부터 지우지 않은 팀끼리만이다.
 
 ## 홈에서 보이는 것
+
+지시서 32부터는 `docs/spec/home.md`가 맞다 ("내 팀" 카드가 없어지고 아래 표는 쓰지 않는다).
 
 홈과 팀 화면의 구성은 `docs/spec/ui.md`가 정하고, 이 절과 다르면 `docs/spec/ui.md`가 맞다. 누가 무엇을 볼 수 있는지는 그대로다.
 

@@ -51,7 +51,7 @@ Tailwind에서 `bg-status-free`처럼 쓸 수 있게 테마에 등록한다. 상
 | 선택 · 내 예약 | `mine` | `#3A5BD9` | `#EEF1FC` | `#3A5BD9` | `#2B46AE` | 드래그 중인 새 예약은 점선 테두리 |
 | 점검 중 | `maintenance` | – | 빗금 | `#D6D4CD` | `#4A4945` | 빗금: 135도, `#F1F0EC`와 `#E6E5E1`을 8px씩 반복 |
 | 전용 공간 | `restricted` | – | `#F1F0EC` | `#D6D4CD` | `#6B6A66` | 자물쇠 아이콘. 내가 쓸 수 없는 다른 팀 전용 공간 |
-| 수락 대기 | `pending` | – | `#FAEEDA` | – | `#633806` | 초대 상태 배지 |
+| 수락 대기 | `pending` | – | `#FAEEDA` | `#E9CF8F` | `#633806` | 초대 상태 배지. 나를 멘션한 말풍선(지시서 29). 테두리 토큰은 지시서 29가 더한다 |
 
 (2차) 다른 사람의 예약을 그릴 때 쓰는 토큰을 더한다. 가용 시간 띠, 시간표, 하루 일정이 같이 쓴다.
 
@@ -91,6 +91,21 @@ Tailwind에서 `bg-status-free`처럼 쓸 수 있게 테마에 등록한다. 상
 | `--presence-dnd` | `#D64545` | 방해 금지 (가운데 가로줄) |
 | `--presence-offline` | `#A3A19B` | 오프라인 (속이 빈 원) |
 
+| `--space-icon-blue` … `--space-icon-gray` | 아래 표 | 커뮤니티 스페이스 아이콘의 바탕 (지시서 26) |
+
+| 스페이스 아이콘 색 | 값 |
+| --- | --- |
+| `blue` | `#3A5BD9` |
+| `green` | `#1F7A5F` |
+| `orange` | `#B85530` |
+| `purple` | `#7A5AD6` |
+| `pink` | `#B83E72` |
+| `teal` | `#1E7385` |
+| `yellow` | `#8F6A12` |
+| `gray` | `#6B6A66` |
+
+아이콘 위의 글자는 흰색이다 (모두 흰 글자와 대비 4.5:1 이상이다: blue 5.7, green 5.2, orange 4.8, purple 4.9, pink 5.3, teal 5.5, yellow 5.0, gray 5.4. 바꾸면 다시 확인한다).
+
 상태 점은 공간 상태 토큰(`--status-*`)과 이름을 나눈다. 색만으로 구분하지 않고 모양과 접근성 이름을 같이 쓴다.
 
 그 밖의 기능 화면에서 참고할 값이다.
@@ -102,7 +117,38 @@ Tailwind에서 `bg-status-free`처럼 쓸 수 있게 테마에 등록한다. 상
 | 팀 전환 레일 (이전 시안) | 배경 `#ECEBE7`, 테두리 `#E0DFDA` | 지시서 19부터 위 72px 회원 레일 토큰으로 대체 |
 | 구분선 | `#EFEEEA` | 표의 행 사이 |
 | 비활성 글자 | `#A3A19B` | 지난 시간 슬롯 |
-| 전송 중 말풍선 | 배경 `#C9D3F5`, 글자 `#1E2F74` | 서버 확인 전 메시지 |
+| 전송 중 말풍선 | 배경 `#C9D3F5`, 글자 `#1E2F74` | 서버 확인 전 메시지. 지시서 29부터 아래 `--chat-pending` 토큰 |
+
+## 채팅 말풍선 (지시서 29)
+
+`docs/spec/chat.md`의 "말풍선". 테마에 등록해 `bg-chat-mine`처럼 쓴다.
+
+| 토큰 | 값 | 쓰임 |
+| --- | --- | --- |
+| `--chat-mine` | `#3A5BD9` | 내 말풍선 바탕 (`--primary`와 같은 값이지만 따로 둔다) |
+| `--chat-mine-foreground` | `#FFFFFF` | 내 말풍선 글자 (대비 5.7:1) |
+| `--chat-pending` | `#C9D3F5` | 보내는 중·보내지 못한 내 말풍선 바탕 |
+| `--chat-pending-foreground` | `#1E2F74` | 그 글자 (대비 8.2:1) |
+
+- 남의 말풍선은 `--card`, `--border`, `--foreground`를 쓴다. 나를 멘션한 말풍선은 `--status-pending` 세 토큰 (대비 8.7:1).
+- 내 말풍선 안의 멘션 칩·코드 바탕은 `--chat-mine-foreground`의 20% (`bg-chat-mine-foreground/20`). hex를 컴포넌트에 쓰지 않는다.
+
+## 사람 아바타 (지시서 30)
+
+`docs/spec/settings.md`의 "아바타". 색 이름은 `avatar_color` enum과 같다. `--avatar-{색}`은 바탕, `--avatar-{색}-foreground`는 글자다.
+
+| 색 | 바탕 | 글자 | 대비 |
+| --- | --- | --- | --- |
+| `blue` | `#E7ECFB` | `#2B46AE` | 6.9 |
+| `green` | `#E3F1EB` | `#1F6B54` | 5.5 |
+| `orange` | `#FBE9E0` | `#A44A28` | 5.0 |
+| `purple` | `#EEE9FB` | `#5B3FB8` | 6.2 |
+| `pink` | `#F9E6EF` | `#A63766` | 5.2 |
+| `teal` | `#E1F0F3` | `#1B6676` | 5.6 |
+| `yellow` | `#F6EEDA` | `#7D5D10` | 5.3 |
+| `gray` | `#EEEDEA` | `#4A4945` | 7.7 |
+
+- 지금 아바타 자리의 `bg-muted`와 `text-muted-foreground`는 이 토큰으로 바뀐다. 스페이스 아이콘 색(`--space-icon-*`, 흰 글자)과는 다른 쓰임이다.
 
 ## 타이포
 

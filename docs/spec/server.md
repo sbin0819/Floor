@@ -14,11 +14,15 @@
 | 팀 만들기, 초대, 가입 요청 | Server Action | 다른 쓰기와 같은 래퍼를 쓴다 |
 | 첫 화면 데이터 | Server Component에서 `features/*/queries.ts` 호출 | 읽기에는 액션을 쓰지 않음 |
 | 게시된 평면도 JSON | Route Handler (GET, 캐시) | 액션은 POST라 캐시가 안 되고, 한 번에 하나씩만 실행됨 |
-| 채팅의 이전 메시지와 빠진 메시지, 채팅 목록의 안 읽음 | Route Handler (GET, `private, no-store`. 지시서 21) | 액션은 한 번에 하나씩만 실행되어 보내기를 늦춤 |
+| 채팅의 이전 메시지와 빠진 메시지, 채팅 목록의 안 읽음 | Route Handler (GET, `private, no-store`. 지시서 21) `/api/rooms/[roomId]/messages`, `/api/chat/nav` | 액션은 한 번에 하나씩만 실행되어 보내기를 늦춤 |
 | 참석자 찾기 (입력하는 동안의 검색), 알림의 수와 목록 (주기적으로 다시 읽기) | Route Handler (GET, `Cache-Control: private, no-store`) | 액션은 한 번에 하나씩 실행돼 입력을 따라가지 못하고, `router.refresh()`는 그 화면의 모든 조회를 다시 돌림. 핸들러는 `features/*/queries.ts`를 부르기만 하고, 세션 확인은 그 함수가 한다 (`docs/spec/booking-2.md`) |
 | 실시간 반영 (예약 상태, 새 메시지, 평면도 게시) | 브라우저가 실시간 채널(Ably)을 직접 구독. 토큰은 Route Handler `POST /api/realtime/token` | 액션은 서버가 먼저 보내는 통신을 못 함. 액션은 하나씩 차례로 실행되므로 토큰 발급에 쓰지 않음 |
 | 도면 이미지 업로드 | 액션이 서명된 업로드 주소 발급 → 브라우저가 저장소로 직접 업로드 | 액션 요청 본문 기본 한도가 1MB |
-| 통화 종료 같은 외부 웹훅 | Route Handler (POST) | 외부 서비스가 호출할 고정 주소가 필요 |
+| 통화 종료 같은 외부 웹훅 | Route Handler (POST) | 외부 서비스가 호출할 고정 주소가 필요. LiveKit 웹훅 `POST /api/livekit/webhook`(서명 확인, 지시서 27) |
+| 파일 올리기의 몸통 (`local` 저장소) | Route Handler (PUT) `/api/uploads/[attachmentId]` | 25MB를 흐름으로 받는다. 뒤의 저장소에서는 서명된 주소로 바로 올리므로 없다. `Origin` 확인 (지시서 28) |
+| 파일 내려받기, 방의 파일 목록 | Route Handler (GET) `/api/files/[attachmentId]`, `/api/rooms/[roomId]/files` | 권한 확인 뒤 흐름으로 내려 주고 머리(`nosniff`, `sandbox` CSP, `attachment`)를 붙인다. 목록은 되풀이 읽기 (지시서 28) |
+| 사람 찾기, 프로필 카드, ⌘K의 사람 목록 | Route Handler (GET, `private, no-store`) `/api/people/search`, `/api/people/[userId]`(지시서 23), `/api/people/contacts`(지시서 26) | 입력을 따라 되풀이해 읽는다. 핸들러는 `features/people/queries.ts`를 부르기만 하고, 세션 확인은 그 함수가 한다 |
+| 통화의 아직 있음·나가기 | Route Handler (POST) `/api/calls/heartbeat`, `/api/calls/leave` | 30초마다 보내는 요청이 Server Action의 줄을 막지 않게, 탭을 닫을 때 `sendBeacon`으로 보낼 수 있게. `Origin` 확인 (지시서 27) |
 
 ## 계층
 
@@ -51,16 +55,19 @@ export type ActionErrorCode =
   | 'NOT_FOUND'
   | 'BOOKING_CONFLICT'   // 겹치는 예약 (Postgres 23P01)
   | 'SPACE_BLOCKED'      // 점검 구간과 겹침
-  | 'LIMIT_EXCEEDED'     // 한도 초과 (역할별 예약 한도, 관리하는 팀 수, 대기 중 초대·요청 수, 채팅의 하루 수와 인원 — message로 구분: send_rate, friend_daily, request_daily 등)
+  | 'LIMIT_EXCEEDED'     // 한도 초과 (역할별 예약 한도, 관리하는 팀 수, 대기 중 초대·요청 수, 채팅의 하루 수와 인원 — message로 구분: send_rate, friend_daily, request_daily, space_count, call_full, password_attempts(지시서 30), admin_teams(지시서 31) 등)
   | 'PLAN_INVALID'       // 평면도 게시 검증 실패
   | 'TEAM_NAME_TAKEN'    // 같은 이름의 팀이 있음
   | 'ALREADY_MEMBER'     // 이미 그 팀의 팀원
   | 'ALREADY_REQUESTED'  // 대기 중인 가입 요청이 있음
-  | 'INVITE_INVALID'     // 초대가 만료·취소·처리됐거나 다른 사람의 초대
+  | 'INVITE_INVALID'     // 초대가 만료·취소·처리됐거나 다른 사람의 초대. 스페이스 초대(지시서 26)도 이유를 가리지 않고 이것 하나
   | 'OUTSIDE_HOURS'      // 운영 시간 밖이거나 쉬는 날
   | 'SPACE_IN_USE'       // 앞으로의 예약이 있어 공간을 보관하거나 예약 불가로 바꿀 수 없음
   | 'OVER_CAPACITY'      // 사용 인원이나 "예약한 사람 + 참석자"가 공간의 정원보다 많음
   | 'USERNAME_TAKEN'     // 다른 사람이 쓰는 사용자 이름 (지시서 23)
+  | 'CHANNEL_NAME_TAKEN' // 같은 스페이스에 같은 이름의 채널이 있음 (지시서 26)
+  | 'PASSWORD_INCORRECT' // 비밀번호 바꾸기에서 지금 비밀번호가 틀림 (지시서 30)
+  | 'LAST_ADMIN'         // 마지막 팀 관리자를 팀원으로 바꾸거나 그 사람이 나가려 함 (지시서 31)
   | 'INTERNAL';          // 그 밖의 오류. 서버 로그에만 자세히 남긴다
 ```
 
@@ -154,6 +161,8 @@ export interface RealtimeSubscriber {
 ```ts
 export type ChatRoomKind = 'text' | 'voice' | 'dm' | 'group_dm' | 'meeting'; // roomKind는 지시서 23부터, bookingId(회의 채널만 값)는 지시서 25부터
 // SystemMessageData는 features/chat/system-messages.ts의 zod 타입 (지시서 24. docs/codex/24-people-requests-groups.md 1단계)
+export type AvatarColor = 'blue' | 'green' | 'orange' | 'purple' | 'pink' | 'teal' | 'yellow' | 'gray'; // 지시서 30
+export type Avatar = { color: AvatarColor; photoUrl: string | null }; // 사람 아바타. 색은 고른 것이 없으면 사용자 id로 정한 것 (docs/spec/settings.md)
 export type ReactionEmoji = 'thumbs_up' | 'heart' | 'joy' | 'tada' | 'open_mouth' | 'cry' | 'pray' | 'check'; // 지시서 22
 
 export type RealtimeEvent =
@@ -162,12 +171,15 @@ export type RealtimeEvent =
   | { type: 'plan.published'; floorId: string; version: number }
   | { type: 'message.created'; roomId: string; id: string; seq: number;
       authorId: string | null; authorName: string | null; kind: 'text' | 'system';
+      authorAvatar: Avatar | null; // 지시서 30. 시스템 메시지는 null
       body: string; clientId: string | null; createdAt: string;
-      // 지시서 22부터. 새 메시지라 editedAt·deletedAt은 null, reactions는 []
-      replyTo: { id: string; authorName: string | null; excerpt: string; deleted: boolean } | null;
+      // 지시서 22부터. 새 메시지라 editedAt·deletedAt은 null, reactions는 []. attachments는 지시서 28부터
+      replyTo: { id: string; authorName: string | null; excerpt: string; deleted: boolean;
+                 attachmentSummary: { images: number; files: number; firstName: string | null } | null /* 지시서 28 */ } | null;
       systemData: SystemMessageData | null; // 지시서 24. text면 null
       mentions: { userId: string; name: string }[]; mentionsEveryone: boolean;
-      editedAt: null; deletedAt: null; reactions: [] }
+      editedAt: null; deletedAt: null; reactions: [];
+      attachments: { id: string; name: string; size: number; kind: 'image' | 'file'; width: number | null; height: number | null }[] }
   | { type: 'room.activity'; spaceId: string | null; roomId: string; roomKind: ChatRoomKind; bookingId: string | null; seq: number; authorId: string | null;
       preview: { messageId: string; authorName: string | null; excerpt: string } | null } // 채널은 space:로 preview 없이 (지시서 21). DM은 상대의 user:로 preview와 함께 (지시서 23)
   | { type: 'room.read'; roomId: string; userId: string; seq: number } // room: 채널. DM에서만 (지시서 23)
@@ -179,7 +191,12 @@ export type RealtimeEvent =
   | { type: 'notifications.changed' }   // user: 채널. 알림 종을 다시 읽기 (지시서 23)
   | { type: 'room.changed'; roomId: string }   // room: 채널. 방 정보·멤버·요청 상태가 바뀜, 다시 읽기 (지시서 24)
   | { type: 'realtime.reauth' }                // user: 채널. 붙은 방을 다시 확인하고 토큰을 다시 받기 (지시서 24)
-  | { type: 'status.changed'; status: 'online' | 'away' | 'dnd' }; // user: 채널. 내 다른 탭 (지시서 24)
+  | { type: 'status.changed'; status: 'online' | 'away' | 'dnd' } // user: 채널. 내 다른 탭 (지시서 24)
+  | { type: 'space.changed'; spaceId: string }   // space: 채널. 채널·멤버·이름·역할이 바뀜, 다시 읽기 (지시서 26)
+  | { type: 'call.changed'; roomId: string; roomKind: ChatRoomKind; spaceId: string | null; bookingId: string | null;
+      sessionId: string | null; kind: 'voice' | 'huddle' | null; participantCount: number; participants: { userId: string; name: string }[] } // room:과 space:(채널) 또는 멤버의 user:. 라운지의 space:는 participants가 빈 배열 (지시서 27)
+  | { type: 'call.ringing'; roomId: string; sessionId: string; callerId: string; callerName: string } // 1:1 DM 상대의 user: (지시서 27)
+  | { type: 'call.declined'; roomId: string; sessionId: string };  // 시작한 사람과 거절한 사람의 user: (지시서 27)
 ```
 
 - 서버의 발행기는 `lib/realtime/server.ts`의 `getRealtimePublisher()`가 고른다: `ABLY_API_KEY`가 있으면 Ably, 없으면 아무 일도 하지 않는 구현. 테스트는 메모리 구현이나 가짜를 주입한다. 발행이 실패해도 액션은 성공이고 오류는 기록만 한다.
@@ -203,5 +220,8 @@ export type RealtimeEvent =
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 아니오 | 둘 다 있을 때만 구글 로그인을 켠다 |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | 아니오 | 둘 다 있을 때만 GitHub 로그인을 켠다 |
 | `ABLY_API_KEY` | 아니오 | 있을 때만 실시간을 켠다 (지시서 20). 서버에서만 읽는다 |
+| `FILE_STORAGE` | 아니오 | `local` 또는 `disabled`. 없으면 `NODE_ENV`가 `development`일 때만 `local`, 그 밖(배포, 테스트)은 `disabled` (지시서 28) |
+| `FILE_STORAGE_DIR` | 아니오 | `local` 저장소의 폴더. 기본값 `.floor-local/uploads` (Git에 올리지 않는다) |
+| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | 아니오 | 셋 다 있을 때만 통화를 켠다 (지시서 27). 서버에서만 읽는다. 브라우저는 통화에 들어갈 때 서버가 돌려주는 주소로 붙는다 (`NEXT_PUBLIC_LIVEKIT_URL`은 쓰지 않는다) |
 
 실시간, LiveKit, 파일 저장소 변수는 해당 작업에서 추가한다.

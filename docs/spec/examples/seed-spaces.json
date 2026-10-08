@@ -1,0 +1,77 @@
+{
+  "note": "스페이스 시드(지시서 26). 지점 라운지는 시드가 지점마다 만든다(이 파일에 적지 않는다). loungeMembers는 그 지점 라운지의 멤버(branchId는 seed.json의 branches[].id), loungeMessages는 라운지 채널(`라운지`)의 메시지다. communities는 커뮤니티 스페이스: 소유자 하나, 관리자와 멤버는 소유자와 겹치지 않는다. communities[].id와 channels[].id는 시드가 쓰는 고정 id다(다시 돌릴 때 이 id로 찾아 지운다). channels의 첫 번째는 기본 채널 `일반`이다. 메시지의 channel은 그 스페이스의 채널 이름이고, 작성자는 멤버(소유자·관리자 포함)여야 한다. 키는 seed.json의 users[].key다. minutesAgo는 채널마다 줄어드는 순서다. 멤버가 들어온 시각은 그 사람의 첫 메시지보다 앞이다. 시드는 초대 링크를 만들지 않는다. 다시 돌려도 같아야 한다.",
+  "loungeMembers": [
+    {
+      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+      "userKeys": [
+        "member",
+        "designMember",
+        "both"
+      ]
+    }
+  ],
+  "loungeMessages": [
+    {
+      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+      "authorKey": "both",
+      "minutesAgo": 240,
+      "body": "강남점 7층 라운지 커피 머신 새로 들어왔어요 ☕"
+    },
+    {
+      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+      "authorKey": "member",
+      "minutesAgo": 230,
+      "body": "오 반가운 소식! 오후에 가 볼게요."
+    }
+  ],
+  "communities": [
+    {
+      "id": "8ac46e85-57e5-55cf-aa23-1608a7664b1d",
+      "name": "주말 러닝 크루",
+      "iconColor": "green",
+      "ownerKey": "member",
+      "adminKeys": [
+        "designMember"
+      ],
+      "memberKeys": [
+        "both"
+      ],
+      "channels": [
+        {
+          "id": "04b9ed91-94b2-5940-97bb-c67bca0132e7",
+          "name": "일반"
+        },
+        {
+          "id": "1a3bc036-5ce1-5510-8c14-46142682ba14",
+          "name": "코스-공유"
+        }
+      ],
+      "messages": [
+        {
+          "channel": "일반",
+          "authorKey": "member",
+          "minutesAgo": 2880,
+          "body": "주말마다 한강에서 같이 뛰어요. 처음 오시는 분 환영해요!"
+        },
+        {
+          "channel": "일반",
+          "authorKey": "designMember",
+          "minutesAgo": 2870,
+          "body": "이번 토요일 아침 7시 반포에서 볼까요?"
+        },
+        {
+          "channel": "일반",
+          "authorKey": "both",
+          "minutesAgo": 45,
+          "body": "저도 이번 주부터 합류할게요 🏃"
+        },
+        {
+          "channel": "코스-공유",
+          "authorKey": "designMember",
+          "minutesAgo": 1500,
+          "body": "반포 → 잠수교 → 이촌 왕복 8km 코스 추천해요."
+        }
+      ]
+    }
+  ]
+}
