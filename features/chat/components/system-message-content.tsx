@@ -1,6 +1,32 @@
-import { LogOut, Pencil, UserPlus, Users } from "lucide-react";
+import {
+  CalendarDays,
+  CalendarX,
+  Clock,
+  LogOut,
+  Pencil,
+  UserMinus,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { formatChatTime } from "@/lib/time/chat-format";
-import { parseSystemMessageData, systemMessageText } from "../system-messages";
+import {
+  parseSystemMessageData,
+  systemMessageText,
+  type SystemMessageData,
+} from "../system-messages";
+
+const systemIcons: Record<SystemMessageData["type"], typeof Users> = {
+  group_created: Users,
+  members_added: UserPlus,
+  member_left: LogOut,
+  room_renamed: Pencil,
+  booking_created: CalendarDays,
+  booking_time_changed: Clock,
+  booking_cancelled: CalendarX,
+  participants_added: UserPlus,
+  participant_removed: UserMinus,
+  participant_left: LogOut,
+};
 
 export function SystemMessageContent({
   data,
@@ -12,14 +38,7 @@ export function SystemMessageContent({
   createdAt: string;
 }) {
   const parsed = parseSystemMessageData(data);
-  const Icon =
-    parsed?.type === "members_added"
-      ? UserPlus
-      : parsed?.type === "member_left"
-        ? LogOut
-        : parsed?.type === "room_renamed"
-          ? Pencil
-          : Users;
+  const Icon = parsed ? systemIcons[parsed.type] : Users;
   return (
     <div
       data-system-message

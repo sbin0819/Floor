@@ -47,6 +47,8 @@ function setup(
     directMessages: [],
     myStatus: "online",
     blockedUserIds: [],
+    meetings: [],
+    now: "2026-10-08T03:00:00.000Z",
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>

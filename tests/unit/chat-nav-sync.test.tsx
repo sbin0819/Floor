@@ -97,6 +97,8 @@ const fixture = (): ChatNav => ({
   directMessages: [],
   myStatus: "online",
   blockedUserIds: [],
+  meetings: [],
+  now: "2026-10-08T03:00:00.000Z",
 });
 function mappedFixture(map: (space: ChatSpaceNav) => ChatSpaceNav): ChatNav {
   return {
@@ -104,11 +106,14 @@ function mappedFixture(map: (space: ChatSpaceNav) => ChatSpaceNav): ChatNav {
     directMessages: [],
     myStatus: "online",
     blockedUserIds: [],
+    meetings: [],
+    now: "2026-10-08T03:00:00.000Z",
   };
 }
 function activity(id = roomId, authorId: string | null = "other") {
   mocks.event({
     type: "room.activity",
+    bookingId: null,
     roomKind: "text",
     preview: null,
     spaceId,
@@ -201,6 +206,7 @@ describe("chat unread navigation", () => {
     const { client, rerender, node } = setup();
     const event = {
       type: "mention.created" as const,
+      bookingId: null,
       roomKind: "text" as const,
       spaceId,
       roomId: secondId,
@@ -253,6 +259,7 @@ describe("chat unread navigation", () => {
       for (let i = 0; i < 4; i++)
         mocks.mention({
           type: "mention.created",
+          bookingId: null,
           roomKind: "text",
           spaceId,
           roomId: secondId,
@@ -265,6 +272,7 @@ describe("chat unread navigation", () => {
       reportRoomViewport(client, roomId, true);
       mocks.mention({
         type: "mention.created",
+        bookingId: null,
         roomKind: "text",
         spaceId,
         roomId,
@@ -306,6 +314,7 @@ describe("chat unread navigation", () => {
     act(() => {
       mocks.event({
         type: "room.activity",
+        bookingId: null,
         roomKind: "text",
         preview: null,
         spaceId,
@@ -380,6 +389,7 @@ describe("chat unread navigation", () => {
       }));
       mocks.event({
         type: "room.activity",
+        bookingId: null,
         roomKind: "text",
         preview: null,
         spaceId: otherSpaceId,
@@ -609,6 +619,7 @@ describe("chat unread navigation", () => {
     act(() =>
       mocks.mention({
         type: "room.activity",
+        bookingId: null,
         roomKind: "dm",
         spaceId: null,
         roomId: directId,

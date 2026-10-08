@@ -19,6 +19,7 @@ describe("optimistic route protection", () => {
     "/messages",
     "/messages/new",
     "/dm/11111111-1111-4111-8111-111111111111",
+    "/m/11111111-1111-4111-8111-111111111111",
     "/friends",
     "/settings",
     "/s/11111111-1111-4111-8111-111111111111",

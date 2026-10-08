@@ -29,6 +29,7 @@ export const config = {
     "/s/:path*",
     "/messages/:path*",
     "/dm/:path*",
+    "/m/:path*",
     "/friends",
     "/settings",
   ],

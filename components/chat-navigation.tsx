@@ -4,7 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Grid2X2, Hash } from "lucide-react";
 import { cn } from "cn";
-import type { ChatSpaceNav, DirectMessageNav } from "@/features/chat/types";
+import type {
+  ChatSpaceNav,
+  DirectMessageNav,
+  MeetingNav,
+} from "@/features/chat/types";
+import { homeUnreadCount } from "@/features/chat/nav-state";
+import { MeetingList } from "@/features/chat/components/meeting-list";
 import { DirectMessageList } from "@/features/chat/components/direct-message-list";
 import { MemberNav } from "@/components/member-nav";
 import { LinkPending } from "@/components/link-pending";
@@ -32,9 +38,11 @@ function chatLocation(pathname: string) {
 export function ChatRailNavigation({
   spaces,
   directMessages = [],
+  meetings = [],
 }: {
   spaces: ChatSpaceNav[];
   directMessages?: DirectMessageNav[];
+  meetings?: MeetingNav[];
 }) {
   const pathname = usePathname();
   const navigation = useRouterOptimisticNavigation(
@@ -44,15 +52,11 @@ export function ChatRailNavigation({
     {
       id: null,
       name: "홈",
-      label: `Floor 홈${directMessages.some((room) => (room.muted ? room.unreadMentions : room.unreadCount) > 0) ? `, 읽지 않은 메시지 ${directMessages.reduce((sum, room) => sum + (room.muted ? room.unreadMentions : room.unreadCount), 0)}개` : ""}`,
+      label: `Floor 홈${homeUnreadCount({ directMessages, meetings }) > 0 ? `, 읽지 않은 메시지 ${homeUnreadCount({ directMessages, meetings })}개` : ""}`,
       href: "/",
       initial: null,
       unread: false,
-      unreadMentions: directMessages.reduce(
-        (sum, room) =>
-          sum + (room.muted ? room.unreadMentions : room.unreadCount),
-        0,
-      ),
+      unreadMentions: homeUnreadCount({ directMessages, meetings }),
     },
     ...spaces.map((space) => ({
       ...space,
@@ -158,9 +162,13 @@ export function ChatSidebarTitle({ spaces }: { spaces: ChatSpaceNav[] }) {
 export function ChatSidebarNavigation({
   spaces,
   directMessages = [],
+  meetings = [],
+  now,
 }: {
   spaces: ChatSpaceNav[];
   directMessages?: DirectMessageNav[];
+  meetings?: MeetingNav[];
+  now?: string;
 }) {
   const { spaceId, roomId } = chatLocation(usePathname());
   const navigation = useRouterOptimisticNavigation(roomId);
@@ -169,6 +177,7 @@ export function ChatSidebarNavigation({
     return (
       <div className="space-y-6">
         <MemberNav />
+        {now && <MeetingList rows={meetings} now={now} />}
         <DirectMessageList rows={directMessages} limit={10} />
       </div>
     );

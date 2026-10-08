@@ -367,7 +367,14 @@ describe("shared direct message screen", () => {
   });
   it("refreshes the nav after a first saved DM but never sends internal room kind to the action", async () => {
     const { user, client, send } = setup(view({ messages: [] }));
-    client.setQueryData(CHAT_NAV_KEY, { spaces: [], directMessages: [] });
+    client.setQueryData(CHAT_NAV_KEY, {
+      spaces: [],
+      directMessages: [],
+      myStatus: "online",
+      blockedUserIds: [],
+      meetings: [],
+      now: "2026-10-08T03:00:00.000Z",
+    });
     const invalidate = vi.spyOn(client, "invalidateQueries");
     await user.type(screen.getByRole("combobox", { name: "메시지" }), "첫 DM");
     await user.click(screen.getByRole("button", { name: "보내기" }));
@@ -383,6 +390,7 @@ describe("shared direct message screen", () => {
   it("moves a known DM to the first position after a saved send", async () => {
     const { user, client } = setup();
     const row = {
+      kind: "dm",
       roomId: "room",
       other: view().other,
       lastSeq: 3,
@@ -394,6 +402,10 @@ describe("shared direct message screen", () => {
     };
     client.setQueryData(CHAT_NAV_KEY, {
       spaces: [],
+      myStatus: "online",
+      blockedUserIds: [],
+      meetings: [],
+      now: "2026-10-08T03:00:00.000Z",
       directMessages: [
         { ...row, roomId: "other-room", lastMessageAt: "2029-12-31T01:00:00Z" },
         row,

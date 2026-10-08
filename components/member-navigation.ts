@@ -27,7 +27,8 @@ export function activeMemberNav(pathname: string): MemberNavKey | null {
   if (
     under(pathname, "/messages") ||
     under(pathname, "/s") ||
-    under(pathname, "/dm")
+    under(pathname, "/dm") ||
+    under(pathname, "/m")
   )
     return "messages";
   return null;

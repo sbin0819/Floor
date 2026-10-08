@@ -21,10 +21,12 @@ import {
   chatNavRevision,
   mergeChatNav,
   mergeInitialChatNav,
+  homeUnreadCount,
 } from "../nav-state";
 import type { ChatNav } from "../types";
 import { ChatMentions } from "./chat-mentions";
 import { DirectMessageList } from "./direct-message-list";
+import { MeetingList } from "./meeting-list";
 
 const spaceSchema = z.array(
   z.object({
@@ -56,6 +58,22 @@ const directNavBase = z.object({
   muted: z.boolean(),
 });
 const navSchema = z.object({
+  now: z.iso.datetime({ offset: true }),
+  meetings: z.array(
+    z.object({
+      bookingId: z.uuid(),
+      roomId: z.uuid(),
+      title: z.string().nullable(),
+      spaceName: z.string(),
+      start: z.iso.datetime({ offset: true }),
+      end: z.iso.datetime({ offset: true }),
+      timezone: z.string(),
+      phase: z.enum(["upcoming", "ongoing", "ended"]),
+      unread: z.boolean(),
+      unreadMentions: z.number().int().nonnegative(),
+      muted: z.boolean(),
+    }),
+  ),
   myStatus: z.enum(["online", "away", "dnd"]),
   blockedUserIds: z.array(z.uuid()),
   spaces: spaceSchema,
@@ -115,6 +133,7 @@ export function LiveChatRail({ data }: { data: ChatNav }) {
     <ChatRailNavigation
       spaces={nav.spaces}
       directMessages={nav.directMessages}
+      meetings={nav.meetings}
     />
   );
 }
@@ -124,6 +143,8 @@ export function LiveChatSidebar({ data }: { data: ChatNav }) {
     <ChatSidebarNavigation
       spaces={nav.spaces}
       directMessages={nav.directMessages}
+      meetings={nav.meetings}
+      now={nav.now}
     />
   );
 }
@@ -132,6 +153,10 @@ export function LiveChatSidebarTitle({ data }: { data: ChatNav }) {
 }
 export function LiveDirectMessages({ data }: { data: ChatNav }) {
   return <DirectMessageList rows={useNavSnapshot(data).directMessages} />;
+}
+export function LiveMeetings({ data }: { data: ChatNav }) {
+  const nav = useNavSnapshot(data);
+  return <MeetingList rows={nav.meetings} now={nav.now} />;
 }
 
 export function ChatNavSync({
@@ -199,12 +224,7 @@ export function ChatNavSync({
           query.data.spaces.reduce(
             (sum, space) => sum + space.unreadMentions,
             0,
-          ) +
-          query.data.directMessages.reduce(
-            (sum, room) =>
-              sum + (room.muted ? room.unreadMentions : room.unreadCount),
-            0,
-          )
+          ) + homeUnreadCount(query.data)
         }
         refresh={async () => (await refetch({ cancelRefetch: true })).data}
       />

@@ -86,11 +86,14 @@ const fixture = (rows: DirectMessageNav[] = [direct()]): ChatNav => ({
   directMessages: rows,
   myStatus: "online",
   blockedUserIds: [],
+  meetings: [],
+  now: "2026-10-08T03:00:00.000Z",
 });
 const activity = (
   patch: Partial<Extract<RealtimeEvent, { type: "room.activity" }>> = {},
 ): Extract<RealtimeEvent, { type: "room.activity" }> => ({
   type: "room.activity",
+  bookingId: null,
   roomKind: "dm",
   spaceId: null,
   roomId,
@@ -107,6 +110,7 @@ const mention = (
   patch: Partial<Extract<RealtimeEvent, { type: "mention.created" }>> = {},
 ): Extract<RealtimeEvent, { type: "mention.created" }> => ({
   type: "mention.created",
+  bookingId: null,
   roomKind: "dm",
   spaceId: null,
   roomId,

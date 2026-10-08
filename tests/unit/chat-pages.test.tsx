@@ -28,6 +28,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/features/chat/components/chat-nav", () => ({
   LiveDirectMessages: () => null,
+  LiveMeetings: () => null,
 }));
 const spaceId = "a1111111-1111-4111-8111-111111111111";
 const roomId = "b2222222-2222-4222-8222-222222222222";
@@ -39,6 +40,8 @@ beforeEach(() => {
     directMessages: [],
     myStatus: "online",
     blockedUserIds: [],
+    meetings: [],
+    now: "2026-10-08T03:00:00.000Z",
   });
   mocks.channel.mockResolvedValue(null);
   mocks.redirect.mockImplementation((path: string) => {
@@ -78,6 +81,8 @@ describe("chat route boundaries", () => {
         directMessages: [],
         myStatus: "online",
         blockedUserIds: [],
+        meetings: [],
+        now: "2026-10-08T03:00:00.000Z",
       });
       const page = SpacePage({ params: Promise.resolve({ spaceId }) });
       await expect(resolvePageContent(page.props.children)).rejects.toThrow(
@@ -120,6 +125,8 @@ describe("chat route boundaries", () => {
       directMessages: [],
       myStatus: "online",
       blockedUserIds: [],
+      meetings: [],
+      now: "2026-10-08T03:00:00.000Z",
     });
     const page = MessagesPage();
     expect(page.props.children.type).toBe(Suspense);

@@ -8,26 +8,19 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Hash, MoreHorizontal, Users, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PersonCard } from "@/features/people/components/person-card";
-import { PersonStatus } from "@/features/people/components/person-status";
 import {
   defaultModerationActions,
   UnblockButton,
 } from "@/features/people/components/person-actions";
 import { ReportDialog } from "@/features/people/components/moderation-dialogs";
 import type { MessageContact } from "@/features/people/types";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sheet,
@@ -37,7 +30,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useRealtimeConnectionState } from "@/components/realtime-provider";
-import type { ChannelView, ChatReply, DirectMessageView } from "../types";
+import type {
+  ChannelView,
+  ChatReply,
+  DirectMessageView,
+  MeetingView,
+} from "../types";
 import type { RoomMessageSource } from "../room-message-source";
 import { excerptOf } from "../message-text";
 import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
@@ -46,7 +44,17 @@ import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
 import { MessageDeleteDialog } from "./message-delete-dialog";
 import { MessageEditor } from "./message-editor";
-import { ChatMuteButton } from "./chat-mute-button";
+import {
+  ChatRoomHeader,
+  type ChatRoomPresentation,
+  type DirectOther,
+} from "./chat-room-header";
+import {
+  MeetingHeader,
+  MeetingBookingCard,
+  MeetingMembers,
+} from "./meeting-room-presentation";
+import { meetingName } from "../meeting-format";
 import { TypingIndicator } from "./typing-indicator";
 import { useMessageMutations } from "./use-message-mutations";
 import { useTyping } from "./use-typing";
@@ -55,10 +63,7 @@ import { useMessageHistory } from "./use-message-history";
 import { useRoomRead } from "./use-room-read";
 import { useDirectPeerRead } from "./use-direct-peer-read";
 import { useChatMetadata } from "./use-chat-metadata";
-import {
-  MessageRequestBanner,
-  type MessageRequestState,
-} from "./message-request-banner";
+import { MessageRequestBanner } from "./message-request-banner";
 import { respondMessageRequest } from "../actions";
 import { GroupDialogs, type GroupDialog } from "./group-dialogs";
 import { useRoomRealtime } from "./use-room-realtime";
@@ -102,6 +107,7 @@ export function ChannelScreen({
         kind: "channel",
         name: data.room.name,
         topic: data.room.topic,
+        archived: data.room.archived,
       }}
     />
   );
@@ -139,6 +145,7 @@ export function DirectMessageScreen({
         data.kind === "group_dm"
           ? {
               kind: "group_dm",
+              archived: data.room.archived,
               name: data.displayName,
               originalName: data.name,
               contacts,
@@ -155,12 +162,37 @@ export function DirectMessageScreen({
   );
 }
 
-type DirectOther = {
-  userId: string;
-  name: string;
-  username: string | null;
-  sharesSpace: boolean;
-};
+export function MeetingScreen({
+  data,
+  send,
+  variant = "page",
+  actions,
+}: {
+  data: MeetingView;
+  send?: SendChatMessage;
+  variant?: "page" | "sheet";
+  actions?: ReactNode;
+}) {
+  const source = useMemo(
+    () => ({
+      ...data,
+      members: data.members.map((member) => ({
+        id: member.userId,
+        name: member.name,
+        admin: false,
+        sharesSpace: member.sharesSpace,
+      })),
+    }),
+    [data],
+  );
+  return (
+    <ChatRoomScreen
+      data={source}
+      send={send}
+      presentation={{ kind: "meeting", data, variant, actions }}
+    />
+  );
+}
 
 function ChatRoomScreen({
   data,
@@ -170,27 +202,29 @@ function ChatRoomScreen({
   data: RoomMessageSource;
   send?: SendChatMessage;
   presentation:
-    | { kind: "channel"; name: string; topic: string | null }
+    | ChatRoomPresentation
     | {
-        kind: "dm";
-        other: DirectOther;
-        peerReadSeq: number;
-        request: MessageRequestState;
-        blockedByMe: boolean;
-      }
-    | {
-        kind: "group_dm";
-        name: string;
-        originalName: string | null;
-        contacts?: Promise<MessageContact[]>;
+        kind: "meeting";
+        data: MeetingView;
+        variant: "page" | "sheet";
+        actions?: ReactNode;
       };
 }) {
   const direct = presentation.kind === "dm" ? presentation : null;
   const group = presentation.kind === "group_dm" ? presentation : null;
+  const meeting = presentation.kind === "meeting" ? presentation : null;
+  const compact = meeting?.variant === "sheet";
+  const archived =
+    (presentation.kind === "channel" || presentation.kind === "group_dm") &&
+    presentation.archived;
   const metadata = useChatMetadata();
   const denied = useRoomRealtime(data.room.id);
   const roomName =
-    presentation.kind !== "dm" ? presentation.name : presentation.other.name;
+    presentation.kind === "meeting"
+      ? meetingName(presentation.data.booking)
+      : presentation.kind !== "dm"
+        ? presentation.name
+        : presentation.other.name;
   const peerRead = useDirectPeerRead(
     data.room.id,
     direct?.other.userId ?? null,
@@ -200,7 +234,9 @@ function ChatRoomScreen({
     data,
     send,
     direct ? peerRead.receivePage : undefined,
-    presentation.kind === "channel" ? false : presentation.kind,
+    presentation.kind === "dm" || presentation.kind === "group_dm"
+      ? presentation.kind
+      : false,
   );
   const sentSinceSnapshot = messages.messages.filter(
     (message) =>
@@ -221,7 +257,8 @@ function ChatRoomScreen({
         )
       : [],
     enabled:
-      !data.room.archived &&
+      !archived &&
+      (!meeting || data.canWrite) &&
       direct?.request?.role !== "recipient" &&
       (!direct || data.canWrite),
   });
@@ -359,7 +396,9 @@ function ChatRoomScreen({
   const wide = useWideMembers();
   const membersId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
-  const memberPanel = (
+  const memberPanel = meeting ? (
+    <MeetingMembers members={meeting.data.members} />
+  ) : (
     <RoomMembersPanel
       members={data.members}
       group={
@@ -378,9 +417,18 @@ function ChatRoomScreen({
   if (denied)
     return (
       <section
-        data-chat-screen
-        className="flex h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-4"
+        data-chat-screen={compact ? undefined : ""}
+        className={
+          compact
+            ? "flex h-full min-h-0 flex-col items-center justify-center gap-4"
+            : "flex h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-4"
+        }
       >
+        {compact && meeting?.actions && (
+          <div className="flex w-full shrink-0 justify-end gap-1 px-4">
+            {meeting.actions}
+          </div>
+        )}
         <p>이 대화를 더 볼 수 없어요</p>
         <Button asChild variant="outline">
           <Link href="/messages">메시지 목록</Link>
@@ -390,113 +438,41 @@ function ChatRoomScreen({
   return (
     <section
       ref={channelRef}
-      data-chat-screen
-      className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col bg-background"
+      data-chat-screen={compact ? undefined : ""}
+      className={
+        compact
+          ? "flex h-full min-h-0 flex-col bg-background"
+          : "flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col bg-background"
+      }
     >
-      <header className="flex min-h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:px-6">
-        {direct ? (
-          <>
-            <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-muted font-semibold">
-              <span aria-hidden="true">
-                {Array.from(direct.other.name.trim())[0] ?? "?"}
-              </span>
-              <span className="absolute right-0 bottom-0">
-                <PersonStatus
-                  userId={direct.other.userId}
-                  sharesSpace={direct.other.sharesSpace}
-                />
-              </span>
-            </span>
-            <h1 className="min-w-0 truncate text-lg font-bold">
-              <PersonCard userId={direct.other.userId} name={direct.other.name}>
-                <button
-                  type="button"
-                  className="min-h-11 max-w-full truncate rounded-md text-left focus-visible:outline-2 focus-visible:outline-ring"
-                  aria-label={`${direct.other.name} 프로필`}
-                >
-                  {direct.other.name}
-                </button>
-              </PersonCard>
-            </h1>
-            {direct.other.username && (
-              <span className="hidden truncate text-sm text-muted-foreground sm:block">
-                @{direct.other.username}
-              </span>
-            )}
-          </>
-        ) : (
-          <>
-            {group ? (
-              <Users
-                aria-hidden="true"
-                className="size-5 shrink-0 text-muted-foreground"
-              />
-            ) : (
-              <Hash
-                aria-hidden="true"
-                className="size-5 shrink-0 text-muted-foreground"
-              />
-            )}
-            <h1 className="truncate text-lg font-bold">{roomName}</h1>
-            {presentation.kind === "channel" && presentation.topic && (
-              <p className="hidden min-w-0 flex-1 truncate border-l border-border pl-3 text-sm text-muted-foreground sm:block">
-                {presentation.topic}
-              </p>
-            )}
-          </>
-        )}
-        <div className="ml-auto flex shrink-0 items-center gap-1">
-          <ChatMuteButton
-            id={data.room.id}
-            name={roomName}
-            muted={data.room.muted}
-          />
-          {!direct && (
-            <Button
-              ref={trigger}
-              type="button"
-              variant="ghost"
-              aria-label={`멤버 ${data.members.length}명`}
-              aria-expanded={membersOpen}
-              aria-controls={membersId}
-              onClick={() => setMembersOpen((open) => !open)}
-            >
-              <Users aria-hidden="true" />
-              <span className="tabular-nums">{data.members.length}</span>
-            </Button>
-          )}
-          {group && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  ref={groupMenu}
-                  variant="ghost"
-                  size="icon"
-                  aria-label="그룹 더보기"
-                >
-                  <MoreHorizontal aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                onCloseAutoFocus={(event) => {
-                  if (groupDialog) event.preventDefault();
-                }}
-              >
-                <DropdownMenuItem
-                  disabled={!data.canWrite}
-                  onSelect={() => {
-                    groupDialogOrigin.current = groupMenu.current;
-                    setGroupDialog("rename");
-                  }}
-                >
-                  이름 바꾸기
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </header>
+      {presentation.kind === "meeting" ? (
+        <MeetingHeader
+          data={presentation.data}
+          compact={compact}
+          actions={presentation.actions}
+          trigger={trigger}
+          membersOpen={membersOpen}
+          membersId={membersId}
+          onToggleMembers={() => setMembersOpen((open) => !open)}
+        />
+      ) : (
+        <ChatRoomHeader
+          data={data}
+          presentation={presentation}
+          roomName={roomName}
+          trigger={trigger}
+          membersOpen={membersOpen}
+          membersId={membersId}
+          onToggleMembers={() => setMembersOpen((open) => !open)}
+          groupMenu={groupMenu}
+          groupDialogOpen={groupDialog !== null}
+          onRename={() => {
+            groupDialogOrigin.current = groupMenu.current;
+            setGroupDialog("rename");
+          }}
+        />
+      )}
+      {meeting && <MeetingBookingCard data={meeting.data} compact={compact} />}
       {direct?.request && !direct.blockedByMe && (
         <MessageRequestBanner
           roomId={data.room.id}
@@ -571,7 +547,7 @@ function ChatRoomScreen({
                     ])
                   }
                   members={candidates}
-                  allowEveryone={Boolean(direct || group) || admin}
+                  allowEveryone={Boolean(direct || group || meeting) || admin}
                   onSave={mutations.edit}
                   onCancel={() => {
                     setEditing(null);
@@ -582,7 +558,7 @@ function ChatRoomScreen({
               actions={{
                 userId: data.user.id,
                 canWrite,
-                canReact: direct ? canWrite : !data.room.archived,
+                canReact: direct || meeting ? canWrite : !archived,
                 admin,
                 names,
                 react: mutations.react,
@@ -608,7 +584,7 @@ function ChatRoomScreen({
                   ? "답장하면 요청을 수락해요"
                   : direct
                     ? `${roomName} 님에게 메시지 보내기`
-                    : group
+                    : group || meeting
                       ? `${roomName}에 메시지 보내기`
                       : undefined
               }
@@ -618,7 +594,7 @@ function ChatRoomScreen({
               }}
               onInput={typing.onInput}
               members={candidates}
-              allowEveryone={Boolean(direct || group) || admin}
+              allowEveryone={Boolean(direct || group || meeting) || admin}
               reply={reply}
               onClearReply={() => setReply(null)}
               focusVersion={composerFocus}
@@ -640,11 +616,15 @@ function ChatRoomScreen({
                   ? "차단한 사용자예요"
                   : requestLimit
                     ? "상대가 수락하면 더 보낼 수 있어요"
-                    : direct || group
-                      ? "이 대화에는 메시지를 보낼 수 없어요"
-                      : data.room.archived
-                        ? "보관된 채널이에요"
-                        : "이 채널에는 관리자만 쓸 수 있어요"}
+                    : meeting
+                      ? meeting.data.readOnlyReason === "cancelled"
+                        ? "취소된 예약이라 읽기 전용이에요"
+                        : "회의가 끝나고 24시간이 지나 읽기 전용이에요"
+                      : direct || group
+                        ? "이 대화에는 메시지를 보낼 수 없어요"
+                        : archived
+                          ? "보관된 채널이에요"
+                          : "이 채널에는 관리자만 쓸 수 있어요"}
               </p>
               {direct?.blockedByMe && (
                 <UnblockButton userId={direct.other.userId} />
@@ -653,10 +633,12 @@ function ChatRoomScreen({
           )}
           <TypingIndicator label={typing.label} />
         </div>
-        {!direct && wide && membersOpen && (
+        {!direct && !compact && wide && membersOpen && (
           <aside
             id={membersId}
-            aria-label={group ? "그룹 멤버" : "채널 멤버"}
+            aria-label={
+              meeting ? "회의 멤버" : group ? "그룹 멤버" : "채널 멤버"
+            }
             className="w-60 shrink-0 overflow-y-auto border-l border-border bg-sidebar"
           >
             <h2 className="px-4 pt-5 text-xs font-semibold text-muted-foreground">
@@ -706,7 +688,7 @@ function ChatRoomScreen({
           }}
         />
       )}
-      {!direct && (
+      {!direct && !compact && (
         <Sheet open={!wide && membersOpen} onOpenChange={setMembersOpen}>
           <SheetContent
             id={membersId}
@@ -719,7 +701,9 @@ function ChatRoomScreen({
             }}
           >
             <SheetHeader>
-              <SheetTitle>{group ? "그룹 멤버" : "채널 멤버"}</SheetTitle>
+              <SheetTitle>
+                {meeting ? "회의 멤버" : group ? "그룹 멤버" : "채널 멤버"}
+              </SheetTitle>
             </SheetHeader>
             <SheetClose asChild>
               <Button

@@ -36,6 +36,8 @@ vi.mock("@/components/realtime-provider", () => ({
 const nav = (): ChatNav => ({
   myStatus: "online",
   blockedUserIds: [],
+  meetings: [],
+  now: "2026-10-08T03:00:00.000Z",
   spaces: [],
   directMessages: [
     {
@@ -53,6 +55,7 @@ const nav = (): ChatNav => ({
 });
 const event = (seq = 1): Extract<RealtimeEvent, { type: "room.activity" }> => ({
   type: "room.activity",
+  bookingId: null,
   roomId: "room",
   spaceId: null,
   roomKind: "dm",

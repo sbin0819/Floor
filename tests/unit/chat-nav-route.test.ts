@@ -14,6 +14,8 @@ it("returns the private navigation after the request boundary", async () => {
     directMessages: [],
     myStatus: "online",
     blockedUserIds: [],
+    meetings: [],
+    now: "2026-10-08T03:00:00.000Z",
   });
   const result = await GET();
   expect(result.status).toBe(200);
@@ -22,6 +24,8 @@ it("returns the private navigation after the request boundary", async () => {
     directMessages: [],
     myStatus: "online",
     blockedUserIds: [],
+    meetings: [],
+    now: "2026-10-08T03:00:00.000Z",
   });
   expect(result.headers.get("Cache-Control")).toBe("private, no-store");
   expect(mocks.connection.mock.invocationCallOrder[0]).toBeLessThan(

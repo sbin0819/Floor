@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { PageContainer, PageHeading } from "@/components/page-container";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatNav, ChatSpaceNav } from "@/features/chat/types";
-import { LiveDirectMessages } from "./chat-nav";
+import { LiveDirectMessages, LiveMeetings } from "./chat-nav";
 
 export function MessagesShell({ children }: { children: ReactNode }) {
   return (
@@ -35,6 +35,7 @@ export function MessagesShell({ children }: { children: ReactNode }) {
 export function MessagesList({ data }: { data: ChatNav }) {
   return (
     <div className="space-y-8">
+      <LiveMeetings data={data} />
       <LiveDirectMessages data={data} />
       <SpaceList spaces={data.spaces} />
     </div>

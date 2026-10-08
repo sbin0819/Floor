@@ -12,6 +12,6 @@ export type RoomMessageSource = Pick<
 > & {
   room: Pick<
     ChannelView["room"],
-    "id" | "archived" | "lastSeq" | "muted" | "unreadMentions"
+    "id" | "lastSeq" | "muted" | "unreadMentions"
   >;
 };

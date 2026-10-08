@@ -19,6 +19,7 @@ import {
   isViewingRoom,
   hasReadThrough,
   applyMyStatus,
+  applyRoomActivity,
 } from "../nav-state";
 
 type Activity = Extract<RealtimeEvent, { type: "room.activity" }>;
@@ -34,6 +35,7 @@ type ToastEntry = {
   roomName?: string;
   groupName?: string;
   direct: boolean;
+  meeting?: boolean;
 };
 export function ChatMentions({
   userId,
@@ -129,7 +131,7 @@ export function ChatMentions({
           toast(
             entry.direct
               ? (entry.groupName ?? entry.authorName)
-              : `${entry.authorName} 님이 #${entry.roomName}에서 멘션했어요`,
+              : `${entry.authorName} 님이 ${entry.meeting ? "" : "#"}${entry.roomName}에서 멘션했어요`,
             {
               id: `${entry.direct ? "dm" : "mention"}:${entry.messageId}`,
               description: entry.groupName
@@ -155,6 +157,9 @@ export function ChatMentions({
       isViewingRoom(client, entry.roomId) ||
       (entry.direct &&
         pathnameRef.current === `/dm/${entry.roomId}` &&
+        document.visibilityState === "visible") ||
+      (entry.meeting &&
+        pathnameRef.current === entry.href &&
         document.visibilityState === "visible")
     );
   }
@@ -213,6 +218,15 @@ export function ChatMentions({
         : {}),
     });
   }
+  function enqueueMeetingMention(event: Mention) {
+    if (!event.bookingId) return;
+    enqueue({
+      ...event,
+      href: `/m/${event.bookingId}`,
+      direct: false,
+      meeting: true,
+    });
+  }
   function requestUnknown() {
     if (refreshTimer.current || refreshPending.current) return;
     refreshTimer.current = setTimeout(() => {
@@ -225,7 +239,10 @@ export function ChatMentions({
         .then((data) => {
           if (!alive.current) return;
           for (const event of pending) {
-            if (event.type === "mention.created")
+            if (event.roomKind === "meeting") {
+              if (event.type === "mention.created")
+                enqueueMeetingMention(event);
+            } else if (event.type === "mention.created")
               enqueueDirectMention(event, data);
             else enqueueDirect(event, data);
           }
@@ -245,6 +262,22 @@ export function ChatMentions({
     if (event.type === "realtime.reauth" || event.type === "friend.changed") {
       if (event.type === "realtime.reauth") reauthorize();
       void refreshRef.current().catch(() => {});
+      return;
+    }
+    if (event.type === "room.activity" && event.roomKind === "meeting") {
+      const known = client
+        .getQueryData<ChatNav>(CHAT_NAV_KEY)
+        ?.meetings.some((room) => room.roomId === event.roomId);
+      applyRoomActivity(client, event, userId);
+      if (
+        !known ||
+        event.authorId === null ||
+        event.preview === null ||
+        event.preview.authorName === null
+      ) {
+        unknown.current.set(`meeting:${event.roomId}`, event);
+        requestUnknown();
+      }
       return;
     }
     if (
@@ -273,6 +306,17 @@ export function ChatMentions({
       const data = client.getQueryData<ChatNav>(CHAT_NAV_KEY);
       if (data?.directMessages.some((room) => room.roomId === event.roomId))
         enqueueDirectMention(event, data);
+      else {
+        unknown.current.set(`mention:${event.messageId}`, event);
+        requestUnknown();
+      }
+    } else if (event.roomKind === "meeting") {
+      if (
+        client
+          .getQueryData<ChatNav>(CHAT_NAV_KEY)
+          ?.meetings.some((room) => room.roomId === event.roomId)
+      )
+        enqueueMeetingMention(event);
       else {
         unknown.current.set(`mention:${event.messageId}`, event);
         requestUnknown();

@@ -52,6 +52,11 @@ function setUnread(client: QueryClient, roomId: string, unread: boolean) {
     (current) =>
       current && {
         ...current,
+        meetings: current.meetings.map((room) =>
+          room.roomId === roomId
+            ? { ...room, unread, ...(!unread ? { unreadMentions: 0 } : {}) }
+            : room,
+        ),
         directMessages: current.directMessages.map((room) =>
           room.roomId === roomId
             ? {
@@ -174,6 +179,11 @@ export function applyMention(
     (current) =>
       current && {
         ...current,
+        meetings: current.meetings.map((room) =>
+          room.roomId === event.roomId
+            ? { ...room, unreadMentions: room.unreadMentions + 1 }
+            : room,
+        ),
         directMessages: current.directMessages.map((room) =>
           room.roomId === event.roomId
             ? { ...room, unreadMentions: room.unreadMentions + 1 }
@@ -244,6 +254,25 @@ export function mergeChatNav(
   const existing = new Map(
     current?.directMessages.map((room) => [room.roomId, room]),
   );
+  const previousMeetings = new Map(
+    current?.meetings.map((room) => [room.roomId, room]),
+  );
+  const meetings = incoming.meetings.map((room) => {
+    const old = previousMeetings.get(room.roomId);
+    const protect =
+      requestedAt === null
+        ? Boolean(old)
+        : (snapshot.rooms.get(room.roomId) ?? 0) > requestedAt;
+    if (old && protect)
+      return {
+        ...room,
+        unread: old.unread,
+        unreadMentions: old.unreadMentions,
+      };
+    if (requestedAt !== null)
+      snapshot.rooms.set(room.roomId, ++snapshot.revision);
+    return room;
+  });
   const protect = (id: string) =>
     requestedAt === null
       ? existing.has(id)
@@ -276,6 +305,7 @@ export function mergeChatNav(
         ? (snapshot.lastStatus ?? current?.myStatus ?? incoming.myStatus)
         : incoming.myStatus,
     spaces,
+    meetings,
     directMessages: sortDirectMessages(directMessages),
   };
 }
@@ -356,9 +386,18 @@ export function applyDirectActivity(
   return "applied" as const;
 }
 
-export function directUnreadCount(data: ChatNav) {
+export function directUnreadCount(data: Pick<ChatNav, "directMessages">) {
   return data.directMessages.reduce(
     (sum, room) => sum + (room.muted ? room.unreadMentions : room.unreadCount),
     0,
+  );
+}
+
+export function homeUnreadCount(
+  data: Pick<ChatNav, "directMessages" | "meetings">,
+) {
+  return (
+    directUnreadCount(data) +
+    data.meetings.reduce((sum, room) => sum + room.unreadMentions, 0)
   );
 }

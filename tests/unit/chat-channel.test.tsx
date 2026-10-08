@@ -139,6 +139,8 @@ function setup(data = view(), send: SendChatMessage = vi.fn()) {
     directMessages: [],
     myStatus: "online",
     blockedUserIds: [],
+    meetings: [],
+    now: "2026-10-08T03:00:00.000Z",
   });
   const renderView = (incoming: ChannelView) => (
     <QueryClientProvider client={client}>
@@ -268,6 +270,8 @@ describe("chat channel presentation", () => {
         directMessages: [],
         myStatus: "online",
         blockedUserIds: [],
+        meetings: [],
+        now: "2026-10-08T03:00:00.000Z",
       });
     });
     expect(await screen.findByText("안녕하세요")).toBeVisible();

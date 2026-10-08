@@ -92,6 +92,8 @@ function Frame({ children }: { children: ReactNode }) {
       spaces: [],
       directMessages: [],
       blockedUserIds: [],
+      meetings: [],
+      now: "2026-10-08T03:00:00.000Z",
       myStatus: "online",
     });
     return client;

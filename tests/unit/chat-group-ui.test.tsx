@@ -67,6 +67,8 @@ async function setup(ui: ReactNode) {
     directMessages: [],
     myStatus: "online",
     blockedUserIds: [],
+    meetings: [],
+    now: "2026-10-08T03:00:00.000Z",
   });
   let result!: ReturnType<typeof render>;
   await act(async () => {

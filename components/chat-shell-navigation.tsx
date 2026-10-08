@@ -14,6 +14,8 @@ async function readNavigation() {
     ? getMyChatNav()
     : {
         spaces: [],
+        meetings: [],
+        now: "1970-01-01T00:00:00.000Z",
         directMessages: [],
         myStatus: "online" as const,
         blockedUserIds: [],
