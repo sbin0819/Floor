@@ -1,5 +1,10 @@
 import { createBookingQueries } from "@/features/bookings/query-factory";
 import type { MyBookingsMonthInput } from "@/features/bookings/calendar";
+import { createParticipantSearch } from "@/features/bookings/participant-search-factory";
+
+export async function searchParticipants(query: unknown) {
+  return createParticipantSearch()(query);
+}
 
 export async function getHomeHeader() {
   return createBookingQueries().getHomeHeader();

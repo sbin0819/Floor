@@ -24,6 +24,7 @@ describe("optimistic route protection", () => {
     "/forgot-password",
     "/reset-password",
     "/api/auth/sign-in/email",
+    "/api/participants/search",
     "/favicon.ico",
     "/_next/static/test.js",
   ])("does not touch public route %s", (url) => {
