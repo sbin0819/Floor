@@ -46,6 +46,13 @@ function showNext(bookings: MyCalendarBooking[], now = "2026-10-07T06:25:00Z") {
     </QueryClientProvider>,
   );
 }
+it("shows the attendee badge only when the count is known", () => {
+  const view = showNext([{ ...booking, attendeeCount: 5 }]);
+  expect(screen.getByText("5명")).toBeVisible();
+  view.unmount();
+  showNext([booking]);
+  expect(screen.queryByText("5명")).not.toBeInTheDocument();
+});
 it("shows ongoing status, an eager photo, exact space navigation and the existing cancellation confirmation", async () => {
   const user = userEvent.setup();
   const { container } = showNext([booking]);

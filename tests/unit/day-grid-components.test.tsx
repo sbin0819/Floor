@@ -80,7 +80,7 @@ describe("day grid and synchronized form", () => {
     expect(screen.getByLabelText("시작")).toHaveTextContent("10:30");
     await userEvent.tab();
     expect(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     ).toHaveFocus();
     await userEvent.keyboard("{Enter}");
     await userEvent.tab();
@@ -168,7 +168,7 @@ describe("day grid and synchronized form", () => {
       screen.getByText("오늘 · 10:00–11:00").closest('[aria-live="polite"]'),
     ).toHaveTextContent("1시간");
     expect(screen.getByText("새 예약")).toHaveTextContent("10:00–11:00");
-    const edit = screen.getByRole("button", { name: "시간·제목 바꾸기" });
+    const edit = screen.getByRole("button", { name: "예약 내용 바꾸기" });
     expect(edit).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(edit);
     expect(edit).toHaveAttribute("aria-expanded", "true");

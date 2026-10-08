@@ -93,7 +93,7 @@ describe("booking form", () => {
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(screen.getByLabelText("시작")).toHaveAttribute("role", "combobox");
     expect(screen.getByLabelText("끝")).toBeEnabled();
@@ -121,7 +121,7 @@ describe("booking form", () => {
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     await userEvent.click(screen.getByRole("combobox", { name: "시작" }));
     expect(screen.getByRole("option", { name: "10:00" })).toBeVisible();
@@ -164,7 +164,7 @@ describe("booking form", () => {
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(screen.getByRole("combobox", { name: "시작" })).toHaveTextContent(
       "10:00",
@@ -185,6 +185,7 @@ describe("booking form", () => {
       end: "2026-10-07T02:00:00.000Z",
       teamId: null,
       title: "테스트 회의",
+      attendeeCount: null,
     });
     expect(
       screen.getByRole("button", { name: "예약하고 있어요" }),
@@ -203,10 +204,10 @@ describe("booking form", () => {
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
     expect(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     ).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(screen.getByLabelText("제목 (선택)")).toHaveValue("");
   });
@@ -285,7 +286,7 @@ describe("booking form", () => {
       await userEvent.click(
         screen.getByRole("button", { name: "10:00, 비어 있음" }),
       );
-      const edit = screen.getByRole("button", { name: "시간·제목 바꾸기" });
+      const edit = screen.getByRole("button", { name: "예약 내용 바꾸기" });
       expect(edit).toHaveAttribute("aria-expanded", "false");
       expect(
         screen.queryByRole("combobox", { name: "시작" }),
@@ -330,7 +331,7 @@ describe("booking form", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
-    const edit = screen.getByRole("button", { name: "시간·제목 바꾸기" });
+    const edit = screen.getByRole("button", { name: "예약 내용 바꾸기" });
     expect(edit.parentElement).toHaveTextContent("오늘 · 10:00–11:00");
     expect(edit.parentElement).toHaveTextContent("1시간");
     const submit = screen.getByRole("button", { name: "예약하기" });
@@ -406,6 +407,7 @@ describe("booking strip", () => {
       end: "2026-10-07T02:00:00.000Z",
       teamId: null,
       title: "예약 줄 테스트",
+      attendeeCount: null,
     });
     expect(
       screen.getByRole("button", { name: "예약하고 있어요" }),
@@ -433,7 +435,7 @@ describe("booking strip", () => {
       screen.getByRole("button", { name: "10:00, 비어 있음" }),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     await userEvent.type(screen.getByLabelText("제목 (선택)"), "유지할 제목");
     view.rerender(

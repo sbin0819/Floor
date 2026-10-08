@@ -1,8 +1,18 @@
 import { createStore } from "zustand/vanilla";
 import type { BookingSelection, FloorBookingSelection } from "./selection";
 
-export type BookingDraft = Readonly<{ title: string; actorId: string | null }>;
-export const emptyBookingDraft: BookingDraft = { title: "", actorId: null };
+export type BookingDraft = Readonly<{
+  title: string;
+  actorId: string | null;
+  attendeeCount: number | null;
+  attendeeCountTouched: boolean;
+}>;
+export const emptyBookingDraft: BookingDraft = {
+  title: "",
+  actorId: null,
+  attendeeCount: null,
+  attendeeCountTouched: false,
+};
 
 export function bookingDraftScope(
   branchId: string,
@@ -24,7 +34,7 @@ export type BookingDraftState = {
     spaceId: string,
     range: BookingSelection | null,
   ) => void;
-  clearTitle: (scope: string) => void;
+  clearBookingContent: (scope: string) => void;
 };
 
 export function createBookingDraftStore() {
@@ -43,7 +53,9 @@ export function createBookingDraftStore() {
         if (state.scope !== scope) return state;
         const draft = { ...state.draft, ...patch };
         return draft.title === state.draft.title &&
-          draft.actorId === state.draft.actorId
+          draft.actorId === state.draft.actorId &&
+          draft.attendeeCount === state.draft.attendeeCount &&
+          draft.attendeeCountTouched === state.draft.attendeeCountTouched
           ? state
           : { draft };
       }),
@@ -58,10 +70,20 @@ export function createBookingDraftStore() {
           ? state
           : { range: { spaceId, ...range } };
       }),
-    clearTitle: (scope) =>
+    clearBookingContent: (scope) =>
       set((state) =>
-        state.scope === scope && state.draft.title !== ""
-          ? { draft: { ...state.draft, title: "" } }
+        state.scope === scope &&
+        (state.draft.title !== "" ||
+          state.draft.attendeeCount !== null ||
+          state.draft.attendeeCountTouched)
+          ? {
+              draft: {
+                ...state.draft,
+                title: "",
+                attendeeCount: null,
+                attendeeCountTouched: false,
+              },
+            }
           : state,
       ),
   }));

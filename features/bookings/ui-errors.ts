@@ -7,6 +7,7 @@ export function bookingErrorMessage(
     limits?: RoleLimits;
     isToday?: boolean;
     restricted?: boolean;
+    capacity?: number | null;
   } = {},
 ): string {
   switch (result.code) {
@@ -16,6 +17,12 @@ export function bookingErrorMessage(
       return "점검 중인 시간이에요";
     case "OUTSIDE_HOURS":
       return "운영 시간이 아니에요";
+    case "OVER_CAPACITY":
+      return options.capacity == null
+        ? "공간의 정원을 확인해 주세요"
+        : result.message === "participants"
+          ? `참석자가 정원(${options.capacity}명)보다 많아요`
+          : `정원은 ${options.capacity}명이에요`;
     case "LIMIT_EXCEEDED":
       if (
         result.message === "per_booking" &&

@@ -222,7 +222,13 @@ export function BookingTimeline({
                   className="truncate"
                   title={
                     block.kind === "booking"
-                      ? [block.item.bookerName, block.item.title]
+                      ? [
+                          block.item.bookerName,
+                          block.item.title,
+                          block.item.attendeeCount
+                            ? `${block.item.attendeeCount}명`
+                            : null,
+                        ]
                           .filter(Boolean)
                           .join(" · ")
                       : block.item.reason || "점검 중"
@@ -233,6 +239,9 @@ export function BookingTimeline({
                     : block.item.reason || "점검 중"}
                   {block.kind === "booking" && block.item.title
                     ? ` · ${block.item.title}`
+                    : ""}
+                  {block.kind === "booking" && block.item.attendeeCount
+                    ? ` · ${block.item.attendeeCount}명`
                     : ""}
                 </p>
               </div>

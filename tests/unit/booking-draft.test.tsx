@@ -10,6 +10,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBooking } from "@/features/bookings/actions";
+import { emptyBookingDraft } from "@/features/bookings/booking-draft-store";
 import { BookingForm } from "@/features/bookings/components/booking-form";
 import {
   useBookingDraft,
@@ -209,12 +210,13 @@ describe("booking form shared draft", () => {
       screen.queryByRole("textbox", { name: "제목 (선택)" }),
     ).not.toBeInTheDocument();
     expect(draft()).toEqual({
+      ...emptyBookingDraft,
       title: "구간보다 먼저 적은 제목",
       actorId: teamId,
     });
     await userEvent.click(screen.getByRole("button", { name: "구간 고르기" }));
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(title()).not.toBe(originalInput);
     expect(title()).toHaveValue("구간보다 먼저 적은 제목");
@@ -225,25 +227,30 @@ describe("booking form shared draft", () => {
     const view = display();
     await userEvent.click(screen.getByRole("button", { name: "구간 고르기" }));
     await userEvent.type(title(), "팀 기획 회의");
+    fireEvent.change(screen.getByRole("spinbutton"), {
+      target: { value: "5" },
+    });
     await chooseTeam();
     view.receive("detail");
     expect(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     ).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(title()).toHaveValue("팀 기획 회의");
+    expect(screen.getByRole("spinbutton")).toHaveValue(5);
     expect(actor()).toHaveTextContent("가상 팀으로");
     view.receive("strip");
     expect(title()).toHaveValue("팀 기획 회의");
+    expect(screen.getByRole("spinbutton")).toHaveValue(5);
     expect(actor()).toHaveTextContent("가상 팀으로");
     view.receive("panel");
     expect(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     ).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(title()).toHaveValue("팀 기획 회의");
     expect(actor()).toHaveTextContent("가상 팀으로");
@@ -256,6 +263,7 @@ describe("booking form shared draft", () => {
         end,
         teamId,
         title: "팀 기획 회의",
+        attendeeCount: 5,
       }),
     );
   });
@@ -267,21 +275,24 @@ describe("booking form shared draft", () => {
     view.receive("strip", fixture(second));
     expect(title()).toHaveValue("");
     expect(actor()).toHaveTextContent("개인으로");
-    expect(draft()).toEqual({ title: "", actorId: null });
+    expect(draft()).toEqual(emptyBookingDraft);
     view.receive("strip", fixture(first));
     expect(title()).toHaveValue("");
     expect(actor()).toHaveTextContent("개인으로");
   });
 
-  it("clears only the shared title after success and retains the actor with an open detail form", async () => {
+  it("clears the shared title and count after success and retains the actor with an open detail form", async () => {
     const view = display();
     await userEvent.click(screen.getByRole("button", { name: "구간 고르기" }));
     await userEvent.type(title(), "성공 뒤 지울 제목");
+    fireEvent.change(screen.getByRole("spinbutton"), {
+      target: { value: "3" },
+    });
     await chooseTeam();
     view.receive("detail");
     await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
     await waitFor(() => expect(route.refresh).toHaveBeenCalledOnce());
-    expect(draft()).toEqual({ title: "", actorId: teamId });
+    expect(draft()).toEqual({ ...emptyBookingDraft, actorId: teamId });
     expect(screen.getByTestId("range")).toHaveTextContent("null");
     expect(screen.getByTestId("layout")).toHaveAttribute(
       "data-layout",
@@ -290,7 +301,7 @@ describe("booking form shared draft", () => {
     expect(route.replace).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "구간 고르기" }));
     await userEvent.click(
-      screen.getByRole("button", { name: "시간·제목 바꾸기" }),
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(title()).toHaveValue("");
     expect(actor()).toHaveTextContent("가상 팀으로");
@@ -314,7 +325,11 @@ describe("booking form shared draft", () => {
       await action.promise;
     });
     await waitFor(() => expect(route.refresh).toHaveBeenCalledOnce());
-    expect(draft()).toEqual({ title: "새 공간 제목", actorId: teamId });
+    expect(draft()).toEqual({
+      ...emptyBookingDraft,
+      title: "새 공간 제목",
+      actorId: teamId,
+    });
     expect(title()).toHaveValue("새 공간 제목");
     expect(actor()).toHaveTextContent("가상 팀으로");
   });
@@ -338,6 +353,7 @@ describe("booking form shared draft", () => {
         end,
         teamId: null,
         title: "권한 갱신 뒤 제목",
+        attendeeCount: null,
       }),
     );
   });
@@ -372,7 +388,11 @@ describe("booking form shared draft", () => {
         await action.promise;
       });
       await waitFor(() => expect(route.refresh).toHaveBeenCalledOnce());
-      expect(draft()).toEqual({ title: "새 공간 제목", actorId: teamId });
+      expect(draft()).toEqual({
+        ...emptyBookingDraft,
+        title: "새 공간 제목",
+        actorId: teamId,
+      });
       expect(title()).toHaveValue("새 공간 제목");
       expect(screen.getByTestId("range").textContent).toBe(nextRange);
       expect(actor()).toHaveTextContent("가상 팀으로");

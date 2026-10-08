@@ -113,6 +113,11 @@ function BookingList({
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {booking.attendeeCount != null && (
+                      <Badge variant="secondary" className="tabular-nums">
+                        {booking.attendeeCount}명
+                      </Badge>
+                    )}
                     {status && (
                       <Badge
                         variant="secondary"

@@ -23,7 +23,10 @@ import {
   useBookingDraft,
   useBookingRange,
 } from "@/features/bookings/components/use-booking-draft";
-import type { BookingDraft } from "@/features/bookings/booking-draft-store";
+import {
+  emptyBookingDraft,
+  type BookingDraft,
+} from "@/features/bookings/booking-draft-store";
 import type { FloorBookingSelection } from "@/features/bookings/selection";
 
 const route = vi.hoisted(() => ({
@@ -166,7 +169,11 @@ describe("branch-scoped retained routes", () => {
       expect(current.routeActive).toBe(false);
       expect(current.isCurrentRoute()).toBe(false);
       expect(current.selection).toEqual({ spaceId, ...range });
-      expect(current.draft).toEqual({ title: "남길 제목", actorId: "team" });
+      expect(current.draft).toEqual({
+        ...emptyBookingDraft,
+        title: "남길 제목",
+        actorId: "team",
+      });
       expect(route.useParams).not.toHaveBeenCalled();
       for (const link of screen.getAllByRole("link"))
         expect(link.getAttribute("href")).toMatch(
@@ -218,7 +225,11 @@ describe("branch-scoped retained routes", () => {
       detail: true,
     });
     expect(current.selection).toEqual({ spaceId, ...range });
-    expect(current.draft).toEqual({ title: "남길 제목", actorId: "team" });
+    expect(current.draft).toEqual({
+      ...emptyBookingDraft,
+      title: "남길 제목",
+      actorId: "team",
+    });
     expect(current.isCurrentRoute()).toBe(true);
     expect(route.push).not.toHaveBeenCalled();
     expect(route.replace).not.toHaveBeenCalled();
@@ -285,6 +296,6 @@ describe("branch-scoped retained routes", () => {
       spaceId: null,
     });
     expect(current.selection).toBeNull();
-    expect(current.draft).toEqual({ title: "", actorId: null });
+    expect(current.draft).toEqual(emptyBookingDraft);
   });
 });

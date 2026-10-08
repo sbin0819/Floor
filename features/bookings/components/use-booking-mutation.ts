@@ -44,7 +44,16 @@ export function useBookingMutation<T>({
       } else {
         const text = bookingErrorMessage(result, errorOptions);
         setMessage(text);
-        setFieldErrors(result.fieldErrors ?? {});
+        setFieldErrors(
+          result.code === "OVER_CAPACITY"
+            ? {
+                ...result.fieldErrors,
+                [result.message === "participants"
+                  ? "participants"
+                  : "attendeeCount"]: [text],
+              }
+            : (result.fieldErrors ?? {}),
+        );
         toast.error(text);
         if (
           result.code === "BOOKING_CONFLICT" ||

@@ -24,3 +24,17 @@ export function useBookingRange(store?: BookingDraftStore, scope?: string) {
     state.scope === scope ? state.range : null,
   );
 }
+
+export function useBookingAttendeeCount(
+  store?: BookingDraftStore,
+  scope?: string,
+) {
+  const draftStore = useDraftStore(store);
+  const attendeeCount = useStore(draftStore, (state) =>
+    state.scope === scope ? state.draft.attendeeCount : null,
+  );
+  const attendeeCountTouched = useStore(draftStore, (state) =>
+    state.scope === scope ? state.draft.attendeeCountTouched : false,
+  );
+  return { attendeeCount, attendeeCountTouched };
+}

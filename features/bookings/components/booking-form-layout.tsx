@@ -20,6 +20,7 @@ export function BookingFormLayout({
   timeline,
   summary,
   times,
+  attendeeInput,
   titleInput,
   actorInput,
   submitButton,
@@ -40,6 +41,7 @@ export function BookingFormLayout({
   timeline: ReactNode;
   summary: ReactNode;
   times: ReactNode;
+  attendeeInput: ReactNode;
   titleInput: ReactNode;
   actorInput: ReactNode;
   submitButton: ReactNode;
@@ -93,7 +95,7 @@ export function BookingFormLayout({
                       aria-controls={`${id}-details`}
                       onClick={onToggle}
                     >
-                      시간·제목 바꾸기
+                      예약 내용 바꾸기
                       <ChevronDown
                         aria-hidden="true"
                         className={cn("size-3", expanded && "rotate-180")}
@@ -109,6 +111,7 @@ export function BookingFormLayout({
                       className="space-y-2 pb-2"
                     >
                       {times}
+                      {attendeeInput}
                       {titleInput}
                     </div>
                     <div className="flex items-center gap-2">
@@ -125,6 +128,7 @@ export function BookingFormLayout({
                 )}
                 {times}
                 {actorInput}
+                {attendeeInput}
                 {titleInput}
                 {submitButton}
               </>

@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { SpacePhoto } from "@/components/photos/space-photo";
 import { StatusLine } from "@/components/status-line";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   floorHref,
   formatBookingTime,
@@ -63,6 +64,11 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
           </p>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <h3 className="font-semibold">{booking.spaceName}</h3>
+            {booking.attendeeCount != null && (
+              <Badge variant="secondary" className="tabular-nums">
+                {booking.attendeeCount}명
+              </Badge>
+            )}
             <p className="text-sm text-muted-foreground">
               {booking.branchName} {booking.floorName} ·{" "}
               {booking.teamName ?? "개인"}

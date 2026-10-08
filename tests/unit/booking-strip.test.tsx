@@ -330,6 +330,12 @@ describe("shared floor timetable booking strip", () => {
       within(strip).getByRole("textbox", { name: "제목 (선택)" }),
       "공유된 기획 회의",
     );
+    fireEvent.change(within(strip).getByRole("spinbutton"), {
+      target: { value: "5" },
+    });
+    expect(strip.querySelector('[aria-atomic="true"]')).toHaveTextContent(
+      "1시간 · 5명",
+    );
     await userEvent.click(
       within(strip).getByRole("combobox", { name: "예약 방식" }),
     );
@@ -353,11 +359,12 @@ describe("shared floor timetable booking strip", () => {
       within(sheet).getByRole("heading", { name: "회의실 A" }),
     ).toBeVisible();
     await userEvent.click(
-      within(sheet).getByRole("button", { name: "시간·제목 바꾸기" }),
+      within(sheet).getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(
       within(sheet).getByRole("textbox", { name: "제목 (선택)" }),
     ).toHaveValue("공유된 기획 회의");
+    expect(within(sheet).getByRole("spinbutton")).toHaveValue(5);
     expect(
       within(sheet).getByRole("combobox", { name: "예약 방식" }),
     ).toHaveTextContent("기획 팀으로");
@@ -381,6 +388,7 @@ describe("shared floor timetable booking strip", () => {
     expect(
       within(restored).getByRole("textbox", { name: "제목 (선택)" }),
     ).toHaveValue("공유된 기획 회의");
+    expect(within(restored).getByRole("spinbutton")).toHaveValue(5);
     expect(
       within(restored).getByRole("combobox", { name: "예약 방식" }),
     ).toHaveTextContent("기획 팀으로");
@@ -423,6 +431,7 @@ describe("shared floor timetable booking strip", () => {
       end,
       teamId: null,
       title: "",
+      attendeeCount: null,
     });
     expect(
       within(strip).getByRole("button", { name: "예약하고 있어요" }),
@@ -478,7 +487,7 @@ describe("shared floor timetable booking strip", () => {
     view.receive(detailFixture());
     await finish(pending);
     await userEvent.click(
-      within(sheet).getByRole("button", { name: "시간·제목 바꾸기" }),
+      within(sheet).getByRole("button", { name: "예약 내용 바꾸기" }),
     );
     expect(
       within(sheet).getByRole("combobox", { name: "시작" }),

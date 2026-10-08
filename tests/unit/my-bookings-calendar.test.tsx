@@ -132,6 +132,17 @@ beforeEach(() => {
   });
 });
 
+it("shows an attendee badge in the selected calendar day", () => {
+  render(
+    element(data([{ ...booking, attendeeCount: 5 }], "2026-10", "2026-10-08")),
+  );
+  expect(
+    within(screen.getByRole("region", { name: "선택한 날짜 예약" })).getByText(
+      "5명",
+    ),
+  ).toBeVisible();
+});
+
 it("preserves calendar location in the page guard and waits for it before the query", async () => {
   const result = await resolvePageContent(
     BookingsPage({

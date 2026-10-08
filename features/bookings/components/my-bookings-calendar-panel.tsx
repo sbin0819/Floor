@@ -81,6 +81,11 @@ function CalendarBookingCards({
                 {status}
               </Badge>
             )}
+            {booking.attendeeCount != null && (
+              <Badge variant="secondary" className="tabular-nums">
+                {booking.attendeeCount}명
+              </Badge>
+            )}
             {kind !== "past" && (
               <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline">

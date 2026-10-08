@@ -4,6 +4,8 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
+import { AttendeeCountInput } from "@/components/attendee-count-input";
+import { attendeeCountError } from "@/features/bookings/attendee-count";
 import { createBooking } from "@/features/bookings/actions";
 import {
   selectableEnds,
@@ -73,12 +75,31 @@ export function BookingForm({
     else setLocalRange(next);
   };
   const [localTitle, setLocalTitle] = useState("");
+  const [localAttendeeCount, setLocalAttendeeCount] = useState<number | null>(
+    null,
+  );
+  const attendeeInputRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [localActorId, setLocalActorId] = useState(
     data.actors[0]?.teamId ?? "personal",
   );
   const title = workspace ? sharedDraft.title : localTitle;
   const actorId = workspace ? sharedDraft.actorId : localActorId;
+  const showAttendeeCount = data.space.bookable && data.space.capacity !== 1;
+  const attendeeCount = showAttendeeCount
+    ? workspace
+      ? sharedDraft.attendeeCount
+      : localAttendeeCount
+    : null;
+  const attendeeError = attendeeCountError(attendeeCount, data.space.capacity);
+  const setAttendeeCount = (value: number | null) => {
+    if (workspace)
+      workspace.draftStore.getState().changeDraft(scope, {
+        attendeeCount: value,
+        attendeeCountTouched: true,
+      });
+    else setLocalAttendeeCount(value);
+  };
   const setTitle = (value: string) => {
     if (workspace)
       workspace.draftStore.getState().changeDraft(scope, { title: value });
@@ -110,6 +131,7 @@ export function BookingForm({
       limits: actor?.limits,
       isToday,
       restricted: !data.actors.some(({ teamId }) => teamId === null),
+      capacity: data.space.capacity,
     },
     onSuccess: () => {
       // mutation 옵션은 재렌더링으로 바뀔 수 있어 제출 때의 범위로만 정리한다.
@@ -120,12 +142,13 @@ export function BookingForm({
         completed.store
           .getState()
           .changeRange(completed.scope, completed.spaceId, null);
-        completed.store.getState().clearTitle(completed.scope);
+        completed.store.getState().clearBookingContent(completed.scope);
       }
       if (currentScope.current === completed.scope) {
         if (!completed.store) {
           setLocalRange(null);
           setLocalTitle("");
+          setLocalAttendeeCount(null);
         }
         setExpanded(false);
       }
@@ -136,10 +159,16 @@ export function BookingForm({
   if (previousErrors !== mutation.fieldErrors) {
     setPreviousErrors(mutation.fieldErrors);
     if (
-      ["start", "end", "title"].some((key) => mutation.fieldErrors[key]?.length)
+      ["start", "end", "title", "attendeeCount"].some(
+        (key) => mutation.fieldErrors[key]?.length,
+      )
     )
       setExpanded(true);
   }
+  useLayoutEffect(() => {
+    if (mutation.fieldErrors.attendeeCount?.length)
+      attendeeInputRef.current?.focus();
+  }, [mutation.fieldErrors, expanded]);
   const disabled =
     mutation.pending || !data.openHours || !data.space.bookable || !actor;
   const duration = selected
@@ -182,6 +211,7 @@ export function BookingForm({
           <span className="font-normal text-muted-foreground">
             {duration >= 60 ? `${Math.floor(duration / 60)}시간` : ""}
             {duration % 60 ? ` ${duration % 60}분` : ""}
+            {attendeeCount !== null && ` · ${attendeeCount}명`}
           </span>
         </>
       ) : (
@@ -221,6 +251,18 @@ export function BookingForm({
       onChange={setTitle}
     />
   );
+  const attendeeInput = showAttendeeCount && (
+    <AttendeeCountInput
+      id={`${id}-attendee-count`}
+      inputRef={attendeeInputRef}
+      value={attendeeCount}
+      capacity={data.space.capacity}
+      disabled={disabled}
+      error={mutation.fieldErrors.attendeeCount?.[0]}
+      className={variant === "strip" ? "min-w-36" : undefined}
+      onChange={setAttendeeCount}
+    />
+  );
   const actorInput = data.hasTeams && (
     <BookingActorField
       id={id}
@@ -241,7 +283,7 @@ export function BookingForm({
       className={
         variant === "panel" ? "min-w-0 flex-1" : "col-span-2 lg:w-auto"
       }
-      disabled={disabled || !selected}
+      disabled={disabled || !selected || Boolean(attendeeError)}
     >
       {mutation.pending && (
         <LoaderCircle
@@ -281,6 +323,7 @@ export function BookingForm({
       message={mutation.message}
       summary={summary}
       times={times}
+      attendeeInput={attendeeInput}
       titleInput={titleInput}
       actorInput={actorInput}
       submitButton={submitButton}
@@ -288,7 +331,14 @@ export function BookingForm({
       onToggle={() => setExpanded((value) => !value)}
       onSubmit={(event) => {
         event.preventDefault();
-        if (!actor || !selectedStart || !selectedEnd || disabled) return;
+        if (
+          !actor ||
+          !selectedStart ||
+          !selectedEnd ||
+          disabled ||
+          attendeeError
+        )
+          return;
         submitted.current = {
           scope,
           spaceId: data.space.id,
@@ -301,6 +351,7 @@ export function BookingForm({
           end: selectedEnd,
           teamId: actor.teamId,
           title,
+          attendeeCount,
         });
       }}
       timeline={

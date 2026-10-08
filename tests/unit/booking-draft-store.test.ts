@@ -13,7 +13,12 @@ describe("scoped booking draft store", () => {
     const store = createBookingDraftStore();
     expect(store.getState()).toMatchObject({
       scope: null,
-      draft: { title: "", actorId: null },
+      draft: {
+        title: "",
+        actorId: null,
+        attendeeCount: null,
+        attendeeCountTouched: false,
+      },
       range: null,
     });
     expect(store.getInitialState()).toBe(store.getState());
@@ -82,7 +87,7 @@ describe("scoped booking draft store", () => {
     const snapshot = store.getState();
     store.getState().changeDraft(first, { title: "늦은 제목" });
     store.getState().changeRange(first, "space-a", null);
-    store.getState().clearTitle(first);
+    store.getState().clearBookingContent(first);
     expect(store.getState()).toBe(snapshot);
   });
 
@@ -94,7 +99,7 @@ describe("scoped booking draft store", () => {
       .changeDraft(first, { title: "예약 제목", actorId: "team" });
     store.getState().changeRange(first, "space-a", range);
     store.getState().changeRange(first, "space-a", null);
-    store.getState().clearTitle(first);
+    store.getState().clearBookingContent(first);
     expect(store.getState()).toMatchObject({
       scope: first,
       draft: { title: "", actorId: "team" },
@@ -116,5 +121,44 @@ describe("scoped booking draft store", () => {
     store.getState().changeRange(first, "space-a", range);
     expect(listener).not.toHaveBeenCalled();
     unsubscribe();
+  });
+
+  it("publishes attendee-only changes and clears their touched state with booking content", () => {
+    const store = createBookingDraftStore();
+    store.getState().activate(first);
+    store.getState().changeDraft(first, { actorId: "team" });
+    const listener = vi.fn();
+    store.subscribe(listener);
+    store
+      .getState()
+      .changeDraft(first, { attendeeCount: 5, attendeeCountTouched: true });
+    expect(listener).toHaveBeenCalledOnce();
+    store
+      .getState()
+      .changeDraft(first, { attendeeCount: 5, attendeeCountTouched: true });
+    expect(listener).toHaveBeenCalledOnce();
+    store.getState().clearBookingContent(second);
+    expect(store.getState().draft.attendeeCount).toBe(5);
+    store.getState().clearBookingContent(first);
+    expect(store.getState().draft).toEqual({
+      title: "",
+      actorId: "team",
+      attendeeCount: null,
+      attendeeCountTouched: false,
+    });
+  });
+
+  it("retains a manually emptied count until scope changes and resets count on another scope", () => {
+    const store = createBookingDraftStore();
+    store.getState().activate(first);
+    store
+      .getState()
+      .changeDraft(first, { attendeeCount: null, attendeeCountTouched: true });
+    expect(store.getState().draft.attendeeCountTouched).toBe(true);
+    store.getState().activate(second);
+    expect(store.getState().draft).toMatchObject({
+      attendeeCount: null,
+      attendeeCountTouched: false,
+    });
   });
 });
