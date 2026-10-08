@@ -94,8 +94,12 @@ export function createPeopleQueries(
       if (!rows) throw new ActionError("NOT_FOUND");
       return { settings, ...rows };
     },
-    async getMessageContacts(): Promise<MessageContact[]> {
+    async getMessageContacts(options?: {
+      rateLimit: true;
+    }): Promise<MessageContact[]> {
       const me = await session();
+      if (options?.rateLimit)
+        consume(`people-contacts:${me.userId}`, 30, 60_000);
       return people.listMessageContacts(me.userId, database);
     },
   };

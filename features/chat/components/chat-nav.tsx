@@ -29,6 +29,7 @@ import { spaceIconColors } from "../space-schema";
 import { ChatMentions } from "./chat-mentions";
 import { DirectMessageList } from "./direct-message-list";
 import { MeetingList } from "./meeting-list";
+import { QuickSwitcher } from "./quick-switcher";
 
 const spaceSchema = z.array(
   z.object({
@@ -253,6 +254,7 @@ export function ChatNavSync({
   }, [activity, refetch]);
   return (
     <>
+      <QuickSwitcher userId={userId} />
       <StatusSync status={query.data.myStatus} />
       <ChatMentions
         userId={userId}

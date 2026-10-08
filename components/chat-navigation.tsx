@@ -19,6 +19,7 @@ import { SpaceAdd } from "@/features/chat/components/space-add";
 import { SpaceMenu } from "@/features/chat/components/space-menu";
 import { spaceColorClasses } from "@/features/chat/components/space-colors";
 import { ChannelDialog } from "@/features/chat/components/channel-dialog";
+import { QuickSwitchButton } from "@/features/chat/components/quick-switcher";
 import {
   shouldInterceptNavigation,
   useRouterOptimisticNavigation,
@@ -183,6 +184,7 @@ export function ChatSidebarNavigation({
   if (!space)
     return (
       <div className="space-y-6">
+        <QuickSwitchButton className="hidden xl:flex" />
         <MemberNav />
         {now && <MeetingList rows={meetings} now={now} />}
         <DirectMessageList rows={directMessages} limit={10} />

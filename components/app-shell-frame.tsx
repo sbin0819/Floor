@@ -20,6 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ChatRailNavigation } from "@/components/chat-navigation";
+import { QuickSwitchButton } from "@/features/chat/components/quick-switcher";
 import {
   CloseOnRouteChange,
   MemberSectionName,
@@ -166,6 +167,7 @@ export function AppShellFrame({
                   <Menu aria-hidden="true" className="size-5" />
                 </Button>
               </SheetTrigger>
+              <QuickSwitchButton compact className="xl:hidden" />
               <Suspense
                 fallback={<span aria-hidden="true" className="h-6 w-16" />}
               >
