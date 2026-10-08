@@ -1,18 +1,9 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { ChevronDown, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { createBooking } from "@/features/bookings/actions";
 import {
   selectableEnds,
@@ -27,65 +18,13 @@ import { BookingTimeline } from "./booking-timeline";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { useBookingMutation } from "./use-booking-mutation";
 import { useFloorSelection } from "./branch-workspace";
-
-function TimeSelect({
-  id,
-  label,
-  value,
-  disabled,
-  onChange,
-  options,
-  error,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  error?: string;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label htmlFor={id}>{label}</Label>
-      <Select
-        value={value}
-        onValueChange={(next) => {
-          // 종료 옵션이 새로 생길 때 네이티브 폼 동기화가 보내는 빈 값은 선택이 아니다.
-          if (options.some((option) => option.value === next)) onChange(next);
-        }}
-        disabled={disabled}
-      >
-        <SelectTrigger
-          id={id}
-          className="min-h-11 w-full tabular-nums"
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${id}-error` : undefined}
-        >
-          <SelectValue placeholder={`${label} 시각 선택`}>
-            {options.find((option) => option.value === value)?.label}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem
-              className="min-h-11 tabular-nums"
-              key={option.value}
-              value={option.value}
-            >
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {error && (
-        <p id={`${id}-error`} className="text-xs text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
+import {
+  BookingTimeFields,
+  BookingTitleField,
+  BookingActorField,
+  type BookingFormVariant,
+} from "./booking-form-fields";
+import { BookingFormLayout } from "./booking-form-layout";
 
 export function BookingForm({
   data,
@@ -93,7 +32,7 @@ export function BookingForm({
   onBooked,
 }: {
   data: SpaceDayData;
-  variant?: "panel" | "strip";
+  variant?: BookingFormVariant;
   onBooked?: () => void;
 }) {
   const id = useId();
@@ -216,93 +155,50 @@ export function BookingForm({
     </p>
   );
   const times = (
-    <div
-      className={cn(
-        "grid grid-cols-2 gap-3",
-        variant === "strip" && "col-span-2 min-w-56 lg:flex-1",
-      )}
-    >
-      <TimeSelect
-        id={`${id}-start`}
-        label="시작"
-        value={selectedStart}
-        disabled={disabled}
-        onChange={(value) =>
-          setRange({ start: value, end: suggestedEnd(slots, value) })
-        }
-        options={slots
-          .filter((slot) => slot.state === "free")
-          .map((slot) => ({ value: slot.start, label: slot.label }))}
-        error={mutation.fieldErrors.start?.[0]}
-      />
-      <TimeSelect
-        id={`${id}-end`}
-        label="끝"
-        value={selectedEnd}
-        disabled={disabled || !selectedStart}
-        onChange={(value) => setRange({ start, end: value })}
-        options={ends.map((slot) => ({
-          value: slot.end,
-          label: slot.endLabel,
-        }))}
-        error={mutation.fieldErrors.end?.[0]}
-      />
-    </div>
+    <BookingTimeFields
+      id={id}
+      variant={variant}
+      start={selectedStart}
+      end={selectedEnd}
+      disabled={disabled}
+      onStartChange={(value) =>
+        setRange({ start: value, end: suggestedEnd(slots, value) })
+      }
+      onEndChange={(value) => setRange({ start, end: value })}
+      startOptions={slots
+        .filter((slot) => slot.state === "free")
+        .map((slot) => ({ value: slot.start, label: slot.label }))}
+      endOptions={ends.map((slot) => ({
+        value: slot.end,
+        label: slot.endLabel,
+      }))}
+      startError={mutation.fieldErrors.start?.[0]}
+      endError={mutation.fieldErrors.end?.[0]}
+    />
   );
   const titleInput = (
-    <div className={cn("space-y-1", variant === "strip" && "min-w-32 flex-1")}>
-      <Label htmlFor={`${id}-title`}>제목 (선택)</Label>
-      <Input
-        id={`${id}-title`}
-        value={title}
-        maxLength={60}
-        disabled={disabled}
-        aria-invalid={Boolean(mutation.fieldErrors.title)}
-        aria-describedby={
-          mutation.fieldErrors.title ? `${id}-title-error` : undefined
-        }
-        onChange={(event) => setTitle(event.target.value)}
-      />
-      {mutation.fieldErrors.title && (
-        <p id={`${id}-title-error`} className="text-xs text-destructive">
-          {mutation.fieldErrors.title[0]}
-        </p>
-      )}
-    </div>
+    <BookingTitleField
+      id={id}
+      variant={variant}
+      value={title}
+      disabled={disabled}
+      errors={mutation.fieldErrors.title}
+      onChange={setTitle}
+    />
   );
   const actorInput = data.hasTeams && (
-    <div
-      className={cn(
-        variant === "strip" ? "min-w-32 space-y-1" : "min-w-0 flex-1",
-      )}
-    >
-      <Label
-        htmlFor={`${id}-actor`}
-        className={variant === "panel" ? "sr-only" : undefined}
-      >
-        예약 방식
-      </Label>
-      <Select
-        value={actor?.teamId ?? "personal"}
-        onValueChange={setActorId}
-        disabled={disabled}
-      >
-        <SelectTrigger id={`${id}-actor`} className="min-h-11 w-full">
-          <SelectValue placeholder="예약 방식 선택">{actor?.name}</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {data.actors.map((item) => (
-            <SelectItem
-              className="min-h-11"
-              key={item.teamId ?? "personal"}
-              value={item.teamId ?? "personal"}
-            >
-              {item.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <BookingActorField
+      id={id}
+      variant={variant}
+      value={actor?.teamId ?? "personal"}
+      label={actor?.name}
+      options={data.actors.map((item) => ({
+        value: item.teamId ?? "personal",
+        label: item.name,
+      }))}
+      disabled={disabled}
+      onChange={setActorId}
+    />
   );
   const submitButton = (
     <Button
@@ -337,146 +233,60 @@ export function BookingForm({
     </p>
   );
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {variant === "panel" && (
-        <div
-          data-booking-scroll="true"
-          className="min-h-[280px] flex-1 overflow-y-auto overscroll-contain p-3"
-        >
-          <BookingTimeline
-            branchId={data.branch.id}
-            slots={slots}
-            bookings={data.bookings}
-            blocks={data.blocks}
-            timeZone={data.branch.timezone}
-            now={data.now}
-            date={data.date}
-            start={selectedStart}
-            end={selectedEnd}
-            disabled={disabled}
-            renderCancel={(bookingId) => (
-              <CancelBookingButton bookingId={bookingId} />
-            )}
-            onSelect={(value) => {
-              const selection = selectBookingSlot(
-                slots,
-                selected ? { start: selectedStart, end: selectedEnd } : null,
-                value,
-              );
-              if (selection) setRange(selection);
-            }}
-          />
-        </div>
-      )}
-      <form
-        aria-label="예약 양식"
-        data-booking-variant={variant}
-        className={cn(
-          "shrink-0 bg-card",
-          variant === "panel"
-            ? "space-y-1 border-t border-border p-3"
-            : "grid min-w-0 grid-cols-2 items-end gap-3 lg:flex lg:flex-wrap",
-        )}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!actor || !selectedStart || !selectedEnd || disabled) return;
-          void mutation.submit({
-            spaceId: data.space.id,
-            start: selectedStart,
-            end: selectedEnd,
-            teamId: actor.teamId,
-            title,
-          });
-        }}
-      >
-        {!data.space.bookable ? (
-          <p>
-            예약 없이 이용해요
-            {data.space.deskCount > 0 && (
-              <span className="block tabular-nums">
-                좌석 {data.space.deskCount}석 · 좌석 예약은 준비 중이에요
-              </span>
-            )}
-          </p>
-        ) : (
-          <>
-            {variant === "panel" ? (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-x-2">
-                  {summary}
-                  {selected && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-1 text-xs text-primary"
-                      disabled={disabled}
-                      aria-expanded={expanded}
-                      aria-controls={`${id}-details`}
-                      onClick={() => setExpanded((value) => !value)}
-                    >
-                      시간·제목 바꾸기
-                      <ChevronDown
-                        aria-hidden="true"
-                        className={cn("size-3", expanded && "rotate-180")}
-                      />
-                    </Button>
-                  )}
-                </div>
-                {selected && (
-                  <>
-                    <div
-                      id={`${id}-details`}
-                      hidden={!expanded}
-                      className="space-y-2 pb-2"
-                    >
-                      {times}
-                      {titleInput}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {actorInput}
-                      {submitButton}
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <>
-                {!selected && (
-                  <div className="col-span-2 basis-full">{summary}</div>
-                )}
-                {times}
-                {actorInput}
-                {titleInput}
-                {submitButton}
-              </>
-            )}
-            {limit}
-            {overLimit && (
-              <p
-                aria-live="polite"
-                className={cn(
-                  "text-xs text-muted-foreground",
-                  variant === "strip" && "order-last col-span-2 basis-full",
-                )}
-              >
-                선택한 시간이 예약 한도를 넘어요. 시간을 줄이거나 예약할 때
-                확인해 주세요
-              </p>
-            )}
-            {!actor && <p>이 공간을 예약할 권한이 없어요</p>}
-          </>
-        )}
-        <p
-          role="status"
-          aria-live="polite"
-          className={cn(
-            "text-sm text-destructive empty:hidden",
-            variant === "strip" && "order-last col-span-2 basis-full",
+    <BookingFormLayout
+      id={id}
+      variant={variant}
+      bookable={data.space.bookable}
+      deskCount={data.space.deskCount}
+      selected={selected}
+      expanded={expanded}
+      disabled={disabled}
+      hasActor={Boolean(actor)}
+      overLimit={Boolean(overLimit)}
+      message={mutation.message}
+      summary={summary}
+      times={times}
+      titleInput={titleInput}
+      actorInput={actorInput}
+      submitButton={submitButton}
+      limit={limit}
+      onToggle={() => setExpanded((value) => !value)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!actor || !selectedStart || !selectedEnd || disabled) return;
+        void mutation.submit({
+          spaceId: data.space.id,
+          start: selectedStart,
+          end: selectedEnd,
+          teamId: actor.teamId,
+          title,
+        });
+      }}
+      timeline={
+        <BookingTimeline
+          branchId={data.branch.id}
+          slots={slots}
+          bookings={data.bookings}
+          blocks={data.blocks}
+          timeZone={data.branch.timezone}
+          now={data.now}
+          date={data.date}
+          start={selectedStart}
+          end={selectedEnd}
+          disabled={disabled}
+          renderCancel={(bookingId) => (
+            <CancelBookingButton bookingId={bookingId} />
           )}
-        >
-          {mutation.message}
-        </p>
-      </form>
-    </div>
+          onSelect={(value) => {
+            const selection = selectBookingSlot(
+              slots,
+              selected ? { start: selectedStart, end: selectedEnd } : null,
+              value,
+            );
+            if (selection) setRange(selection);
+          }}
+        />
+      }
+    />
   );
 }
