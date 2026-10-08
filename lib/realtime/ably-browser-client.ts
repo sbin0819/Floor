@@ -53,8 +53,22 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("friend.changed") }),
   z.object({ type: z.literal("notifications.changed") }),
   z.object({
+    type: z.literal("room.read"),
+    roomId: z.string(),
+    userId: z.string(),
+    seq: z.number().int().nonnegative(),
+  }),
+  z.object({
     type: z.literal("room.activity"),
-    spaceId: z.string(),
+    spaceId: z.string().nullable(),
+    roomKind: z.enum(["text", "voice", "dm", "group_dm", "meeting"]),
+    preview: z
+      .object({
+        messageId: z.string(),
+        authorName: z.string(),
+        excerpt: z.string(),
+      })
+      .nullable(),
     roomId: z.string(),
     seq: z.number().int().positive(),
     authorId: z.string().nullable(),
@@ -111,7 +125,8 @@ const eventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("mention.created"),
-    spaceId: z.string(),
+    spaceId: z.string().nullable(),
+    roomKind: z.enum(["text", "voice", "dm", "group_dm", "meeting"]),
     roomId: z.string(),
     roomName: z.string(),
     messageId: z.string(),

@@ -195,6 +195,8 @@ describe("Ably SDK bridge", () => {
     sdk.subscribe.mock.calls[0]?.[0]({
       data: {
         type: "room.activity",
+        roomKind: "text",
+        preview: null,
         spaceId: "a",
         roomId: "b",
         seq: 3,
@@ -205,6 +207,8 @@ describe("Ably SDK bridge", () => {
     });
     expect(listener).toHaveBeenCalledExactlyOnceWith({
       type: "room.activity",
+      roomKind: "text",
+      preview: null,
       spaceId: "a",
       roomId: "b",
       seq: 3,
@@ -240,6 +244,29 @@ describe("Ably SDK bridge", () => {
       editedAt: "2026-10-08T01:00:00Z",
     },
     { type: "message.deleted", roomId: "a", id: "m", seq: 1 },
+    { type: "room.read", roomId: "a", userId: "u", seq: 1 },
+    { type: "friend.changed" },
+    { type: "notifications.changed" },
+    {
+      type: "room.activity",
+      roomId: "a",
+      spaceId: null,
+      roomKind: "dm",
+      seq: 1,
+      authorId: "u",
+      preview: { messageId: "m", authorName: "김서연", excerpt: "안녕하세요" },
+    },
+    {
+      type: "mention.created",
+      roomId: "a",
+      spaceId: null,
+      roomKind: "dm",
+      roomName: "김서연",
+      seq: 1,
+      messageId: "m",
+      authorName: "김서연",
+      excerpt: "@모두",
+    },
     {
       type: "reaction.changed",
       roomId: "a",
@@ -260,6 +287,7 @@ describe("Ably SDK bridge", () => {
     },
     {
       type: "mention.created",
+      roomKind: "text",
       spaceId: "s",
       roomId: "a",
       roomName: "일반",

@@ -187,6 +187,7 @@ describe("Ably server publishing", () => {
           channel: "room:b",
           event: {
             type: "mention.created",
+            roomKind: "text",
             spaceId: "a",
             roomId: "b",
             roomName: "일반",

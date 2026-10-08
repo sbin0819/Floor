@@ -258,6 +258,8 @@ describe("Ably browser connection ownership", () => {
     );
     client.channel("space:b").emit({
       type: "room.activity",
+      roomKind: "text",
+      preview: null,
       spaceId: "b",
       roomId: "two",
       seq: 1,
@@ -265,6 +267,8 @@ describe("Ably browser connection ownership", () => {
     });
     expect(onEvent).toHaveBeenCalledExactlyOnceWith({
       type: "room.activity",
+      roomKind: "text",
+      preview: null,
       spaceId: "b",
       roomId: "two",
       seq: 1,
