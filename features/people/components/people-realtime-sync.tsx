@@ -33,7 +33,8 @@ export function PeopleRealtimeSync({ userId }: { userId: string }) {
       current.friends = setTimeout(() => {
         current.friends = null;
         void client.invalidateQueries({ queryKey: ["people"] });
-        if (path.current === "/friends") router.refresh();
+        if (path.current === "/friends" || /^\/dm\/[^/]+$/.test(path.current))
+          router.refresh();
       }, 150);
     }
     if (

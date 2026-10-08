@@ -16,6 +16,7 @@ import {
   ChannelScreen,
 } from "@/features/chat/components/channel-screen";
 import { useDirectPeerRead } from "@/features/chat/components/use-direct-peer-read";
+import { PeopleRealtimeSync } from "@/features/people/components/people-realtime-sync";
 import {
   emptyMessageDetails,
   type ChatMessage,
@@ -37,6 +38,7 @@ const live = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/dm/room",
   useRouter: () => ({ refresh: live.refresh }),
 }));
 vi.mock("@/features/chat/actions", () => ({
@@ -151,12 +153,14 @@ function setup(
       data: { ...message(4), body, clientId },
     }),
   ),
+  withPeopleSync = false,
 ) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const ui = (snapshot: DirectMessageView) => (
     <QueryClientProvider client={client}>
+      {withPeopleSync && <PeopleRealtimeSync userId={me} />}
       <DirectMessageScreen data={snapshot} send={send} />
     </QueryClientProvider>
   );
@@ -165,6 +169,7 @@ function setup(
 let restore: () => void;
 beforeEach(() => {
   vi.clearAllMocks();
+  live.refresh.mockReset();
   live.listeners.clear();
   live.lifecycle.clear();
   restore = installChatViewport();
@@ -172,6 +177,24 @@ beforeEach(() => {
 afterEach(() => restore());
 
 describe("shared direct message screen", () => {
+  it("replaces stale DM permissions and composer after another tab blocks the peer", async () => {
+    const { rerender, ui } = setup(view(), undefined, true);
+    expect(screen.getByRole("combobox", { name: "메시지" })).toBeVisible();
+    live.refresh.mockImplementation(() => {
+      rerender(ui(view({ blockedByMe: true, canWrite: false })));
+    });
+    act(() => {
+      for (const receive of live.listeners) receive({ type: "friend.changed" });
+    });
+    await waitFor(() =>
+      expect(screen.getByText("차단한 사용자예요")).toBeVisible(),
+    );
+    expect(
+      screen.queryByRole("combobox", { name: "메시지" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "차단 풀기" })).toBeVisible();
+    expect(live.refresh).toHaveBeenCalledOnce();
+  });
   it("shows the recipient request, allows an accepting reply, and never shows a pending read receipt", () => {
     setup(view({ request: { role: "recipient" }, peerReadSeq: 3 }));
     expect(

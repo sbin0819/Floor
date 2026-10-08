@@ -45,6 +45,8 @@ function setup(
       },
     ],
     directMessages: [],
+    myStatus: "online",
+    blockedUserIds: [],
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>

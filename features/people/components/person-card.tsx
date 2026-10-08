@@ -20,18 +20,18 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import type { PersonProfile } from "../types";
-import {
-  FriendControls,
-  MessagePersonButton,
-  type FriendActions,
-} from "./friend-controls";
+import type { FriendActions } from "./friend-controls";
+import { ProfilePersonActions } from "./person-actions";
+import { PersonStatus } from "./person-status";
 
 const profileSchema = z.strictObject({
   userId: z.uuid(),
   name: z.string(),
   username: z.string().nullable(),
   isMe: z.boolean(),
-  relation: z.enum(["none", "friend", "incoming", "outgoing"]).nullable(),
+  relation: z
+    .enum(["none", "friend", "incoming", "outgoing", "blocked"])
+    .nullable(),
   sharedSpaces: z.array(z.strictObject({ id: z.uuid(), name: z.string() })),
   directRoomId: z.uuid().nullable(),
   canDirectMessage: z.boolean(),
@@ -175,6 +175,11 @@ export function PersonProfileContent({
           {Array.from(person.name.trim())[0] ?? "?"}
         </span>
         <h2 className="text-lg font-bold">{person.name}</h2>
+        <PersonStatus
+          userId={person.userId}
+          sharesSpace={person.sharedSpaces.length > 0}
+          showLabel
+        />
         {person.username && (
           <p className="text-sm text-muted-foreground">@{person.username}</p>
         )}
@@ -203,27 +208,7 @@ export function PersonProfileContent({
           <Link href="/settings">설정</Link>
         </Button>
       ) : (
-        <div className="space-y-3">
-          {!person.canDirectMessage && (
-            <p className="text-sm text-muted-foreground">
-              친구가 되면 메시지를 보낼 수 있어요
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-2">
-            {person.canDirectMessage && (
-              <MessagePersonButton
-                person={person}
-                action={actions?.openDirect}
-              />
-            )}
-            <FriendControls
-              person={person}
-              relation={person.relation ?? "none"}
-              actions={actions}
-              profile
-            />
-          </div>
-        </div>
+        <ProfilePersonActions person={person} actions={actions} />
       )}
     </div>
   );

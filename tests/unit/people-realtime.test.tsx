@@ -80,6 +80,28 @@ describe("people and notification change events", () => {
     expect(invalidate).toHaveBeenCalledOnce();
     expect(mocks.refresh).not.toHaveBeenCalled();
   });
+  it("refreshes the active DM once after an own-account relationship change from another tab", () => {
+    mocks.pathname = "/dm/room";
+    const { invalidate } = setup();
+    act(() => {
+      mocks.receive({ type: "friend.changed" });
+      mocks.receive({ type: "friend.changed" });
+      vi.advanceTimersByTime(150);
+    });
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(invalidate).toHaveBeenCalledExactlyOnceWith({
+      queryKey: ["people"],
+    });
+  });
+  it("does not refresh an abandoned DM when a relationship event was queued before navigation", () => {
+    mocks.pathname = "/dm/room";
+    const { rerender, ui } = setup();
+    act(() => mocks.receive({ type: "friend.changed" }));
+    mocks.pathname = "/messages";
+    rerender(ui());
+    act(() => vi.advanceTimersByTime(150));
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
   it("cancels delayed work on Activity hide and on account changes", () => {
     const { invalidate, rerender, ui } = setup();
     act(() => {

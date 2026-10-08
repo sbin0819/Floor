@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithQuery as render } from "../helpers/query-render";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AccountMenuPlaceholder,
@@ -11,6 +12,7 @@ import type { Session } from "@/lib/auth/types";
 vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }));
 vi.mock("@/features/auth/queries", () => ({ getAccountMenuData: vi.fn() }));
 vi.mock("@/lib/auth/client", () => ({ authClient: { signOut: vi.fn() } }));
+vi.mock("@/features/people/actions", () => ({ setStatus: vi.fn() }));
 
 const session: Session = {
   userId: "e10c07ac-715a-4071-bce5-e2b8f117a2ac",
@@ -25,6 +27,8 @@ beforeEach(() => {
     name: session.name,
     email: session.email,
     isOperator: false,
+    myStatus: "online",
+    username: null,
   });
 });
 
@@ -47,6 +51,8 @@ describe("shell account slots", () => {
         name: session.name,
         email: session.email,
         isOperator: false,
+        myStatus: "online",
+        username: null,
       });
       render(result);
       expect(

@@ -9,8 +9,24 @@ const readOnlyAction: (
 
 export const createBooking = readOnlyAction;
 export const sendMessage = readOnlyAction;
+export const editMessage = readOnlyAction;
+export const deleteMessage = readOnlyAction;
+export const setReaction = readOnlyAction;
+export const setRoomMuted = readOnlyAction;
+export const setSpaceMuted = readOnlyAction;
 export const openDirectMessage = readOnlyAction;
+export const sendMessageRequest = readOnlyAction;
+export const respondMessageRequest = readOnlyAction;
+export const createGroupDm = readOnlyAction;
+export const addGroupMembers = readOnlyAction;
+export const leaveGroupDm = readOnlyAction;
+export const renameGroupDm = readOnlyAction;
+export const blockUser = readOnlyAction;
+export const unblockUser = readOnlyAction;
+export const reportUser = readOnlyAction;
+export const reportMessage = readOnlyAction;
 export const setUsername = readOnlyAction;
+export const setStatus = readOnlyAction;
 export const sendFriendRequest = readOnlyAction;
 export const respondFriendRequest = readOnlyAction;
 export const cancelFriendRequest = readOnlyAction;

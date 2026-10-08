@@ -296,7 +296,7 @@ describe("member app shell frame", () => {
   });
 
   it("closes from the portalled account operator link and returns focus to the drawer trigger", async () => {
-    render(frame({ realAccount: true }));
+    renderWithQuery(frame({ realAccount: true }));
     const { user, dialog, trigger } = await openDrawer();
     await user.click(
       within(dialog).getByRole("button", { name: "가상 회원님 사용자 메뉴" }),
@@ -424,3 +424,4 @@ describe("shell route observer", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 });
+import { renderWithQuery } from "../helpers/query-render";

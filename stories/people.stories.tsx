@@ -24,6 +24,7 @@ const person: PersonProfile = {
   canDirectMessage: true,
 };
 const data: FriendsView = {
+  messageRequestCount: 0,
   settings: {
     username: "haeun.kim",
     usernameChangedAt: null,
@@ -84,7 +85,9 @@ function FriendsExample({
           }}
           tab={tab}
           actions={actions}
-          search={async () => [{ ...data.rows[0]!, relation: "friend" }]}
+          search={async () => [
+            { ...data.rows[0]!, relation: "friend", canDirectMessage: true },
+          ]}
           saveUsername={async (input) => ({
             ok: true,
             data: { username: (input as { username: string }).username },

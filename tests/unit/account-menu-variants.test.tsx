@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
+import { renderWithQuery as render } from "../helpers/query-render";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@/components/account-menu";
@@ -32,9 +33,7 @@ describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
       const trigger = screen.getByRole("button", {
         name: `${profile.name}님 사용자 메뉴`,
       });
-      expect(trigger).toHaveTextContent(
-        variant === "card" ? "가가상 회원" : "가",
-      );
+      expect(within(trigger).getByText("가")).toBeVisible();
       expect(screen.queryByText(profile.email)).not.toBeInTheDocument();
       if (variant === "card") {
         expect(trigger).toHaveClass("h-14", "w-full");
@@ -43,10 +42,10 @@ describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
           "font-semibold",
         );
         expect(within(trigger).getByText("가")).toHaveClass("size-8");
-        expect(trigger.querySelector("svg")).toHaveClass(
+        expect(trigger.querySelector("svg.lucide")).toHaveClass(
           "lucide-chevrons-up-down",
         );
-        expect(trigger.querySelector("svg")).toHaveAttribute(
+        expect(trigger.querySelector("svg.lucide")).toHaveAttribute(
           "aria-hidden",
           "true",
         );
@@ -55,7 +54,7 @@ describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
         expect(
           within(trigger).queryByText(profile.name),
         ).not.toBeInTheDocument();
-        expect(trigger.querySelector("svg")).toBeNull();
+        expect(trigger.querySelector("svg.lucide")).toBeNull();
       }
 
       await user.click(trigger);
@@ -83,8 +82,10 @@ describe.each(["card", "avatar"] as const)("%s account menu", (variant) => {
     await user.tab();
     await user.keyboard("{Enter}");
     await waitFor(() =>
-      expect(screen.getByRole("menuitem", { name: "설정" })).toHaveFocus(),
+      expect(screen.getByRole("menuitemradio", { name: "온라인" })).toHaveFocus(),
     );
+    await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}");
+    expect(screen.getByRole("menuitem", { name: "설정" })).toHaveFocus();
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("menuitem", { name: "로그아웃" })).toHaveFocus();
     await user.keyboard("{Enter}");

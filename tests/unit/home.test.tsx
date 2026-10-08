@@ -118,6 +118,8 @@ beforeEach(() => {
     name: "가상 회원",
     email: "member@example.test",
     isOperator: false,
+    myStatus: "online",
+    username: null,
   });
 });
 
@@ -186,6 +188,8 @@ it("shows team roles and the operator destination without a personal limit card"
     name: "가상 회원",
     email: "member@example.test",
     isOperator: true,
+    myStatus: "online",
+    username: null,
   });
   await displayHome();
   expect(screen.getByRole("link", { name: /가상 팀/ })).toHaveAttribute(

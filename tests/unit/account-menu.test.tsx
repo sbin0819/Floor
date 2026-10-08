@@ -1,13 +1,8 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "@/components/account-menu";
+import { renderWithQuery as render } from "../helpers/query-render";
 
 const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
@@ -18,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/client", () => ({
   authClient: { signOut: mocks.signOut },
 }));
+vi.mock("@/features/people/actions", () => ({ setStatus: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
 }));
@@ -75,8 +71,12 @@ describe("account menu", () => {
     await user.tab();
     await user.keyboard("{Enter}");
     await waitFor(() =>
-      expect(screen.getByRole("menuitem", { name: "설정" })).toHaveFocus(),
+      expect(
+        screen.getByRole("menuitemradio", { name: /온라인/ }),
+      ).toHaveFocus(),
     );
+    await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}");
+    expect(screen.getByRole("menuitem", { name: "설정" })).toHaveFocus();
     await user.keyboard("{ArrowDown}");
     const item = screen.getByRole("menuitem", { name: "로그아웃" });
     await waitFor(() => expect(item).toHaveFocus());

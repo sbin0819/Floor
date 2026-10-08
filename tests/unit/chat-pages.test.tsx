@@ -37,6 +37,8 @@ beforeEach(() => {
   mocks.nav.mockResolvedValue({
     spaces: [{ id: spaceId, channels: [{ id: roomId }] }],
     directMessages: [],
+    myStatus: "online",
+    blockedUserIds: [],
   });
   mocks.channel.mockResolvedValue(null);
   mocks.redirect.mockImplementation((path: string) => {
@@ -71,7 +73,12 @@ describe("chat route boundaries", () => {
   it.each([{ nav: [] }, { nav: [{ id: spaceId, channels: [] }] }])(
     "does not reveal an inaccessible or channel-less space",
     async ({ nav }) => {
-      mocks.nav.mockResolvedValue({ spaces: nav, directMessages: [] });
+      mocks.nav.mockResolvedValue({
+        spaces: nav,
+        directMessages: [],
+        myStatus: "online",
+        blockedUserIds: [],
+      });
       const page = SpacePage({ params: Promise.resolve({ spaceId }) });
       await expect(resolvePageContent(page.props.children)).rejects.toThrow(
         "not-found",
@@ -108,7 +115,12 @@ describe("chat route boundaries", () => {
     expect(mocks.channel).not.toHaveBeenCalled();
   });
   it("guards messages independently and leaves its fixed title outside Suspense", async () => {
-    mocks.nav.mockResolvedValue({ spaces: [], directMessages: [] });
+    mocks.nav.mockResolvedValue({
+      spaces: [],
+      directMessages: [],
+      myStatus: "online",
+      blockedUserIds: [],
+    });
     const page = MessagesPage();
     expect(page.props.children.type).toBe(Suspense);
     const content = await resolvePageContent(page.props.children);

@@ -94,6 +94,8 @@ describe("member shell streaming", () => {
       expect((await slot()).props.data).toEqual({
         spaces: [],
         directMessages: [],
+        myStatus: "online",
+        blockedUserIds: [],
       });
     }
     expect(mocks.nav).not.toHaveBeenCalled();

@@ -16,6 +16,9 @@ import {
 const mock = vi.hoisted(() => ({ toast: vi.fn(), push: vi.fn() }));
 vi.mock("sonner", () => ({ toast: mock.toast }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mock.push }) }));
+vi.mock("@/features/chat/components/use-chat-metadata", () => ({
+  useChatMetadata: () => ({ myStatus: "online", blockedUserIds: [] }),
+}));
 const base = {
   id: "friend",
   read: false,

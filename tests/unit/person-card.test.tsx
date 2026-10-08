@@ -172,7 +172,7 @@ describe("PersonCard", () => {
     ["outgoing", "요청 보냄"],
     ["incoming", "요청 수락"],
   ] as const)(
-    "shows the %s relationship and blocks DM without permission",
+    "shows the %s relationship and opens a message request instead of a direct conversation",
     async (relation, label) => {
       const { element } = card({
         ...person,
@@ -185,12 +185,14 @@ describe("PersonCard", () => {
       expect(await screen.findByRole("button", { name: label })).toBeVisible();
       if (relation === "outgoing")
         expect(screen.getByRole("button", { name: label })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "메시지" }));
       expect(
-        screen.getByText("친구가 되면 메시지를 보낼 수 있어요"),
+        screen.getByRole("dialog", { name: "이서연 님에게 메시지 보내기" }),
       ).toBeVisible();
       expect(
-        screen.queryByRole("button", { name: "메시지" }),
-      ).not.toBeInTheDocument();
+        screen.getByText(/친구가 아니어서 메시지 요청으로 가요/),
+      ).toBeVisible();
+      expect(actions.openDirect).not.toHaveBeenCalled();
     },
   );
   it("invalidates and rereads the person's card after a friend action", async () => {
