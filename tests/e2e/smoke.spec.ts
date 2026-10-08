@@ -1,5 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 스페이스 초대는 로그인 후 돌아올 주소를 보존해요", async ({
+  page,
+}) => {
+  const path = "/s/join/aaaaaaaaaaaaaaaaaaaaaa";
+  await page.goto(path);
+  await expect(
+    page.getByRole("heading", { name: "Floor에 로그인", exact: true }),
+  ).toBeVisible();
+  const url = new URL(page.url());
+  expect(url.pathname).toBe("/login");
+  expect(url.searchParams.get("next")).toBe(path);
+});
+
 test("비로그인 회의 채널은 로그인으로 안내해요", async ({ page }) => {
   const path = "/m/11111111-1111-4111-8111-111111111111";
   await page.goto(path);

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionResult } from "@/lib/actions/result";
 import type { MessageContact } from "@/features/people/types";
-import { openDirectMessage, createGroupDm } from "../actions";
+import { openDirectMessage, createGroupDm } from "@/features/chat/actions";
 import { ContactPicker } from "./contact-picker";
 
 export type OpenConversation = (

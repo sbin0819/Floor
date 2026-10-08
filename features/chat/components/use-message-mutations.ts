@@ -2,7 +2,11 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { deleteMessage, editMessage, setReaction } from "../actions";
+import {
+  deleteMessage,
+  editMessage,
+  setReaction,
+} from "@/features/chat/actions";
 import type { ChatMessage, ReactionEmoji } from "../types";
 import { applyMessageEvent, invalidateMessage } from "../message-sync";
 import { roomMessagesKey, type DisplayMessage } from "./message-state";

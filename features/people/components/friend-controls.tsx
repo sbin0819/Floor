@@ -26,7 +26,7 @@ import {
   respondFriendRequest,
   cancelFriendRequest,
   removeFriend,
-} from "../actions";
+} from "@/features/people/actions";
 import type { FriendRow, PersonRelation } from "../types";
 import { peopleError, usePeopleMutation } from "./people-mutation";
 

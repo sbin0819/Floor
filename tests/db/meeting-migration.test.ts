@@ -147,8 +147,43 @@ describe("meeting channel backfill", () => {
       )!;
       await client.exec(backfill);
       expect(
-        (await client.query("SELECT id FROM chat_rooms")).rows,
+        (
+          await client.query(
+            "SELECT id FROM chat_rooms WHERE booking_id IS NOT NULL",
+          )
+        ).rows,
       ).toHaveLength(5);
+      const loungeChannels = await client.query<{
+        branch_id: string;
+        kind: string;
+        name: string;
+        admin_only: boolean;
+        booking_id: null;
+        last_seq: number;
+      }>(
+        "SELECT s.branch_id,r.kind,r.name,r.admin_only,r.booking_id,r.last_seq::int FROM chat_rooms r JOIN chat_spaces s ON s.id=r.space_id WHERE s.kind='branch' ORDER BY r.name",
+      );
+      expect(loungeChannels.rows).toEqual([
+        {
+          branch_id: branch,
+          kind: "text",
+          name: "공지",
+          admin_only: true,
+          booking_id: null,
+          last_seq: 0,
+        },
+        {
+          branch_id: branch,
+          kind: "text",
+          name: "라운지",
+          admin_only: false,
+          booking_id: null,
+          last_seq: 0,
+        },
+      ]);
+      expect(
+        (await client.query("SELECT id FROM chat_rooms")).rows,
+      ).toHaveLength(7);
     } finally {
       await client.close();
     }

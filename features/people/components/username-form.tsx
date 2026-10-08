@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActionResult } from "@/lib/actions/result";
 import { parseUsername } from "@/lib/people/username";
-import { setUsername } from "../actions";
+import { setUsername } from "@/features/people/actions";
 import type { UsernameSettings } from "../types";
 
 export type SaveUsername = (

@@ -18,7 +18,11 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ActionResult } from "@/lib/actions/result";
 import type { MessageContact } from "@/features/people/types";
-import { addGroupMembers, leaveGroupDm, renameGroupDm } from "../actions";
+import {
+  addGroupMembers,
+  leaveGroupDm,
+  renameGroupDm,
+} from "@/features/chat/actions";
 import { ContactPicker } from "./contact-picker";
 
 type GroupAction = (input: unknown) => Promise<ActionResult<unknown>>;

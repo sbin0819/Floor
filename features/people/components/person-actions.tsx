@@ -22,7 +22,12 @@ import {
   MessageRequestDialog,
   type SendMessageRequest,
 } from "@/features/chat/components/message-request-dialog";
-import { blockUser, unblockUser, reportUser, reportMessage } from "../actions";
+import {
+  blockUser,
+  unblockUser,
+  reportUser,
+  reportMessage,
+} from "@/features/people/actions";
 import type { PersonProfile, PersonSearchResult } from "../types";
 import {
   defaultFriendActions,

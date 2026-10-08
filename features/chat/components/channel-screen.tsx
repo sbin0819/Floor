@@ -64,7 +64,7 @@ import { useRoomRead } from "./use-room-read";
 import { useDirectPeerRead } from "./use-direct-peer-read";
 import { useChatMetadata } from "./use-chat-metadata";
 import { MessageRequestBanner } from "./message-request-banner";
-import { respondMessageRequest } from "../actions";
+import { respondMessageRequest } from "@/features/chat/actions";
 import { GroupDialogs, type GroupDialog } from "./group-dialogs";
 import { useRoomRealtime } from "./use-room-realtime";
 import {
