@@ -13,6 +13,7 @@ export type ActionErrorCode =
   | "INVITE_INVALID"
   | "OUTSIDE_HOURS"
   | "SPACE_IN_USE"
+  | "OVER_CAPACITY"
   | "INTERNAL";
 
 export type ActionResult<T> =
@@ -25,7 +26,12 @@ export type ActionResult<T> =
     };
 
 export type ActionErrorDetails = {
-  message?: "per_booking" | "per_day" | "days_ahead";
+  message?:
+    | "per_booking"
+    | "per_day"
+    | "days_ahead"
+    | "attendee_count"
+    | "participants";
   fieldErrors?: Record<string, string[]>;
 };
 

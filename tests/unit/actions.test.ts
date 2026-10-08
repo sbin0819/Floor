@@ -18,6 +18,39 @@ const session: Session = {
 const dependencies = { getSession: async () => session, logError: vi.fn() };
 
 describe("createAction", () => {
+  it.each(["attendee_count", "participants"] as const)(
+    "returns a trusted capacity field %s",
+    async (message) => {
+      const action = createAction(
+        {
+          input: z.unknown(),
+          authorize: "none",
+          handler: () => {
+            throw new ActionError("OVER_CAPACITY", { message });
+          },
+        },
+        dependencies,
+      );
+      expect(await action(null)).toEqual({
+        ok: false,
+        code: "OVER_CAPACITY",
+        message,
+      });
+    },
+  );
+  it("does not mix capacity and quota reason namespaces", async () => {
+    const action = createAction(
+      {
+        input: z.unknown(),
+        authorize: "none",
+        handler: () => {
+          throw new ActionError("OVER_CAPACITY", { message: "per_day" });
+        },
+      },
+      dependencies,
+    );
+    expect(await action(null)).toEqual({ ok: false, code: "OVER_CAPACITY" });
+  });
   it.each(["per_booking", "per_day", "days_ahead"] as const)(
     "returns a trusted quota reason %s",
     async (message) => {

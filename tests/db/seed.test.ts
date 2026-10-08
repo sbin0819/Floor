@@ -25,6 +25,7 @@ import {
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import { canAccess, canAccessFloor } from "@/lib/permissions/can-access";
 import { loadSeedData } from "@/lib/seed/data";
+import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { runSeed } from "@/lib/seed/run-seed";
 import { getOpenHours } from "@/lib/time/open-hours";
 import { localDate, localTime } from "@/lib/time/zoned";
@@ -32,6 +33,11 @@ import { createTestDatabase, type TestDatabase } from "./helper";
 
 const now = new Date("2026-10-07T03:00:00Z");
 const fixtures = loadSeedData();
+const attendeeCounts = new Map(
+  loadSeedBookings2(fixtures).attendeeCounts.map(
+    ({ bookingId, attendeeCount }) => [bookingId, attendeeCount],
+  ),
+);
 const expectedCounts = {
   users: 6,
   branches: 5,
@@ -169,6 +175,7 @@ describe("transactional development seed", () => {
     expect(rows.filter(({ status }) => status === "cancelled")).toHaveLength(4);
     for (const fixture of fixtures.bookings) {
       const actual = rows.find(({ id }) => id === fixture.id)!;
+      expect(actual.attendeeCount).toBe(attendeeCounts.get(fixture.id) ?? null);
       if (fixture.status === "cancelled") {
         const actor = fixtures.users.find(
           ({ key }) => key === fixture.cancelledByKey,
@@ -193,6 +200,7 @@ describe("transactional development seed", () => {
     const rows = await database.db.select().from(bookings);
     for (const fixture of fixtures.bookings) {
       const actual = rows.find(({ id }) => id === fixture.id)!;
+      expect(actual.attendeeCount).toBe(attendeeCounts.get(fixture.id) ?? null);
       expect(localDate(actual.during.start, "Asia/Seoul")).toBe(
         fixture.dayOffset === 0 ? "2026-10-14" : "2026-10-15",
       );
@@ -321,6 +329,11 @@ describe("transactional development seed", () => {
         .from(bookings)
         .where(eq(bookings.id, original.id)),
     ).toHaveLength(0);
+    const [preservedBooking] = await database.db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, foreignId));
+    expect(preservedBooking!.attendeeCount).toBeNull();
     expect((await user(outsider.email)).name).toBe("기존 사람");
     expect((await login(outsider.email, "existing-password")).ok).toBe(true);
     expect(await getMemberships(outsider.id, database.db)).toMatchObject({

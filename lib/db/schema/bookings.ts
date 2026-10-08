@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -29,6 +30,7 @@ export const bookings = pgTable(
     }),
     during: tstzrange("during").notNull(),
     title: text("title"),
+    attendeeCount: integer("attendee_count"),
     status: bookingStatus("status").notNull().default("confirmed"),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     cancelledBy: uuid("cancelled_by").references(() => users.id, {
@@ -44,6 +46,10 @@ export const bookings = pgTable(
     check(
       "bookings_cancel_consistent",
       sql`(${table.status} = 'cancelled') = (${table.cancelledAt} IS NOT NULL)`,
+    ),
+    check(
+      "bookings_attendee_count_range",
+      sql`${table.attendeeCount} IS NULL OR ${table.attendeeCount} BETWEEN 1 AND 500`,
     ),
     index("bookings_user_id_idx").on(table.userId),
     index("bookings_team_id_idx").on(table.teamId),

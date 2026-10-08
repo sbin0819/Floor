@@ -14,6 +14,7 @@ import seedFile from "@/docs/spec/examples/seed.json";
 import spacesFile from "@/docs/spec/examples/gangnam-7f.spaces.json";
 import planFile from "@/docs/spec/examples/gangnam-7f.plan.json";
 import photoFile from "@/docs/spec/examples/seed-photos.json";
+import bookingExtrasFile from "@/docs/spec/examples/seed-bookings-2.json";
 import * as authModule from "@/lib/auth/auth";
 import * as seedDal from "@/lib/dal/seed";
 import * as schema from "@/lib/db/schema";
@@ -394,6 +395,10 @@ describe("transactional additive-only branch seed", () => {
 
   it("supports existing and absent branch scopes in one transaction without syncing existing rows", async () => {
     const existing = base.branches.find(({ name }) => name === "강남점")!;
+    await database.db
+      .update(bookings)
+      .set({ attendeeCount: 1 })
+      .where(eq(bookings.id, bookingExtrasFile.attendeeCounts[0]!.bookingId));
     await database.db
       .update(branches)
       .set({ address: "기존 편집 유지" })

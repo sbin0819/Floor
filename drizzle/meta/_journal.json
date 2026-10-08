@@ -57,6 +57,13 @@
       "when": 1791387619472,
       "tag": "0007_space-photos",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791427114940,
+      "tag": "0008_motionless_stature",
+      "breakpoints": true
     }
   ]
 }

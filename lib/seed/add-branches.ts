@@ -7,6 +7,7 @@ import {
 import { getOperatingDate } from "@/lib/time/open-hours";
 import { zonedDateTime } from "@/lib/time/zoned";
 import { loadSeedData } from "./data";
+import { loadSeedBookings2, type SeedBookings2Data } from "./bookings-2";
 import { SeedError } from "./errors";
 import { loadSeedPhotos } from "./photos";
 import type { SeedResult } from "./run-seed";
@@ -156,6 +157,7 @@ export async function preflightSeedBranches({
 }) {
   const data = loadSeedData();
   const photos = loadSeedPhotos(data);
+  loadSeedBookings2(data);
   const ids = validateSeedBranchIds(branchIds, data);
   const plan = await prepareAddition(selectSeedBranches(data, photos, ids), db);
   return {
@@ -169,10 +171,17 @@ export async function addSeedBranches(
   scope: SeedBranchScope,
   db: DalDatabase,
   now: Date,
+  bookingExtras?: SeedBookings2Data,
 ): Promise<SeedResult> {
   const { addition, userIds, addedBranchIds, skippedBranchIds } =
     await prepareAddition(scope, db);
   const { data } = addition;
+  const attendeeCounts = new Map(
+    bookingExtras?.attendeeCounts.map(({ bookingId, attendeeCount }) => [
+      bookingId,
+      attendeeCount,
+    ]),
+  );
   // 존재 여부를 먼저 읽었어도 다른 실행과 경합할 수 있으므로 INSERT 충돌을 숨기지 않는다.
   await insertSeedBranchStructure(addition, userIds, db);
   const branches = new Map(data.branches.map((branch) => [branch.id, branch]));
@@ -218,6 +227,7 @@ export async function addSeedBranches(
     await insertSeedBooking(
       {
         ...booking,
+        attendeeCount: attendeeCounts.get(booking.id) ?? null,
         userId: userIds.get(userKey)!,
         during: {
           start: instant(booking.spaceId, dayOffset, start),

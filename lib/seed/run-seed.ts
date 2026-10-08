@@ -16,6 +16,7 @@ import {
   syncSeedSpacePhotos,
 } from "@/lib/dal/seed-photos";
 import { loadSeedData } from "@/lib/seed/data";
+import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { SeedError } from "@/lib/seed/errors";
 import { loadSeedPhotos } from "@/lib/seed/photos";
 import { getOperatingDate } from "@/lib/time/open-hours";
@@ -49,11 +50,18 @@ export async function runSeed({
   try {
     const data = loadSeedData();
     const photos = loadSeedPhotos(data);
+    const bookingExtras = loadSeedBookings2(data);
+    const attendeeCounts = new Map(
+      bookingExtras.attendeeCounts.map(({ bookingId, attendeeCount }) => [
+        bookingId,
+        attendeeCount,
+      ]),
+    );
     if (branchIds !== undefined) {
       const ids = validateSeedBranchIds(branchIds, data, resetPasswords);
       const scope = selectSeedBranches(data, photos, ids);
       return await withTransaction(
-        (database) => addSeedBranches(scope, database, now),
+        (database) => addSeedBranches(scope, database, now, bookingExtras),
         db,
       );
     }
@@ -222,6 +230,7 @@ export async function runSeed({
         await seedDal.insertSeedBooking(
           {
             ...booking,
+            attendeeCount: attendeeCounts.get(booking.id) ?? null,
             userId: userId(userKey),
             during,
             cancelledAt: booking.status === "cancelled" ? now : null,

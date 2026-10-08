@@ -115,8 +115,14 @@ export function createAction<Input, Output>(
         ok: false,
         code,
         ...(error instanceof ActionError &&
-        code === "LIMIT_EXCEEDED" &&
-        error.details.message
+        ((code === "LIMIT_EXCEEDED" &&
+          ["per_booking", "per_day", "days_ahead"].includes(
+            error.details.message ?? "",
+          )) ||
+          (code === "OVER_CAPACITY" &&
+            ["attendee_count", "participants"].includes(
+              error.details.message ?? "",
+            )))
           ? { message: error.details.message }
           : {}),
         ...(error instanceof ActionError &&

@@ -1,0 +1,2 @@
+ALTER TABLE "bookings" ADD COLUMN "attendee_count" integer;--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_attendee_count_range" CHECK ("bookings"."attendee_count" IS NULL OR "bookings"."attendee_count" BETWEEN 1 AND 500);
