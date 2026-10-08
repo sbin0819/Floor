@@ -206,7 +206,7 @@ describe("single responsive space detail", () => {
     expect(media.matchMedia).toHaveBeenCalledWith(WIDE_SCREEN_QUERY);
     expect(
       view.container.querySelector('[data-space-detail-layout="panel"]'),
-    ).toHaveClass("lg:sticky", "lg:w-[420px]");
+    ).toHaveClass("lg:sticky", "lg:top-20", "lg:w-[420px]");
     expect(
       view.container.querySelector('[data-space-detail-layout="panel"]'),
     ).toHaveClass("lg:h-[calc(100dvh-15rem)]", "lg:min-h-[32rem]");

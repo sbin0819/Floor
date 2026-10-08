@@ -49,7 +49,7 @@ export function SpaceDetailContainer({
         {resolution}
         <div
           data-space-detail-layout="panel"
-          className="hidden min-h-0 w-full lg:sticky lg:top-6 lg:block lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:w-[420px]"
+          className="hidden min-h-0 w-full lg:sticky lg:top-20 lg:block lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:w-[420px]"
         >
           {children}
         </div>

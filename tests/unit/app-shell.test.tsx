@@ -185,8 +185,15 @@ describe("member app shell frame", () => {
       "xl:hidden",
     );
     const header = screen.getByRole("banner");
-    expect(header).toHaveClass("h-14", "bg-card", "border-b");
-    expect(header).not.toHaveClass("sticky", "fixed");
+    expect(header).toHaveClass(
+      "sticky",
+      "top-0",
+      "z-[45]",
+      "h-14",
+      "bg-card",
+      "border-b",
+    );
+    expect(header).not.toHaveClass("fixed");
     const content = container.querySelector("#content")!;
     for (const element of [shell, content, content.parentElement!]) {
       expect(element).not.toHaveClass(
@@ -208,6 +215,7 @@ describe("member app shell frame", () => {
     const content = container.querySelector("#content")!;
     expect(content.tagName).toBe("DIV");
     expect(content).toHaveAttribute("tabindex", "-1");
+    expect(content).toHaveClass("scroll-mt-14");
     expect(content).toContainElement(screen.getByRole("main"));
   });
 

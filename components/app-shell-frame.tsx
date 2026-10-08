@@ -158,7 +158,7 @@ export function AppShellFrame({
         <AppRail avatar={accountAvatar} />
         <AppSidebar menu={menu} accountCard={accountCard} />
         <div className="min-w-0">
-          <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 md:px-8">
+          <header className="sticky top-0 z-[45] flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 md:px-8">
             <div className="flex min-w-0 items-center gap-2">
               <SheetTrigger asChild>
                 <Button
@@ -179,7 +179,7 @@ export function AppShellFrame({
             </div>
             <div className="shrink-0">{notifications}</div>
           </header>
-          <div id="content" tabIndex={-1}>
+          <div id="content" tabIndex={-1} className="scroll-mt-14">
             {children}
           </div>
         </div>
