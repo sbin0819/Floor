@@ -13,14 +13,17 @@ import {
 import { useFloorSelection } from "./branch-workspace";
 import { useBookingAttendeeCount, useBookingRange } from "./use-booking-draft";
 import { FloorNavigationLink } from "./floor-navigation-link";
+import { useFloorPeople } from "./floor-view";
+import { effectiveAttendeeCount } from "../attendee-count";
 
 export function BookingStrip({ children }: { children: ReactNode }) {
   const workspace = useFloorSelection();
+  const { people } = useFloorPeople();
   const sharedRange = useBookingRange(
     workspace?.draftStore,
     workspace?.bookingScope,
   );
-  const { attendeeCount } = useBookingAttendeeCount(
+  const countDraft = useBookingAttendeeCount(
     workspace?.draftStore,
     workspace?.bookingScope,
   );
@@ -40,6 +43,10 @@ export function BookingStrip({ children }: { children: ReactNode }) {
     space.kind !== "accessible"
   )
     return null;
+  const attendeeCount =
+    space.bookable && space.capacity !== 1
+      ? effectiveAttendeeCount(countDraft, people, space.capacity)
+      : null;
   const range = sharedRange?.spaceId === space.id ? sharedRange : null;
   const duration = range
     ? (Date.parse(range.end) - Date.parse(range.start)) / 60_000

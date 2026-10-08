@@ -5,7 +5,10 @@ import { LoaderCircle } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { AttendeeCountInput } from "@/components/attendee-count-input";
-import { attendeeCountError } from "@/features/bookings/attendee-count";
+import {
+  attendeeCountError,
+  effectiveAttendeeCount,
+} from "@/features/bookings/attendee-count";
 import { createBooking } from "@/features/bookings/actions";
 import {
   selectableEnds,
@@ -32,6 +35,7 @@ import {
   type BookingFormVariant,
 } from "./booking-form-fields";
 import { BookingFormLayout } from "./booking-form-layout";
+import { useFloorPeople } from "./floor-view";
 
 export function BookingForm({
   data,
@@ -44,6 +48,7 @@ export function BookingForm({
 }) {
   const id = useId();
   const workspace = useFloorSelection();
+  const { people } = useFloorPeople();
   const scope = bookingDraftScope(
     data.branch.id,
     data.floor.id,
@@ -78,6 +83,8 @@ export function BookingForm({
   const [localAttendeeCount, setLocalAttendeeCount] = useState<number | null>(
     null,
   );
+  const [localAttendeeCountTouched, setLocalAttendeeCountTouched] =
+    useState(false);
   const attendeeInputRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [localActorId, setLocalActorId] = useState(
@@ -87,9 +94,16 @@ export function BookingForm({
   const actorId = workspace ? sharedDraft.actorId : localActorId;
   const showAttendeeCount = data.space.bookable && data.space.capacity !== 1;
   const attendeeCount = showAttendeeCount
-    ? workspace
-      ? sharedDraft.attendeeCount
-      : localAttendeeCount
+    ? effectiveAttendeeCount(
+        workspace
+          ? sharedDraft
+          : {
+              attendeeCount: localAttendeeCount,
+              attendeeCountTouched: localAttendeeCountTouched,
+            },
+        people,
+        data.space.capacity,
+      )
     : null;
   const attendeeError = attendeeCountError(attendeeCount, data.space.capacity);
   const setAttendeeCount = (value: number | null) => {
@@ -98,7 +112,10 @@ export function BookingForm({
         attendeeCount: value,
         attendeeCountTouched: true,
       });
-    else setLocalAttendeeCount(value);
+    else {
+      setLocalAttendeeCount(value);
+      setLocalAttendeeCountTouched(true);
+    }
   };
   const setTitle = (value: string) => {
     if (workspace)
@@ -149,6 +166,7 @@ export function BookingForm({
           setLocalRange(null);
           setLocalTitle("");
           setLocalAttendeeCount(null);
+          setLocalAttendeeCountTouched(false);
         }
         setExpanded(false);
       }

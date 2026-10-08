@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import type { FloorDayData } from "@/features/bookings/types";
 import type { FloorView } from "@/features/bookings/floor-view";
+import { floorHref } from "@/features/bookings/format";
+import { filterFloorByPeople } from "@/features/bookings/people-filter";
 import { FloorDay } from "./floor-day";
 import { FloorTimetable } from "./floor-timetable";
-import { useFloorView } from "./floor-view";
+import { useFloorView, useFloorPeople } from "./floor-view";
 import { useFloorSelection } from "./branch-workspace";
 import { ClosedFloorDay } from "./closed-floor-day";
+import { FloorPeopleLink, FloorPeopleNotice } from "./floor-people-filter";
 
 export function FloorViews({
   data,
@@ -17,19 +21,55 @@ export function FloorViews({
   initialView: FloorView | null;
 }) {
   const { view } = useFloorView(initialView);
-  const registerFloor = useFloorSelection()?.registerFloor;
+  const { people } = useFloorPeople();
+  const selection = useFloorSelection();
+  const currentSearch = useSearchParams();
+  const search = selection?.search ?? currentSearch;
+  const registerFloor = selection?.registerFloor;
   useEffect(() => registerFloor?.(data), [registerFloor, data]);
   if (!data.openHours) return <ClosedFloorDay data={data} />;
-  if (view === "list") return <FloorDay data={data} />;
-  if (view === "timeline") return <FloorTimetable data={data} />;
+  const filtered = filterFloorByPeople(
+    data,
+    people,
+    selection?.location.spaceId ?? null,
+  );
+  const href = `${floorHref(data.branch.id, data.floor.id)}?${search}`;
+  const content =
+    people !== null && filtered.data.spaces.length === 0 ? (
+      <div className="space-y-2 py-8 text-sm text-muted-foreground">
+        <p>{people}명이 쓸 수 있는 공간이 이 층에 없어요</p>
+        <FloorPeopleLink
+          href={href}
+          people={null}
+          className="inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-4"
+        >
+          모두 보기
+        </FloorPeopleLink>
+      </div>
+    ) : view === "list" ? (
+      <FloorDay data={filtered.data} />
+    ) : view === "timeline" ? (
+      <FloorTimetable data={filtered.data} />
+    ) : (
+      <>
+        <div data-floor-view="list" className="lg:hidden">
+          <FloorDay data={filtered.data} />
+        </div>
+        <div data-floor-view="timeline" className="hidden lg:block">
+          <FloorTimetable data={filtered.data} />
+        </div>
+      </>
+    );
   return (
-    <>
-      <div data-floor-view="list" className="lg:hidden">
-        <FloorDay data={data} />
-      </div>
-      <div data-floor-view="timeline" className="hidden lg:block">
-        <FloorTimetable data={data} />
-      </div>
-    </>
+    <div className="min-w-0 space-y-4">
+      {people !== null && (
+        <FloorPeopleNotice
+          people={people}
+          hiddenCount={filtered.hiddenCount}
+          href={href}
+        />
+      )}
+      {content}
+    </div>
   );
 }

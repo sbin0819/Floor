@@ -16,7 +16,10 @@ import type { ActionResult } from "@/lib/actions/result";
 import type { SpaceDayData } from "@/features/bookings/types";
 
 const navigation = vi.hoisted(() => ({ refresh: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => navigation,
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/features/bookings/actions", () => ({
   createBooking: vi.fn(),
   cancelBooking: vi.fn(),

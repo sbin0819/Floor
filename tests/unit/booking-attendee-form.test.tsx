@@ -6,10 +6,10 @@ import { BookingForm } from "@/features/bookings/components/booking-form";
 import { createBooking } from "@/features/bookings/actions";
 import { spaceDayFixture } from "./booking-ui-fixtures";
 
-const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+const router = vi.hoisted(() => ({ refresh: vi.fn(), query: "" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(router.query),
 }));
 vi.mock("@/features/bookings/actions", () => ({
   createBooking: vi.fn(),
@@ -25,6 +25,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   vi.clearAllMocks();
+  router.query = "";
   vi.mocked(createBooking).mockResolvedValue({
     ok: true,
     data: { bookingId: "created" },
@@ -34,21 +35,79 @@ beforeEach(() => {
 async function display(capacity: number | null = 6) {
   const data = spaceDayFixture();
   data.space.capacity = capacity;
-  const view = render(
-    <QueryClientProvider client={new QueryClient()}>
+  const client = new QueryClient();
+  const frame = (
+    <QueryClientProvider client={client}>
       <BookingForm data={data} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(frame);
   await userEvent.click(
     screen.getByRole("button", { name: "10:00, 비어 있음" }),
   );
   await userEvent.click(
     screen.getByRole("button", { name: "예약 내용 바꾸기" }),
   );
-  return view;
+  return {
+    ...view,
+    changeFilter: (people: number) => {
+      router.query = `people=${people}`;
+      view.rerender(
+        <QueryClientProvider client={client}>
+          <BookingForm data={data} />
+        </QueryClientProvider>,
+      );
+    },
+  };
 }
 
 describe("attendee count in the booking form", () => {
+  it("uses the fitting people filter for summary/submission and restores it after success", async () => {
+    router.query = "people=5";
+    await display(8);
+    expect(screen.getByRole("spinbutton")).toHaveValue(5);
+    expect(screen.getByRole("form", { name: "예약 양식" })).toHaveTextContent(
+      "1시간 · 5명",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
+    await waitFor(() =>
+      expect(createBooking).toHaveBeenCalledWith(
+        expect.objectContaining({ attendeeCount: 5 }),
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "10:00, 비어 있음" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "예약 내용 바꾸기" }),
+    );
+    expect(screen.getByRole("spinbutton")).toHaveValue(5);
+  });
+
+  it("does not use a filter beyond capacity", async () => {
+    router.query = "people=5";
+    await display(4);
+    expect(screen.getByRole("spinbutton")).toHaveValue(null);
+    expect(
+      screen.getByRole("form", { name: "예약 양식" }),
+    ).not.toHaveTextContent("· 5명");
+  });
+
+  it("follows a changed filter until the count is manually emptied", async () => {
+    router.query = "people=5";
+    const view = await display(8);
+    view.changeFilter(6);
+    expect(screen.getByRole("spinbutton")).toHaveValue(6);
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "" } });
+    view.changeFilter(7);
+    expect(screen.getByRole("spinbutton")).toHaveValue(null);
+    await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
+    await waitFor(() =>
+      expect(createBooking).toHaveBeenCalledWith(
+        expect.objectContaining({ attendeeCount: null }),
+      ),
+    );
+  });
   it("submits a chosen count, includes it in the summary, and clears it after success", async () => {
     await display();
     fireEvent.change(
