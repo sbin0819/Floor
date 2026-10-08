@@ -61,6 +61,50 @@ beforeEach(() => {
 });
 
 describe("floor date picker", () => {
+  it("keeps date links and focus usable while reservation marks stream in", async () => {
+    let resolve!: (dates: string[]) => void;
+    const bookingDates = new Promise<string[]>((done) => {
+      resolve = done;
+    });
+    render(<FloorDatePicker {...defaults} bookingDates={bookingDates} />);
+    const picker = await openPicker();
+    const selected = picker.getByRole("link", {
+      name: "10월 7일 수요일, 오늘",
+    });
+    const day = picker.getByRole("link", { name: "10월 13일 화요일" });
+    expect(selected).toHaveFocus();
+    expect(picker.getByRole("status")).toHaveTextContent(
+      "예약 표시를 불러오고 있어요",
+    );
+    expect(picker.queryByText("예약 없음")).not.toBeInTheDocument();
+    await act(async () => {
+      resolve(["2026-10-13"]);
+      await bookingDates;
+    });
+    expect(
+      picker.getByRole("link", { name: "10월 13일 화요일 내 예약 있음" }),
+    ).toBe(day);
+    expect(selected).toHaveFocus();
+    expect(picker.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("can change months and select a date before reservation marks resolve", async () => {
+    render(
+      <FloorDatePicker
+        {...defaults}
+        bookingDates={new Promise<string[]>(() => {})}
+      />,
+    );
+    const picker = await openPicker();
+    fireEvent.click(picker.getByRole("button", { name: "다음 달" }));
+    expect(picker.getByRole("heading", { name: "2026년 11월" })).toBeVisible();
+    fireEvent.click(picker.getByRole("link", { name: "11월 12일 목요일" }));
+    expect(context.change).toHaveBeenCalledWith(
+      expect.objectContaining({ date: "2026-11-12" }),
+      expect.stringContaining("date=2026-11-12"),
+    );
+  });
+
   it("opens at the selected month and keeps the previous and final range boundaries", async () => {
     render(<FloorDatePicker {...defaults} date="2026-11-12" />);
     const picker = await openPicker();
@@ -102,7 +146,7 @@ describe("floor date picker", () => {
     });
     expect(within(holiday).getByText("쉼")).toBeVisible();
     const marked = picker.getByRole("link", {
-      name: "10월 13일 화요일, 내 예약 있음",
+      name: "10월 13일 화요일 내 예약 있음",
     });
     expect(marked.querySelector('[aria-hidden="true"]')).toBeTruthy();
     expect(
@@ -115,7 +159,7 @@ describe("floor date picker", () => {
     render(<FloorDatePicker {...defaults} />);
     const picker = await openPicker();
     const link = picker.getByRole("link", {
-      name: "10월 13일 화요일, 내 예약 있음",
+      name: "10월 13일 화요일 내 예약 있음",
     });
     expect(link).toHaveAttribute(
       "href",
@@ -135,7 +179,7 @@ describe("floor date picker", () => {
     render(<FloorDatePicker {...defaults} />);
     const picker = await openPicker();
     fireEvent.click(
-      picker.getByRole("link", { name: "10월 13일 화요일, 내 예약 있음" }),
+      picker.getByRole("link", { name: "10월 13일 화요일 내 예약 있음" }),
       { ctrlKey: true },
     );
     expect(context.change).not.toHaveBeenCalled();
@@ -256,7 +300,7 @@ describe("floor date picker", () => {
     );
     const dates = within(screen.getByRole("navigation", { name: "날짜 선택" }));
     const marked = dates.getByRole("link", {
-      name: "10월 13일 화요일 · 내 예약 있음",
+      name: "10월 13일 화요일 내 예약 있음",
     });
     expect(marked.querySelector('[aria-hidden="true"]')).toBeTruthy();
     expect(marked).toHaveAttribute(

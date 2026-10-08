@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  Suspense,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "cn";
 import { MonthGrid } from "@/components/calendar/month-grid";
@@ -33,6 +40,7 @@ import type { OpenHours } from "@/lib/time/open-hours";
 import { addDays } from "@/lib/time/zoned";
 import { useFloorSelection } from "./branch-workspace";
 import { useWideScreen } from "./use-wide-screen";
+import { BookingDateMark, BookingDateLegend } from "./booking-date-mark";
 
 type FloorDatePickerProps = {
   branchId: string;
@@ -43,7 +51,7 @@ type FloorDatePickerProps = {
   today: string;
   timezone: string;
   openHours: OpenHours;
-  bookingDates: string[];
+  bookingDates: string[] | Promise<string[]>;
 };
 
 export function FloorDatePicker(props: FloorDatePickerProps) {
@@ -125,6 +133,7 @@ function DatePickerCalendar({
   onSelect,
 }: FloorDatePickerProps & { onSelect: () => void }) {
   const [month, setMonth] = useState(date.slice(0, 7));
+  const calendarId = useId();
   const [focusedDate, setFocusedDate] = useState(date);
   const links = useRef(new Map<string, HTMLAnchorElement>());
   const focusRequested = useRef(true);
@@ -132,7 +141,6 @@ function DatePickerCalendar({
   const lastDate = addDays(today, 60);
   const parsed = parseCalendarMonth(month);
   const grid = buildMonthGrid(parsed.year, parsed.month);
-  const markedDates = new Set(bookingDates);
   const label = `${parsed.year}년 ${parsed.month}월`;
   useEffect(() => {
     if (focusRequested.current) {
@@ -210,29 +218,29 @@ function DatePickerCalendar({
             minDate: today,
             maxDate: lastDate,
             selectedDate: date,
-            markedDates,
             openHours,
           });
           const name = [
             formatBookingDate(day.date, timezone),
             state.today && "오늘",
             state.closed && "쉬는 날",
-            state.marked && "내 예약 있음",
           ]
             .filter(Boolean)
             .join(", ");
           const content = (
             <>
+              <span id={`${calendarId}-${day.date}-label`} className="sr-only">
+                {name}
+              </span>
               <span>{day.day}</span>
               {state.closed && (
                 <span className="text-[10px] leading-none">쉼</span>
               )}
-              {state.marked && (
-                <span
-                  aria-hidden="true"
-                  className="size-1 rounded-full bg-primary"
-                />
-              )}
+              <span id={`${calendarId}-${day.date}-booking`}>
+                <Suspense fallback={null}>
+                  <BookingDateMark source={bookingDates} date={day.date} />
+                </Suspense>
+              </span>
             </>
           );
           const className = cn(
@@ -244,7 +252,7 @@ function DatePickerCalendar({
           if (state.outsideRange)
             return (
               <span
-                aria-label={name}
+                aria-labelledby={`${calendarId}-${day.date}-label ${calendarId}-${day.date}-booking`}
                 aria-disabled="true"
                 className={cn(className, "opacity-35")}
               >
@@ -254,7 +262,7 @@ function DatePickerCalendar({
           return (
             <Link
               href={href(day.date)}
-              aria-label={name}
+              aria-labelledby={`${calendarId}-${day.date}-label ${calendarId}-${day.date}-booking`}
               aria-current={state.selected ? "date" : undefined}
               tabIndex={day.date === focusedDate ? 0 : -1}
               className={cn(
@@ -279,7 +287,11 @@ function DatePickerCalendar({
             aria-hidden="true"
             className="size-1.5 rounded-full bg-primary"
           />
-          내 예약이 있는 날
+          <Suspense
+            fallback={<span role="status">예약 표시를 불러오고 있어요</span>}
+          >
+            <BookingDateLegend source={bookingDates} />
+          </Suspense>
         </p>
         <Button asChild variant="ghost">
           <Link href={href(today)} onClick={(event) => choose(event, today)}>

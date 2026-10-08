@@ -1,8 +1,11 @@
 import { Suspense } from "react";
 import { requirePageSession } from "@/lib/auth/session";
-import { getMyBookings, getMyBookingsMonth } from "@/features/bookings/queries";
+import {
+  getMyBookings,
+  getMyBookingsMonthStream,
+} from "@/features/bookings/queries";
 import { MyBookings } from "@/features/bookings/components/my-bookings";
-import { MyBookingsCalendar } from "@/features/bookings/components/my-bookings-calendar";
+import { StreamingMyBookingsCalendar } from "@/features/bookings/components/my-bookings-calendar";
 import { MyBookingsCalendarSkeleton } from "@/features/bookings/components/my-bookings-calendar-skeleton";
 import { MyBookingsSkeleton } from "@/features/bookings/components/booking-skeletons";
 
@@ -15,10 +18,13 @@ async function BookingsContent({ searchParams }: Props) {
     const next = new URLSearchParams({ view: "calendar" });
     for (const key of ["month", "day"] as const)
       if (typeof query[key] === "string") next.set(key, query[key]);
-    await requirePageSession(`/bookings?${next}`);
     return (
       <Suspense fallback={<MyBookingsCalendarSkeleton />}>
-        <CalendarContent month={query.month} day={query.day} />
+        <CalendarContent
+          month={query.month}
+          day={query.day}
+          next={`/bookings?${next}`}
+        />
       </Suspense>
     );
   }
@@ -29,11 +35,18 @@ async function BookingsContent({ searchParams }: Props) {
 async function CalendarContent({
   month,
   day,
+  next,
 }: {
   month: unknown;
   day: unknown;
+  next: string;
 }) {
-  return <MyBookingsCalendar data={await getMyBookingsMonth({ month, day })} />;
+  await requirePageSession(next);
+  return (
+    <StreamingMyBookingsCalendar
+      {...await getMyBookingsMonthStream({ month, day })}
+    />
+  );
 }
 export default function BookingsPage(props: Props = {}) {
   return (

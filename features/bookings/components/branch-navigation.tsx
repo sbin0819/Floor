@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, type ReactNode } from "react";
+import { Suspense, useEffect, useId, type ReactNode } from "react";
 import { useSearchParams, useSelectedLayoutSegments } from "next/navigation";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "cn";
@@ -21,7 +21,10 @@ import { getBookingDateWindow } from "@/features/bookings/date";
 import { floorHref, formatBookingDate } from "@/features/bookings/format";
 import { getDisplayOperatingState } from "@/features/bookings/display-operating-state";
 import { searchValue } from "@/features/bookings/floor-selection";
-import type { BranchNavigationData } from "@/features/bookings/types";
+import type {
+  BranchNavigationData,
+  BranchNavigationMeta,
+} from "@/features/bookings/types";
 import { getOpenHours } from "@/lib/time/open-hours";
 import { zonedDateTime } from "@/lib/time/zoned";
 import { useFloorSelection } from "./branch-workspace";
@@ -29,14 +32,20 @@ import { FloorNavigationLink } from "./floor-navigation-link";
 import { FloorDatePicker } from "./floor-date-picker";
 import { useBranchDisplayNow } from "./branch-display-clock";
 import { floorIdFromSegments } from "./use-branch-route-scope";
+import { BookingDateMark } from "./booking-date-mark";
 
 export function BranchNavigation({
   data,
+  bookingDates,
   viewControl,
 }: {
-  data: BranchNavigationData;
+  data: BranchNavigationMeta &
+    Partial<Pick<BranchNavigationData, "bookingDates">>;
+  bookingDates?: Promise<string[]>;
   viewControl?: ReactNode;
 }) {
+  const calendarId = useId();
+  const markedDates = bookingDates ?? data.bookingDates ?? [];
   const segments = useSelectedLayoutSegments();
   const currentSearch = useSearchParams();
   const navigation = useFloorSelection();
@@ -204,10 +213,14 @@ export function BranchNavigation({
                 timeZone: data.branch.timezone,
                 weekday: "short",
               }).format(zonedDateTime(day, "12:00", data.branch.timezone));
-              const marked = data.bookingDates.includes(day);
-              const label = `${day === data.today ? "오늘 · " : ""}${formatBookingDate(day, data.branch.timezone)}${closed ? " · 쉬는 날" : ""}${marked ? " · 내 예약 있음" : ""}`;
+              const label = `${day === data.today ? "오늘 · " : ""}${formatBookingDate(day, data.branch.timezone)}${closed ? " · 쉬는 날" : ""}`;
+              const labelId = `${calendarId}-${day}-label`;
+              const bookingId = `${calendarId}-${day}-booking`;
               const content = (
                 <>
+                  <span id={labelId} className="sr-only">
+                    {label}
+                  </span>
                   <span className="text-xs font-normal">
                     {day === data.today ? "오늘" : weekday}
                   </span>
@@ -219,12 +232,11 @@ export function BranchNavigation({
                       쉬는 날
                     </span>
                   )}
-                  {marked && (
-                    <span
-                      aria-hidden="true"
-                      className="size-1 rounded-full bg-primary"
-                    />
-                  )}
+                  <span id={bookingId}>
+                    <Suspense fallback={null}>
+                      <BookingDateMark source={markedDates} date={day} />
+                    </Suspense>
+                  </span>
                 </>
               );
               const className = cn(
@@ -239,7 +251,7 @@ export function BranchNavigation({
                   variant="outline"
                   className={className}
                   disabled
-                  aria-label={label}
+                  aria-labelledby={`${labelId} ${bookingId}`}
                 >
                   {content}
                 </Button>
@@ -253,7 +265,7 @@ export function BranchNavigation({
                   <FloorNavigationLink
                     href={link(day)}
                     location={location(day)}
-                    aria-label={label}
+                    aria-labelledby={`${labelId} ${bookingId}`}
                     aria-current={day === date ? "date" : undefined}
                   >
                     {content}
@@ -291,7 +303,7 @@ export function BranchNavigation({
             today={data.today}
             timezone={data.branch.timezone}
             openHours={data.branch.openHours}
-            bookingDates={data.bookingDates}
+            bookingDates={markedDates}
             spaceId={selectedSpaceId}
             view={view}
           />

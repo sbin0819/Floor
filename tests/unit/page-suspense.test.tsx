@@ -1,5 +1,10 @@
 import { render, screen } from "@testing-library/react";
-import { isValidElement, Suspense, type SuspenseProps } from "react";
+import {
+  isValidElement,
+  Suspense,
+  type ReactNode,
+  type SuspenseProps,
+} from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/(app)/page";
 import TeamPage from "@/app/(app)/teams/[teamId]/page";
@@ -74,18 +79,35 @@ describe("protected page-local streaming boundaries", () => {
 
       const shell = pages[route]();
       expect(isValidElement(shell)).toBe(true);
-      if (!isValidElement<SuspenseProps>(shell)) {
+      const boundary =
+        route === "home"
+          ? Home().props.header
+          : route === "admin"
+            ? AdminHome().props.children
+            : shell;
+      if (!isValidElement<SuspenseProps>(boundary)) {
         throw new Error("The page must return its fallback synchronously");
       }
-      expect(shell.type).toBe(Suspense);
-      expect(isValidElement(shell.props.children)).toBe(true);
-      const { container } = render(shell.props.fallback);
+      expect(boundary.type).toBe(Suspense);
+      expect(isValidElement(boundary.props.children)).toBe(true);
+      const { container } = render(boundary.props.fallback as ReactNode);
       expect(screen.getAllByRole("status")).toHaveLength(1);
       expect(screen.getByRole("status")).toHaveTextContent("불러오고 있어요.");
-      expect(container.firstElementChild).toHaveAttribute("aria-busy", "true");
-      expect(
-        container.querySelectorAll('[data-slot="skeleton"]').length,
-      ).toBeGreaterThan(1);
+      expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+      const skeletons = container.querySelectorAll('[data-slot="skeleton"]');
+      if (route === "team-start") {
+        expect(skeletons).toHaveLength(1);
+        expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+          "팀 회원으로 전환",
+        );
+        expect(
+          screen.getByRole("link", { name: "새 팀 만들기" }),
+        ).toHaveAttribute("href", "/teams/start?mode=create");
+        expect(screen.getByRole("link", { name: "팀 찾기" })).toHaveAttribute(
+          "href",
+          "/teams/start?mode=join",
+        );
+      } else expect(skeletons.length).toBeGreaterThan(1);
 
       expect(teamParams.read).not.toHaveBeenCalled();
       expect(inviteParams.read).not.toHaveBeenCalled();

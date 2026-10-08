@@ -1,7 +1,16 @@
 import { PageContainer, PageHeading } from "@/components/page-container";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SkeletonRegion } from "@/components/skeleton-region";
 import { Skeleton } from "@/components/ui/skeleton";
-import { buildMonthGrid, parseCalendarMonth } from "@/lib/calendar/month";
+import {
+  buildMonthGrid,
+  calendarWeekdays,
+  calendarWeekdayLabels,
+  parseCalendarMonth,
+} from "@/lib/calendar/month";
+import { MyBookingsViewLinks } from "./my-bookings-view-links";
 
 export function MyBookingsCalendarBodySkeleton({
   month,
@@ -17,9 +26,13 @@ export function MyBookingsCalendarBodySkeleton({
           data-slot="skeleton-calendar-weekdays"
           className="grid grid-cols-7"
         >
-          {Array.from({ length: 7 }, (_, index) => (
-            <div key={index} className="flex h-8 items-center justify-center">
-              <Skeleton className="h-3 w-4" />
+          {calendarWeekdays.map((day) => (
+            <div
+              key={day}
+              className="flex h-8 items-center justify-center text-xs font-medium text-muted-foreground"
+              aria-label={calendarWeekdayLabels[day]}
+            >
+              {calendarWeekdayLabels[day].slice(0, 1)}
             </div>
           ))}
         </div>
@@ -76,17 +89,27 @@ export function MyBookingsCalendarSkeleton() {
       <div className="space-y-1">
         <PageHeading
           title="내 예약"
-          action={<Skeleton className="h-11 w-28" />}
+          action={
+            <Button asChild>
+              <Link href="/booking">공간 예약하기</Link>
+            </Button>
+          }
         />
         <Skeleton className="h-5 w-32" />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Skeleton className="h-12 w-40" />
+        <MyBookingsViewLinks view="calendar" />
         <div className="flex gap-2">
-          <Skeleton className="h-11 w-16" />
-          <Skeleton className="h-11 w-11" />
+          <Button variant="outline" disabled>
+            오늘
+          </Button>
+          <Button variant="ghost" size="icon" aria-label="이전 달" disabled>
+            <ChevronLeft aria-hidden="true" />
+          </Button>
           <Skeleton className="h-11 w-36" />
-          <Skeleton className="h-11 w-11" />
+          <Button variant="ghost" size="icon" aria-label="다음 달" disabled>
+            <ChevronRight aria-hidden="true" />
+          </Button>
         </div>
       </div>
       <MyBookingsCalendarBodySkeleton />

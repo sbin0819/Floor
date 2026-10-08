@@ -9,17 +9,25 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderToString } from "react-dom/server";
+import { Activity, startTransition } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import BookingsPage from "@/app/(app)/bookings/page";
 import { cancelBooking } from "@/features/bookings/actions";
 import { normalizeMyBookingsMonth } from "@/features/bookings/calendar";
-import { MyBookingsCalendar } from "@/features/bookings/components/my-bookings-calendar";
+import {
+  MyBookingsCalendar,
+  StreamingMyBookingsCalendar,
+} from "@/features/bookings/components/my-bookings-calendar";
 import { MyBookingCalendarDay } from "@/features/bookings/components/my-bookings-calendar";
 import {
   MyBookingsCalendarBodySkeleton,
   MyBookingsCalendarSkeleton,
 } from "@/features/bookings/components/my-bookings-calendar-skeleton";
-import { getMyBookings, getMyBookingsMonth } from "@/features/bookings/queries";
+import {
+  getMyBookings,
+  getMyBookingsMonth,
+  getMyBookingsMonthStream,
+} from "@/features/bookings/queries";
 import type {
   MyCalendarBooking,
   MyBookingsMonthData,
@@ -32,6 +40,7 @@ vi.mock("next/navigation", async () => {
   const { useSyncExternalStore } = await import("react");
   return {
     useRouter: () => navigation,
+    usePathname: () => window.location.pathname,
     useSearchParams: () => {
       const search = useSyncExternalStore(
         (listener) => {
@@ -49,6 +58,7 @@ vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
 vi.mock("@/features/bookings/queries", () => ({
   getMyBookings: vi.fn(),
   getMyBookingsMonth: vi.fn(),
+  getMyBookingsMonthStream: vi.fn(),
 }));
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -111,6 +121,10 @@ beforeEach(() => {
     name: "김가상",
   });
   vi.mocked(getMyBookingsMonth).mockResolvedValue(data());
+  vi.mocked(getMyBookingsMonthStream).mockResolvedValue({
+    meta: data(),
+    bookings: Promise.resolve([]),
+  });
   vi.mocked(cancelBooking).mockResolvedValue({
     ok: true,
     data: { bookingId: booking.id },
@@ -127,35 +141,47 @@ it("preserves calendar location in the page guard and waits for it before the qu
       }),
     }),
   );
+  expect(requirePageSession).not.toHaveBeenCalled();
+  expect(getMyBookingsMonthStream).not.toHaveBeenCalled();
+  await resolvePageContent(result);
   expect(requirePageSession).toHaveBeenCalledWith(
     "/bookings?view=calendar&month=2026-11&day=2026-11-03",
   );
   expect(getMyBookingsMonth).not.toHaveBeenCalled();
-  await resolvePageContent(result);
-  expect(getMyBookingsMonth).toHaveBeenCalledWith({
+  expect(getMyBookingsMonthStream).toHaveBeenCalledWith({
     month: "2026-11",
     day: "2026-11-03",
   });
   expect(
     vi.mocked(requirePageSession).mock.invocationCallOrder[0],
-  ).toBeLessThan(vi.mocked(getMyBookingsMonth).mock.invocationCallOrder[0]!);
+  ).toBeLessThan(
+    vi.mocked(getMyBookingsMonthStream).mock.invocationCallOrder[0]!,
+  );
   expect(getMyBookings).not.toHaveBeenCalled();
 });
 it("does not query the calendar after the page guard rejects", async () => {
   vi.mocked(requirePageSession).mockRejectedValue(new Error("LOGIN_REDIRECT"));
-  await expect(
-    resolvePageContent(
-      BookingsPage({ searchParams: Promise.resolve({ view: "calendar" }) }),
-    ),
-  ).rejects.toThrow("LOGIN_REDIRECT");
+  const content = await resolvePageContent(
+    BookingsPage({ searchParams: Promise.resolve({ view: "calendar" }) }),
+  );
+  await expect(resolvePageContent(content)).rejects.toThrow("LOGIN_REDIRECT");
   expect(getMyBookingsMonth).not.toHaveBeenCalled();
+  expect(getMyBookingsMonthStream).not.toHaveBeenCalled();
 });
 it("server-renders the selected day and keeps the list and calendar as links", () => {
   const html = renderToString(element(data([booking])));
   expect(html).toContain("10월 예약 1건");
-  expect(html).toContain("10월 8일 목요일, 예약 1건");
+  const serverDocument = render(
+    <div dangerouslySetInnerHTML={{ __html: html }} />,
+  );
+  expect(
+    within(serverDocument.container).getByRole("link", {
+      name: "10월 8일 목요일, 예약 1건",
+    }),
+  ).toHaveAttribute("aria-current", "date");
   expect(html).toContain('aria-current="date"');
   expect(html).toContain("회의실 A");
+  serverDocument.unmount();
   render(element());
   const views = within(
     screen.getByRole("navigation", { name: "예약 보기 선택" }),
@@ -322,7 +348,7 @@ it("omits cancellation for finished bookings and respects the server capability"
     screen.queryByRole("button", { name: "예약 취소" }),
   ).not.toBeInTheDocument();
 });
-it("keeps the title, view and month controls during month navigation and only skeletonizes the body", async () => {
+it("keeps the title and controls and immediately renders the next month's real dates while its bookings load", async () => {
   let finish!: () => void;
   const response = new Promise<void>((resolve) => {
     finish = resolve;
@@ -342,10 +368,21 @@ it("keeps the title, view and month controls during month navigation and only sk
   );
   expect(screen.getByRole("heading", { name: "2026년 11월" })).toBeVisible();
   expect(screen.getByRole("status")).toHaveTextContent("불러오고 있어요");
-  expect(screen.queryByRole("grid")).not.toBeInTheDocument();
   expect(
-    screen.queryByRole("region", { name: "선택한 날짜 예약" }),
-  ).not.toBeInTheDocument();
+    screen.getByRole("grid", { name: "2026년 11월 내 예약" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("link", {
+      name: "11월 1일 일요일, 예약을 불러오고 있어요",
+    }),
+  ).toHaveAttribute(
+    "href",
+    "/bookings?view=calendar&month=2026-11&day=2026-11-01",
+  );
+  expect(screen.queryByText("10월 예약 1건")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "선택한 날짜 예약" }),
+  ).toHaveTextContent("날짜를 골라 주세요");
   await act(async () => {
     finish();
     await response;
@@ -447,11 +484,359 @@ it.each([
   },
 );
 
-it("renders a wide calendar page skeleton without interactive placeholders", () => {
+it("renders known headings, view links and weekdays before metadata without guessing dates", () => {
   const { container } = render(<MyBookingsCalendarSkeleton />);
   expect(container.firstElementChild).toHaveClass("max-w-[1184px]");
   expect(screen.getAllByRole("status")).toHaveLength(1);
   expect(screen.getByRole("heading", { name: "내 예약" })).toBeVisible();
-  expect(screen.queryByRole("link")).not.toBeInTheDocument();
-  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "공간 예약하기" })).toHaveAttribute(
+    "href",
+    "/booking",
+  );
+  expect(screen.getByRole("link", { name: "달력" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  expect(screen.getByRole("button", { name: "오늘" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "이전 달" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "다음 달" })).toBeDisabled();
+  expect(screen.getByLabelText("일요일")).toHaveTextContent("일");
+  expect(screen.getByLabelText("토요일")).toHaveTextContent("토");
+  expect(
+    screen.queryByText(/예약 0건|이 날은 예약이 없어요|\d{4}년/),
+  ).not.toBeInTheDocument();
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((finish) => {
+    resolve = finish;
+  });
+  return { promise, resolve };
+}
+function streamed(
+  value: MyBookingsMonthData,
+  bookings: Promise<MyCalendarBooking[]>,
+  navigateAction?: () => Promise<void>,
+) {
+  return (
+    <QueryClientProvider client={new QueryClient()}>
+      <StreamingMyBookingsCalendar
+        meta={value}
+        bookings={bookings}
+        navigateAction={navigateAction}
+      />
+    </QueryClientProvider>
+  );
+}
+
+it("shows metadata dates before bookings, keeps date links and focus, and resolves the latest selected day only", async () => {
+  const response = deferred<MyCalendarBooking[]>();
+  await act(async () => {
+    render(streamed(data(), response.promise));
+  });
+  const grid = screen.getByRole("grid", { name: "2026년 10월 내 예약" });
+  const ninth = screen.getByRole("link", {
+    name: "10월 9일 금요일, 예약을 불러오고 있어요",
+  });
+  expect(
+    screen.queryByText(/예약 0건|이 날은 예약이 없어요/),
+  ).not.toBeInTheDocument();
+  await act(async () => {
+    fireEvent.click(ninth);
+    ninth.focus();
+  });
+  expect(ninth).toHaveAttribute("aria-current", "date");
+  expect(
+    screen.getByRole("region", { name: "선택한 날짜 예약" }),
+  ).toHaveTextContent("10월 9일 금요일");
+  expect(screen.getByLabelText("날짜 예약을 불러오고 있어요")).toBeVisible();
+  await act(async () => {
+    response.resolve([booking]);
+    await response.promise;
+  });
+  expect(screen.getByRole("grid")).toBe(grid);
+  expect(screen.getByRole("link", { name: "10월 9일 금요일, 예약 0건" })).toBe(
+    ninth,
+  );
+  expect(ninth).toHaveFocus();
+  expect(ninth).toHaveAttribute("aria-current", "date");
+  expect(
+    screen.getByRole("region", { name: "선택한 날짜 예약" }),
+  ).toHaveTextContent("이 날은 예약이 없어요");
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.getByText("10월 예약 1건")).toBeVisible();
+});
+
+it("queues only the last day during month navigation without another router call and preserves its link through the response", async () => {
+  const navigationResponse = deferred<void>();
+  const bookingsResponse = deferred<MyCalendarBooking[]>();
+  const navigate = vi.fn(() => navigationResponse.promise);
+  const initial = Promise.resolve([booking]);
+  const view = await act(async () =>
+    render(streamed(data([booking]), initial, navigate)),
+  );
+  const push = vi.spyOn(window.history, "pushState");
+  fireEvent.click(screen.getByRole("link", { name: "다음 달" }));
+  fireEvent.click(
+    screen.getByRole("link", {
+      name: "11월 2일 월요일, 예약을 불러오고 있어요",
+    }),
+  );
+  const latest = screen.getByRole("link", {
+    name: "11월 3일 화요일, 예약을 불러오고 있어요",
+  });
+  fireEvent.click(latest);
+  latest.focus();
+  expect(latest).toHaveAttribute("aria-current", "date");
+  expect(push).not.toHaveBeenCalled();
+  expect(navigate).toHaveBeenCalledOnce();
+  act(() => {
+    window.history.replaceState(
+      null,
+      "",
+      "/bookings?view=calendar&month=2026-11",
+    );
+    view.rerender(
+      streamed(data([], "2026-11"), bookingsResponse.promise, navigate),
+    );
+  });
+  await act(async () => {
+    navigationResponse.resolve();
+    await navigationResponse.promise;
+  });
+  expect(push).toHaveBeenCalledExactlyOnceWith(
+    null,
+    "",
+    "/bookings?view=calendar&month=2026-11&day=2026-11-03",
+  );
+  expect(latest).toHaveFocus();
+  const nextBooking = {
+    ...booking,
+    date: "2026-11-03",
+    start: "2026-11-03T02:00:00Z",
+    end: "2026-11-03T03:00:00Z",
+  };
+  await act(async () => {
+    bookingsResponse.resolve([nextBooking]);
+    await bookingsResponse.promise;
+  });
+  expect(screen.getByRole("link", { name: "11월 3일 화요일, 예약 1건" })).toBe(
+    latest,
+  );
+  expect(latest).toHaveAttribute("aria-current", "date");
+  expect(latest).toHaveFocus();
+  expect(
+    screen.getByRole("region", { name: "선택한 날짜 예약" }),
+  ).toHaveTextContent("회의실 A");
+  expect(navigate).toHaveBeenCalledOnce();
+  push.mockRestore();
+});
+
+it("drops a queued day when another month supersedes the in-flight month", async () => {
+  const first = deferred<void>();
+  const second = deferred<void>();
+  const navigate = vi
+    .fn()
+    .mockReturnValueOnce(first.promise)
+    .mockReturnValueOnce(second.promise);
+  const initial = Promise.resolve([booking]);
+  const view = await act(async () =>
+    render(streamed(data([booking]), initial, navigate)),
+  );
+  const push = vi.spyOn(window.history, "pushState");
+  fireEvent.click(screen.getByRole("link", { name: "다음 달" }));
+  fireEvent.click(
+    screen.getByRole("link", {
+      name: "11월 2일 월요일, 예약을 불러오고 있어요",
+    }),
+  );
+  fireEvent.click(screen.getByRole("link", { name: "다음 달" }));
+  expect(
+    screen.getByRole("grid", { name: "2026년 12월 내 예약" }),
+  ).toBeVisible();
+  const december = Promise.resolve<MyCalendarBooking[]>([]);
+  act(() => {
+    window.history.replaceState(
+      null,
+      "",
+      "/bookings?view=calendar&month=2026-12",
+    );
+    view.rerender(streamed(data([], "2026-12"), december, navigate));
+  });
+  await act(async () => {
+    second.resolve();
+    first.resolve();
+    await Promise.all([first.promise, second.promise, december]);
+  });
+  expect(push).not.toHaveBeenCalled();
+  expect(window.location.search).toBe("?view=calendar&month=2026-12");
+  expect(
+    screen.getByRole("region", { name: "선택한 날짜 예약" }),
+  ).toHaveTextContent("날짜를 골라 주세요");
+  expect(navigate).toHaveBeenCalledTimes(2);
+  push.mockRestore();
+});
+
+it("does not overwrite a history selection when an older month navigation completes", async () => {
+  const response = deferred<void>();
+  const navigate = vi.fn(() => response.promise);
+  const initial = Promise.resolve([booking]);
+  await act(async () => render(streamed(data([booking]), initial, navigate)));
+  const push = vi.spyOn(window.history, "pushState");
+  fireEvent.click(screen.getByRole("link", { name: "다음 달" }));
+  fireEvent.click(
+    screen.getByRole("link", {
+      name: "11월 2일 월요일, 예약을 불러오고 있어요",
+    }),
+  );
+  changeUrl("/bookings?view=calendar&month=2026-10&day=2026-10-10");
+  await act(async () => {
+    response.resolve();
+    await response.promise;
+  });
+  expect(push).not.toHaveBeenCalled();
+  expect(window.location.search).toBe(
+    "?view=calendar&month=2026-10&day=2026-10-10",
+  );
+  expect(
+    screen.getByRole("link", { name: "10월 10일 토요일, 예약 0건" }),
+  ).toHaveAttribute("aria-current", "date");
+  expect(navigate).toHaveBeenCalledOnce();
+  push.mockRestore();
+});
+
+it.each([
+  "/bookings?tab=past",
+  "/teams?month=2026-11",
+  "/bookings?view=calendar&month=2026-12&day=2026-12-04",
+])(
+  "discards an in-flight day through Activity hide and return without overwriting %s",
+  async (destination) => {
+    const response = deferred<void>();
+    const navigate = vi.fn(() => response.promise);
+    const initial = Promise.resolve([booking]);
+    const frame = (
+      mode: "visible" | "hidden",
+      value = data([booking]),
+      source = initial,
+    ) => <Activity mode={mode}>{streamed(value, source, navigate)}</Activity>;
+    const view = await act(async () => render(frame("visible")));
+    fireEvent.click(screen.getByRole("link", { name: "다음 달" }));
+    fireEvent.click(
+      screen.getByRole("link", {
+        name: "11월 2일 월요일, 예약을 불러오고 있어요",
+      }),
+    );
+    const push = vi.spyOn(window.history, "pushState");
+    await act(async () => view.rerender(frame("hidden")));
+    const settled = Promise.resolve<MyCalendarBooking[]>([]);
+    await act(async () => {
+      window.history.replaceState(null, "", destination);
+      view.rerender(frame("hidden", data([], "2026-11"), settled));
+      response.resolve();
+      await response.promise;
+    });
+    await act(async () =>
+      view.rerender(frame("visible", data([], "2026-11"), settled)),
+    );
+    expect(push).not.toHaveBeenCalled();
+    expect(`${window.location.pathname}${window.location.search}`).toBe(
+      destination,
+    );
+    act(() => {
+      window.history.replaceState(
+        null,
+        "",
+        "/bookings?view=calendar&month=2026-11&day=2026-11-05",
+      );
+      view.rerender(frame("visible", data([], "2026-11"), settled));
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("link", { name: "11월 5일 목요일, 예약 0건" }),
+    ).toHaveAttribute("aria-current", "date");
+    expect(
+      screen.getByRole("link", { name: "11월 2일 월요일, 예약 0건" }),
+    ).not.toHaveAttribute("aria-current");
+    expect(navigate).toHaveBeenCalledOnce();
+    push.mockRestore();
+  },
+);
+
+it("does not apply a queued day when the actual URL month no longer matches the resolved metadata", async () => {
+  const response = deferred<void>();
+  const navigate = vi.fn(() => response.promise);
+  const initial = Promise.resolve([booking]);
+  const view = await act(async () =>
+    render(streamed(data([booking]), initial, navigate)),
+  );
+  fireEvent.click(screen.getByRole("link", { name: "다음 달" }));
+  fireEvent.click(
+    screen.getByRole("link", {
+      name: "11월 2일 월요일, 예약을 불러오고 있어요",
+    }),
+  );
+  const push = vi.spyOn(window.history, "pushState");
+  const settled = Promise.resolve<MyCalendarBooking[]>([]);
+  await act(async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/bookings?view=calendar&month=2026-12&day=2026-12-04",
+    );
+    view.rerender(streamed(data([], "2026-11"), settled, navigate));
+    response.resolve();
+    await response.promise;
+  });
+  expect(push).not.toHaveBeenCalled();
+  expect(window.location.search).toBe(
+    "?view=calendar&month=2026-12&day=2026-12-04",
+  );
+  act(() => {
+    window.history.replaceState(
+      null,
+      "",
+      "/bookings?view=calendar&month=2026-11&day=2026-11-05",
+    );
+    view.rerender(streamed(data([], "2026-11"), settled, navigate));
+  });
+  expect(push).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("link", { name: "11월 5일 목요일, 예약 0건" }),
+  ).toHaveAttribute("aria-current", "date");
+  push.mockRestore();
+});
+
+it("keeps resolved reservations and focus during a same-month refresh until fresh bookings resolve", async () => {
+  const initial = Promise.resolve([booking]);
+  const view = await act(async () =>
+    render(streamed(data([booking]), initial)),
+  );
+  const link = screen.getByRole("link", { name: "10월 8일 목요일, 예약 1건" });
+  await act(async () => {
+    link.focus();
+  });
+  const fresh = deferred<MyCalendarBooking[]>();
+  await act(async () => {
+    startTransition(() => view.rerender(streamed(data(), fresh.promise)));
+  });
+  expect(screen.getByRole("link", { name: "10월 8일 목요일, 예약 1건" })).toBe(
+    link,
+  );
+  expect(
+    screen.getByRole("region", { name: "선택한 날짜 예약" }),
+  ).toHaveTextContent("회의실 A");
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  await act(async () => {
+    fresh.resolve([]);
+    await fresh.promise;
+  });
+  expect(
+    await screen.findByRole("link", { name: "10월 8일 목요일, 예약 0건" }),
+  ).toBe(link);
+  expect(link).toHaveFocus();
+  expect(
+    screen.getByRole("region", { name: "선택한 날짜 예약" }),
+  ).toHaveTextContent("이 날은 예약이 없어요");
 });

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { ActionError } from "@/lib/actions/result";
-import { getBranchNavigation } from "@/features/bookings/queries";
+import { getBranchNavigationStream } from "@/features/bookings/queries";
 import { BranchNavigation } from "@/features/bookings/components/branch-navigation";
 import { BranchWorkspace } from "@/features/bookings/components/branch-workspace";
 import { BranchDisplayClockProvider } from "@/features/bookings/components/branch-display-clock";
@@ -32,13 +32,20 @@ async function NavigationContent({
 }) {
   if (!(await getSession())) return <NavigationFallback />;
   const { branchId } = await params;
-  const data = await getBranchNavigation(branchId).catch((error: unknown) => {
-    if (error instanceof ActionError && error.code === "NOT_FOUND") notFound();
-    throw error;
-  });
+  const data = await getBranchNavigationStream(branchId).catch(
+    (error: unknown) => {
+      if (error instanceof ActionError && error.code === "NOT_FOUND")
+        notFound();
+      throw error;
+    },
+  );
   return (
     <Suspense fallback={<NavigationFallback />}>
-      <BranchNavigation data={data} viewControl={<FloorViewControl />} />
+      <BranchNavigation
+        data={data.meta}
+        bookingDates={data.bookingDates}
+        viewControl={<FloorViewControl />}
+      />
     </Suspense>
   );
 }
