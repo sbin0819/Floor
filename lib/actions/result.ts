@@ -45,6 +45,7 @@ export type ActionErrorDetails = {
     | "invite_count"
     | "channel_count"
     | "space_full"
+    | "call_full"
     | "desk_per_person"
     | "attendee_count"
     | "participants";

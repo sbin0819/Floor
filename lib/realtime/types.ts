@@ -18,6 +18,26 @@ export type RealtimeEvent =
   | { type: "notifications.changed" }
   | { type: "room.changed"; roomId: string }
   | { type: "space.changed"; spaceId: string }
+  | {
+      type: "call.changed";
+      roomId: string;
+      roomKind: ChatRoomKind;
+      spaceId: string | null;
+      bookingId: string | null;
+      sessionId: string | null;
+      kind: "voice" | "huddle" | null;
+      participantCount: number;
+      participants: { userId: string; name: string }[];
+    }
+  | {
+      type: "call.ringing";
+      roomId: string;
+      sessionId: string;
+      callerId: string;
+      callerName: string;
+    }
+  | { type: "call.declined"; roomId: string; sessionId: string }
+  | { type: "call.replaced"; participantId: string }
   | { type: "realtime.reauth" }
   | { type: "status.changed"; status: "online" | "away" | "dnd" }
   | { type: "booking.changed"; spaceId: string }
