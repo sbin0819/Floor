@@ -23,13 +23,14 @@ import {
 import { ReactionPills } from "./reaction-pills";
 import { SystemMessageContent } from "./system-message-content";
 import type { ChatMessage, ReactionEmoji } from "../types";
-import { MessageAttachments } from "./message-attachments";
+import { MessageAttachments, type AttachmentUrl } from "./message-attachments";
 
 export type MessageActions = {
   userId: string;
   canWrite: boolean;
   canReact: boolean;
   filesEnabled?: boolean;
+  fileUrl?: AttachmentUrl;
   admin: boolean;
   names: ReadonlyMap<string, string>;
   react: (
@@ -47,6 +48,10 @@ export type MessageActions = {
 export const MessageRow = memo(function MessageRow({
   message,
   grouped,
+  mine = false,
+  runStart = !grouped,
+  runEnd = true,
+  showTime = true,
   dateDivider,
   unread,
   now,
@@ -64,6 +69,10 @@ export const MessageRow = memo(function MessageRow({
 }: {
   message: DisplayMessage;
   grouped: boolean;
+  mine?: boolean;
+  runStart?: boolean;
+  runEnd?: boolean;
+  showTime?: boolean;
   dateDivider: boolean;
   unread: boolean;
   now: string;
@@ -164,6 +173,48 @@ export const MessageRow = memo(function MessageRow({
     message.authorId !== actions.userId &&
     (message.mentionsEveryone ||
       message.mentions.some(({ userId }) => userId === actions.userId));
+  const bubbleState = message.deletedAt
+    ? "deleted"
+    : (message.delivery ?? "sent");
+  const editing = Boolean(editor && !message.deletedAt);
+  const hasBubble = Boolean(
+    message.deletedAt || message.body || message.replyTo,
+  );
+  const bubbleColor = message.deletedAt
+    ? "border border-dashed border-border bg-transparent text-muted-foreground"
+    : message.delivery
+      ? "bg-chat-pending text-chat-pending-foreground"
+      : mentioned
+        ? "border border-status-pending-border bg-status-pending text-status-pending-foreground"
+        : mine
+          ? "bg-chat-mine text-chat-mine-foreground"
+          : "border border-border bg-card text-foreground";
+  const metadata = !editing &&
+    (showTime ||
+      (!message.deletedAt && (message.editedAt || message.delivery))) && (
+      <span
+        data-message-time
+        className="shrink-0 pb-1 text-xs text-muted-foreground tabular-nums"
+      >
+        {!message.deletedAt && message.delivery === "pending" ? (
+          <span className="inline-flex items-center gap-1">
+            <Clock className="size-3" aria-hidden="true" />
+            보내는 중
+          </span>
+        ) : !message.deletedAt && message.delivery === "failed" ? (
+          <span className="text-destructive">{messageSendError(message)}</span>
+        ) : showTime ? (
+          <>
+            {message.editedAt && !message.deletedAt && "수정됨 · "}
+            <time dateTime={message.createdAt}>
+              {formatChatTime(message.createdAt)}
+            </time>
+          </>
+        ) : message.editedAt && !message.deletedAt ? (
+          "수정됨"
+        ) : null}
+      </span>
+    );
   return (
     <>
       {dateDivider && (
@@ -249,12 +300,16 @@ export const MessageRow = memo(function MessageRow({
         data-delivery={message.delivery ?? "sent"}
         data-mentioned={mentioned || undefined}
         data-highlighted={highlighted || undefined}
-        className={`relative flex gap-3 rounded-md py-1 outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${mentioned ? "bg-status-pending" : highlighted ? "bg-accent" : ""} ${!grouped ? "mt-4" : ""} ${message.delivery === "pending" ? "opacity-50" : ""}`}
+        data-side={mine ? "mine" : "other"}
+        data-run-start={runStart}
+        data-show-time={showTime}
+        data-bubble-state={bubbleState}
+        className={`relative flex gap-2 rounded-md py-1 outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${runStart ? "mt-4" : ""} ${foldedCount || message.kind === "system" ? "justify-center" : mine ? "justify-end" : ""}`}
       >
         {foldedCount ? (
           <Button
             variant="ghost"
-            className="min-h-11 text-muted-foreground"
+            className="mx-auto min-h-11 text-muted-foreground"
             onClick={onExpand}
           >
             차단한 사용자의 메시지{foldedCount > 1 ? ` ${foldedCount}개` : ""} ·
@@ -268,30 +323,35 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : (
           <>
-            <div className="w-10 shrink-0">
-              {!grouped && message.authorId && (
-                <PersonCard
-                  userId={message.authorId}
-                  name={message.authorName ?? "알 수 없는 사람"}
-                >
-                  <button
-                    type="button"
-                    aria-label={`${message.authorName ?? "알 수 없는 사람"} 아바타 프로필`}
-                    className="flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
+            {!mine && (
+              <div className="w-9 shrink-0">
+                {runStart && message.authorId && (
+                  <PersonCard
+                    userId={message.authorId}
+                    name={message.authorName ?? "알 수 없는 사람"}
                   >
-                    <span
-                      aria-hidden="true"
-                      className="flex size-10 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground"
+                    <button
+                      type="button"
+                      aria-label={`${message.authorName ?? "알 수 없는 사람"} 아바타 프로필`}
+                      className="-mx-1 flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-ring"
                     >
-                      {Array.from(message.authorName ?? "?")[0]}
-                    </span>
-                  </button>
-                </PersonCard>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              {!grouped && (
-                <div className="mb-1 flex items-baseline gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="flex size-9 items-center justify-center rounded-full bg-muted font-semibold text-muted-foreground @max-[600px]:size-7.5"
+                      >
+                        {Array.from(message.authorName ?? "?")[0]}
+                      </span>
+                    </button>
+                  </PersonCard>
+                )}
+              </div>
+            )}
+            <div
+              data-message-content
+              className={`flex min-w-0 flex-1 flex-col ${mine ? "items-end" : "items-start"}`}
+            >
+              {!mine && runStart && (
+                <div className="mb-1 flex items-baseline">
                   {message.authorId ? (
                     <PersonCard
                       userId={message.authorId}
@@ -312,78 +372,83 @@ export const MessageRow = memo(function MessageRow({
                       {message.authorName ?? "알 수 없는 사람"}
                     </strong>
                   )}
-                  <time
-                    dateTime={message.createdAt}
-                    className="text-xs text-muted-foreground tabular-nums"
-                  >
-                    {formatChatTime(message.createdAt)}
-                  </time>
                 </div>
               )}
-              {message.replyTo && !message.deletedAt && (
-                <button
-                  type="button"
-                  aria-label={`${message.replyTo.authorName ?? "알 수 없는 사람"} 님의 원문: ${message.replyTo.deleted ? "삭제된 메시지예요" : message.replyTo.excerpt}`}
-                  className="mb-1 flex min-h-11 max-w-full items-center gap-2 rounded-md border-l-2 border-border px-2 text-left text-xs text-muted-foreground hover:bg-muted"
-                  onClick={() => actions?.onJump?.(message.replyTo!.id)}
+              {editing ? (
+                <div className="w-full min-w-0 rounded-lg bg-card text-card-foreground">
+                  {editor}
+                </div>
+              ) : hasBubble ? (
+                <div
+                  className={`flex max-w-full min-w-0 items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}
                 >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted"
+                  <div
+                    data-message-bubble-anchor
+                    className="relative max-w-[min(560px,75cqw)] min-w-0 @max-[600px]:max-w-[80cqw]"
                   >
-                    {Array.from(message.replyTo.authorName ?? "?")[0]}
-                  </span>
-                  <strong className="shrink-0">
-                    {message.replyTo.authorName ?? "알 수 없는 사람"}
-                  </strong>
-                  <span className="truncate">
-                    {message.replyTo.deleted
-                      ? "삭제된 메시지예요"
-                      : message.replyTo.excerpt}
-                  </span>
-                </button>
-              )}
-              {(message.deletedAt ? null : editor) ??
-                (message.deletedAt ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    삭제된 메시지예요
-                  </p>
-                ) : (
-                  <MessageBody body={message.body} names={names} />
-                ))}
-              {message.editedAt && !message.deletedAt && (
-                <span className="text-xs text-muted-foreground">(수정됨)</span>
-              )}
+                    <div
+                      data-message-bubble
+                      className={`rounded-2xl px-3.5 py-2 text-sm [overflow-wrap:anywhere] break-keep ${bubbleColor} ${!mine && runStart ? "rounded-tl-[6px]" : ""} ${mine && runEnd ? "rounded-br-[6px]" : ""} ${highlighted ? "ring-2 ring-ring/40" : ""}`}
+                    >
+                      {message.replyTo && !message.deletedAt && (
+                        <button
+                          type="button"
+                          aria-label={`${message.replyTo.authorName ?? "알 수 없는 사람"} 님의 원문: ${message.replyTo.deleted ? "삭제된 메시지예요" : message.replyTo.excerpt}`}
+                          className={`mb-1 flex min-h-11 w-full min-w-0 flex-col justify-center rounded-md border-l-2 px-2 py-1 text-left text-xs ${mine ? "border-chat-mine-foreground/60 bg-chat-mine-foreground/15" : "border-border bg-muted text-muted-foreground"}`}
+                          onClick={() => actions?.onJump?.(message.replyTo!.id)}
+                        >
+                          <strong className="max-w-full truncate">
+                            {message.replyTo.authorName ?? "알 수 없는 사람"}
+                          </strong>
+                          <span className="max-w-full truncate">
+                            {message.replyTo.deleted
+                              ? "삭제된 메시지예요"
+                              : message.replyTo.excerpt}
+                          </span>
+                        </button>
+                      )}
+                      {message.deletedAt ? (
+                        <p className="text-sm text-muted-foreground italic">
+                          삭제된 메시지예요
+                        </p>
+                      ) : message.body ? (
+                        <MessageBody
+                          body={message.body}
+                          names={names}
+                          tone={mine ? "mine" : "other"}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                  {(message.body ||
+                    message.deletedAt ||
+                    !message.attachments.length) &&
+                    metadata}
+                </div>
+              ) : null}
               {!message.deletedAt && (
                 <MessageAttachments
                   attachments={message.attachments}
                   enabled={actions?.filesEnabled ?? false}
+                  fileUrl={actions?.fileUrl}
+                  align={mine ? "end" : "start"}
+                  trailing={!message.body ? metadata : undefined}
+                  highlighted={!message.body && highlighted}
                 />
-              )}
-              {read && (
-                <p
-                  className="text-right text-xs text-muted-foreground"
-                  data-chat-read-receipt
-                >
-                  읽음
-                </p>
               )}
               {!message.deletedAt && (
-                <ReactionPills
-                  reactions={message.reactions}
-                  disabled={!permissions.canReact}
-                  onChange={toolbarProps.onReaction}
-                />
+                <div
+                  className={`flex max-w-full ${mine ? "justify-end" : "justify-start"}`}
+                >
+                  <ReactionPills
+                    reactions={message.reactions}
+                    disabled={!permissions.canReact}
+                    onChange={toolbarProps.onReaction}
+                  />
+                </div>
               )}
-              {message.delivery === "pending" && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="size-3" aria-hidden="true" />
-                  보내는 중이에요
-                </span>
-              )}
-              {message.delivery === "failed" && (
-                <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  <span>{messageSendError(message)}</span>
+              {!message.deletedAt && message.delivery === "failed" && (
+                <div className="flex flex-wrap items-center justify-end gap-x-2 self-end text-xs text-muted-foreground">
                   {message.errorCode === "UNAUTHENTICATED" ? (
                     <Link
                       href="/login"
@@ -416,6 +481,14 @@ export const MessageRow = memo(function MessageRow({
                     지우기
                   </Button>
                 </div>
+              )}
+              {read && (
+                <p
+                  className="self-end text-right text-xs text-muted-foreground"
+                  data-chat-read-receipt
+                >
+                  읽음
+                </p>
               )}
             </div>
           </>

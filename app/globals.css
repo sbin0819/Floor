@@ -85,6 +85,10 @@
   --presence-away: #d99a2b;
   --presence-dnd: #d64545;
   --presence-offline: #a3a19b;
+  --chat-mine: #3a5bd9;
+  --chat-mine-foreground: #ffffff;
+  --chat-pending: #c9d3f5;
+  --chat-pending-foreground: #1e2f74;
   --sidebar: #faf9f6;
   --sidebar-foreground: #1c1c1a;
   --sidebar-primary: #3a5bd9;
@@ -135,9 +139,14 @@
   --status-restricted-border: #d6d4cd;
   --status-pending: #faeeda;
   --status-pending-foreground: #633806;
+  --status-pending-border: #e9cf8f;
 }
 
 @theme inline {
+  --color-chat-mine: var(--chat-mine);
+  --color-chat-mine-foreground: var(--chat-mine-foreground);
+  --color-chat-pending: var(--chat-pending);
+  --color-chat-pending-foreground: var(--chat-pending-foreground);
   --color-booked: var(--booked);
   --color-booked-border: var(--booked-border);
   --color-booked-foreground: var(--booked-foreground);
@@ -161,6 +170,7 @@
   --color-status-restricted-border: var(--status-restricted-border);
   --color-status-pending: var(--status-pending);
   --color-status-pending-foreground: var(--status-pending-foreground);
+  --color-status-pending-border: var(--status-pending-border);
 }
 
 @utility bg-status-maintenance-hatch {

@@ -403,7 +403,9 @@ describe("chat channel presentation", () => {
     );
     const log = screen.getByRole("region", { name: "일반 메시지" });
     expect(log.querySelector("script")).toBeNull();
-    expect(log.querySelectorAll("strong")).toHaveLength(2);
+    expect(log.querySelectorAll('article[data-run-start="true"]')).toHaveLength(
+      2,
+    );
     expect(log.textContent).toContain("<script>bad()</script>\n둘째 줄");
     expect(within(log).getByText("오늘")).toBeVisible();
   });
@@ -505,7 +507,14 @@ describe("optimistic sending and streamed updates", () => {
     const node = container.querySelector(
       `[data-message-key="${submitted.clientId}"]`,
     );
-    expect(node?.querySelector("article")).toHaveClass("opacity-50");
+    expect(node?.querySelector("article")).toHaveAttribute(
+      "data-delivery",
+      "pending",
+    );
+    expect(node?.querySelector("article")).toHaveAttribute(
+      "data-bubble-state",
+      "pending",
+    );
     expect(input).toHaveValue("");
     const saved = message({
       id: "saved",

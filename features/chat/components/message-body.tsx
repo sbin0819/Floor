@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import {
   mentionLabel,
   parseMessageBody,
@@ -9,6 +10,7 @@ import {
 function renderParts(
   parts: MessageBodyPart[],
   names: MentionNames,
+  tone: "mine" | "other",
 ): ReactNode[] {
   return parts.map((part, index) => {
     switch (part.type) {
@@ -18,7 +20,10 @@ function renderParts(
         return (
           <code
             key={index}
-            className="rounded bg-muted px-1 font-mono text-[0.9em]"
+            className={cn(
+              "rounded px-1 font-mono text-[0.9em]",
+              tone === "mine" ? "bg-chat-mine-foreground/20" : "bg-muted",
+            )}
           >
             {part.text}
           </code>
@@ -27,7 +32,10 @@ function renderParts(
         return (
           <pre
             key={index}
-            className="my-2 overflow-x-auto rounded-md bg-muted p-3 text-xs"
+            className={cn(
+              "my-2 max-w-full overflow-x-auto rounded-md p-3 text-xs",
+              tone === "mine" ? "bg-chat-mine-foreground/20" : "bg-muted",
+            )}
           >
             <code>{part.text}</code>
           </pre>
@@ -37,7 +45,12 @@ function renderParts(
           <span
             key={index}
             data-mention={part.userId}
-            className="rounded bg-accent px-0.5 font-medium text-accent-foreground"
+            className={cn(
+              "rounded px-0.5 font-medium",
+              tone === "mine"
+                ? "bg-chat-mine-foreground/20 text-current"
+                : "bg-accent text-accent-foreground",
+            )}
           >
             {mentionLabel(part.userId, names)}
           </span>
@@ -49,15 +62,20 @@ function renderParts(
             href={part.href}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            className="text-primary underline underline-offset-2"
+            className={cn(
+              "underline underline-offset-2",
+              tone === "mine" ? "text-current" : "text-primary",
+            )}
           >
             {part.text}
           </a>
         );
       case "bold":
-        return <strong key={index}>{renderParts(part.children, names)}</strong>;
+        return (
+          <strong key={index}>{renderParts(part.children, names, tone)}</strong>
+        );
       case "italic":
-        return <em key={index}>{renderParts(part.children, names)}</em>;
+        return <em key={index}>{renderParts(part.children, names, tone)}</em>;
     }
   });
 }
@@ -65,13 +83,15 @@ function renderParts(
 export function MessageBody({
   body,
   names = {},
+  tone = "other",
 }: {
   body: string;
   names?: MentionNames;
+  tone?: "mine" | "other";
 }) {
   return (
-    <div className="text-sm leading-6 wrap-anywhere whitespace-pre-wrap">
-      {renderParts(parseMessageBody(body), names)}
+    <div className="text-sm leading-6 wrap-anywhere break-keep whitespace-pre-wrap">
+      {renderParts(parseMessageBody(body), names, tone)}
     </div>
   );
 }

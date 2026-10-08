@@ -389,7 +389,7 @@ export const MessageList = memo(function MessageList({
                 : (visibleRows[0]?.index ?? 0),
             );
           }}
-          className="h-full overflow-y-auto overscroll-contain px-4 focus-visible:outline-2 focus-visible:outline-ring md:px-6"
+          className="@container h-full overflow-y-auto overscroll-contain px-4 focus-visible:outline-2 focus-visible:outline-ring md:px-6"
           style={{ overflowAnchor: "none" }}
         >
           <div
@@ -418,6 +418,12 @@ export const MessageList = memo(function MessageList({
             {rows.map((row) => {
               const message = messages[row.index]!;
               const previous = messages[row.index - 1];
+              const next = messages[row.index + 1];
+              const unread =
+                message.seq === unreadSeq ||
+                (unreadSeq !== null &&
+                  Boolean(groups.get(message.id)?.seqs.includes(unreadSeq)));
+              const mine = message.authorId === userId;
               return (
                 <div
                   key={row.key}
@@ -431,18 +437,26 @@ export const MessageList = memo(function MessageList({
                   <MessageRow
                     message={message}
                     grouped={isMessageContinuation(previous, message)}
+                    mine={mine}
+                    runStart={
+                      !isMessageContinuation(previous, message) ||
+                      (unread && !mine)
+                    }
+                    runEnd={!next || !isMessageContinuation(message, next)}
+                    showTime={
+                      !next ||
+                      next.authorId !== message.authorId ||
+                      next.kind !== "text" ||
+                      Math.floor(Date.parse(next.createdAt) / 60000) !==
+                        Math.floor(Date.parse(message.createdAt) / 60000) ||
+                      next.delivery !== message.delivery
+                    }
                     dateDivider={
                       !previous ||
                       chatDate(previous.createdAt) !==
                         chatDate(message.createdAt)
                     }
-                    unread={
-                      message.seq === unreadSeq ||
-                      (unreadSeq !== null &&
-                        Boolean(
-                          groups.get(message.id)?.seqs.includes(unreadSeq),
-                        ))
-                    }
+                    unread={unread}
                     now={now}
                     onRetry={onRetry}
                     onRemove={onRemove}

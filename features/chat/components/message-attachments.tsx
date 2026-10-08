@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import {
   Archive,
@@ -49,7 +49,7 @@ export function FileCard({
 }) {
   const Icon = icons[fileIconKind(attachment.name)];
   return (
-    <div className="flex w-full max-w-90 min-w-0 items-center gap-3 rounded-lg border border-border bg-card p-3">
+    <div className="flex w-90 max-w-full min-w-0 items-center gap-3 rounded-lg border border-border bg-card p-3">
       <Icon aria-hidden className="size-8 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <TooltipProvider>
@@ -192,10 +192,16 @@ export function MessageAttachments({
   attachments,
   enabled = true,
   fileUrl = attachmentUrl,
+  align = "start",
+  trailing,
+  highlighted = false,
 }: {
   attachments: readonly ChatAttachment[];
   enabled?: boolean;
   fileUrl?: AttachmentUrl;
+  align?: "start" | "end";
+  trailing?: ReactNode;
+  highlighted?: boolean;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
@@ -203,67 +209,79 @@ export function MessageAttachments({
   const images = attachments.filter((file) => file.kind === "image");
   const files = attachments.filter((file) => file.kind !== "image");
   return (
-    <div className="mt-2 space-y-2" data-message-attachments>
-      {enabled && images.length > 0 ? (
-        <div
-          className={
-            images.length > 1
-              ? "grid w-fit max-w-full grid-cols-2 gap-2"
-              : "max-w-90"
-          }
-        >
-          {images.map((file, index) => (
-            <button
-              key={file.id}
-              type="button"
-              aria-label={`${file.name} 크게 보기`}
-              className={`relative block overflow-hidden rounded-lg bg-muted focus-visible:outline-2 focus-visible:outline-ring ${images.length > 1 ? "aspect-square w-42.5 max-w-full" : "max-h-90 max-w-full"}`}
-              style={
-                images.length > 1
-                  ? undefined
-                  : {
-                      aspectRatio: `${file.width ?? 1}/${file.height ?? 1}`,
-                      width: Math.min(file.width ?? 360, 360),
-                      maxHeight: 360,
-                    }
-              }
-              onClick={(event) => {
-                trigger.current = event.currentTarget;
-                setSelected(index);
-              }}
-            >
-              <Image
-                unoptimized
-                fill
-                loading="lazy"
-                sizes={
-                  images.length > 1 ? "170px" : "(max-width: 480px) 80vw, 360px"
+    <div
+      className={`mt-2 flex max-w-full min-w-0 items-end gap-2 ${align === "end" ? "flex-row-reverse" : ""}`}
+      data-message-attachments
+    >
+      <div
+        data-message-attachment-cards
+        data-message-bubble-anchor
+        className={`relative flex max-w-[min(560px,75cqw)] min-w-0 flex-col gap-2 rounded-lg @max-[600px]:max-w-[80cqw] ${align === "end" ? "items-end" : "items-start"} ${highlighted ? "ring-2 ring-ring/40" : ""}`}
+      >
+        {enabled && images.length > 0 ? (
+          <div
+            className={
+              images.length > 1
+                ? "grid w-87 max-w-full grid-cols-2 gap-2"
+                : "max-w-full"
+            }
+          >
+            {images.map((file, index) => (
+              <button
+                key={file.id}
+                type="button"
+                aria-label={`${file.name} 크게 보기`}
+                className={`relative block overflow-hidden rounded-lg bg-muted focus-visible:outline-2 focus-visible:outline-ring ${images.length > 1 ? "aspect-square w-42.5 max-w-full min-w-0" : "max-h-90 max-w-full"}`}
+                style={
+                  images.length > 1
+                    ? undefined
+                    : {
+                        aspectRatio: `${file.width ?? 1}/${file.height ?? 1}`,
+                        width: Math.min(file.width ?? 360, 360),
+                        maxHeight: 360,
+                      }
                 }
-                src={fileUrl(file.id)}
-                alt={file.name}
-                className="object-cover"
-              />
-            </button>
-          ))}
-        </div>
-      ) : (
-        images.map((file) => (
+                onClick={(event) => {
+                  trigger.current = event.currentTarget;
+                  setSelected(index);
+                }}
+              >
+                <Image
+                  unoptimized
+                  fill
+                  loading="lazy"
+                  sizes={
+                    images.length > 1
+                      ? "170px"
+                      : "(max-width: 480px) 80vw, 360px"
+                  }
+                  src={fileUrl(file.id)}
+                  alt={file.name}
+                  className="object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        ) : (
+          images.map((file) => (
+            <FileCard
+              key={file.id}
+              attachment={file}
+              enabled={false}
+              fileUrl={fileUrl}
+            />
+          ))
+        )}
+        {files.map((file) => (
           <FileCard
             key={file.id}
             attachment={file}
-            enabled={false}
+            enabled={enabled}
             fileUrl={fileUrl}
           />
-        ))
-      )}
-      {files.map((file) => (
-        <FileCard
-          key={file.id}
-          attachment={file}
-          enabled={enabled}
-          fileUrl={fileUrl}
-        />
-      ))}
+        ))}
+      </div>
+      {trailing}
       {enabled && (
         <AttachmentGallery
           fileUrl={fileUrl}
