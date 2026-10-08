@@ -32,12 +32,12 @@ describe("photo DTO privacy and bounded reads", () => {
     await database.db
       .update(users)
       .set({ defaultBranchId: branchId })
-      .where(eq(users.email, "member@floor.com"));
+      .where(eq(users.email, "test1@ai.com"));
   });
   afterAll(async () => {
     await database?.client.close();
   });
-  async function queries(email = "member@floor.com") {
+  async function queries(email = "test1@ai.com") {
     const [user] = await database.db
       .select()
       .from(users)
@@ -93,7 +93,7 @@ describe("photo DTO privacy and bounded reads", () => {
   });
 
   it("returns allowed cover and sorted detail photos without adding SQL", async () => {
-    const query = await queries("both@floor.com");
+    const query = await queries("test5@ai.com");
     const floor = await query.getFloorDay(branchId, floorId);
     const room = floor.spaces.find(
       (space) => space.kind === "accessible" && space.name === "회의실 A",
@@ -204,7 +204,7 @@ describe("photo DTO privacy and bounded reads", () => {
     expect((await query.getBranchNavigation(branchId)).branch.cover).toEqual(
       list.find(({ id }) => id === branchId)?.cover,
     );
-    const member = await queries("design.member@floor.com");
+    const member = await queries("test3@ai.com");
     expect(
       (await member.getBranchList()).find(({ id }) => id === branchId)!
         .bookableSpaceCount,
@@ -218,7 +218,7 @@ describe("photo DTO privacy and bounded reads", () => {
     const [operator] = await database.db
       .select()
       .from(users)
-      .where(eq(users.email, "admin@floor.com"));
+      .where(eq(users.email, "admin@ai.com"));
     if (!operator) throw new Error("Missing seeded operator");
     const admin = createAdminQueries({
       database: database.db,

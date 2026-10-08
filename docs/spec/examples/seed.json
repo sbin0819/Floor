@@ -776,39 +776,129 @@
   "users": [
     {
       "key": "admin",
-      "email": "admin@floor.com",
-      "name": "관리자",
-      "password": "admin1234!"
+      "email": "admin@ai.com",
+      "name": "김도윤",
+      "password": "qwer1234"
     },
     {
       "key": "member",
-      "email": "member@floor.com",
+      "email": "test1@ai.com",
       "name": "김하은",
-      "password": "floor1234!"
+      "password": "qwer1234"
     },
     {
       "key": "designAdmin",
-      "email": "design.admin@floor.com",
+      "email": "test2@ai.com",
       "name": "박지훈",
-      "password": "floor1234!"
+      "password": "qwer1234"
     },
     {
       "key": "designMember",
-      "email": "design.member@floor.com",
+      "email": "test3@ai.com",
       "name": "이서연",
-      "password": "floor1234!"
+      "password": "qwer1234"
     },
     {
       "key": "growthAdmin",
-      "email": "growth.admin@floor.com",
+      "email": "test4@ai.com",
       "name": "최민준",
-      "password": "floor1234!"
+      "password": "qwer1234"
     },
     {
       "key": "both",
-      "email": "both@floor.com",
+      "email": "test5@ai.com",
       "name": "정유나",
-      "password": "floor1234!"
+      "password": "qwer1234"
+    },
+    {
+      "key": "test6",
+      "email": "test6@ai.com",
+      "name": "이준서",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test7",
+      "email": "test7@ai.com",
+      "name": "박수빈",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test8",
+      "email": "test8@ai.com",
+      "name": "최현우",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test9",
+      "email": "test9@ai.com",
+      "name": "정지아",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test10",
+      "email": "test10@ai.com",
+      "name": "강민서",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test11",
+      "email": "test11@ai.com",
+      "name": "조서준",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test12",
+      "email": "test12@ai.com",
+      "name": "윤소윤",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test13",
+      "email": "test13@ai.com",
+      "name": "장예준",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test14",
+      "email": "test14@ai.com",
+      "name": "임채원",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test15",
+      "email": "test15@ai.com",
+      "name": "한지호",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test16",
+      "email": "test16@ai.com",
+      "name": "오다은",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test17",
+      "email": "test17@ai.com",
+      "name": "신우진",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test18",
+      "email": "test18@ai.com",
+      "name": "서유진",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test19",
+      "email": "test19@ai.com",
+      "name": "권태현",
+      "password": "qwer1234"
+    },
+    {
+      "key": "test20",
+      "email": "test20@ai.com",
+      "name": "황서아",
+      "password": "qwer1234"
     }
   ],
   "teams": [

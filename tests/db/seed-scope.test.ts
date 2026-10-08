@@ -260,7 +260,7 @@ describe("transactional additive-only branch seed", () => {
       await database.db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.email, "member@floor.com"))
+        .where(eq(users.email, "test1@ai.com"))
     )[0]!.id;
   }
 
@@ -273,8 +273,8 @@ describe("transactional additive-only branch seed", () => {
           origin: "http://localhost:3000",
         },
         body: JSON.stringify({
-          email: "member@floor.com",
-          password: "floor1234!",
+          email: "test1@ai.com",
+          password: "qwer1234",
         }),
       }),
     );
@@ -300,10 +300,7 @@ describe("transactional additive-only branch seed", () => {
       skippedBookings: 0,
       branchScope: { addedBranchIds: [ids.branch], skippedBranchIds: [] },
     });
-    expect(result.accounts.sort()).toEqual([
-      "admin@floor.com",
-      "member@floor.com",
-    ]);
+    expect(result.accounts.sort()).toEqual(["admin@ai.com", "test1@ai.com"]);
     const after = await snapshot();
     for (const [table, rows] of Object.entries(before))
       expect(after[table]).toEqual(expect.arrayContaining(rows));
@@ -399,7 +396,7 @@ describe("transactional additive-only branch seed", () => {
     await database.db
       .update(users)
       .set({ name: "바뀐 사용자 이름" })
-      .where(eq(users.email, "member@floor.com"));
+      .where(eq(users.email, "test1@ai.com"));
     const before = await snapshot();
     statements.length = 0;
     statementParameters.length = 0;
@@ -554,7 +551,7 @@ describe("transactional additive-only branch seed", () => {
     await database.db
       .update(users)
       .set({ emailVerified: false })
-      .where(eq(users.email, "member@floor.com"));
+      .where(eq(users.email, "test1@ai.com"));
     const before = await snapshot();
     await expect(append()).rejects.toThrow("인증 완료 시드 계정");
     expect(await snapshot()).toEqual(before);
@@ -565,7 +562,7 @@ describe("transactional additive-only branch seed", () => {
     await database.db
       .update(users)
       .set({ emailVerified: false })
-      .where(eq(users.email, "growth.admin@floor.com"));
+      .where(eq(users.email, "test4@ai.com"));
     const before = await database.db.select().from(users).orderBy(users.id);
     expect((await append()).branchScope?.addedBranchIds).toEqual([ids.branch]);
     expect(await database.db.select().from(users).orderBy(users.id)).toEqual(

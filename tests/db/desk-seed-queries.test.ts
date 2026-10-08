@@ -32,7 +32,7 @@ describe("seeded seat availability", () => {
     const [member] = await database.db
       .select()
       .from(users)
-      .where(eq(users.email, "member@floor.com"));
+      .where(eq(users.email, "test1@ai.com"));
     session = { userId: member!.id, email: member!.email, name: member!.name };
   });
   afterAll(async () => {

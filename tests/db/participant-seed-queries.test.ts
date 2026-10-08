@@ -41,7 +41,7 @@ describe("seeded sprint invitation", () => {
     });
   };
   it("shows Kim Haeun the invitation without a private room photo and Minjun the names", async () => {
-    const member = await (await query("member@floor.com")).getMyBookings();
+    const member = await (await query("test1@ai.com")).getMyBookings();
     const invited = member.upcoming.find(
       ({ title }) => title === "스프린트 계획",
     );
@@ -51,7 +51,7 @@ describe("seeded sprint invitation", () => {
       spaceName: "회의실 A",
       photo: null,
     });
-    const owner = await (await query("growth.admin@floor.com")).getMyBookings();
+    const owner = await (await query("test4@ai.com")).getMyBookings();
     expect(
       owner.upcoming.find(({ title }) => title === "스프린트 계획"),
     ).toMatchObject({

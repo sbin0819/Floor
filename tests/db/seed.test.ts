@@ -43,7 +43,7 @@ const attendeeCounts = new Map(
   ),
 );
 const expectedCounts = {
-  users: 6,
+  users: 21,
   branches: 5,
   floors: 11,
   spaces: 71,
@@ -187,7 +187,7 @@ describe("transactional development seed", () => {
       expect((await user(input.email)).emailVerified).toBe(true);
       expect((await login(input.email, input.password)).status).toBe(200);
     }
-    const admin = await user("admin@floor.com");
+    const admin = await user("admin@ai.com");
     expect(
       (await getMemberships(admin.id, database.db)).staffBranchIds.sort(),
     ).toEqual(fixtures.branches.map(({ id }) => id).sort());
@@ -312,7 +312,7 @@ describe("transactional development seed", () => {
 
   it("preserves unrelated accounts, memberships and schedules while skipping a conflicting seed booking", async () => {
     await seed();
-    const outsider = await account("test1@ai.com");
+    const outsider = await account("outsider@ai.com");
     const original = fixtures.bookings[0]!;
     const [existing] = await database.db
       .select()
@@ -407,7 +407,7 @@ describe("transactional development seed", () => {
   });
 
   it("rolls back credential resets and session revocation after a later team collision", async () => {
-    const original = await account("admin@floor.com");
+    const original = await account("admin@ai.com");
     const signedIn = await login(original.email, "existing-password");
     expect(signedIn.ok).toBe(true);
     const cookie = signedIn.headers.get("set-cookie")!;
@@ -448,19 +448,19 @@ describe("transactional development seed", () => {
     );
     expect(await session.json()).toMatchObject({ user: { id: original.id } });
     expect((await login(original.email, "existing-password")).ok).toBe(true);
-    expect((await login(original.email, "admin1234!")).ok).toBe(false);
+    expect((await login(original.email, "qwer1234")).ok).toBe(false);
     expect(await database.db.select().from(users)).toHaveLength(1);
     expect(await database.db.select().from(branches)).toHaveLength(0);
   });
 
   it("preserves verified existing names/passwords unless reset was explicitly selected", async () => {
-    const original = await account("admin@floor.com");
+    const original = await account("admin@ai.com");
     const signedIn = await login(original.email, "existing-password");
     const cookie = signedIn.headers.get("set-cookie")!;
     await seed();
     expect((await user(original.email)).name).toBe("기존 사람");
     expect((await login(original.email, "existing-password")).ok).toBe(true);
-    expect((await login(original.email, "admin1234!")).ok).toBe(false);
+    expect((await login(original.email, "qwer1234")).ok).toBe(false);
     await seed(now, true);
     expect((await login(original.email, "existing-password")).ok).toBe(false);
     expect(
@@ -478,18 +478,18 @@ describe("transactional development seed", () => {
         )
       ).json(),
     ).toBeNull();
-    expect((await login(original.email, "admin1234!")).ok).toBe(true);
+    expect((await login(original.email, "qwer1234")).ok).toBe(true);
   });
 
   it("refuses a preempted unverified seed account and supports explicit recovery", async () => {
-    const original = await account("admin@floor.com", false);
+    const original = await account("admin@ai.com", false);
     await expect(seed()).rejects.toThrow(/인증되지 않은 기존 계정/);
     expect(await database.db.select().from(branches)).toHaveLength(0);
     expect(await database.db.select().from(users)).toHaveLength(1);
     await seed(now, true);
     expect((await user(original.email)).emailVerified).toBe(true);
     expect((await login(original.email, "existing-password")).ok).toBe(false);
-    expect((await login(original.email, "admin1234!")).ok).toBe(true);
+    expect((await login(original.email, "qwer1234")).ok).toBe(true);
   });
 
   it("restores seed values and exact grants without deleting unrelated grants", async () => {
@@ -533,7 +533,7 @@ describe("transactional development seed", () => {
   it("does not replace an existing published plan or its floor pointer", async () => {
     await seed();
     const input = fixtures.floorPlans[0]!;
-    const admin = await user("admin@floor.com");
+    const admin = await user("admin@ai.com");
     await database.db
       .update(floorPlans)
       .set({ status: "archived" })
@@ -614,10 +614,10 @@ describe("transactional development seed", () => {
     const floor8 = fixtures.floors.find(({ level }) => level === 8)!;
     const closed = fixtures.floors.find(({ access }) => access === "closed")!;
     for (const [email, allowedFloor, allowedRoom, allowedClosed] of [
-      ["member@floor.com", false, false, false],
-      ["design.member@floor.com", true, false, false],
-      ["growth.admin@floor.com", false, true, false],
-      ["admin@floor.com", true, true, true],
+      ["test1@ai.com", false, false, false],
+      ["test3@ai.com", true, false, false],
+      ["test4@ai.com", false, true, false],
+      ["admin@ai.com", true, true, true],
     ] as const) {
       const current = await user(email);
       const context = {
@@ -646,6 +646,6 @@ describe("transactional development seed", () => {
             sql`${authAccounts.password} is not null`,
           ),
         ),
-    ).toHaveLength(6);
+    ).toHaveLength(21);
   });
 });

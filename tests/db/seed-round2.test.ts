@@ -199,8 +199,8 @@ describe("receipt-backed booking round 2 additions", () => {
   it("changes only the six counts and adds five participants, nine desks, one block and future reminders", async () => {
     for (let index = 1; index <= 20; index++)
       await database.db.insert(users).values({
-        email: `test${index}@ai.com`,
-        name: `테스트 회원 ${index}`,
+        email: `outsider${index}@ai.com`,
+        name: `시드 외 회원 ${index}`,
         emailVerified: true,
       });
     const before = await preserved();

@@ -3,7 +3,7 @@ import "server-only";
 import { eq, inArray } from "drizzle-orm";
 import { createTeamSpace } from "@/lib/dal/chat-write";
 import type { DalDatabase } from "@/lib/dal/database";
-import { chatRooms, messages } from "@/lib/db/schema";
+import { chatRoomReads, chatRooms, messages } from "@/lib/db/schema";
 import type { SeedChatData } from "@/lib/seed/chat";
 import { SeedError } from "@/lib/seed/errors";
 
@@ -55,6 +55,19 @@ export async function syncSeedChat(
     .update(chatRooms)
     .set({ lastSeq: 0, lastMessageAt: null })
     .where(inArray(chatRooms.spaceId, spaceIds));
+  // 번호를 다시 매기므로 읽음 위치도 되돌린다. 알림 끔과 가입 시각은 유지한다.
+  await database
+    .update(chatRoomReads)
+    .set({ lastReadSeq: 0, updatedAt: now })
+    .where(
+      inArray(
+        chatRoomReads.roomId,
+        database
+          .select({ id: chatRooms.id })
+          .from(chatRooms)
+          .where(inArray(chatRooms.spaceId, spaceIds)),
+      ),
+    );
   if (rows.length) await database.insert(messages).values(rows);
   const lastByRoom = new Map(rows.map((row) => [row.roomId, row]));
   for (const row of lastByRoom.values())

@@ -34,7 +34,7 @@ describe("seed data", () => {
     expect(data.branches).toHaveLength(5);
     expect(data.floors).toHaveLength(11);
     expect(data.spaces).toHaveLength(71);
-    expect(data.users).toHaveLength(6);
+    expect(data.users).toHaveLength(21);
     expect(data.teams).toHaveLength(2);
     expect(data.teamMembers).toHaveLength(5);
     expect(data.branchStaff).toHaveLength(5);
@@ -400,7 +400,7 @@ describe("seed data", () => {
           email: "another@example.test",
         });
       },
-      path: ["seed", "users", 6, "key"],
+      path: ["seed", "users", 21, "key"],
     },
     {
       name: "duplicate space across source files",

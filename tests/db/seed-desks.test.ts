@@ -109,20 +109,18 @@ describe("desk additions in transactional seed", () => {
         await database.db
           .select()
           .from(users)
-          .where(eq(users.email, "member@floor.com"))
+          .where(eq(users.email, "test1@ai.com"))
       )[0]!;
       const foreignId = crypto.randomUUID();
-      await database.db
-        .insert(bookings)
-        .values({
-          id: foreignId,
-          spaceId:
-            kind === "same-seat"
-              ? row.spaceId
-              : data.spaces.find(({ name }) => name === "A-23")!.id,
-          userId: kind === "same-seat" ? otherUser.id : row.userId,
-          during: row.during,
-        });
+      await database.db.insert(bookings).values({
+        id: foreignId,
+        spaceId:
+          kind === "same-seat"
+            ? row.spaceId
+            : data.spaces.find(({ name }) => name === "A-23")!.id,
+        userId: kind === "same-seat" ? otherUser.id : row.userId,
+        during: row.during,
+      });
       const result = await seed();
       expect(result.skippedBookings).toBe(1);
       expect(result.counts.bookings).toBe(29);

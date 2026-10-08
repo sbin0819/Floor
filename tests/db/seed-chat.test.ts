@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -14,11 +14,14 @@ import { createAuth, type AuthInstance } from "@/lib/auth/auth";
 import * as seedDal from "@/lib/dal/seed";
 import * as chatDal from "@/lib/dal/seed-chat";
 import { createTeamSpace } from "@/lib/dal/chat-write";
+import { listChatNav } from "@/lib/dal/chat-read";
 import {
   branches,
+  chatRoomReads,
   chatRooms,
   chatSpaces,
   messages,
+  teamMembers,
   teams,
   users,
 } from "@/lib/db/schema";
@@ -77,6 +80,19 @@ describe("transactional team chat seed", () => {
         ),
       )
       .orderBy(messages.roomId, messages.seq),
+    reads: await database.db
+      .select()
+      .from(chatRoomReads)
+      .where(
+        inArray(
+          chatRoomReads.roomId,
+          database.db
+            .select({ id: chatRooms.id })
+            .from(chatRooms)
+            .where(eq(chatRooms.kind, "text")),
+        ),
+      )
+      .orderBy(chatRoomReads.roomId, chatRoomReads.userId),
   });
 
   it("writes two general channels and eight sequenced messages, keeping channels and timestamps on rerun", async () => {
@@ -150,6 +166,16 @@ describe("transactional team chat seed", () => {
       .update(chatRooms)
       .set({ lastSeq: 9, lastMessageAt: now })
       .where(eq(chatRooms.id, foreign.roomId));
+    const [foreignRead] = await database.db
+      .insert(chatRoomReads)
+      .values({
+        roomId: foreign.roomId,
+        userId: author!.id,
+        lastReadSeq: 9,
+        muted: true,
+        updatedAt: now,
+      })
+      .returning();
     const [seedSpace] = await database.db
       .select()
       .from(chatSpaces)
@@ -172,6 +198,13 @@ describe("transactional team chat seed", () => {
       body: "시드에서 제거할 대화",
       createdAt: now,
     });
+    await database.db.insert(chatRoomReads).values({
+      roomId: extraRoom!.id,
+      userId: author!.id,
+      lastReadSeq: 1,
+      muted: true,
+      updatedAt: now,
+    });
     const foreignBefore = (await state()).rooms.find(
       ({ id }) => id === foreign.roomId,
     );
@@ -192,6 +225,77 @@ describe("transactional team chat seed", () => {
       archivedAt: now,
     });
     expect(after.messages).toHaveLength(9);
+    expect(after.reads.find(({ roomId }) => roomId === foreign.roomId)).toEqual(
+      foreignRead,
+    );
+    expect(
+      after.reads.find(({ roomId }) => roomId === extraRoom!.id),
+    ).toMatchObject({
+      lastReadSeq: 0,
+      muted: true,
+      updatedAt: now,
+    });
+  });
+
+  it("resets stale seed cursors without changing mute or membership-based unread boundaries", async () => {
+    await seed();
+    const accounts = await database.db.select().from(users);
+    const member = (key: string) =>
+      accounts.find(
+        ({ email }) =>
+          email === data.users.find((row) => row.key === key)!.email,
+      )!.id;
+    const teamId = data.teams[0]!.id;
+    const room = (await listChatNav(member("designMember"), database.db))[0]!;
+    const existingJoinedAt = new Date(now.getTime() - 100 * 60_000);
+    for (const [key, createdAt] of [
+      ["designMember", existingJoinedAt],
+      ["both", now],
+    ] as const) {
+      await database.db
+        .update(teamMembers)
+        .set({ createdAt })
+        .where(
+          and(
+            eq(teamMembers.teamId, teamId),
+            eq(teamMembers.userId, member(key)),
+          ),
+        );
+      await database.db.insert(chatRoomReads).values({
+        roomId: room.roomId!,
+        userId: member(key),
+        lastReadSeq: 99,
+        muted: key === "designMember",
+        updatedAt: existingJoinedAt,
+      });
+    }
+    await seed();
+    const reads = (await state()).reads;
+    for (const key of ["designMember", "both"]) {
+      expect(reads.find(({ userId }) => userId === member(key))).toMatchObject({
+        lastReadSeq: 0,
+        muted: key === "designMember",
+        updatedAt: now,
+      });
+    }
+    const joined = await database.db
+      .select()
+      .from(teamMembers)
+      .where(eq(teamMembers.teamId, teamId));
+    expect(
+      joined.find(({ userId }) => userId === member("designMember"))!.createdAt,
+    ).toEqual(existingJoinedAt);
+    expect(
+      joined.find(({ userId }) => userId === member("both"))!.createdAt,
+    ).toEqual(now);
+    expect(
+      (await listChatNav(member("designMember"), database.db))[0],
+    ).toMatchObject({ unread: true, roomMuted: true });
+    expect(
+      (await listChatNav(member("both"), database.db)).find(
+        ({ roomId }) => roomId === room.roomId,
+      ),
+    ).toMatchObject({ unread: false });
   });
 
   it("rolls chat replacement and other seed changes back together after a later failure", async () => {
@@ -209,6 +313,13 @@ describe("transactional team chat seed", () => {
       .update(chatRooms)
       .set({ lastSeq: room.lastSeq + 1, lastMessageAt: now })
       .where(eq(chatRooms.id, room.id));
+    await database.db.insert(chatRoomReads).values({
+      roomId: room.id,
+      userId: first.messages[0]!.authorId!,
+      lastReadSeq: room.lastSeq + 1,
+      muted: true,
+      updatedAt: now,
+    });
     await database.db
       .update(branches)
       .set({ name: "실패 뒤에도 남는 지점명" })
