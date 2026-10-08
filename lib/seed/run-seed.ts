@@ -40,6 +40,8 @@ import {
   type BookingRound2Options,
 } from "@/lib/seed/booking-round2";
 import type { BookingRound2Receipt } from "@/lib/seed/booking-round2-receipt";
+import { resetSeedDatabase } from "@/lib/dal/seed-reset";
+import { seedMigrations } from "./migrations";
 
 export type SeedResult = {
   counts: Record<string, number>;
@@ -48,6 +50,7 @@ export type SeedResult = {
   accounts: string[];
   branchScope?: { addedBranchIds: string[]; skippedBranchIds: string[] };
   bookingRound2?: { applied: boolean; receipt: BookingRound2Receipt };
+  reset?: { migrationCount: number; counts: Record<string, number> };
 };
 
 export async function runSeed({
@@ -57,6 +60,7 @@ export async function runSeed({
   resetPasswords,
   branchIds,
   bookingRound2,
+  resetData = false,
 }: {
   db?: TransactionDatabase;
   auth?: AuthInstance;
@@ -64,9 +68,17 @@ export async function runSeed({
   resetPasswords: boolean;
   branchIds?: readonly string[];
   bookingRound2?: BookingRound2Options;
+  resetData?: boolean;
 }): Promise<SeedResult> {
   if (!Number.isFinite(now.getTime()))
     throw new SeedError("시드 기준 시각이 올바르지 않아요.");
+  if (
+    resetData &&
+    (branchIds !== undefined || bookingRound2 !== undefined || resetPasswords)
+  )
+    throw new SeedError(
+      "전체 초기화는 지점 추가·예약 2차·비밀번호 재설정과 함께 실행할 수 없어요.",
+    );
   if (bookingRound2 !== undefined) {
     if (branchIds !== undefined || resetPasswords)
       throw new SeedError(
@@ -83,6 +95,7 @@ export async function runSeed({
     const people = loadSeedPeople(data);
     const people2 = loadSeedPeople2(data, people);
     const meeting = loadSeedMeeting(data, bookingExtras);
+    const migrations = resetData ? seedMigrations() : [];
     const meetingPlans = new Map(
       data.bookings.map(({ id }) => {
         const messages = meeting.messages.filter(
@@ -127,6 +140,10 @@ export async function runSeed({
     }
     const instance = auth ?? getAuth();
     return await withTransaction(async (database) => {
+      current = "전체 초기화 사전 검사";
+      const reset = resetData
+        ? await resetSeedDatabase(database, migrations)
+        : undefined;
       const provisioning = await createProvisioningAuth({
         db: database,
         auth: instance,
@@ -388,6 +405,7 @@ export async function runSeed({
         skippedBookings,
         skippedMeetingMessages,
         accounts: data.users.map(({ email }) => email),
+        ...(reset ? { reset } : {}),
       };
     }, db);
   } catch (error) {
@@ -399,6 +417,10 @@ export async function runSeed({
     if (getPostgresError(error)?.code === "23505")
       throw new SeedError(
         `${current}: 다른 행이 같은 고유 값을 사용하고 있어요. 시드를 되돌렸어요.`,
+      );
+    if (resetData)
+      throw new SeedError(
+        "초기화 완료 여부를 확인하지 못했어요. 연결 오류는 커밋 응답 유실일 수 있어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.",
       );
     throw new SeedError(
       `${current}: 시드를 완료하지 못했어요. 모든 시드 변경을 되돌렸어요.`,

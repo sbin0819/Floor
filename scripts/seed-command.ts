@@ -9,7 +9,7 @@ import {
 } from "@/lib/seed/booking-round2-receipt";
 
 export const seedUsage =
-  "pnpm db:seed [--reset-passwords] [--help]\npnpm db:seed --branches <UUID,UUID,...> (없는 지점만 추가, 기존 지점·계정은 변경하지 않음)\npnpm db:seed --booking-round2 (예약 2차 추가분만 적용, 다른 범위·비밀번호 초기화와 함께 사용 불가)";
+  "pnpm db:seed [--reset-passwords] [--help]\npnpm db:seed --branches <UUID,UUID,...> (없는 지점만 추가, 기존 지점·계정은 변경하지 않음)\npnpm db:seed --booking-round2 (예약 2차 추가분만 적용, 다른 범위·비밀번호 초기화와 함께 사용 불가)\npnpm db:seed --reset-data --confirm-reset (기존 개발 데이터 전체 삭제 후 시드 재생성, 복구 불가. 로컬 DB도 정확한 SEED_ALLOW_HOST 필수)";
 
 export type SeedCommandDependencies = {
   getEnvironment: () => {
@@ -22,11 +22,13 @@ export type SeedCommandDependencies = {
   runSeed: (options: {
     now: Date;
     resetPasswords: boolean;
+    resetData?: boolean;
     branchIds?: readonly string[];
     bookingRound2?: { hostHash: string; receipt: BookingRound2Receipt | null };
   }) => Promise<SeedResult>;
   readReceipt: (hostHash: string) => Promise<BookingRound2Receipt | null>;
   writeReceipt: (receipt: BookingRound2Receipt) => Promise<void>;
+  archiveReceipt: (hostHash: string) => Promise<string | null>;
   closeDatabase: () => Promise<void>;
   stdout: (message: string) => void;
   stderr: (message: string) => void;
@@ -59,6 +61,23 @@ export async function runSeedCommand(
   if (values.help) {
     dependencies.stdout(seedUsage);
     return 0;
+  }
+  if (values["reset-data"] !== values["confirm-reset"]) {
+    dependencies.stderr(
+      "전체 초기화에는 --reset-data와 --confirm-reset을 함께 적어 주세요. 기존 개발 데이터가 모두 삭제돼요.",
+    );
+    return 1;
+  }
+  if (
+    values["reset-data"] &&
+    (values.branches !== undefined ||
+      values["booking-round2"] ||
+      values["reset-passwords"])
+  ) {
+    dependencies.stderr(
+      "--reset-data는 --branches, --booking-round2, --reset-passwords와 함께 쓸 수 없어요.",
+    );
+    return 1;
   }
   if (
     values["booking-round2"] &&
@@ -106,12 +125,14 @@ export async function runSeedCommand(
     }
     hostname = databaseHost(environment.DATABASE_URL!);
     if (
-      hostname !== "localhost" &&
-      hostname !== "127.0.0.1" &&
+      (values["reset-data"] ||
+        (hostname !== "localhost" && hostname !== "127.0.0.1")) &&
       environment.SEED_ALLOW_HOST !== hostname
     ) {
       dependencies.stderr(
-        `이 DB에 시드를 넣으려면 .env.local에 SEED_ALLOW_HOST=${hostname}를 적어 주세요.`,
+        values["reset-data"]
+          ? `이 DB를 초기화하려면 SEED_ALLOW_HOST=${hostname}를 정확히 설정해 주세요. 로컬 DB도 예외가 아니에요.`
+          : `이 DB에 시드를 넣으려면 .env.local에 SEED_ALLOW_HOST=${hostname}를 적어 주세요.`,
       );
       return 1;
     }
@@ -140,14 +161,42 @@ export async function runSeedCommand(
   }
   let exitCode = 0;
   let appliedWithoutReceipt = false;
+  let resetWithoutReceiptArchive = false;
   try {
     dependencies.stdout(`시드를 넣을 DB 호스트: ${hostname}`);
+    if (values["reset-data"])
+      dependencies.stdout(
+        "이 호스트의 기존 개발 데이터를 모두 삭제하고 시드를 다시 만들어요. 삭제된 데이터는 복구할 수 없어요.",
+      );
     const result = await dependencies.runSeed({
       now: dependencies.now(),
       resetPasswords: values["reset-passwords"],
+      ...(values["reset-data"] ? { resetData: true } : {}),
       ...(branchIds ? { branchIds } : {}),
       ...(bookingRound2 ? { bookingRound2 } : {}),
     });
+    if (values["reset-data"]) {
+      if (!result.reset)
+        throw new SeedError(
+          "초기화 완료 여부를 확인하지 못했어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
+        );
+      resetWithoutReceiptArchive = true;
+      const archived = await dependencies.archiveReceipt(
+        bookingRound2HostHash(hostname),
+      );
+      resetWithoutReceiptArchive = false;
+      dependencies.stdout(
+        "기존 개발 데이터를 삭제하고 시드 데이터를 다시 만들었어요. 삭제한 데이터는 복구할 수 없어요.",
+      );
+      dependencies.stdout(
+        `삭제한 기존 행: ${Object.values(result.reset.counts).reduce((sum, count) => sum + count, 0)}개 · 확인한 마이그레이션: ${result.reset.migrationCount}개`,
+      );
+      dependencies.stdout(
+        archived
+          ? `이 호스트의 이전 예약 2차 적용 표식을 같은 폴더에 보관했어요: ${archived}`
+          : "이 호스트의 이전 예약 2차 적용 표식은 없어요.",
+      );
+    }
     if (bookingRound2) {
       if (!result.bookingRound2)
         throw new SeedError(
@@ -195,11 +244,13 @@ export async function runSeedCommand(
       dependencies.stdout("비밀번호는 README에 있어요.");
   } catch (error) {
     dependencies.stderr(
-      appliedWithoutReceipt
-        ? "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요."
-        : error instanceof SeedError
-          ? error.publicMessage
-          : "시드를 넣지 못했어요. 데이터와 데이터베이스 연결, 마이그레이션 적용 상태를 확인해 주세요.",
+      resetWithoutReceiptArchive
+        ? "DB 초기화와 시드 재생성은 끝났지만 이전 예약 2차 적용 표식을 보관하지 못했어요. 자동으로 다시 실행하지 말고 이 호스트의 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요."
+        : appliedWithoutReceipt
+          ? "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요."
+          : error instanceof SeedError
+            ? error.publicMessage
+            : "시드를 넣지 못했어요. 데이터와 데이터베이스 연결, 마이그레이션 적용 상태를 확인해 주세요.",
     );
     exitCode = 1;
   } finally {
@@ -220,6 +271,8 @@ function parseSeedArguments(args: string[]) {
     allowPositionals: false,
     options: {
       "reset-passwords": { type: "boolean", default: false },
+      "reset-data": { type: "boolean", default: false },
+      "confirm-reset": { type: "boolean", default: false },
       "booking-round2": { type: "boolean", default: false },
       branches: { type: "string" },
       help: { type: "boolean", default: false },

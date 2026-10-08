@@ -44,6 +44,9 @@ function dependencies(
     writeReceipt: vi
       .fn<SeedCommandDependencies["writeReceipt"]>()
       .mockResolvedValue(),
+    archiveReceipt: vi
+      .fn<SeedCommandDependencies["archiveReceipt"]>()
+      .mockResolvedValue(null),
     stdout: vi.fn(),
     stderr: vi.fn(),
   };
@@ -104,7 +107,7 @@ describe("seed command safety and output", () => {
     deps.runSeed.mockResolvedValue({
       counts: { branches: 1, users: 0 },
       skippedBookings: 0,
-      accounts: ["admin@floor.com"],
+      accounts: ["admin@ai.com"],
       branchScope: {
         addedBranchIds: [branchIds[0]!],
         skippedBranchIds: [branchIds[1]!],
@@ -127,7 +130,7 @@ describe("seed command safety and output", () => {
       "다음 건수는 이번에 추가한 행이며 DB 전체 건수가 아니에요.",
     );
     expect(deps.stdout).toHaveBeenCalledWith(
-      "참조한 기존 계정 (변경 없음): admin@floor.com",
+      "참조한 기존 계정 (변경 없음): admin@ai.com",
     );
     expect(JSON.stringify(deps.stdout.mock.calls)).not.toContain("비밀번호는");
     expect(deps.closeDatabase).toHaveBeenCalledOnce();
@@ -380,6 +383,201 @@ describe("seed command safety and output", () => {
   });
 });
 
+describe("explicit full-data reset safety", () => {
+  const args = ["--reset-data", "--confirm-reset"];
+  const resetResult = {
+    counts: { users: 21, branches: 5 },
+    skippedBookings: 0,
+    accounts: ["admin@ai.com", "test1@ai.com"],
+    reset: { migrationCount: 25, counts: { users: 7, branches: 2 } },
+  };
+
+  it.each([
+    ["--reset-data"],
+    ["--confirm-reset"],
+    ["--confirm-reset", "--reset-passwords"],
+    [...args, "--reset-passwords"],
+    [...args, "--booking-round2"],
+    [...args, "--branches", "invalid"],
+    [...args, "--branches", ""],
+  ])(
+    "rejects invalid reset arguments %j before settings or DB access",
+    async (...input) => {
+      const deps = dependencies();
+      expect(await runSeedCommand(input, deps)).toBe(1);
+      expect(deps.getEnvironment).not.toHaveBeenCalled();
+      expect(deps.readReceipt).not.toHaveBeenCalled();
+      expect(deps.archiveReceipt).not.toHaveBeenCalled();
+      expectNoDatabaseUse(deps);
+    },
+  );
+
+  it.each(["localhost", "127.0.0.1", "remote.example.test"])(
+    "requires exact explicit authorization even for %s",
+    async (host) => {
+      const deps = dependencies({
+        DATABASE_URL: `postgresql://user:private-password@${host}/floor`,
+      });
+      expect(await runSeedCommand(args, deps)).toBe(1);
+      expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
+        `이 DB를 초기화하려면 SEED_ALLOW_HOST=${host}를 정확히 설정해 주세요. 로컬 DB도 예외가 아니에요.`,
+      );
+      expect(deps.archiveReceipt).not.toHaveBeenCalled();
+      expectNoDatabaseUse(deps);
+    },
+  );
+
+  it.each(["LOCALHOST", " localhost", "localhost:5432", "*"])(
+    "does not broaden local reset authorization %s",
+    async (allowed) => {
+      const deps = dependencies({ SEED_ALLOW_HOST: allowed });
+      expect(await runSeedCommand(args, deps)).toBe(1);
+      expectNoDatabaseUse(deps);
+    },
+  );
+
+  it("blocks reset in production even with both confirmations and matching host", async () => {
+    const deps = dependencies({
+      NODE_ENV: "production",
+      SEED_ALLOW_HOST: "localhost",
+    });
+    expect(await runSeedCommand(args, deps)).toBe(1);
+    expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
+      "배포 환경에서는 개발용 시드를 실행할 수 없어요.",
+    );
+    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    expectNoDatabaseUse(deps);
+  });
+
+  it("requires the auth secret to recreate accounts", async () => {
+    const deps = dependencies({
+      AUTH_SECRET: undefined,
+      SEED_ALLOW_HOST: "localhost",
+    });
+    expect(await runSeedCommand(args, deps)).toBe(1);
+    expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
+      ".env.local에 AUTH_SECRET을 설정해 주세요.",
+    );
+    expectNoDatabaseUse(deps);
+  });
+
+  it("reports the host first and archives only its receipt after the successful reset", async () => {
+    const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    deps.runSeed.mockResolvedValue(resetResult);
+    deps.archiveReceipt.mockResolvedValue("receipt.reset-archive");
+    expect(await runSeedCommand(args, deps)).toBe(0);
+    expect(deps.runSeed).toHaveBeenCalledExactlyOnceWith({
+      now: currentTime,
+      resetPasswords: false,
+      resetData: true,
+    });
+    expect(deps.stdout).toHaveBeenNthCalledWith(
+      1,
+      "시드를 넣을 DB 호스트: localhost",
+    );
+    expect(deps.stdout.mock.invocationCallOrder[1]).toBeLessThan(
+      deps.runSeed.mock.invocationCallOrder[0]!,
+    );
+    expect(deps.archiveReceipt).toHaveBeenCalledExactlyOnceWith(
+      bookingRound2HostHash("localhost"),
+    );
+    expect(deps.runSeed.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.archiveReceipt.mock.invocationCallOrder[0]!,
+    );
+    expect(deps.readReceipt).not.toHaveBeenCalled();
+    expect(deps.writeReceipt).not.toHaveBeenCalled();
+    expect(deps.stdout).toHaveBeenCalledWith(
+      "기존 개발 데이터를 삭제하고 시드 데이터를 다시 만들었어요. 삭제한 데이터는 복구할 수 없어요.",
+    );
+    expect(deps.stdout).toHaveBeenCalledWith(
+      "삭제한 기존 행: 9개 · 확인한 마이그레이션: 25개",
+    );
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+    const output = JSON.stringify([
+      deps.stdout.mock.calls,
+      deps.stderr.mock.calls,
+    ]);
+    for (const secret of [
+      connectionString,
+      authSecret,
+      "private-db-password",
+      "private-db-name",
+    ])
+      expect(output).not.toContain(secret);
+  });
+
+  it("allows a successful reset when that host has no previous receipt", async () => {
+    const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    deps.runSeed.mockResolvedValue(resetResult);
+    expect(await runSeedCommand(args, deps)).toBe(0);
+    expect(deps.stdout).toHaveBeenCalledWith(
+      "이 호스트의 이전 예약 2차 적용 표식은 없어요.",
+    );
+  });
+
+  it("never archives receipts when the reset transaction fails", async () => {
+    const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    deps.runSeed.mockRejectedValue(new SeedError("초기화를 롤백했어요."));
+    expect(await runSeedCommand(args, deps)).toBe(1);
+    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    expect(deps.stderr).toHaveBeenCalledExactlyOnceWith("초기화를 롤백했어요.");
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+  });
+
+  it("distinguishes a committed reset from an archival failure without retrying or exposing errors", async () => {
+    const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    deps.runSeed.mockResolvedValue(resetResult);
+    deps.archiveReceipt.mockRejectedValue(
+      new Error("private-receipt-path private-token"),
+    );
+    expect(await runSeedCommand(args, deps)).toBe(1);
+    expect(deps.runSeed).toHaveBeenCalledOnce();
+    expect(deps.archiveReceipt).toHaveBeenCalledOnce();
+    expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
+      "DB 초기화와 시드 재생성은 끝났지만 이전 예약 2차 적용 표식을 보관하지 못했어요. 자동으로 다시 실행하지 말고 이 호스트의 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
+    );
+    expect(deps.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+  });
+
+  it("does not archive the receipt while reset completion is still pending", async () => {
+    const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    let commit!: (result: typeof resetResult) => void;
+    deps.runSeed.mockReturnValue(
+      new Promise((resolve) => {
+        commit = resolve;
+      }),
+    );
+    const command = runSeedCommand(args, deps);
+    expect(deps.runSeed).toHaveBeenCalledOnce();
+    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    commit(resetResult);
+    expect(await command).toBe(0);
+    expect(deps.archiveReceipt).toHaveBeenCalledOnce();
+  });
+
+  it("does not archive or claim reset success when the runner omits reset confirmation", async () => {
+    const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    expect(await runSeedCommand(args, deps)).toBe(1);
+    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
+      "초기화 완료 여부를 확인하지 못했어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
+    );
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+  });
+
+  it.each([[], ["--reset-passwords"], ["--help"]])(
+    "never forwards resetData or archives a receipt for other modes %j",
+    async (...input) => {
+      const deps = dependencies();
+      expect(await runSeedCommand(input, deps)).toBe(0);
+      expect(deps.archiveReceipt).not.toHaveBeenCalled();
+      for (const [options] of deps.runSeed.mock.calls)
+        expect(options).not.toHaveProperty("resetData");
+    },
+  );
+});
+
 describe("booking-round2 command and commit receipts", () => {
   const hostHash = bookingRound2HostHash("localhost");
   const receipt: BookingRound2Receipt = {
@@ -398,7 +596,7 @@ describe("booking-round2 command and commit receipts", () => {
       spaceBlocks: 1,
     },
     skippedBookings: 0,
-    accounts: ["member@floor.com"],
+    accounts: ["test1@ai.com"],
     bookingRound2: { applied: true, receipt },
   };
 

@@ -8,6 +8,7 @@ import {
   rmdir,
   unlink,
 } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import {
   parseBookingRound2Receipt,
@@ -77,6 +78,34 @@ export function createSeedReceiptStore(
         await unlink(temporary).catch(() => {});
         await rmdir(temporaryDirectory).catch(() => {});
       }
+    },
+    async archiveReceipt(hostHash: string): Promise<string | null> {
+      const filename = seedReceiptFilename(hostHash);
+      const target = join(directory, filename);
+      const source = await lstat(target).catch((error: unknown) => {
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === "ENOENT"
+        )
+          return null;
+        throw error;
+      });
+      if (!source) return null;
+      if (!source.isFile() || source.isSymbolicLink())
+        throw new SeedError("예약 2차 적용 표식이 일반 파일이 아니에요.");
+
+      const archivedFilename = `${filename}.${randomUUID()}.reset-archive`;
+      // rename은 기존 파일을 덮어쓸 수 있어, 배타적인 링크 생성 후 원래 이름만 지운다.
+      await link(target, join(directory, archivedFilename));
+      const current = await lstat(target);
+      if (current.ino !== source.ino || current.dev !== source.dev)
+        throw new SeedError(
+          "보관 중 예약 2차 적용 표식이 바뀌었어요. 원본과 보관본을 확인해 주세요.",
+        );
+      await unlink(target);
+      return archivedFilename;
     },
   };
 }
