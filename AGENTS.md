@@ -32,7 +32,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/10-photos-and-look.md` | 공간 사진과 전체 인상 작업 지시서 (끝남) | 사진과 토큰에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/11-floor-timetable.md` | 층 화면: 날짜 달력, 시간표, 목록과 공간 상세 작업 지시서 (끝남) | 층 화면에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/12-calendar-home-branches.md` | 내 예약 달력, 홈, 지점 목록 작업 지시서 (끝남) | 그 화면에서 왜 그렇게 했는지 확인할 때 |
-| `docs/codex/13-timetable-space-detail.md` | 시간표에서 공간 칸을 눌러 공간 상세를 여는 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/13-timetable-space-detail.md` | 시간표에서 공간 칸을 눌러 공간 상세를 여는 작업 지시서 (끝남) | 상세 시트와 공유 입력에서 왜 그렇게 했는지 확인할 때 |
 | `docs/spec/ui.md` | 화면 구성, 로딩 상태(스켈레톤, 바뀌는 부분만 바꾸기), 조회 속도 예산, 화면별 구성과 문구 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/ui-2.md` | 화면 구성 2차: 공간 사진, 날짜 달력, 층 시간표, 내 예약 달력, 홈·지점 목록·공간 상세. `ui.md`와 다르면 이 문서가 맞다 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |

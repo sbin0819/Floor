@@ -136,8 +136,8 @@ describe("floor optimistic navigation", () => {
         <div data-testid="wide-timetable" style={{ minWidth: 1380 }} />
       </FloorListRegion>,
     );
-    const gridItem = screen.getByTestId("wide-timetable").parentElement
-      ?.parentElement;
+    const gridItem =
+      screen.getByTestId("wide-timetable").parentElement?.parentElement;
     expect(gridItem).toHaveClass("min-w-0", "min-h-0");
   });
 
