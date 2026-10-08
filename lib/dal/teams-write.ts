@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
+import { createTeamSpace } from "@/lib/dal/chat-write";
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { getPostgresError } from "@/lib/actions/errors";
 import { ActionError } from "@/lib/actions/result";
@@ -118,6 +119,7 @@ export async function createTeam(
         ),
       );
     if (total!.value > 5) throw new ActionError("LIMIT_EXCEEDED");
+    await createTeamSpace(team.id, transaction);
     return team;
   }, database);
 }

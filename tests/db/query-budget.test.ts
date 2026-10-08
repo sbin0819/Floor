@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAdminQueries } from "@/features/admin/query-factory";
 import { createBookingQueries } from "@/features/bookings/query-factory";
 import { createTeamQueries } from "@/features/teams/query-factory";
+import { createChatQueries } from "@/features/chat/query-factory";
+import { createTeamSpace } from "@/lib/dal/chat-write";
 import type { Session } from "@/lib/auth/types";
 import { getOperatorBranches } from "@/lib/dal";
 import {
@@ -28,6 +30,7 @@ describe("authenticated query execution budgets", () => {
   let database: TestDatabase;
   let actors: BookingActors;
   let editableBookingId: string;
+  let chat: { spaceId: string; roomId: string };
   let meter: ReturnType<typeof createQueryMeter>;
   const token = "query-budget-recipient-token";
   const measured: Record<string, QueryMeasurement> = {};
@@ -35,6 +38,7 @@ describe("authenticated query execution budgets", () => {
   beforeAll(async () => {
     database = await createTestDatabase();
     actors = await seedBookingActors(database);
+    chat = await createTeamSpace(actors.teamId, database.db);
     editableBookingId = (await insertFixtureBooking(database, actors)).id;
     await database.db.insert(teamInvites).values({
       teamId: actors.teamId,
@@ -78,7 +82,18 @@ describe("authenticated query execution budgets", () => {
       database: database.db,
       requireSession: async () => actors.operator,
     });
+  const chatQueries = () =>
+    createChatQueries({
+      database: database.db,
+      requireSession: async () => actors.member,
+      now: () => bookingNow,
+    });
   const cases: [string, () => Promise<unknown>][] = [
+    ["chat.getMyChatNav", () => chatQueries().getMyChatNav()],
+    [
+      "chat.getChannelView",
+      () => chatQueries().getChannelView(chat.spaceId, chat.roomId),
+    ],
     ["bookings.getHomeHeader", () => bookings().getHomeHeader()],
     [
       "bookings.getHomeUpcomingBookings",
@@ -193,6 +208,10 @@ describe("authenticated query execution budgets", () => {
           : 2,
       );
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
+      if (name === "chat.getMyChatNav") {
+        expect(result.stages).toBe(1);
+        expect(result.statements).toBeLessThanOrEqual(3);
+      }
     },
   );
 
