@@ -31,6 +31,7 @@ import type {
   BranchFloorsData,
   BranchListItem,
   BranchNavigationData,
+  BranchNavigationStream,
   FloorDayData,
   FloorSummary,
   HomeHeaderData,
@@ -42,6 +43,7 @@ import type {
   MyBooking,
   MyBookingsData,
   MyBookingsMonthData,
+  MyBookingsMonthStream,
   SpaceDayData,
   SpaceType,
 } from "@/features/bookings/types";
@@ -188,6 +190,65 @@ export function createBookingQueries(
     )
       throw new ActionError("NOT_FOUND");
     return { ...data, floor };
+  }
+  async function readBranchNavigation(
+    branchId: string,
+  ): Promise<BranchNavigationStream> {
+    const session = await readSession();
+    const current = now();
+    const [data, branches] = await Promise.all([
+      branchFloors(session, branchId),
+      listBranches(db),
+    ]);
+    const today = localDate(current, data.branch.timezone);
+    return {
+      meta: {
+        branch: data.branch,
+        floors: data.floors,
+        branches,
+        today,
+        now: current.toISOString(),
+      },
+      bookingDates: listMyBranchBookingDates(
+        {
+          userId: session.userId,
+          branchId: data.branch.id,
+          today,
+          timezone: data.branch.timezone,
+        },
+        db,
+      ),
+    };
+  }
+  async function readMyBookingsMonth(
+    input: MyBookingsMonthInput = {},
+  ): Promise<MyBookingsMonthStream> {
+    const session = await readSession();
+    const current = now();
+    const branch = await resolveBookingBranch(session.userId, db);
+    const timezone = branch?.timezone ?? "Asia/Seoul";
+    const selection = normalizeMyBookingsMonth(
+      input,
+      localDate(current, timezone),
+    );
+    return {
+      meta: { ...selection, now: current.toISOString(), timezone },
+      bookings: listMyConfirmedBookingsBetween(
+        {
+          userId: session.userId,
+          ...myBookingsMonthReadRange(selection.month),
+        },
+        db,
+      ).then((rows) =>
+        rows
+          .map((row) => ({
+            ...myBookingDto(row),
+            // 소유자·확정 상태를 SQL에서 확인했고 본인 취소는 역할 설정과 무관하다.
+            canCancel: row.booking.during.end > current,
+          }))
+          .filter((booking) => booking.date.slice(0, 7) === selection.month),
+      ),
+    };
   }
   return {
     async getBranchList(): Promise<BranchListItem[]> {
@@ -524,31 +585,10 @@ export function createBookingQueries(
       return { branch: data.branch, floors: data.floors };
     },
     async getBranchNavigation(branchId: string): Promise<BranchNavigationData> {
-      const session = await readSession();
-      const current = now();
-      const [data, branches] = await Promise.all([
-        branchFloors(session, branchId),
-        listBranches(db),
-      ]);
-      const today = localDate(current, data.branch.timezone);
-      const bookingDates = await listMyBranchBookingDates(
-        {
-          userId: session.userId,
-          branchId: data.branch.id,
-          today,
-          timezone: data.branch.timezone,
-        },
-        db,
-      );
-      return {
-        branch: data.branch,
-        floors: data.floors,
-        branches,
-        today,
-        bookingDates,
-        now: current.toISOString(),
-      };
+      const { meta, bookingDates } = await readBranchNavigation(branchId);
+      return { ...meta, bookingDates: await bookingDates };
     },
+    getBranchNavigationStream: readBranchNavigation,
     async getFloorDay(
       branchId: string,
       floorId: string,
@@ -825,33 +865,9 @@ export function createBookingQueries(
     async getMyBookingsMonth(
       input: MyBookingsMonthInput = {},
     ): Promise<MyBookingsMonthData> {
-      const session = await readSession();
-      const current = now();
-      const branch = await resolveBookingBranch(session.userId, db);
-      const timezone = branch?.timezone ?? "Asia/Seoul";
-      const selection = normalizeMyBookingsMonth(
-        input,
-        localDate(current, timezone),
-      );
-      const rows = await listMyConfirmedBookingsBetween(
-        {
-          userId: session.userId,
-          ...myBookingsMonthReadRange(selection.month),
-        },
-        db,
-      );
-      return {
-        ...selection,
-        now: current.toISOString(),
-        timezone,
-        bookings: rows
-          .map((row) => ({
-            ...myBookingDto(row),
-            // 소유자·확정 상태를 SQL에서 확인했고 본인 취소는 역할 설정과 무관하다.
-            canCancel: row.booking.during.end > current,
-          }))
-          .filter((booking) => booking.date.slice(0, 7) === selection.month),
-      };
+      const { meta, bookings } = await readMyBookingsMonth(input);
+      return { ...meta, bookings: await bookings };
     },
+    getMyBookingsMonthStream: readMyBookingsMonth,
   };
 }

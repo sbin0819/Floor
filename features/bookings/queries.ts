@@ -35,6 +35,9 @@ export async function getBranchFloors(branchId: string) {
 export async function getBranchNavigation(branchId: string) {
   return createBookingQueries().getBranchNavigation(branchId);
 }
+export async function getBranchNavigationStream(branchId: string) {
+  return createBookingQueries().getBranchNavigationStream(branchId);
+}
 export async function getFloorDay(
   branchId: string,
   floorId: string,
@@ -55,4 +58,9 @@ export async function getMyBookings() {
 }
 export async function getMyBookingsMonth(input: MyBookingsMonthInput = {}) {
   return createBookingQueries().getMyBookingsMonth(input);
+}
+export async function getMyBookingsMonthStream(
+  input: MyBookingsMonthInput = {},
+) {
+  return createBookingQueries().getMyBookingsMonthStream(input);
 }

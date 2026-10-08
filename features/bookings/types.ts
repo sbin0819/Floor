@@ -44,6 +44,11 @@ export type BranchNavigationData = BranchFloorsData & {
   today: string;
   now: string;
 };
+export type BranchNavigationMeta = Omit<BranchNavigationData, "bookingDates">;
+export type BranchNavigationStream = {
+  meta: BranchNavigationMeta;
+  bookingDates: Promise<string[]>;
+};
 export type VisibleSpace = {
   kind: "accessible";
   id: string;
@@ -133,6 +138,11 @@ export type MyBookingsMonthData = MyBookingsMonthSelection & {
   now: string;
   timezone: string;
   bookings: MyCalendarBooking[];
+};
+export type MyBookingsMonthMeta = Omit<MyBookingsMonthData, "bookings">;
+export type MyBookingsMonthStream = {
+  meta: MyBookingsMonthMeta;
+  bookings: Promise<MyCalendarBooking[]>;
 };
 
 export type HomeHeaderData = {
