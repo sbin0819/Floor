@@ -13,11 +13,15 @@ import InvitePage from "@/app/(app)/invite/[token]/page";
 import AdminHome from "@/app/admin/page";
 import { requireOperatorPage, requirePageSession } from "@/lib/auth/session";
 import {
-  getHomeTeams,
   getInvitePageData,
   getTeamPageData,
   getTeamStartData,
 } from "@/features/teams/queries";
+import {
+  getHomeTodo,
+  getHomeChecklist,
+  getHomeRecentChats,
+} from "@/features/home/queries";
 import { getOperatorHome } from "@/features/admin/queries";
 
 vi.mock("@/lib/auth/session", () => ({
@@ -25,16 +29,18 @@ vi.mock("@/lib/auth/session", () => ({
   requireOperatorPage: vi.fn(),
 }));
 vi.mock("@/features/teams/queries", () => ({
-  getHomeTeams: vi.fn(),
   getInvitePageData: vi.fn(),
   getTeamPageData: vi.fn(),
   getTeamStartData: vi.fn(),
 }));
+vi.mock("@/features/home/queries", () => ({
+  getHomeTodo: vi.fn(),
+  getHomeChecklist: vi.fn(),
+  getHomeRecentChats: vi.fn(),
+}));
+vi.mock("@/features/home/actions", () => ({ dismissHomeChecklist: vi.fn() }));
 vi.mock("@/features/admin/queries", () => ({ getOperatorHome: vi.fn() }));
 vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
-vi.mock("@/features/teams/components/team-home", () => ({
-  TeamHome: () => null,
-}));
 vi.mock("@/features/teams/components/team-detail", () => ({
   TeamDetail: () => null,
 }));
@@ -126,7 +132,9 @@ describe("protected page-local streaming boundaries", () => {
       expect(searchParams.read).not.toHaveBeenCalled();
       expect(requirePageSession).not.toHaveBeenCalled();
       expect(requireOperatorPage).not.toHaveBeenCalled();
-      expect(getHomeTeams).not.toHaveBeenCalled();
+      expect(getHomeTodo).not.toHaveBeenCalled();
+      expect(getHomeChecklist).not.toHaveBeenCalled();
+      expect(getHomeRecentChats).not.toHaveBeenCalled();
       expect(getTeamPageData).not.toHaveBeenCalled();
       expect(getTeamStartData).not.toHaveBeenCalled();
       expect(getInvitePageData).not.toHaveBeenCalled();

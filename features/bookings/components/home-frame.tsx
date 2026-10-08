@@ -21,21 +21,50 @@ export function HomeHeaderFrame({ children }: { children: ReactNode }) {
 
 export function HomeDashboardFrame({
   header,
-  primary,
-  secondary,
+  children,
 }: {
   header: ReactNode;
-  primary: ReactNode;
-  secondary: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <PageContainer as="main" width="wide" className="space-y-6">
       <HomeHeaderFrame>{header}</HomeHeaderFrame>
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="space-y-6">{primary}</div>
-        <div className="space-y-6">{secondary}</div>
-      </div>
+      {children}
     </PageContainer>
+  );
+}
+
+export function HomeDashboardRows({
+  todo,
+  firstRow,
+  week,
+  thirdRow,
+  operator,
+}: {
+  todo?: ReactNode;
+  firstRow: ReactNode;
+  week: ReactNode;
+  thirdRow: ReactNode;
+  operator?: ReactNode;
+}) {
+  return (
+    <>
+      {todo}
+      <div
+        data-home-row="first"
+        className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+      >
+        {firstRow}
+      </div>
+      <div data-home-row="week">{week}</div>
+      <div
+        data-home-row="third"
+        className="grid items-start gap-6 lg:grid-cols-3"
+      >
+        {thirdRow}
+      </div>
+      {operator}
+    </>
   );
 }
 

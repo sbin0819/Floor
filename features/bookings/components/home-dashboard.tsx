@@ -3,7 +3,6 @@ import { ChevronRight } from "lucide-react";
 import { PageHeading } from "@/components/page-container";
 import { SpacePhoto } from "@/components/photos/space-photo";
 import { StatusLine } from "@/components/status-line";
-import { Button } from "@/components/ui/button";
 import { HomeCard, HomeHeaderFrame } from "./home-frame";
 import { AvailabilityBar } from "./availability-bar";
 import {
@@ -16,7 +15,6 @@ import type {
   HomeFreeSpacesData,
   HomeBookingLimitsData,
 } from "@/features/bookings/types";
-import type { HomeTeamsData } from "@/features/teams/types";
 import { addDays, localDate, localTime } from "@/lib/time/zoned";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 export { HomeNextBooking as HomeUpcomingBookings } from "./home-next-booking";
@@ -252,60 +250,6 @@ export function HomeBookingLimits({
         <p className="text-xs text-muted-foreground">
           개인 예약 기준이에요. 팀 이름으로 예약하면 팀 한도를 써요.
         </p>
-      </div>
-    </HomeCard>
-  );
-}
-export function HomeTeams({ data }: { data: HomeTeamsData }) {
-  return (
-    <HomeCard
-      title="내 팀"
-      action={
-        <Link href="/teams" className={linkClass}>
-          팀 관리
-          <ChevronRight aria-hidden="true" className="size-4" />
-        </Link>
-      }
-    >
-      <div className="space-y-4">
-        {data.pendingInviteCount > 0 && (
-          <Link
-            href="/teams"
-            className="flex min-h-11 items-center justify-between gap-3 rounded-lg bg-status-pending p-3 text-status-pending-foreground focus-visible:outline-2 focus-visible:outline-ring"
-          >
-            <span className="tabular-nums">
-              받은 초대 {data.pendingInviteCount}개
-            </span>
-            <span>확인하기</span>
-          </Link>
-        )}
-        {data.teams.length ? (
-          <ul>
-            {data.teams.map((team) => (
-              <li key={team.id}>
-                <Link
-                  href={`/teams/${team.id}`}
-                  className="flex min-h-11 items-center justify-between gap-4 rounded-lg py-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  <span>{team.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {team.role === "admin" ? "팀 관리자" : "팀원"}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <>
-            <p className="text-sm text-muted-foreground">
-              아직 속한 팀이 없어요. 팀이 있으면 팀 전용 공간과 더 긴 예약
-              시간을 쓸 수 있어요.
-            </p>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/teams/start">팀 만들기 또는 가입</Link>
-            </Button>
-          </>
-        )}
       </div>
     </HomeCard>
   );

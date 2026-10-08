@@ -95,3 +95,4 @@ export const changePassword = readOnlyAction;
 export const revokeSession = readOnlyAction;
 export const revokeOtherSessions = readOnlyAction;
 export const updatePreferences = readOnlyAction;
+export const dismissHomeChecklist = readOnlyAction;

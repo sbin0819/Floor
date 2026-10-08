@@ -3,8 +3,6 @@ import { ActionError } from "@/lib/actions/result";
 import { canManageTeam } from "@/features/teams/action-factory";
 import { teamSearchSchema } from "@/features/teams/schema";
 import type {
-  HomeData,
-  HomeTeamsData,
   TeamsData,
   InvitePageData,
   ReceivedInvite,
@@ -15,7 +13,6 @@ import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
 import {
   getInviteForRecipient,
-  getOperatorBranches,
   getTeamMember,
   getUserById,
   listBranches,
@@ -72,14 +69,6 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
   }
   return {
     ...createTeamManagementQueries(dependencies),
-    async getHomeTeams(): Promise<HomeTeamsData> {
-      const session = await readSession();
-      const [myTeams, invites] = await Promise.all([
-        listMyTeams(session.userId, database),
-        receivedInvites(session),
-      ]);
-      return { teams: myTeams, pendingInviteCount: invites.length };
-    },
     async getTeamsData(): Promise<TeamsData> {
       const session = await readSession();
       const current = now();
@@ -106,20 +95,6 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
               ]
             : [],
         ),
-      };
-    },
-    async getHomeData(): Promise<HomeData> {
-      const session = await readSession();
-      const [myTeams, invites, branches] = await Promise.all([
-        listMyTeams(session.userId, database),
-        receivedInvites(session),
-        getOperatorBranches(session.userId, database),
-      ]);
-      return {
-        name: session.name,
-        teams: myTeams,
-        pendingInviteCount: invites.length,
-        isOperator: branches.length > 0,
       };
     },
     async getTeamStartData(

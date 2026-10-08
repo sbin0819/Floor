@@ -10,6 +10,7 @@ import {
 } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTeamQueries } from "@/features/teams/query-factory";
+import { createHomeQueries } from "@/features/home/query-factory";
 import { avatarColorFor } from "@/lib/avatar";
 import { ActionError } from "@/lib/actions/result";
 import type { Session } from "@/lib/auth/types";
@@ -97,7 +98,7 @@ describe("authenticated team queries and safe DTOs", () => {
       .set({ deletedAt: new Date(), deletedBy: actors.owner.userId })
       .where(eq(teams.id, teamId));
     expect(await queries(actors.owner).getTeamPageData(teamId)).toBeNull();
-    expect((await queries(actors.owner).getHomeTeams()).teams).toEqual([]);
+    expect((await queries(actors.owner).getTeamsData()).teams).toEqual([]);
     expect((await queries().getTeamStartData("회사")).search.results).toEqual(
       [],
     );
@@ -158,7 +159,7 @@ describe("authenticated team queries and safe DTOs", () => {
     const userRead = vi.spyOn(dal, "getUserById");
     const teamRead = vi.spyOn(dal, "getTeamMember");
     const search = vi.spyOn(dal, "searchTeams");
-    await expect(safe.getHomeData()).rejects.toMatchObject({
+    await expect(safe.getTeamsData()).rejects.toMatchObject({
       code: "UNAUTHENTICATED",
     });
     await expect(safe.getTeamStartData("회사")).rejects.toMatchObject({
@@ -356,7 +357,12 @@ describe("authenticated team queries and safe DTOs", () => {
       (await queries(actors.unverified).getTeamStartData()).invites,
     ).toEqual([]);
     expect(
-      (await queries(actors.unverified).getHomeData()).pendingInviteCount,
+      (
+        await createHomeQueries({
+          database: database.db,
+          requireSession: async () => actors.unverified,
+        }).getHomeTodo()
+      ).teamInvites,
     ).toBe(0);
     for (const invalidToken of ["", "does-not-exist", "expired-invite"])
       expect(await queries().getInvitePageData(invalidToken)).toBeNull();
@@ -389,22 +395,4 @@ describe("authenticated team queries and safe DTOs", () => {
       ).resolves.toBeNull();
     },
   );
-
-  it("returns only home-facing team summaries, pending invite count and operator flag", async () => {
-    expect(await queries().getHomeData()).toEqual({
-      name: actors.outsider.name,
-      teams: [],
-      pendingInviteCount: 1,
-      isOperator: false,
-    });
-    expect(await queries(actors.owner).getHomeData()).toEqual({
-      name: actors.owner.name,
-      teams: [{ id: teamId, name: "가상 회사", role: "admin" }],
-      pendingInviteCount: 0,
-      isOperator: false,
-    });
-    expect((await queries(actors.operator).getHomeData()).isOperator).toBe(
-      true,
-    );
-  });
 });

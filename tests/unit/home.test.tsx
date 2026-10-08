@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Children,
   cloneElement,
@@ -10,7 +11,12 @@ import { beforeEach, expect, it, vi } from "vitest";
 import Home from "@/app/(app)/page";
 import BookingPage from "@/app/(app)/booking/page";
 import { requirePageSession } from "@/lib/auth/session";
-import { getHomeTeams } from "@/features/teams/queries";
+import {
+  getHomeChecklist,
+  getHomeRecentChats,
+  getHomeTodo,
+} from "@/features/home/queries";
+import { homeChecklist, homeChats, homeTodo } from "../helpers/home";
 import { getAccountMenuData } from "@/features/auth/queries";
 import {
   getHomeHeader,
@@ -26,7 +32,12 @@ import { resolvePageContent } from "./page-test-utils";
 import { spaceDayFixture } from "./booking-ui-fixtures";
 
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
-vi.mock("@/features/teams/queries", () => ({ getHomeTeams: vi.fn() }));
+vi.mock("@/features/home/queries", () => ({
+  getHomeChecklist: vi.fn(),
+  getHomeRecentChats: vi.fn(),
+  getHomeTodo: vi.fn(),
+}));
+vi.mock("@/features/home/actions", () => ({ dismissHomeChecklist: vi.fn() }));
 vi.mock("@/features/auth/queries", () => ({ getAccountMenuData: vi.fn() }));
 vi.mock("@/features/bookings/actions", () => ({ cancelBooking: vi.fn() }));
 vi.mock("@/features/bookings/queries", () => ({
@@ -39,6 +50,8 @@ vi.mock("@/features/bookings/queries", () => ({
   getBookingDestination: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ refresh: vi.fn() }),
   redirect: (href: string) => {
     throw new Error(`REDIRECT ${href}`);
   },
@@ -61,7 +74,15 @@ async function resolveRegions(node: ReactNode): Promise<ReactNode> {
     return resolveRegions(await component(node.props));
   }
   const slots: Record<string, ReactNode> = {};
-  for (const key of ["children", "header", "primary", "secondary"]) {
+  for (const key of [
+    "children",
+    "header",
+    "todo",
+    "firstRow",
+    "week",
+    "thirdRow",
+    "operator",
+  ]) {
     if (!(key in node.props)) continue;
     slots[key] = await Promise.all(
       Children.toArray(node.props[key]).map(resolveRegions),
@@ -70,7 +91,11 @@ async function resolveRegions(node: ReactNode): Promise<ReactNode> {
   return cloneElement(node, slots);
 }
 async function displayHome() {
-  return render(await resolveRegions(Home()));
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      {await resolveRegions(Home())}
+    </QueryClientProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -110,10 +135,9 @@ beforeEach(() => {
     days: [],
   });
   vi.mocked(getHomeFrequentSpaces).mockResolvedValue({ spaces: [] });
-  vi.mocked(getHomeTeams).mockResolvedValue({
-    teams: [],
-    pendingInviteCount: 2,
-  });
+  vi.mocked(getHomeTodo).mockResolvedValue({ ...homeTodo, teamInvites: 2 });
+  vi.mocked(getHomeChecklist).mockResolvedValue(homeChecklist);
+  vi.mocked(getHomeRecentChats).mockResolvedValue([]);
   vi.mocked(getAccountMenuData).mockResolvedValue({
     name: "가상 회원",
     avatar: { color: "blue", photoUrl: null },
@@ -128,17 +152,18 @@ it("shows fixed titles and links before session data and preserves the booking l
   const page = Home();
   const pending = cloneElement(page, {
     header: page.props.header.props.fallback,
-    primary: page.props.primary.props.fallback,
-    secondary: page.props.secondary.props.fallback,
+    children: page.props.children.props.fallback,
   });
-  const view = render(pending);
+  const client = new QueryClient();
+  const view = render(
+    <QueryClientProvider client={client}>{pending}</QueryClientProvider>,
+  );
   for (const name of [
     "다음 예약",
     "지금 비어 있는 공간",
     "자주 쓰는 공간",
     "이번 주 내 예약",
     "오늘 예약 한도",
-    "내 팀",
   ])
     expect(screen.getByRole("heading", { name })).toBeVisible();
   const bookingLink = screen.getByRole("link", { name: "공간 예약하기" });
@@ -149,7 +174,11 @@ it("shows fixed titles and links before session data and preserves the booking l
   expect(
     screen.queryByRole("link", { name: "운영자 화면" }),
   ).not.toBeInTheDocument();
-  view.rerender(await resolveRegions(page));
+  view.rerender(
+    <QueryClientProvider client={client}>
+      {await resolveRegions(page)}
+    </QueryClientProvider>,
+  );
   expect(screen.getAllByRole("link", { name: "공간 예약하기" })[0]).toBe(
     bookingLink,
   );
@@ -162,10 +191,14 @@ it("checks the page session and greets the member with branch selection, invites
   expect(
     screen.getByRole("heading", { name: "안녕하세요, 가상 회원님" }),
   ).toBeVisible();
+  expect(screen.getByRole("link", { name: "팀 찾기" })).toHaveAttribute(
+    "href",
+    "/teams/start",
+  );
   expect(
-    screen.getByRole("link", { name: "팀 만들기 또는 가입" }),
-  ).toHaveAttribute("href", "/teams/start");
-  expect(screen.getByText("받은 초대 2개")).toBeVisible();
+    screen.getByRole("link", { name: "받은 팀 초대 2개" }),
+  ).toHaveAttribute("href", "/teams");
+  expect(screen.getByText("팀 만들기 또는 들어가기")).toBeVisible();
   expect(screen.getByRole("link", { name: "지점 고르기" })).toHaveAttribute(
     "href",
     "/branches",
@@ -180,10 +213,18 @@ it("checks the page session and greets the member with branch selection, invites
   ).not.toBeInTheDocument();
 });
 
-it("shows team roles and the operator destination without a personal limit card", async () => {
-  vi.mocked(getHomeTeams).mockResolvedValue({
-    teams: [{ id: "team", name: "가상 팀", role: "admin" }],
-    pendingInviteCount: 0,
+it("shows team requests in their new destination and the operator link without a personal limit card", async () => {
+  vi.mocked(getHomeTodo).mockResolvedValue({
+    ...homeTodo,
+    joinRequests: {
+      top: { teamId: "team", teamName: "가상 팀", count: 3 },
+      rest: 0,
+    },
+  });
+  vi.mocked(getHomeChecklist).mockResolvedValue({
+    ...homeChecklist,
+    visible: false,
+    isOperator: true,
   });
   vi.mocked(getAccountMenuData).mockResolvedValue({
     name: "가상 회원",
@@ -196,13 +237,14 @@ it("shows team roles and the operator destination without a personal limit card"
   await displayHome();
   expect(screen.getByRole("link", { name: /가상 팀/ })).toHaveAttribute(
     "href",
-    "/teams/team",
+    "/teams/team?tab=requests",
   );
-  expect(screen.getByText("팀 관리자")).toBeVisible();
-  expect(screen.getByRole("link", { name: "팀 관리" })).toHaveAttribute(
-    "href",
-    "/teams",
-  );
+  expect(
+    screen.queryByRole("region", { name: "내 팀" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("region", { name: "Floor 시작하기" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "운영자 화면" })).toHaveAttribute(
     "href",
     "/admin",
@@ -315,20 +357,28 @@ it("does not invent an opening for an entirely closed branch", async () => {
   expect(screen.getByText("운영 예정 시간이 없어요")).toBeVisible();
 });
 
-it("keeps the static frame outside three guarded regions and eight independent reads", async () => {
+it("creates the shared placement promises only after the content session guard", async () => {
   const page = Home();
   expect(requirePageSession).not.toHaveBeenCalled();
   const boundaries: ReactNode[] = [];
   function visit(node: ReactNode) {
-    if (!isValidElement<{ children?: ReactNode }>(node)) return;
+    if (!isValidElement<Record<string, ReactNode>>(node)) return;
     if (node.type === Suspense) boundaries.push(node);
-    else Children.forEach(node.props.children, visit);
+    else
+      for (const key of [
+        "children",
+        "todo",
+        "firstRow",
+        "week",
+        "thirdRow",
+        "operator",
+      ])
+        Children.forEach(node.props[key], visit);
   }
   visit(page.props.header);
-  visit(await resolvePageContent(page.props.primary));
-  visit(await resolvePageContent(page.props.secondary));
+  visit(await resolvePageContent(page.props.children));
   expect(boundaries).toHaveLength(8);
-  expect(requirePageSession).toHaveBeenCalledTimes(2);
+  expect(requirePageSession).toHaveBeenCalledTimes(1);
   expect(requirePageSession).toHaveBeenCalledWith("/");
   expect(getHomeHeader).not.toHaveBeenCalled();
   expect(getHomeUpcomingBookings).not.toHaveBeenCalled();
@@ -336,7 +386,66 @@ it("keeps the static frame outside three guarded regions and eight independent r
   expect(getHomeBookingLimits).not.toHaveBeenCalled();
   expect(getHomeWeekBookings).not.toHaveBeenCalled();
   expect(getHomeFrequentSpaces).not.toHaveBeenCalled();
-  expect(getHomeTeams).not.toHaveBeenCalled();
+  expect(getHomeChecklist).toHaveBeenCalledOnce();
+  expect(getHomeRecentChats).toHaveBeenCalledOnce();
+  expect(getHomeTodo).not.toHaveBeenCalled();
+});
+
+it.each([
+  [true, true, "Floor 시작하기", true],
+  [true, false, "Floor 시작하기", true],
+  [false, false, "다음 예약", true],
+  [false, true, "다음 예약", false],
+] as const)(
+  "places one free-spaces card with checklist=%s and chats=%s",
+  async (visible, hasChats, left, firstFree) => {
+    vi.mocked(getHomeChecklist).mockResolvedValue({
+      ...homeChecklist,
+      visible,
+    });
+    vi.mocked(getHomeRecentChats).mockResolvedValue(hasChats ? homeChats : []);
+    const { container } = await displayHome();
+    const first = container.querySelector(
+      '[data-home-row="first"]',
+    )! as HTMLElement;
+    const third = container.querySelector(
+      '[data-home-row="third"]',
+    )! as HTMLElement;
+    expect(within(first).getByRole("region", { name: left })).toBeVisible();
+    expect(
+      within(firstFree ? first : third).getByRole("region", {
+        name: "지금 비어 있는 공간",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getAllByRole("region", { name: "지금 비어 있는 공간" }),
+    ).toHaveLength(1);
+    expect(Boolean(screen.queryByRole("region", { name: "최근 대화" }))).toBe(
+      !firstFree,
+    );
+    expect(getHomeChecklist).toHaveBeenCalledOnce();
+    expect(getHomeRecentChats).toHaveBeenCalledOnce();
+    expect(getHomeFreeSpaces).toHaveBeenCalledOnce();
+    expect(getHomeUpcomingBookings).toHaveBeenCalledTimes(visible ? 0 : 1);
+  },
+);
+
+it("does not start any home lookup if the direct page guard rejects", async () => {
+  vi.mocked(requirePageSession).mockRejectedValue(new Error("REDIRECT login"));
+  await expect(resolvePageContent(Home().props.children)).rejects.toThrow(
+    "REDIRECT login",
+  );
+  for (const read of [
+    getHomeChecklist,
+    getHomeRecentChats,
+    getHomeTodo,
+    getHomeUpcomingBookings,
+    getHomeFreeSpaces,
+    getHomeBookingLimits,
+    getHomeWeekBookings,
+    getHomeFrequentSpaces,
+  ])
+    expect(read).not.toHaveBeenCalled();
 });
 
 it.each(["/branches", "/branches/branch", "/branches/branch/floors/floor"])(

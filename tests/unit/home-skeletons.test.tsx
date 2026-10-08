@@ -8,9 +8,13 @@ import {
   HomeFreeSpacesSkeleton,
 } from "@/features/bookings/components/home-card-skeletons";
 
-it("matches the six dashboard cards without nested loading announcements", () => {
+it("matches the three dashboard rows without the removed team card or nested loading announcements", () => {
   const { container } = render(<HomeDashboardSkeleton />);
   expect(screen.getAllByRole("status")).toHaveLength(1);
+  expect(container.querySelectorAll("[data-home-row]")).toHaveLength(3);
+  expect(
+    screen.queryByRole("heading", { name: "내 팀" }),
+  ).not.toBeInTheDocument();
   for (const slot of [
     "home-next-shape",
     "home-free-shape",

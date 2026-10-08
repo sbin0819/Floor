@@ -1,9 +1,11 @@
 import { Suspense } from "react";
-import { requirePageSession } from "@/lib/auth/session";
 import Link from "next/link";
-import { HomeDashboardFrame } from "@/features/bookings/components/home-frame";
-import { getHomeTeams } from "@/features/teams/queries";
+import { requirePageSession } from "@/lib/auth/session";
 import { getAccountMenuData } from "@/features/auth/queries";
+import {
+  HomeDashboardFrame,
+  HomeDashboardRows,
+} from "@/features/bookings/components/home-frame";
 import {
   getHomeHeader,
   getHomeUpcomingBookings,
@@ -13,11 +15,23 @@ import {
   getHomeFrequentSpaces,
 } from "@/features/bookings/queries";
 import {
+  getHomeChecklist,
+  getHomeRecentChats,
+  getHomeTodo,
+} from "@/features/home/queries";
+import type {
+  HomeChecklist as ChecklistData,
+  HomeRecentChat,
+} from "@/features/home/types";
+import { HomeChecklist } from "@/features/home/components/home-checklist";
+import { HomeRecentChats } from "@/features/home/components/home-recent-chats";
+import { HomeTodo } from "@/features/home/components/home-todo";
+import { HomeRefresh } from "@/features/home/components/home-refresh";
+import {
   HomeGreeting,
   HomeUpcomingBookings,
   HomeFreeSpaces,
   HomeBookingLimits,
-  HomeTeams,
 } from "@/features/bookings/components/home-dashboard";
 import {
   HomeWeekBookings,
@@ -26,9 +40,8 @@ import {
 import {
   HomeGreetingSkeleton,
   HomeCardSkeleton,
+  HomeRowsSkeleton,
 } from "@/features/bookings/components/home-skeletons";
-import { SkeletonRegion } from "@/components/skeleton-region";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   HomeNextBookingSkeleton,
   HomeWeekBookingsSkeleton,
@@ -55,8 +68,8 @@ async function WeekBookings() {
 async function FrequentSpaces() {
   return <HomeFrequentSpaces data={await getHomeFrequentSpaces()} />;
 }
-async function Teams() {
-  return <HomeTeams data={await getHomeTeams()} />;
+async function Todo() {
+  return <HomeTodo data={await getHomeTodo()} />;
 }
 async function OperatorLink() {
   const data = await getAccountMenuData();
@@ -70,45 +83,95 @@ async function OperatorLink() {
   ) : null;
 }
 
-async function PrimaryCards() {
-  await requirePageSession("/");
+type Placement = {
+  checklist: Promise<ChecklistData>;
+  chats: Promise<HomeRecentChat[]>;
+};
+async function FirstRow({ checklist, chats }: Placement) {
+  const [guide, recent] = await Promise.all([checklist, chats]);
   return (
     <>
-      <Suspense fallback={<HomeNextBookingSkeleton />}>
-        <Upcoming />
-      </Suspense>
-      <Suspense fallback={<HomeFreeSpacesSkeleton />}>
-        <FreeSpaces />
-      </Suspense>
-      <Suspense fallback={<HomeFrequentSpacesSkeleton />}>
-        <FrequentSpaces />
-      </Suspense>
+      <div className="min-w-0">
+        {guide.visible ? (
+          <HomeChecklist data={guide} />
+        ) : (
+          <Suspense fallback={<HomeNextBookingSkeleton />}>
+            <Upcoming />
+          </Suspense>
+        )}
+      </div>
+      <div className="min-w-0">
+        {guide.visible || recent.length === 0 ? (
+          <Suspense fallback={<HomeFreeSpacesSkeleton />}>
+            <FreeSpaces />
+          </Suspense>
+        ) : (
+          <HomeRecentChats data={recent} />
+        )}
+      </div>
     </>
   );
 }
+async function ThirdRowFreeSpaces({ checklist, chats }: Placement) {
+  const [guide, recent] = await Promise.all([checklist, chats]);
+  if (guide.visible || recent.length === 0) return null;
+  return (
+    <Suspense fallback={<HomeFreeSpacesSkeleton />}>
+      <FreeSpaces />
+    </Suspense>
+  );
+}
 
-async function SecondaryCards() {
-  await requirePageSession("/");
+async function Content() {
+  const session = await requirePageSession("/");
+  // 배치를 정하는 두 결과를 같은 요청의 두 자리가 나눠 쓴다.
+  const checklist = getHomeChecklist();
+  const chats = getHomeRecentChats();
   return (
     <>
-      <Suspense fallback={<HomeWeekBookingsSkeleton />}>
-        <WeekBookings />
-      </Suspense>
-      <Suspense fallback={<HomeCardSkeleton rows={1} />}>
-        <Limits />
-      </Suspense>
-      <Suspense fallback={<HomeCardSkeleton title="내 팀" rows={2} />}>
-        <Teams />
-      </Suspense>
-      <Suspense
-        fallback={
-          <SkeletonRegion>
-            <Skeleton className="h-11 w-32" />
-          </SkeletonRegion>
+      <HomeRefresh userId={session.userId} />
+      <HomeDashboardRows
+        todo={
+          <Suspense fallback={null}>
+            <Todo />
+          </Suspense>
         }
-      >
-        <OperatorLink />
-      </Suspense>
+        firstRow={
+          <Suspense
+            fallback={
+              <>
+                <HomeNextBookingSkeleton />
+                <HomeFreeSpacesSkeleton />
+              </>
+            }
+          >
+            <FirstRow checklist={checklist} chats={chats} />
+          </Suspense>
+        }
+        week={
+          <Suspense fallback={<HomeWeekBookingsSkeleton />}>
+            <WeekBookings />
+          </Suspense>
+        }
+        thirdRow={
+          <>
+            <Suspense fallback={null}>
+              <ThirdRowFreeSpaces checklist={checklist} chats={chats} />
+            </Suspense>
+            <Suspense fallback={<HomeCardSkeleton rows={1} />}>
+              <Limits />
+            </Suspense>
+            <Suspense fallback={<HomeFrequentSpacesSkeleton />}>
+              <FrequentSpaces />
+            </Suspense>
+          </>
+        }
+        operator={
+          <Suspense fallback={null}>
+            <OperatorLink />
+          </Suspense>
+        }
+      />
     </>
   );
 }
@@ -121,32 +184,10 @@ export default function Home() {
           <Header />
         </Suspense>
       }
-      primary={
-        <Suspense
-          fallback={
-            <>
-              <HomeNextBookingSkeleton />
-              <HomeFreeSpacesSkeleton />
-              <HomeFrequentSpacesSkeleton />
-            </>
-          }
-        >
-          <PrimaryCards />
-        </Suspense>
-      }
-      secondary={
-        <Suspense
-          fallback={
-            <>
-              <HomeWeekBookingsSkeleton />
-              <HomeCardSkeleton rows={1} />
-              <HomeCardSkeleton title="내 팀" rows={2} />
-            </>
-          }
-        >
-          <SecondaryCards />
-        </Suspense>
-      }
-    />
+    >
+      <Suspense fallback={<HomeRowsSkeleton />}>
+        <Content />
+      </Suspense>
+    </HomeDashboardFrame>
   );
 }

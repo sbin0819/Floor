@@ -2,8 +2,8 @@ import { SkeletonRegion } from "@/components/skeleton-region";
 import { SkeletonHeading, SkeletonRows } from "@/components/skeleton-shapes";
 import {
   HomeCard,
-  HomeCardLink,
   HomeDashboardFrame,
+  HomeDashboardRows,
   HomeHeaderFrame,
 } from "./home-frame";
 import {
@@ -37,14 +37,7 @@ export function HomeCardSkeleton({
   title?: string;
 }) {
   return (
-    <HomeCard
-      title={title}
-      action={
-        title === "내 팀" ? (
-          <HomeCardLink href="/teams">팀 관리</HomeCardLink>
-        ) : undefined
-      }
-    >
+    <HomeCard title={title}>
       <SkeletonRegion>
         <SkeletonRows count={rows} photo={photo} />
       </SkeletonRegion>
@@ -54,30 +47,39 @@ export function HomeCardSkeleton({
 export function HomeDashboardSkeleton() {
   return (
     <SkeletonRegion>
-      <HomeDashboardFrame
-        header={<SkeletonHeading />}
-        primary={
-          <>
-            <HomeNextBookingShape />
-            <HomeFreeSpacesShape />
-            <HomeFrequentSpacesShape />
-          </>
-        }
-        secondary={
-          <>
-            <HomeWeekBookingsShape />
-            <HomeCard title="오늘 예약 한도">
-              <SkeletonRows count={1} />
-            </HomeCard>
-            <HomeCard
-              title="내 팀"
-              action={<HomeCardLink href="/teams">팀 관리</HomeCardLink>}
-            >
-              <SkeletonRows count={2} />
-            </HomeCard>
-          </>
-        }
-      />
+      <HomeDashboardFrame header={<SkeletonHeading />}>
+        <HomeRowsShape />
+      </HomeDashboardFrame>
+    </SkeletonRegion>
+  );
+}
+
+function HomeRowsShape() {
+  return (
+    <HomeDashboardRows
+      firstRow={
+        <>
+          <HomeNextBookingShape />
+          <HomeFreeSpacesShape />
+        </>
+      }
+      week={<HomeWeekBookingsShape />}
+      thirdRow={
+        <>
+          <HomeCard title="오늘 예약 한도">
+            <SkeletonRows count={1} />
+          </HomeCard>
+          <HomeFrequentSpacesShape />
+        </>
+      }
+    />
+  );
+}
+
+export function HomeRowsSkeleton() {
+  return (
+    <SkeletonRegion className="space-y-6">
+      <HomeRowsShape />
     </SkeletonRegion>
   );
 }

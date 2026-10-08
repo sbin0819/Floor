@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTeamQueries } from "@/features/teams/query-factory";
+import { createHomeQueries } from "@/features/home/query-factory";
 import { ActionError } from "@/lib/actions/result";
 import {
   teamInvites,
@@ -145,12 +146,16 @@ describe("team screen projections and query budgets", () => {
     expect(search.search.results[0]).not.toHaveProperty("memberCount");
     expect(search.invites).toEqual([{ teamName: "가상 대표 팀" }]);
     expect(search).not.toHaveProperty("requests");
-    const home = await queries().getHomeTeams();
-    expect(home.pendingInviteCount).toBe(1);
-    expect(home.teams[0]).not.toHaveProperty("memberCount");
+    const home = await createHomeQueries({
+      database: database.db,
+      requireSession: async () => actors.outsider,
+      now: () => now,
+    }).getHomeTodo();
+    expect(home.teamInvites).toBe(1);
+    expect(home).not.toHaveProperty("teams");
     expect(JSON.stringify(home)).not.toContain("screen-budget-recipient-token");
   });
-  it("checks the session for both new public reads", async () => {
+  it("checks the session for the team hub before database access", async () => {
     const denied = createTeamQueries({
       database: database.db,
       requireSession: async () => {
@@ -161,13 +166,9 @@ describe("team screen projections and query budgets", () => {
     await expect(denied.getTeamsData()).rejects.toMatchObject({
       code: "UNAUTHENTICATED",
     });
-    await expect(denied.getHomeTeams()).rejects.toMatchObject({
-      code: "UNAUTHENTICATED",
-    });
     expect(meter.stop().statements).toBe(0);
   });
   it.each([
-    "home",
     "hub",
     "start-search",
     "start-empty",
@@ -178,7 +179,6 @@ describe("team screen projections and query budgets", () => {
     "keeps %s within two stages and six statements per stage",
     async (kind) => {
       meter.start();
-      if (kind === "home") await queries().getHomeTeams();
       if (kind === "hub") await queries().getTeamsData();
       if (kind === "start-search") await queries().getTeamStartData("재요청");
       if (kind === "start-empty") await queries().getTeamStartData();

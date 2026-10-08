@@ -8,7 +8,6 @@ export type MyTeamSummary = MyTeam & {
   memberCount: number;
   homeBranchName: string | null;
 };
-export type HomeTeamsData = { teams: MyTeam[]; pendingInviteCount: number };
 export type ReceivedInvite = {
   token: string;
   teamId: string;
@@ -40,12 +39,6 @@ export type TeamSearchResult = {
   isMember: boolean;
   hasInvite: boolean;
   hasRequest: boolean;
-};
-export type HomeData = {
-  name: string;
-  teams: MyTeam[];
-  pendingInviteCount: number;
-  isOperator: boolean;
 };
 export type TeamStartData = {
   branches: { id: string; name: string }[];
