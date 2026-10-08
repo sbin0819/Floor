@@ -86,6 +86,8 @@ export type DirectMessageNav = DirectMessageNavBase &
       }
   );
 export type ChatNav = {
+  myStatus: "online" | "away" | "dnd";
+  blockedUserIds: string[];
   spaces: ChatSpaceNav[];
   directMessages: DirectMessageNav[];
 };

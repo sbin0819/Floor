@@ -16,19 +16,20 @@ import { readableRoomCondition, readableTeamSpace } from "./chat-access";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { selectChatMessages } from "./chat-messages";
+import type { UserStatus } from "@/features/people/status";
 import { blockedBy } from "./people-blocks";
 
 export function listChatNav(userId: string, database: DalDatabase = getDb()) {
   return database
     .select({
-      spaceId: chatSpaces.id,
-      spaceName: teams.name,
-      roomId: chatRooms.id,
-      roomName: chatRooms.name,
-      unread: sql<boolean>`${firstUnreadSequence(userId)} is not null`,
-      unreadMentions: unreadMentionCount(userId),
-      roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`,
-      spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`,
+      spaceId: sql<string>`${chatSpaces.id}`.as("space_id"),
+      spaceName: sql<string>`${teams.name}`.as("space_name"),
+      roomId: sql<string | null>`${chatRooms.id}`.as("room_id"),
+      roomName: sql<string | null>`${chatRooms.name}`.as("room_name"),
+      unread: sql<boolean>`${firstUnreadSequence(userId)} is not null`.as("unread"),
+      unreadMentions: unreadMentionCount(userId).as("unread_mentions"),
+      roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`.as("room_muted"),
+      spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`.as("space_muted"),
     })
     .from(chatSpaces)
     .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
@@ -62,6 +63,23 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
       asc(chatRooms.createdAt),
       asc(chatRooms.id),
     );
+}
+
+// 공간이 하나도 없는 사람도 자기 상태와 차단 목록을 받는다. SQL 문장은 늘리지 않는다.
+export async function readChatNavigation(userId: string, database: DalDatabase = getDb()) {
+  type Row = Awaited<ReturnType<typeof listChatNav>>[number];
+  const navigation = listChatNav(userId, database).as("nav_rows");
+  const [result] = await database.select({
+    myStatus: sql<UserStatus>`${users.status}`,
+    blockedUserIds: sql<string[]>`array(select b.blocked_id from user_blocks b where b.blocker_id = ${userId}::uuid order by b.blocked_id)`,
+    rows: sql<Row[]>`coalesce((select jsonb_agg(jsonb_build_object(
+      'spaceId', nav_rows.space_id, 'spaceName', nav_rows.space_name,
+      'roomId', nav_rows.room_id, 'roomName', nav_rows.room_name,
+      'unread', nav_rows.unread, 'unreadMentions', nav_rows.unread_mentions,
+      'roomMuted', nav_rows.room_muted, 'spaceMuted', nav_rows.space_muted
+    )) from ${navigation}), '[]'::jsonb)`,
+  }).from(users).where(eq(users.id,userId));
+  return result ?? { myStatus: "online" as const, blockedUserIds: [], rows: [] };
 }
 
 export async function listRecentMessages(

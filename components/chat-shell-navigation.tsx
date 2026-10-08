@@ -12,7 +12,12 @@ import { getMyChatNav } from "@/features/chat/queries";
 async function readNavigation() {
   return (await getSession())
     ? getMyChatNav()
-    : { spaces: [], directMessages: [] };
+    : {
+        spaces: [],
+        directMessages: [],
+        myStatus: "online" as const,
+        blockedUserIds: [],
+      };
 }
 
 export async function ChatRailSlot() {

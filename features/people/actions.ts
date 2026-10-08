@@ -3,6 +3,11 @@
 import { createUsernameAction } from "./username";
 import { createFriendActions } from "./friend-actions";
 import { createModerationActions } from "./moderation-actions";
+import { createStatusAction } from "./status-action";
+
+export async function setStatus(input: unknown) {
+  return createStatusAction()(input);
+}
 
 export async function setUsername(input: unknown) {
   return createUsernameAction()(input);

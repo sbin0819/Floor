@@ -6,7 +6,7 @@ import type { DalDatabase } from "@/lib/dal/database";
 import { canReadRoom, writableRoom } from "@/lib/dal/chat-access";
 import {
   listChatMembers,
-  listChatNav,
+  readChatNavigation,
   listRecentMessages,
   listMessagesPage,
 } from "@/lib/dal/chat-read";
@@ -86,12 +86,12 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
     },
     async getMyChatNav(): Promise<ChatNav> {
       const session = await readSession();
-      const [rows, directRows] = await Promise.all([
-        listChatNav(session.userId, dependencies.database),
+      const [navigation, directRows] = await Promise.all([
+        readChatNavigation(session.userId, dependencies.database),
         listDirectNav(session.userId, dependencies.database),
       ]);
       const spaces = new Map<string, ChatSpaceNav>();
-      for (const row of rows) {
+      for (const row of navigation.rows) {
         let space = spaces.get(row.spaceId);
         if (!space) {
           space = {
@@ -119,6 +119,8 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         }
       }
       return {
+        myStatus: navigation.myStatus,
+        blockedUserIds: navigation.blockedUserIds,
         spaces: [...spaces.values()],
         directMessages: directRows.map((row) => ({
           roomId: row.roomId,

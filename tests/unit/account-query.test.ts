@@ -4,11 +4,11 @@ import { ActionError } from "@/lib/actions/result";
 
 const mocks = vi.hoisted(() => ({
   requireSession: vi.fn(),
-  getOperatorBranches: vi.fn(),
+  readAccountMenu: vi.fn(),
 }));
 vi.mock("@/lib/auth/session", () => ({ requireSession: mocks.requireSession }));
-vi.mock("@/lib/dal", () => ({
-  getOperatorBranches: mocks.getOperatorBranches,
+vi.mock("@/lib/dal/people-status", () => ({
+  readAccountMenu: mocks.readAccountMenu,
 }));
 
 beforeEach(() => {
@@ -18,7 +18,11 @@ beforeEach(() => {
     name: "회원",
     email: "member@example.test",
   });
-  mocks.getOperatorBranches.mockResolvedValue([]);
+  mocks.readAccountMenu.mockResolvedValue({
+    isOperator: false,
+    myStatus: "online",
+    username: null,
+  });
 });
 
 describe("account menu server data", () => {
@@ -27,32 +31,39 @@ describe("account menu server data", () => {
     await expect(getAccountMenuData()).rejects.toMatchObject({
       code: "UNAUTHENTICATED",
     });
-    expect(mocks.getOperatorBranches).not.toHaveBeenCalled();
+    expect(mocks.readAccountMenu).not.toHaveBeenCalled();
   });
 
-  it("returns only the profile and derived operator boolean", async () => {
+  it("returns only the profile, own status and derived operator boolean", async () => {
     expect(await getAccountMenuData()).toEqual({
       name: "회원",
       email: "member@example.test",
       isOperator: false,
+      myStatus: "online",
+      username: null,
     });
-    expect(mocks.getOperatorBranches).toHaveBeenCalledExactlyOnceWith("member");
+    expect(mocks.readAccountMenu).toHaveBeenCalledExactlyOnceWith("member");
   });
 
   it("does not expose operator branch rows", async () => {
-    mocks.getOperatorBranches.mockResolvedValue([
-      { id: "branch-secret-id", name: "가상 지점" },
-    ]);
+    mocks.readAccountMenu.mockResolvedValue({
+      isOperator: true,
+      myStatus: "dnd",
+      username: "member",
+      branches: [{ id: "branch-secret-id", name: "가상 지점" }],
+    });
     expect(await getAccountMenuData()).toEqual({
       name: "회원",
       email: "member@example.test",
       isOperator: true,
+      myStatus: "dnd",
+      username: "member",
     });
   });
 
   it("lets membership failures reach the error boundary instead of hiding them", async () => {
     const failure = new Error("membership failed");
-    mocks.getOperatorBranches.mockRejectedValue(failure);
+    mocks.readAccountMenu.mockRejectedValue(failure);
     await expect(getAccountMenuData()).rejects.toBe(failure);
   });
 });
