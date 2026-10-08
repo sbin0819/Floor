@@ -5,6 +5,8 @@ export function getActionErrorCode(error: unknown): ActionErrorCode {
   const databaseError = getPostgresError(error);
   if (databaseError?.code === "23P01") return "BOOKING_CONFLICT";
   if (databaseError?.code === "23505") {
+    if (databaseError.constraint === "users_username_unique")
+      return "USERNAME_TAKEN";
     if (databaseError.constraint === "teams_name_unique")
       return "TEAM_NAME_TAKEN";
     if (databaseError.constraint === "team_join_requests_one_pending")

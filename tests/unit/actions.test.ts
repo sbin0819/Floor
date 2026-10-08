@@ -432,6 +432,7 @@ describe("getActionErrorCode", () => {
 
   it.each([
     ["teams_name_unique", "TEAM_NAME_TAKEN"],
+    ["users_username_unique", "USERNAME_TAKEN"],
     ["team_join_requests_one_pending", "ALREADY_REQUESTED"],
     ["team_invites_one_pending", "INTERNAL"],
     ["unknown", "INTERNAL"],

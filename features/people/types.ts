@@ -1,0 +1,36 @@
+export type UsernameSettings = {
+  username: string | null;
+  usernameChangedAt: string | null;
+  nextChangeAt: string | null;
+  now: string;
+  suggestion: string | null;
+};
+
+export type PersonRelation = "friend" | "outgoing" | "incoming" | "none";
+export type FriendsTab = "all" | "received" | "sent";
+export type FriendRow = {
+  userId: string;
+  name: string;
+  username: string | null;
+  sharedTeamNames: string[];
+  directRoomId: string | null;
+};
+export type FriendsView = {
+  settings: UsernameSettings;
+  receivedCount: number;
+  rows: FriendRow[];
+};
+export type PersonSearchResult = Omit<FriendRow, "directRoomId"> & {
+  relation: PersonRelation;
+};
+export type PersonProfile = {
+  userId: string;
+  name: string;
+  username: string | null;
+  isMe: boolean;
+  relation: PersonRelation | null;
+  sharedSpaces: { id: string; name: string }[];
+  directRoomId: string | null;
+  canDirectMessage: boolean;
+};
+export type MessageContact = FriendRow & { isFriend: boolean };

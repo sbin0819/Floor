@@ -8,6 +8,7 @@ export type ActionErrorCode =
   | "LIMIT_EXCEEDED"
   | "PLAN_INVALID"
   | "TEAM_NAME_TAKEN"
+  | "USERNAME_TAKEN"
   | "ALREADY_MEMBER"
   | "ALREADY_REQUESTED"
   | "INVITE_INVALID"
@@ -32,6 +33,9 @@ export type ActionErrorDetails = {
     | "days_ahead"
     | "send_rate"
     | "reaction_rate"
+    | "username_cooldown"
+    | "friend_daily"
+    | "friend_cooldown"
     | "desk_per_person"
     | "attendee_count"
     | "participants";
