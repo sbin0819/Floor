@@ -30,7 +30,17 @@ function setup(
       initial: "팀",
       kind: "team",
       unread: true,
-      channels: [{ id: "room", name: "일반", unread: true }],
+      muted: false,
+      unreadMentions: 0,
+      channels: [
+        {
+          id: "room",
+          name: "일반",
+          unread: true,
+          muted: false,
+          unreadMentions: 0,
+        },
+      ],
     },
   ]);
   const wrapper = ({ children }: { children: ReactNode }) => (

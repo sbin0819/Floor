@@ -22,6 +22,7 @@ import {
   type DisplayMessage,
 } from "@/features/chat/components/message-state";
 import type { SendChatMessage } from "@/features/chat/components/use-channel-messages";
+import { setRoomMuted } from "@/features/chat/actions";
 import { installChatViewport } from "../helpers/chat-viewport";
 import { fetchRoomMessagesPage } from "@/features/chat/client";
 
@@ -43,6 +44,8 @@ vi.mock("@/features/chat/actions", () => ({
   setReaction: vi.fn(),
   editMessage: vi.fn(),
   deleteMessage: vi.fn(),
+  setRoomMuted: vi.fn(async () => ({ ok: true, data: undefined })),
+  setSpaceMuted: vi.fn(),
   markRoomRead: vi.fn(async ({ seq }: { seq: number }) => ({
     ok: true,
     data: { lastReadSeq: seq },
@@ -93,7 +96,7 @@ function created(
 }
 function view(overrides: Partial<ChannelView> = {}): ChannelView {
   return {
-    space: { id: "space", name: "디자인팀" },
+    space: { id: "space", name: "디자인팀", muted: false },
     room: {
       id: "room",
       name: "일반",
@@ -101,6 +104,8 @@ function view(overrides: Partial<ChannelView> = {}): ChannelView {
       archived: false,
       adminOnly: false,
       lastSeq: 1,
+      muted: false,
+      unreadMentions: 0,
     },
     user: { id: "me", name: "박지훈" },
     members: [
@@ -145,6 +150,7 @@ beforeEach(() => {
   realtime.refresh.mockReset();
   realtime.connection = "disabled";
   realtime.presenceUpdate.mockReset();
+  vi.mocked(setRoomMuted).mockClear();
   vi.mocked(fetchRoomMessagesPage).mockReset();
 });
 afterEach(() => {
@@ -197,6 +203,21 @@ describe("chat message composer", () => {
 });
 
 describe("chat channel presentation", () => {
+  it("offers the current channel mute setting in its header and refreshes only after success", async () => {
+    setup();
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "일반 알림 설정" }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "알림 끄기" }));
+    await waitFor(() =>
+      expect(setRoomMuted).toHaveBeenCalledWith({
+        roomId: "room",
+        muted: true,
+      }),
+    );
+    await waitFor(() => expect(realtime.refresh).toHaveBeenCalledOnce());
+  });
   it("wires typing to the composer and clears it when sending", () => {
     setup(view(), async (input) => ({
       ok: true,

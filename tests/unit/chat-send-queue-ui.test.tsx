@@ -38,7 +38,7 @@ vi.mock("@/components/realtime-provider", () => ({
   },
 }));
 const data: ChannelView = {
-  space: { id: "space", name: "디자인팀" },
+  space: { id: "space", name: "디자인팀", muted: false },
   room: {
     id: "room",
     name: "일반",
@@ -46,6 +46,8 @@ const data: ChannelView = {
     archived: false,
     adminOnly: false,
     lastSeq: 0,
+    muted: false,
+    unreadMentions: 0,
   },
   user: { id: "me", name: "박지훈" },
   members: [],

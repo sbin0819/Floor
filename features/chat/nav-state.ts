@@ -9,6 +9,7 @@ type NavChanges = {
   readThrough: Map<string, number>;
   incoming: WeakSet<ChatSpaceNav[]>;
   viewport: { roomId: string; atBottom: boolean } | null;
+  mentions: Set<string>;
 };
 const changes = new WeakMap<QueryClient, NavChanges>();
 function state(client: QueryClient) {
@@ -21,6 +22,7 @@ function state(client: QueryClient) {
       readThrough: new Map(),
       incoming: new WeakSet(),
       viewport: null,
+      mentions: new Set(),
     };
     changes.set(client, value);
   }
@@ -45,12 +47,19 @@ function setUnread(client: QueryClient, roomId: string, unread: boolean) {
   client.setQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY, (current) =>
     current?.map((space) => {
       const channels = space.channels.map((room) =>
-        room.id === roomId ? { ...room, unread } : room,
+        room.id === roomId
+          ? { ...room, unread, ...(!unread ? { unreadMentions: 0 } : {}) }
+          : room,
       );
       return {
         ...space,
         channels,
-        unread: channels.some((room) => room.unread),
+        unread:
+          !space.muted && channels.some((room) => room.unread && !room.muted),
+        unreadMentions: channels.reduce(
+          (sum, room) => sum + room.unreadMentions,
+          0,
+        ),
       };
     }),
   );
@@ -104,6 +113,56 @@ export function chatNavRevision(client: QueryClient) {
   return state(client).revision;
 }
 
+export function isViewingRoom(
+  client: QueryClient,
+  roomId: string,
+  bottomOnly = false,
+) {
+  const viewport = state(client).viewport;
+  return (
+    viewport?.roomId === roomId &&
+    (!bottomOnly || viewport.atBottom) &&
+    document.visibilityState === "visible"
+  );
+}
+
+export function applyMention(
+  client: QueryClient,
+  event: { roomId: string; messageId: string; seq: number },
+) {
+  const snapshot = state(client);
+  if (snapshot.mentions.has(event.messageId)) return false;
+  snapshot.mentions.add(event.messageId);
+  if (
+    event.seq <= (snapshot.readThrough.get(event.roomId) ?? 0) ||
+    isViewingRoom(client, event.roomId, true)
+  )
+    return false;
+  snapshot.rooms.set(event.roomId, ++snapshot.revision);
+  snapshot.activitySeq.set(
+    event.roomId,
+    Math.max(snapshot.activitySeq.get(event.roomId) ?? 0, event.seq),
+  );
+  client.setQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY, (current) =>
+    current?.map((space) => {
+      const channels = space.channels.map((room) =>
+        room.id === event.roomId
+          ? { ...room, unreadMentions: room.unreadMentions + 1 }
+          : room,
+      );
+      return {
+        ...space,
+        channels,
+        unreadMentions: channels.reduce(
+          (sum, room) => sum + room.unreadMentions,
+          0,
+        ),
+      };
+    }),
+  );
+  return true;
+}
+
 // 요청 이후 바뀐 방만 현재 값을 남긴다. 다음 정상 폴링은 실패한 읽음도 바로잡는다.
 export function mergeChatNav(
   client: QueryClient,
@@ -114,7 +173,13 @@ export function mergeChatNav(
   const current = client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY);
   const unread = new Map(
     current?.flatMap((space) =>
-      space.channels.map((room) => [room.id, room.unread] as const),
+      space.channels.map(
+        (room) =>
+          [
+            room.id,
+            { unread: room.unread, unreadMentions: room.unreadMentions },
+          ] as const,
+      ),
     ),
   );
   return incoming.map((space) => {
@@ -124,12 +189,21 @@ export function mergeChatNav(
           ? unread.has(room.id)
           : (snapshot.rooms.get(room.id) ?? 0) > requestedAt;
       if (protect && unread.has(room.id))
-        return { ...room, unread: unread.get(room.id)! };
+        return { ...room, ...unread.get(room.id)! };
       if (requestedAt !== null)
         snapshot.rooms.set(room.id, ++snapshot.revision);
       return room;
     });
-    return { ...space, channels, unread: channels.some((room) => room.unread) };
+    return {
+      ...space,
+      channels,
+      unread:
+        !space.muted && channels.some((room) => room.unread && !room.muted),
+      unreadMentions: channels.reduce(
+        (sum, room) => sum + room.unreadMentions,
+        0,
+      ),
+    };
   });
 }
 

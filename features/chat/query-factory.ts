@@ -86,6 +86,8 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
             name: row.spaceName,
             initial: Array.from(row.spaceName)[0] ?? "",
             unread: false,
+            muted: row.spaceMuted,
+            unreadMentions: 0,
             channels: [],
           };
           spaces.set(space.id, space);
@@ -95,8 +97,11 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
             id: row.roomId,
             name: row.roomName,
             unread: row.unread,
+            muted: row.roomMuted,
+            unreadMentions: row.unreadMentions,
           });
-          space.unread ||= row.unread;
+          space.unread ||= row.unread && !row.roomMuted && !row.spaceMuted;
+          space.unreadMentions += row.unreadMentions;
         }
       }
       return [...spaces.values()];
@@ -122,7 +127,11 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         listChatMembers(room.teamId, dependencies.database),
       ]);
       return {
-        space: { id: room.spaceId, name: room.spaceName },
+        space: {
+          id: room.spaceId,
+          name: room.spaceName,
+          muted: room.spaceMuted,
+        },
         room: {
           id: room.id,
           name: room.name!,
@@ -130,6 +139,8 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           archived: room.archivedAt !== null,
           adminOnly: room.adminOnly,
           lastSeq: room.lastSeq,
+          muted: room.roomMuted,
+          unreadMentions: room.unreadMentions,
         },
         user: { id: session.userId, name: session.name },
         messages: messages.map(serializeChatMessage),

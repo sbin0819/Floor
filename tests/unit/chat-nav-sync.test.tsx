@@ -24,10 +24,19 @@ const secondId = "33333333-3333-4333-8333-333333333333";
 const mocks = vi.hoisted(() => ({
   pathname: "/",
   channel: null as string | null,
+  mention: (_event: RealtimeEvent) => {
+    void _event;
+  },
+  toast: vi.fn(),
   event: (_event: RealtimeEvent) => {
     void _event;
   },
 }));
+vi.mock("@/features/chat/actions", () => ({
+  setRoomMuted: vi.fn(),
+  setSpaceMuted: vi.fn(),
+}));
+vi.mock("sonner", () => ({ toast: mocks.toast }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
   useRouter: () => ({ push: vi.fn() }),
@@ -38,6 +47,10 @@ vi.mock("next/link", async (original) => ({
 }));
 vi.mock("@/components/realtime-provider", () => ({
   useRealtimeChannel: (channel: string | null, event: typeof mocks.event) => {
+    if (channel?.startsWith("user:")) {
+      mocks.mention = event;
+      return;
+    }
     mocks.channel = channel;
     mocks.event = event;
   },
@@ -49,9 +62,23 @@ const fixture = (): ChatSpaceNav[] => [
     name: "디자인팀",
     initial: "디",
     unread: false,
+    unreadMentions: 0,
+    muted: false,
     channels: [
-      { id: roomId, name: "일반", unread: false },
-      { id: secondId, name: "자료", unread: false },
+      {
+        id: roomId,
+        name: "일반",
+        unread: false,
+        unreadMentions: 0,
+        muted: false,
+      },
+      {
+        id: secondId,
+        name: "자료",
+        unread: false,
+        unreadMentions: 0,
+        muted: false,
+      },
     ],
   },
 ];
@@ -82,6 +109,8 @@ async function advance(ms: number) {
 }
 beforeEach(() => {
   vi.useFakeTimers();
+  document.title = "Floor";
+  mocks.toast.mockReset();
   mocks.pathname = `/s/${spaceId}/${roomId}`;
   Object.defineProperty(document, "visibilityState", {
     configurable: true,
@@ -95,6 +124,90 @@ afterEach(() => {
 });
 
 describe("chat unread navigation", () => {
+  it("deduplicates mention counts and toasts, protects newer mentions from old reads, and restores title after metadata navigation", async () => {
+    const { client, rerender, node } = setup();
+    const event = {
+      type: "mention.created" as const,
+      spaceId,
+      roomId: secondId,
+      roomName: "자료",
+      messageId: "mention-1",
+      seq: 8,
+      authorName: "서연",
+      excerpt: "안녕하세요",
+    };
+    act(() => {
+      mocks.mention(event);
+      mocks.mention(event);
+      clearRoomUnread(client, secondId, 7);
+    });
+    await advance(251);
+    expect(
+      client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]!.unreadMentions,
+    ).toBe(1);
+    expect(
+      screen.getByRole("link", { name: "자료, 멘션 1개" }),
+    ).toBeInTheDocument();
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+    expect(document.title).toBe("(1) Floor");
+    mocks.pathname = "/teams";
+    rerender(node());
+    await act(async () => {
+      document.head.querySelector("title")?.remove();
+      const title = document.createElement("title");
+      title.textContent = "팀 | Floor";
+      document.head.append(title);
+    });
+    expect(document.title).toBe("(1) 팀 | Floor");
+    act(() => clearRoomUnread(client, secondId, 8));
+    await advance(1);
+    expect(document.title).toBe("팀 | Floor");
+    act(() => mocks.mention(event));
+    await advance(251);
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+  });
+  it("retains muted mention badges and groups bursts but excludes the visible bottom", async () => {
+    const { client } = setup();
+    act(() =>
+      client.setQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY, (rows) =>
+        rows!.map((space) => ({ ...space, muted: true })),
+      ),
+    );
+    act(() => {
+      activity();
+      for (let i = 0; i < 4; i++)
+        mocks.mention({
+          type: "mention.created",
+          spaceId,
+          roomId: secondId,
+          roomName: "자료",
+          messageId: `m${i}`,
+          seq: i + 3,
+          authorName: "서연",
+          excerpt: "멘션",
+        });
+      reportRoomViewport(client, roomId, true);
+      mocks.mention({
+        type: "mention.created",
+        spaceId,
+        roomId,
+        roomName: "일반",
+        messageId: "visible",
+        seq: 9,
+        authorName: "서연",
+        excerpt: "현재 방",
+      });
+    });
+    await advance(251);
+    expect(client.getQueryData<ChatSpaceNav[]>(CHAT_NAV_KEY)![0]).toMatchObject(
+      { unread: false, unreadMentions: 4 },
+    );
+    expect(mocks.toast).toHaveBeenCalledOnce();
+    expect(mocks.toast).toHaveBeenCalledWith("새 멘션 4개", expect.anything());
+    expect(screen.getByRole("link", { name: "일반" })).not.toHaveClass(
+      "font-bold",
+    );
+  });
   it("preserves a newer unread poll while a send acknowledgment was in flight", async () => {
     const read = vi.fn(async () =>
       fixture().map((space) => ({

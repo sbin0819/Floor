@@ -7,6 +7,7 @@ import { cn } from "cn";
 import type { ChatSpaceNav } from "@/features/chat/types";
 import { MemberNav } from "@/components/member-nav";
 import { LinkPending } from "@/components/link-pending";
+import { ChatMuteButton } from "@/features/chat/components/chat-mute-button";
 import {
   shouldInterceptNavigation,
   useRouterOptimisticNavigation,
@@ -40,10 +41,11 @@ export function ChatRailNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
       href: "/",
       initial: null,
       unread: false,
+      unreadMentions: 0,
     },
     ...spaces.map((space) => ({
       ...space,
-      label: space.unread ? `${space.name}, 안 읽은 메시지 있음` : space.name,
+      label: `${space.name}${space.unread ? ", 안 읽은 메시지 있음" : ""}${space.unreadMentions > 0 ? `, 멘션 ${space.unreadMentions}개` : ""}`,
       href: `/s/${space.id}`,
     })),
   ];
@@ -97,6 +99,14 @@ export function ChatRailNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
                 </TooltipTrigger>
                 <TooltipContent side="right">{entry.name}</TooltipContent>
               </Tooltip>
+              {entry.unreadMentions > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-0.5 -bottom-1 min-w-5 rounded-full bg-status-busy-strong px-1 text-center text-xs font-semibold text-primary-foreground tabular-nums"
+                >
+                  {entry.unreadMentions > 99 ? "99+" : entry.unreadMentions}
+                </span>
+              )}
             </div>
             {entry.id === null && (
               <div
@@ -115,12 +125,22 @@ export function ChatSidebarTitle({ spaces }: { spaces: ChatSpaceNav[] }) {
   const { spaceId } = chatLocation(usePathname());
   const space = spaces.find(({ id }) => id === spaceId);
   return (
-    <Link
-      href={space ? `/s/${space.id}` : "/"}
-      className="inline-flex min-h-11 min-w-0 items-center rounded-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-    >
-      <span className="truncate">{space?.name ?? "Floor"}</span>
-    </Link>
+    <div className="flex min-w-0 items-center gap-1">
+      <Link
+        href={space ? `/s/${space.id}` : "/"}
+        className="inline-flex min-h-11 min-w-0 items-center rounded-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <span className="truncate">{space?.name ?? "Floor"}</span>
+      </Link>
+      {space && (
+        <ChatMuteButton
+          id={space.id}
+          name={space.name}
+          muted={space.muted}
+          space
+        />
+      )}
+    </div>
   );
 }
 
@@ -139,32 +159,50 @@ export function ChatSidebarNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
           const href = `/s/${space.id}/${channel.id}`;
           const selected = navigation.value === channel.id;
           return (
-            <Link
-              key={channel.id}
-              href={href}
-              aria-current={selected ? "page" : undefined}
-              aria-label={
-                channel.unread
-                  ? `${channel.name}, 안 읽은 메시지 있음`
-                  : channel.name
-              }
-              onClick={(event) => {
-                if (!shouldInterceptNavigation(event)) return;
-                event.preventDefault();
-                navigation.change(channel.id, href);
-              }}
-              className={cn(
-                "relative flex h-11 min-h-11 items-center gap-2 rounded-sm px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                selected
-                  ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/60",
-                channel.unread && "font-bold text-foreground",
-              )}
-            >
-              <LinkPending />
-              <Hash aria-hidden="true" className="relative size-5 shrink-0" />
-              <span className="relative truncate">{channel.name}</span>
-            </Link>
+            <div key={channel.id} className="group flex items-center">
+              <Link
+                href={href}
+                aria-current={selected ? "page" : undefined}
+                aria-label={`${channel.name}${channel.unread && !channel.muted && !space.muted ? ", 안 읽은 메시지 있음" : ""}${channel.unreadMentions > 0 ? `, 멘션 ${channel.unreadMentions}개` : ""}`}
+                onClick={(event) => {
+                  if (!shouldInterceptNavigation(event)) return;
+                  event.preventDefault();
+                  navigation.change(channel.id, href);
+                }}
+                className={cn(
+                  "relative flex h-11 min-h-11 min-w-0 flex-1 items-center gap-2 rounded-sm px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  selected
+                    ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60",
+                  channel.unread &&
+                    !channel.muted &&
+                    !space.muted &&
+                    "font-bold text-foreground",
+                  (channel.muted || space.muted) && "text-muted-foreground",
+                )}
+              >
+                <LinkPending />
+                <Hash aria-hidden="true" className="relative size-5 shrink-0" />
+                <span className="relative truncate">{channel.name}</span>
+                {channel.unreadMentions > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="relative ml-auto min-w-5 rounded-full bg-status-busy-strong px-1 text-center text-xs font-semibold text-primary-foreground tabular-nums"
+                  >
+                    {channel.unreadMentions > 99
+                      ? "99+"
+                      : channel.unreadMentions}
+                  </span>
+                )}
+              </Link>
+              <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                <ChatMuteButton
+                  id={channel.id}
+                  name={channel.name}
+                  muted={channel.muted}
+                />
+              </div>
+            </div>
           );
         })}
       </div>

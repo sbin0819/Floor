@@ -21,3 +21,11 @@ export async function deleteMessage(input: unknown) {
 export async function setReaction(input: unknown) {
   return createChatActions().setReaction(input);
 }
+
+export async function setRoomMuted(input: unknown) {
+  return createChatActions().setRoomMuted(input);
+}
+
+export async function setSpaceMuted(input: unknown) {
+  return createChatActions().setSpaceMuted(input);
+}

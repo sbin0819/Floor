@@ -29,6 +29,7 @@ import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
 import { MessageDeleteDialog } from "./message-delete-dialog";
 import { MessageEditor } from "./message-editor";
+import { ChatMuteButton } from "./chat-mute-button";
 import { useMessageMutations } from "./use-message-mutations";
 import { useTyping } from "./use-typing";
 import type { DisplayMessage } from "./message-state";
@@ -201,19 +202,25 @@ export function ChannelScreen({
             {data.room.topic}
           </p>
         )}
-        <Button
-          ref={trigger}
-          type="button"
-          variant="ghost"
-          className="ml-auto"
-          aria-label={`멤버 ${data.members.length}명`}
-          aria-expanded={membersOpen}
-          aria-controls={membersId}
-          onClick={() => setMembersOpen((open) => !open)}
-        >
-          <Users aria-hidden="true" />
-          <span className="tabular-nums">{data.members.length}</span>
-        </Button>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <ChatMuteButton
+            id={data.room.id}
+            name={data.room.name}
+            muted={data.room.muted}
+          />
+          <Button
+            ref={trigger}
+            type="button"
+            variant="ghost"
+            aria-label={`멤버 ${data.members.length}명`}
+            aria-expanded={membersOpen}
+            aria-controls={membersId}
+            onClick={() => setMembersOpen((open) => !open)}
+          >
+            <Users aria-hidden="true" />
+            <span className="tabular-nums">{data.members.length}</span>
+          </Button>
+        </div>
       </header>
       {(connection === "disconnected" ||
         connection === "suspended" ||

@@ -20,6 +20,7 @@ import {
   mergeInitialChatNav,
 } from "../nav-state";
 import type { ChatSpaceNav } from "../types";
+import { ChatMentions } from "./chat-mentions";
 
 const navSchema = z.array(
   z.object({
@@ -28,8 +29,16 @@ const navSchema = z.array(
     name: z.string(),
     initial: z.string(),
     unread: z.boolean(),
+    unreadMentions: z.number().int().nonnegative(),
+    muted: z.boolean(),
     channels: z.array(
-      z.object({ id: z.uuid(), name: z.string(), unread: z.boolean() }),
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        unread: z.boolean(),
+        unreadMentions: z.number().int().nonnegative(),
+        muted: z.boolean(),
+      }),
     ),
   }),
 );
@@ -118,5 +127,10 @@ export function ChatNavSync({
     resumed.current = activity.resumed;
     void refetch({ cancelRefetch: false });
   }, [activity, refetch]);
-  return null;
+  return (
+    <ChatMentions
+      userId={userId}
+      count={query.data.reduce((sum, space) => sum + space.unreadMentions, 0)}
+    />
+  );
 }

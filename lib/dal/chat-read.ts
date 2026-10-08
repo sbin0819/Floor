@@ -6,13 +6,14 @@ import {
   chatRooms,
   chatRoomReads,
   chatSpaces,
+  chatSpacePrefs,
   messages,
   teamMembers,
   teams,
   users,
 } from "@/lib/db/schema";
 import { readableTeamSpace } from "./chat-access";
-import { firstUnreadSequence } from "./chat-reads";
+import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { selectChatMessages } from "./chat-messages";
 
@@ -24,6 +25,9 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
       roomId: chatRooms.id,
       roomName: chatRooms.name,
       unread: sql<boolean>`${firstUnreadSequence(userId)} is not null`,
+      unreadMentions: unreadMentionCount(userId),
+      roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`,
+      spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`,
     })
     .from(chatSpaces)
     .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
@@ -34,6 +38,13 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
         eq(chatRooms.spaceId, chatSpaces.id),
         eq(chatRooms.kind, "text"),
         isNull(chatRooms.archivedAt),
+      ),
+    )
+    .leftJoin(
+      chatSpacePrefs,
+      and(
+        eq(chatSpacePrefs.spaceId, chatSpaces.id),
+        eq(chatSpacePrefs.userId, userId),
       ),
     )
     .leftJoin(

@@ -1,15 +1,16 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   chatRoomReads,
   chatRooms,
   chatSpaces,
+  chatSpacePrefs,
   teamMembers,
   teams,
 } from "@/lib/db/schema";
-import { firstUnreadSequence } from "./chat-reads";
+import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 
 // 같은 JOIN 조건을 조회와 액션·토큰에 사용한다. 운영자 권한은 팀 소속을 대신하지 않는다.
@@ -39,12 +40,22 @@ export async function canReadRoom(
       lastSeq: chatRooms.lastSeq,
       lastReadSeq: chatRoomReads.lastReadSeq,
       firstUnreadSeq: firstUnreadSequence(userId),
+      unreadMentions: unreadMentionCount(userId),
+      roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`,
+      spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`,
       role: teamMembers.role,
     })
     .from(chatRooms)
     .innerJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
     .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
     .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
+    .leftJoin(
+      chatSpacePrefs,
+      and(
+        eq(chatSpacePrefs.spaceId, chatSpaces.id),
+        eq(chatSpacePrefs.userId, userId),
+      ),
+    )
     .leftJoin(
       chatRoomReads,
       and(

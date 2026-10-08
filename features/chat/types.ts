@@ -65,11 +65,19 @@ export type ChatSpaceNav = {
   name: string;
   initial: string;
   unread: boolean;
-  channels: { id: string; name: string; unread: boolean }[];
+  muted: boolean;
+  unreadMentions: number;
+  channels: {
+    id: string;
+    name: string;
+    unread: boolean;
+    muted: boolean;
+    unreadMentions: number;
+  }[];
 };
 
 export type ChannelView = {
-  space: { id: string; name: string };
+  space: { id: string; name: string; muted: boolean };
   room: {
     id: string;
     name: string;
@@ -77,6 +85,8 @@ export type ChannelView = {
     archived: boolean;
     adminOnly: boolean;
     lastSeq: number;
+    muted: boolean;
+    unreadMentions: number;
   };
   user: { id: string; name: string };
   members: { id: string; name: string; admin: boolean }[];

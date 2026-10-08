@@ -1,4 +1,12 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render as renderView,
+  screen,
+  within,
+} from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -19,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   pathname: "/",
   push: vi.fn(),
   replace: vi.fn(),
+  refresh: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
@@ -30,6 +39,19 @@ vi.mock("next/link", async (importOriginal) => ({
 }));
 vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }));
 vi.mock("@/features/chat/queries", () => ({ getMyChatNav: vi.fn() }));
+vi.mock("@/features/chat/actions", () => ({
+  setRoomMuted: vi.fn(),
+  setSpaceMuted: vi.fn(),
+}));
+
+function render(ui: ReactNode) {
+  const client = new QueryClient();
+  return renderView(ui, {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    ),
+  });
+}
 
 const spaces: ChatSpaceNav[] = [
   {
@@ -38,16 +60,22 @@ const spaces: ChatSpaceNav[] = [
     name: "디자인팀",
     initial: "디",
     unread: false,
+    muted: false,
+    unreadMentions: 0,
     channels: [
       {
         id: "22222222-2222-4222-8222-222222222222",
         name: "일반",
         unread: false,
+        muted: false,
+        unreadMentions: 0,
       },
       {
         id: "33333333-3333-4333-8333-333333333333",
         name: "자료",
         unread: false,
+        muted: false,
+        unreadMentions: 0,
       },
     ],
   },
@@ -57,6 +85,8 @@ const spaces: ChatSpaceNav[] = [
     name: "그로스팀",
     initial: "그",
     unread: false,
+    muted: false,
+    unreadMentions: 0,
     channels: [],
   },
 ];
