@@ -35,6 +35,16 @@ export const chatRoomKind = pgEnum("chat_room_kind", [
   "meeting",
 ]);
 export const messageKind = pgEnum("message_kind", ["text", "system"]);
+export const reactionEmoji = pgEnum("reaction_emoji", [
+  "thumbs_up",
+  "heart",
+  "joy",
+  "tada",
+  "open_mouth",
+  "cry",
+  "pray",
+  "check",
+]);
 export const teamRole = pgEnum("team_role", ["admin", "member"]);
 export const joinRequestStatus = pgEnum("join_request_status", [
   "pending",

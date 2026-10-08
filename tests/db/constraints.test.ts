@@ -11,9 +11,12 @@ import {
   branchStaff,
   chatRooms,
   chatSpaces,
+  chatSpacePrefs,
   floorPlans,
   floors,
   messages,
+  messageMentions,
+  messageReactions,
   roleSettings,
   spaces,
   teamInvites,
@@ -323,15 +326,13 @@ describe("database constraints from the real migrations", () => {
       { roomId, seq: 3, authorId: userId, body: "셋째 메시지" },
     ]);
     await expect(
-      database.db
-        .insert(messages)
-        .values({
-          roomId,
-          seq: 4,
-          authorId: userId,
-          body: "재전송",
-          clientId: "retry-key",
-        }),
+      database.db.insert(messages).values({
+        roomId,
+        seq: 4,
+        authorId: userId,
+        body: "재전송",
+        clientId: "retry-key",
+      }),
     ).rejects.toMatchObject({
       cause: { code: "23505", constraint: "messages_room_id_client_id_unique" },
     });
@@ -383,14 +384,12 @@ describe("database constraints from the real migrations", () => {
 
   it.each([0, 4001])("9. rejects invalid body length %i", async (length) => {
     await expect(
-      database.db
-        .insert(messages)
-        .values({
-          roomId,
-          seq: 1,
-          authorId: userId,
-          body: "가".repeat(length),
-        }),
+      database.db.insert(messages).values({
+        roomId,
+        seq: 1,
+        authorId: userId,
+        body: "가".repeat(length),
+      }),
     ).rejects.toMatchObject({
       cause: { code: "23514", constraint: "messages_body_length" },
     });
@@ -476,14 +475,12 @@ describe("database constraints from the real migrations", () => {
   );
 
   it("10. accepts 30-character channel names and 200-character topics", async () => {
-    await database.db
-      .insert(chatRooms)
-      .values({
-        kind: "voice",
-        spaceId: chatSpaceId,
-        name: "😀".repeat(30),
-        topic: "가".repeat(200),
-      });
+    await database.db.insert(chatRooms).values({
+      kind: "voice",
+      spaceId: chatSpaceId,
+      name: "😀".repeat(30),
+      topic: "가".repeat(200),
+    });
   });
 
   it("11. rejects team names that differ only by case", async () => {
@@ -730,14 +727,12 @@ describe("database constraints from the real migrations", () => {
 
   it("17. reuses archived names but rejects restoring a conflicting active name", async () => {
     const archivedId = crypto.randomUUID();
-    await database.db
-      .insert(spaces)
-      .values({
-        id: archivedId,
-        floorId,
-        type: "meeting_room",
-        name: "Room Alpha",
-      });
+    await database.db.insert(spaces).values({
+      id: archivedId,
+      floorId,
+      type: "meeting_room",
+      name: "Room Alpha",
+    });
     await database.db
       .update(spaces)
       .set({ archivedAt: during.start })
@@ -855,6 +850,129 @@ describe("database constraints from the real migrations", () => {
       .values({ roomId, seq: 1, authorId: userId, body: "메시지" });
     await database.db.delete(chatRooms).where(eq(chatRooms.id, roomId));
     expect(await database.db.select().from(messages)).toHaveLength(0);
+  });
+
+  it("25. permits only empty bodies for deleted messages and nonempty live bodies", async () => {
+    for (const value of [
+      { body: "", deletedAt: null },
+      { body: "남은 본문", deletedAt: during.start },
+    ]) {
+      await expect(
+        database.db.insert(messages).values({
+          roomId,
+          authorId: userId,
+          seq: 1,
+          ...value,
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "messages_body_length" },
+      });
+    }
+    await database.db.insert(messages).values([
+      { roomId, authorId: userId, seq: 1, body: "정상 메시지" },
+      {
+        roomId,
+        authorId: userId,
+        seq: 2,
+        body: "",
+        deletedAt: during.start,
+        deletedBy: userId,
+      },
+    ]);
+    expect(await database.db.select().from(messages)).toHaveLength(2);
+  });
+
+  it("26. enforces reaction uniqueness and enum and cascades reaction/mention rows", async () => {
+    const [message] = await database.db
+      .insert(messages)
+      .values({
+        roomId,
+        authorId: userId,
+        seq: 1,
+        body: "리액션",
+      })
+      .returning();
+    if (!message) throw new Error("Missing message fixture");
+    const reaction = { messageId: message.id, userId, emoji: "heart" as const };
+    await database.db.insert(messageReactions).values(reaction);
+    await expect(
+      database.db.insert(messageReactions).values(reaction),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+    await database.db
+      .insert(messageReactions)
+      .values({ ...reaction, emoji: "thumbs_up" });
+    expect(await database.db.select().from(messageReactions)).toHaveLength(2);
+    await expect(
+      database.db.execute(
+        sql`INSERT INTO message_reactions (message_id, user_id, emoji) VALUES (${message.id}, ${userId}, 'invalid')`,
+      ),
+    ).rejects.toMatchObject({ cause: { code: "22P02" } });
+    await database.db
+      .insert(messageMentions)
+      .values({ messageId: message.id, userId });
+    await database.db.delete(messages).where(eq(messages.id, message.id));
+    expect(await database.db.select().from(messageReactions)).toHaveLength(0);
+    expect(await database.db.select().from(messageMentions)).toHaveLength(0);
+  });
+
+  it("27. enforces mention and space preference uniqueness", async () => {
+    const [message] = await database.db
+      .insert(messages)
+      .values({
+        roomId,
+        authorId: userId,
+        seq: 1,
+        body: "멘션",
+      })
+      .returning();
+    if (!message) throw new Error("Missing message fixture");
+    const mention = { messageId: message.id, userId };
+    await database.db.insert(messageMentions).values(mention);
+    await expect(
+      database.db.insert(messageMentions).values(mention),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+    const preference = {
+      spaceId: chatSpaceId,
+      userId,
+      updatedAt: during.start,
+    };
+    await database.db.insert(chatSpacePrefs).values(preference);
+    await expect(
+      database.db.insert(chatSpacePrefs).values(preference),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+  });
+
+  it("keeps replies but clears their reference when the original row is removed", async () => {
+    const [original] = await database.db
+      .insert(messages)
+      .values({
+        roomId,
+        authorId: userId,
+        seq: 1,
+        body: "원문",
+      })
+      .returning();
+    if (!original) throw new Error("Missing original fixture");
+    await database.db.insert(messages).values({
+      roomId,
+      authorId: userId,
+      seq: 2,
+      body: "답장",
+      replyToId: original.id,
+    });
+    await database.db.delete(messages).where(eq(messages.id, original.id));
+    expect(
+      await database.db
+        .select({ replyToId: messages.replyToId })
+        .from(messages),
+    ).toEqual([{ replyToId: null }]);
+    const index = await database.client.query<{ indexdef: string }>(
+      "SELECT indexdef FROM pg_indexes WHERE indexname = 'messages_everyone_idx'",
+    );
+    expect(index.rows[0]?.indexdef).toContain("(room_id, seq)");
+    expect(index.rows[0]?.indexdef).toContain(
+      "WHERE (mentions_everyone AND (deleted_at IS NULL))",
+    );
   });
 
   it("creates the maintenance GiST index from the declared schema", async () => {
