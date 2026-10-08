@@ -195,6 +195,7 @@ export function MessageAttachments({
   align = "start",
   trailing,
   highlighted = false,
+  leading,
 }: {
   attachments: readonly ChatAttachment[];
   enabled?: boolean;
@@ -202,6 +203,7 @@ export function MessageAttachments({
   align?: "start" | "end";
   trailing?: ReactNode;
   highlighted?: boolean;
+  leading?: ReactNode;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
@@ -218,6 +220,7 @@ export function MessageAttachments({
         data-message-bubble-anchor
         className={`relative flex max-w-[min(560px,75cqw)] min-w-0 flex-col gap-2 rounded-lg @max-[600px]:max-w-[80cqw] ${align === "end" ? "items-end" : "items-start"} ${highlighted ? "ring-2 ring-ring/40" : ""}`}
       >
+        {leading}
         {enabled && images.length > 0 ? (
           <div
             className={

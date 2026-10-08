@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { Clock } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PersonCard } from "@/features/people/components/person-card";
 import { formatChatDate, formatChatTime } from "@/lib/time/chat-format";
@@ -24,6 +25,7 @@ import { ReactionPills } from "./reaction-pills";
 import { SystemMessageContent } from "./system-message-content";
 import type { ChatMessage, ReactionEmoji } from "../types";
 import { MessageAttachments, type AttachmentUrl } from "./message-attachments";
+import { messageCopyText } from "../copy-message";
 
 export type MessageActions = {
   userId: string;
@@ -112,6 +114,11 @@ export const MessageRow = memo(function MessageRow({
   const usable =
     actions && message.kind === "text" && !message.delivery && !foldedCount;
   const permissions = {
+    canCopy:
+      message.kind === "text" &&
+      !message.deletedAt &&
+      Boolean(message.body) &&
+      !foldedCount,
     canReact: Boolean(usable && actions.canReact && !message.deletedAt),
     canReply: Boolean(usable && actions.canWrite && actions.onReply),
     canEdit: Boolean(
@@ -163,6 +170,18 @@ export const MessageRow = memo(function MessageRow({
       setToolbar(false);
       actions?.onReport?.(message);
     },
+    onCopy: () => {
+      void (async () => {
+        try {
+          await navigator.clipboard.writeText(
+            messageCopyText(message.body, names),
+          );
+          toast.success("복사했어요");
+        } catch {
+          toast.error("복사하지 못했어요");
+        }
+      })();
+    },
   };
   const names = new Map(actions?.names);
   for (const mention of message.mentions)
@@ -177,6 +196,21 @@ export const MessageRow = memo(function MessageRow({
     ? "deleted"
     : (message.delivery ?? "sent");
   const editing = Boolean(editor && !message.deletedAt);
+  const toolbarVisible =
+    available &&
+    !editing &&
+    !sheet &&
+    !dismissedToolbar &&
+    (hovered || focused || toolbar);
+  const toolbarElement = available && !editing && !sheet && (
+    <div
+      ref={tools}
+      className={`absolute -top-10 z-10 @min-[960px]:top-0 ${mine ? "right-0 @min-[960px]:right-full @min-[960px]:mr-2" : "left-0 @min-[960px]:left-full @min-[960px]:ml-2"} ${toolbarVisible ? "" : "pointer-events-none invisible"}`}
+      data-message-toolbar
+    >
+      <MessageToolbar {...toolbarProps} />
+    </div>
+  );
   const hasBubble = Boolean(
     message.deletedAt || message.body || message.replyTo,
   );
@@ -194,7 +228,7 @@ export const MessageRow = memo(function MessageRow({
       (!message.deletedAt && (message.editedAt || message.delivery))) && (
       <span
         data-message-time
-        className="shrink-0 pb-1 text-xs text-muted-foreground tabular-nums"
+        className={`shrink-0 pb-1 text-xs text-muted-foreground tabular-nums ${toolbarVisible ? "@min-[960px]:invisible" : ""}`}
       >
         {!message.deletedAt && message.delivery === "pending" ? (
           <span className="inline-flex items-center gap-1">
@@ -386,6 +420,7 @@ export const MessageRow = memo(function MessageRow({
                     data-message-bubble-anchor
                     className="relative max-w-[min(560px,75cqw)] min-w-0 @max-[600px]:max-w-[80cqw]"
                   >
+                    {toolbarElement}
                     <div
                       data-message-bubble
                       className={`rounded-2xl px-3.5 py-2 text-sm [overflow-wrap:anywhere] break-keep ${bubbleColor} ${!mine && runStart ? "rounded-tl-[6px]" : ""} ${mine && runEnd ? "rounded-br-[6px]" : ""} ${highlighted ? "ring-2 ring-ring/40" : ""}`}
@@ -434,6 +469,7 @@ export const MessageRow = memo(function MessageRow({
                   align={mine ? "end" : "start"}
                   trailing={!message.body ? metadata : undefined}
                   highlighted={!message.body && highlighted}
+                  leading={!hasBubble ? toolbarElement : undefined}
                 />
               )}
               {!message.deletedAt && (
@@ -492,15 +528,6 @@ export const MessageRow = memo(function MessageRow({
               )}
             </div>
           </>
-        )}
-        {available && !editor && !sheet && (
-          <div
-            ref={tools}
-            className={`absolute -top-10 right-1 z-10 ${!dismissedToolbar && (hovered || focused || toolbar) ? "" : "pointer-events-none invisible"}`}
-            data-message-toolbar
-          >
-            <MessageToolbar {...toolbarProps} />
-          </div>
         )}
       </article>
       {available && (

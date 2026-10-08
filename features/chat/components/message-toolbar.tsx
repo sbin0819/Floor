@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import {
+  Copy,
   Ellipsis,
   Flag,
   Pencil,
@@ -48,6 +49,7 @@ export type MessageToolbarProps = {
   canEdit: boolean;
   canDelete: boolean;
   canReport?: boolean;
+  canCopy?: boolean;
   reactions?: readonly ChatReaction[];
   disabled?: boolean;
   onReaction: (emoji: ReactionEmoji, on: boolean) => void;
@@ -55,6 +57,7 @@ export type MessageToolbarProps = {
   onEdit: () => void;
   onDelete: () => void;
   onReport?: () => void;
+  onCopy?: () => void;
   onEscape?: () => void;
 };
 
@@ -133,7 +136,8 @@ export function MessageToolbar(props: MessageToolbarProps) {
     !props.canReply &&
     !props.canEdit &&
     !props.canDelete &&
-    !props.canReport
+    !props.canReport &&
+    !props.canCopy
   )
     return null;
   return (
@@ -213,7 +217,7 @@ export function MessageToolbar(props: MessageToolbarProps) {
           <Pencil aria-hidden="true" />
         </ActionButton>
       )}
-      {(props.canDelete || props.canReport) && (
+      {(props.canCopy || props.canDelete || props.canReport) && (
         <DropdownMenu open={moreOpen} onOpenChange={setMoreOpen}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -236,6 +240,15 @@ export function MessageToolbar(props: MessageToolbarProps) {
               }
             }}
           >
+            {props.canCopy && (
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => props.onCopy?.()}
+              >
+                <Copy aria-hidden="true" />
+                본문 복사
+              </DropdownMenuItem>
+            )}
             {props.canDelete && (
               <DropdownMenuItem
                 variant="destructive"
@@ -347,6 +360,18 @@ export function MessageActionsSheet({
             >
               <Pencil aria-hidden="true" />
               수정
+            </Button>
+          )}
+          {props.canCopy && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start"
+              disabled={props.disabled}
+              onClick={() => choose(() => props.onCopy?.())}
+            >
+              <Copy aria-hidden="true" />
+              본문 복사
             </Button>
           )}
           {props.canDelete && (
