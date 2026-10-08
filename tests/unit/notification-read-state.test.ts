@@ -71,4 +71,19 @@ describe("notification optimistic reads", () => {
       ).unreadCount,
     ).toBe(0);
   });
+  it("does not reduce a newer summary for an expired or not-yet-published row absent from its latest items", () => {
+    const expired = { ...initial, items: [], now: "2026-10-08T07:00:00Z" };
+    expect(applyNotificationRead(expired, { kind: "one", item })).toEqual(
+      expired,
+    );
+    const future = {
+      ...item,
+      type: "booking_invited" as const,
+      id: "future",
+      scheduledFor: "2026-10-08T06:00:00Z",
+    };
+    expect(
+      applyNotificationRead(initial, { kind: "one", item: future }),
+    ).toEqual(initial);
+  });
 });

@@ -17,18 +17,21 @@ import type { MatchMedia } from "@/features/bookings/components/use-wide-screen"
 
 const mocked = vi.hoisted(() => ({
   push: vi.fn(),
+  refresh: vi.fn(),
   one: vi.fn(),
   all: vi.fn(),
   error: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mocked.push }),
+  useRouter: () => ({ push: mocked.push, refresh: mocked.refresh }),
 }));
 vi.mock("@/features/notifications/actions", () => ({
   markNotificationRead: mocked.one,
   markAllNotificationsRead: mocked.all,
 }));
-vi.mock("sonner", () => ({ toast: { error: mocked.error } }));
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), { error: mocked.error }),
+}));
 const initial: NotificationSummary = {
   now: "2026-10-08T05:55:00Z",
   nextAt: null,
@@ -72,7 +75,14 @@ function display(data = initial, wide = true, page = false) {
   const matchMedia = media(wide);
   const frame = (incoming: NotificationSummary) => (
     <QueryClientProvider client={client}>
-      <NotificationBell initialData={incoming} matchMedia={matchMedia} />
+      <NotificationBell
+        initialData={incoming}
+        matchMedia={matchMedia}
+        fetchSummary={async () =>
+          client.getQueryData<NotificationSummary>(NOTIFICATION_SUMMARY_KEY) ??
+          incoming
+        }
+      />
       {page && <NotificationsFeed initialData={incoming} />}
     </QueryClientProvider>
   );
@@ -163,6 +173,17 @@ describe("notification bell and shared read state", () => {
     await screen.findByRole("button", { name: "알림" });
     expect(mocked.all).toHaveBeenCalledWith();
     expect(screen.getByRole("button", { name: "모두 읽음" })).toBeDisabled();
+    expect(mocked.refresh).toHaveBeenCalledOnce();
+  });
+  it("does not refresh the whole screen after a read from the bell alone", async () => {
+    display();
+    await userEvent.click(
+      screen.getByRole("button", { name: "알림, 읽지 않은 알림 3개" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "모두 읽음" }));
+    await screen.findByRole("button", { name: "알림" });
+    expect(mocked.all).toHaveBeenCalledOnce();
+    expect(mocked.refresh).not.toHaveBeenCalled();
   });
   it("preserves modified anchor clicks without marking rows or routing", () => {
     display(initial, true, true);

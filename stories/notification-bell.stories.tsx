@@ -40,7 +40,10 @@ const meta = {
     return (
       <QueryClientProvider client={client}>
         <div className="flex min-h-96 w-[480px] max-w-full justify-end bg-background p-8">
-          <NotificationBell {...args} />
+          <NotificationBell
+            {...args}
+            fetchSummary={async () => args.initialData}
+          />
         </div>
       </QueryClientProvider>
     );

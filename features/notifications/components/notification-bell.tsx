@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/popover";
 import type { MatchMedia } from "@/features/bookings/components/use-wide-screen";
 import type { NotificationSummary } from "../types";
+import type { FetchNotificationSummary } from "../client";
 import { NotificationList } from "./notification-list";
 import {
   useNotificationReads,
   useNotificationSummary,
 } from "./use-notifications";
+import { useNotificationToasts } from "./use-notification-toasts";
 
 const browserMatchMedia: MatchMedia = (query) => window.matchMedia(query);
 const serverSnapshot = () => true;
@@ -41,12 +43,15 @@ function usePopoverWidth(matchMedia: MatchMedia) {
 export function NotificationBell({
   initialData,
   matchMedia = browserMatchMedia,
+  fetchSummary,
 }: {
   initialData: NotificationSummary;
   matchMedia?: MatchMedia;
+  fetchSummary?: FetchNotificationSummary;
 }) {
-  const data = useNotificationSummary(initialData);
+  const data = useNotificationSummary(initialData, fetchSummary);
   const reads = useNotificationReads();
+  useNotificationToasts(data, reads.activate);
   const [open, setOpen] = useState(false);
   const wide = usePopoverWidth(matchMedia);
   const label =
