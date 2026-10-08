@@ -172,3 +172,15 @@ export async function lockFirstTeamTextChannel(
     .for("update");
   return room && !room.archivedAt ? room : null;
 }
+
+export async function removeTeamMember(
+  teamId: string,
+  userId: string,
+  database: DalDatabase,
+) {
+  const [row] = await database
+    .delete(teamMembers)
+    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+    .returning({ userId: teamMembers.userId });
+  if (!row) throw new ActionError("NOT_FOUND");
+}
