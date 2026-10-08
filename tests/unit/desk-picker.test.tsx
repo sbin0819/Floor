@@ -127,6 +127,16 @@ function display(input = fixture()) {
   };
 }
 describe("DeskPicker", () => {
+  it("keeps a usable seat viewport and lets the outer detail scroll on short screens", () => {
+    const { container } = display();
+    const map = screen.getByRole("group", { name: "좌석 배치도" });
+    expect(map.parentElement?.parentElement).toHaveClass("min-h-72");
+    expect(container.firstElementChild).not.toHaveClass("min-h-0");
+    expect(map).toHaveClass("overflow-auto");
+    expect(screen.getByRole("form", { name: "좌석 예약 양식" })).toHaveClass(
+      "shrink-0",
+    );
+  });
   it("defaults to full day, submits only seat/date/part/actor, keeps the picker and part after success", async () => {
     display();
     expect(screen.getByRole("radio", { name: /종일/ })).toBeChecked();

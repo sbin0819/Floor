@@ -160,7 +160,7 @@ export function DeskPicker({
     selectedSeat.state !== "free" ||
     Boolean(overlap);
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
       <div className="shrink-0 space-y-2 border-b border-border p-4">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold" id={`${id}-part-label`}>
@@ -217,7 +217,7 @@ export function DeskPicker({
           </p>
         )}
       </div>
-      <div className="flex min-h-28 flex-1 flex-col overflow-hidden p-4">
+      <div className="flex min-h-72 flex-1 flex-col overflow-hidden p-4">
         <SeatMap
           seats={seats}
           selectedId={selectedSeat?.id ?? null}
