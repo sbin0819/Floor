@@ -33,10 +33,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/11-floor-timetable.md` | 층 화면: 날짜 달력, 시간표, 목록과 공간 상세 작업 지시서 (끝남) | 층 화면에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/12-calendar-home-branches.md` | 내 예약 달력, 홈, 지점 목록 작업 지시서 (끝남) | 그 화면에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/13-timetable-space-detail.md` | 시간표에서 공간 칸을 눌러 공간 상세를 여는 작업 지시서 (끝남) | 상세 시트와 공유 입력에서 왜 그렇게 했는지 확인할 때 |
+| `docs/codex/14-attendees-and-filter.md` | 예약의 사용 인원, 인원으로 공간 거르기 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/15-desk-booking.md` | 오픈 데스크 좌석 예약(오전·오후·종일, 좌석 배치도) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/16-participants.md` | 예약에 참석자 초대(사람 찾기, 초대받은 예약, 참석 안 함) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/17-notifications.md` | 알림(머리글의 종, 알림 목록, 미리 알림) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/18-edit-booking.md` | 예약 바꾸기(시간, 인원, 참석자, 제목) 작업 지시서 | 그 작업을 받았을 때 |
 | `docs/spec/ui.md` | 화면 구성, 로딩 상태(스켈레톤, 바뀌는 부분만 바꾸기), 조회 속도 예산, 화면별 구성과 문구 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/ui-2.md` | 화면 구성 2차: 공간 사진, 날짜 달력, 층 시간표, 내 예약 달력, 홈·지점 목록·공간 상세. `ui.md`와 다르면 이 문서가 맞다 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
 | `docs/spec/booking.md` | 지점 → 층 → 공간 → 예약 흐름, 사용자 행동별 데이터, 시간 규칙, 한도 | 공간 목록·예약을 만질 때 |
+| `docs/spec/booking-2.md` | 예약 2차: 예약 프로세스 전체, 좌석 예약, 사용 인원, 인원으로 거르기, 참석자 초대, 알림, 예약 바꾸기. `booking.md`와 다르면 이 문서가 맞다 | 예약·내 예약·알림을 만질 때 |
 | `docs/spec/space-admin.md` | 운영자가 지점·층·공간·이용 대상을 입력하는 규칙 | 운영자 화면을 만질 때 |
 | `docs/spec/data-model.md` | 테이블, 컬럼, 제약 | DB 스키마·쿼리를 만질 때 |
 | `docs/spec/server.md` | Server Actions 규칙, 결과 타입, 데이터 접근 계층, 세션, 메일, 실시간 | 서버 코드를 만질 때 |
@@ -46,8 +52,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/design/floor-*.png` | 처음 그린 화면 시안 9장, 다이어그램 4장 | 화면을 만들 때 참고 |
 | `docs/design/ui-*.png` | 07–09의 시안 11장 (홈, 지점, 층, 내 예약, 팀, 로딩, 좁은 화면). `docs/spec/ui.md`와 같이 본다 | 팀 화면과 로딩 상태를 볼 때 |
 | `docs/design/ui2-*.png` | 화면 구성 2차의 시안 8장 (층 시간표, 시간표에서 연 공간 상세, 층 목록과 공간 상세, 날짜 달력, 내 예약 달력, 홈, 지점 목록, 좁은 화면). `docs/spec/ui-2.md`와 같이 본다. 같은 화면이 `ui-*.png`에도 있으면 이쪽이 맞다 | 멤버 화면을 만들 때 |
+| `docs/design/ui3-*.png` | 예약 2차의 시안 9장 (예약 프로세스, 시간표의 데스크 구역, 좌석 고르기, 인원으로 거르기, 예약 양식, 내 예약, 알림, 예약 바꾸기, 좁은 화면). `docs/spec/booking-2.md`와 같이 본다 | 예약 2차의 화면을 만들 때 |
+| `docs/spec/examples/seed-bookings-2.json` | 예약 2차의 시드: 사용 인원, 참석자, 좌석 예약, 좌석 점검 | 시드를 만질 때 |
 | `docs/spec/examples/seed-photos.json`, `public/seed/photos/` | 공간 사진과 지점 대표 사진의 시드와 그림 파일 29개 | 사진을 만질 때 |
-| `docs/jira-issues.md` | Jira 이슈 90개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
+| `docs/jira-issues.md` | Jira 이슈 96개의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
 
 ## 기술 스택 (확정)
 
@@ -100,6 +108,7 @@ lib/seed/            시드 데이터 읽기·검증과 실행 함수
 lib/permissions/     권한 키, 기본값, can(), canAccess()
 lib/actions/         Server Action 래퍼와 결과 타입
 lib/realtime/        발행·구독 인터페이스
+lib/rate-limit/      메모리 요청 제한기 (참석자 찾기)
 lib/floor-plan/      평면도 zod 스키마와 검증
 lib/env.ts           zod로 검증한 환경 변수
 drizzle/             생성된 마이그레이션 SQL
@@ -114,8 +123,8 @@ docs/                명세와 작업 지시서
 
 - 쓰기는 전부 Server Actions로 한다. 별도 API 서버를 만들지 않는다.
 - 첫 화면 데이터는 Server Component에서 `features/*/queries.ts`의 읽기 함수를 불러 읽는다. queries가 `lib/dal`과 `canAccess()`를 쓴다. 읽기에 Server Action을 쓰지 않는다.
-- Route Handler는 캐시되는 GET(게시된 평면도 JSON, 이전 메시지), 외부 웹훅, Better Auth(`app/api/auth/[...all]/route.ts`)에만 쓴다. 가입·로그인·로그아웃은 Better Auth가 처리하므로 Server Action 래퍼를 거치지 않는다. 그 밖의 쓰기는 예외가 없다.
-- Better Auth를 직접 부르는 곳은 `lib/auth/*`, 위 Route Handler, 브라우저용 인증 클라이언트(`lib/auth/client.ts`)뿐이다. 다른 코드는 `getSession()`, `requireSession()`, `requirePageSession()`, `requireOperatorPage()`만 쓴다.
+- Route Handler는 캐시되는 GET(게시된 평면도 JSON, 이전 메시지), 외부 웹훅, Better Auth(`app/api/auth/[...all]/route.ts`), 그리고 화면이 떠 있는 동안 되풀이해 읽는 두 가지 GET(참석자 찾기 `/api/participants/search`, 알림 `/api/notifications`. `docs/spec/booking-2.md`)에만 쓴다. 뒤의 둘은 캐시하지 않고(`private, no-store`), `features/*/queries.ts`의 함수를 부르기만 하며, 세션은 그 함수가 확인한다. 이 목록에 없는 읽기를 Route Handler로 만들지 않는다. 가입·로그인·로그아웃은 Better Auth가 처리하므로 Server Action 래퍼를 거치지 않는다. 그 밖의 쓰기는 예외가 없다.
+- Better Auth를 직접 부르는 곳은 `lib/auth/*`, 인증의 Route Handler(`app/api/auth/[...all]/route.ts`), 브라우저용 인증 클라이언트(`lib/auth/client.ts`)뿐이다. 다른 코드는 `getSession()`, `requireSession()`, `requirePageSession()`, `requireOperatorPage()`만 쓴다.
 - 모든 Server Action은 누구나 호출할 수 있는 공개 POST 주소로 취급한다. 순서는 세션 확인 → zod 검증 → 권한 확인 → 실행이고, `lib/actions`의 래퍼로만 만든다.
 - 액션은 예외를 던지지 않고 `{ ok: true, data }` 또는 `{ ok: false, code }`를 돌려준다. 코드 목록은 `docs/spec/server.md`에 있다.
 - 클라이언트가 보낸 사용자 id, 역할, 소유자 값을 믿지 않는다. 서버가 세션으로 다시 조회한다.
@@ -140,7 +149,7 @@ UI
 
 - 화면 문구는 한국어 해요체로 쓴다. `<html lang="ko">`.
 - 색은 `docs/spec/design-tokens.md`의 토큰만 쓴다. 컴포넌트에 hex 값을 직접 쓰지 않는다.
-- 색은 의미가 있을 때만 쓴다. 공간 상태(비어 있음, 사용 중, 내 예약, 점검 중, 전용 공간), 초대의 수락 대기, 강조 버튼 외에는 무채색이다.
+- 색은 의미가 있을 때만 쓴다. 공간 상태(비어 있음, 사용 중, 내 예약, 점검 중, 전용 공간), 초대의 수락 대기, 읽지 않은 알림의 수, 강조 버튼 외에는 무채색이다.
 - 기본 컴포넌트는 shadcn/ui를 쓴다. 같은 역할의 컴포넌트를 새로 만들지 않는다.
 - 키보드로 모든 동작이 가능해야 하고, 포커스 표시를 없애지 않는다. 기본 컨트롤 높이는 44px이고, 더 작은 컨트롤은 누를 수 있는 영역을 44px로 넓힌다. 예외는 둘이다: 공간 상세의 하루 일정에서 빈 칸의 높이는 1024px 이상의 패널에서 28px이고(시트에서는 44px. `docs/spec/ui.md`), 층 시간표에서 빈 칸의 폭은 1024px 이상에서 34px이다(그보다 좁으면 44px. `docs/spec/ui-2.md`).
 - 사진은 `next/image`로 그리고 대체 글을 넣는다. 사진의 경로는 사이트 안의 경로만 받는다 (`docs/spec/ui-2.md`의 "사진"). 접근할 수 없는 공간의 사진을 내려보내지 않는다.

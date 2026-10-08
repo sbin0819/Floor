@@ -1,0 +1,165 @@
+{
+  "note": "예약 2차의 가상 데이터다. seed.json의 형식을 바꾸지 않으려고 따로 둔다. bookingId는 seed.json의 예약 id, deskId와 spaceId는 gangnam-7f.spaces.json의 좌석 id, userKey와 userKeys는 seed.json의 users[].key다. dayOffset과 startDayOffset의 뜻은 seed.json과 같다(쉬는 날을 건너뛰고 센 운영일 수). part는 그 날짜의 구간이다(am, pm, day. 범위는 docs/spec/booking-2.md의 \"구간\"). 시드가 만드는 알림은 시간 예약의 미리 알림뿐이다(지시서 17. 이 파일에는 적지 않고 예약에서 계산한다).",
+  "attendeeCounts": [
+    {
+      "bookingId": "0b67bf8e-1ac3-5b0c-86ce-1b89d5bbd6fe",
+      "title": "디자인 리뷰",
+      "attendeeCount": 5
+    },
+    {
+      "bookingId": "c885afbf-ea9b-596e-acfd-cdbea0a30902",
+      "title": "주간 회의",
+      "attendeeCount": 4
+    },
+    {
+      "bookingId": "cd2a5869-de71-5f7c-8f59-501d73c2b06c",
+      "title": "1:1",
+      "attendeeCount": 2
+    },
+    {
+      "bookingId": "a9252de8-cd9f-56f6-bae6-2f78ff6799bb",
+      "title": "외부 세션",
+      "attendeeCount": 12
+    },
+    {
+      "bookingId": "389a05bd-250b-5cc5-9b3e-f42a74ea6b67",
+      "title": "스프린트 계획",
+      "attendeeCount": 6
+    },
+    {
+      "bookingId": "32947633-992f-5c71-9036-cb23a434c414",
+      "title": "워크숍",
+      "attendeeCount": 6
+    }
+  ],
+  "participants": [
+    {
+      "bookingId": "0b67bf8e-1ac3-5b0c-86ce-1b89d5bbd6fe",
+      "title": "디자인 리뷰",
+      "userKeys": [
+        "designMember",
+        "both"
+      ]
+    },
+    {
+      "bookingId": "389a05bd-250b-5cc5-9b3e-f42a74ea6b67",
+      "title": "스프린트 계획",
+      "userKeys": [
+        "both",
+        "member"
+      ]
+    },
+    {
+      "bookingId": "32947633-992f-5c71-9036-cb23a434c414",
+      "title": "워크숍",
+      "userKeys": [
+        "designMember"
+      ]
+    }
+  ],
+  "deskBookings": [
+    {
+      "id": "fd37f9cf-bf0d-5e34-9533-589e6d7a451d",
+      "deskId": "1847d48a-b886-5731-a3db-8d43a48bb745",
+      "deskName": "A-01",
+      "dayOffset": 0,
+      "part": "day",
+      "userKey": "designAdmin",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "d9979a45-6558-5f76-aa3c-ebc23daaedd7",
+      "deskId": "62324832-b7f1-55f1-892d-9541c0ddfb42",
+      "deskName": "A-02",
+      "dayOffset": 0,
+      "part": "day",
+      "userKey": "designMember",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "8f14fc2e-1e9e-5b7d-81cf-d6c457055e28",
+      "deskId": "8bdc2d1d-9ba5-5844-925c-672fe80ab7c9",
+      "deskName": "A-05",
+      "dayOffset": 0,
+      "part": "am",
+      "userKey": "growthAdmin",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "3d5d6480-d807-561f-88f6-e5c8fbfc7381",
+      "deskId": "819a7e27-14a6-522f-8a83-ef79e1621207",
+      "deskName": "A-09",
+      "dayOffset": 0,
+      "part": "pm",
+      "userKey": "both",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "cad5c511-80c1-52db-bf55-b869dd402b7a",
+      "deskId": "37b2a08f-5932-5885-bbe6-e12037d75e37",
+      "deskName": "A-10",
+      "dayOffset": 0,
+      "part": "day",
+      "userKey": "admin",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "e2fb2d7c-2569-5d66-9eee-de1a85d97846",
+      "deskId": "1847d48a-b886-5731-a3db-8d43a48bb745",
+      "deskName": "A-01",
+      "dayOffset": 1,
+      "part": "day",
+      "userKey": "designAdmin",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "721b6faa-e93d-5964-8d4c-59fcd460909e",
+      "deskId": "e6be7b1f-d0fb-5337-9b82-c67e6ecb7686",
+      "deskName": "A-14",
+      "dayOffset": 1,
+      "part": "am",
+      "userKey": "designMember",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "974adae8-9a41-543f-b2bf-19a8bd5d687f",
+      "deskId": "c71aa02b-d84e-5361-827e-7c800312baf0",
+      "deskName": "A-15",
+      "dayOffset": 1,
+      "part": "day",
+      "userKey": "member",
+      "teamId": null,
+      "status": "confirmed"
+    },
+    {
+      "id": "b3e6fad9-8616-5c99-b26c-cd57a481fa46",
+      "deskId": "9ad9d783-09f1-57b8-aff4-d7602fd7a327",
+      "deskName": "A-19",
+      "dayOffset": 1,
+      "part": "pm",
+      "userKey": "both",
+      "teamId": null,
+      "status": "confirmed"
+    }
+  ],
+  "deskBlocks": [
+    {
+      "id": "f518ef5c-1820-5c88-adc5-3d38ec72aeb1",
+      "spaceId": "db485e83-08b8-5fc5-95aa-1205a70d5a22",
+      "deskName": "A-24",
+      "startDayOffset": 0,
+      "start": "00:00",
+      "endDayOffset": 2,
+      "end": "00:00",
+      "reason": "책상 수리",
+      "createdByKey": "admin"
+    }
+  ]
+}

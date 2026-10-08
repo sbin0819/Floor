@@ -14,6 +14,7 @@
 | 팀 만들기, 초대, 가입 요청 | Server Action | 다른 쓰기와 같은 래퍼를 쓴다 |
 | 첫 화면 데이터 | Server Component에서 `features/*/queries.ts` 호출 | 읽기에는 액션을 쓰지 않음 |
 | 게시된 평면도 JSON, 이전 메시지 불러오기 | Route Handler (GET) | 액션은 POST라 캐시가 안 되고, 한 번에 하나씩만 실행됨 |
+| 참석자 찾기 (입력하는 동안의 검색), 알림의 수와 목록 (주기적으로 다시 읽기) | Route Handler (GET, `Cache-Control: private, no-store`) | 액션은 한 번에 하나씩 실행돼 입력을 따라가지 못하고, `router.refresh()`는 그 화면의 모든 조회를 다시 돌림. 핸들러는 `features/*/queries.ts`를 부르기만 하고, 세션 확인은 그 함수가 한다 (`docs/spec/booking-2.md`) |
 | 실시간 반영 (예약 상태, 새 메시지, 평면도 게시) | 브라우저가 실시간 채널을 직접 구독 | 액션은 서버가 먼저 보내는 통신을 못 함 |
 | 도면 이미지 업로드 | 액션이 서명된 업로드 주소 발급 → 브라우저가 저장소로 직접 업로드 | 액션 요청 본문 기본 한도가 1MB |
 | 통화 종료 같은 외부 웹훅 | Route Handler (POST) | 외부 서비스가 호출할 고정 주소가 필요 |
@@ -57,6 +58,7 @@ export type ActionErrorCode =
   | 'INVITE_INVALID'     // 초대가 만료·취소·처리됐거나 다른 사람의 초대
   | 'OUTSIDE_HOURS'      // 운영 시간 밖이거나 쉬는 날
   | 'SPACE_IN_USE'       // 앞으로의 예약이 있어 공간을 보관하거나 예약 불가로 바꿀 수 없음
+  | 'OVER_CAPACITY'      // 사용 인원이나 "예약한 사람 + 참석자"가 공간의 정원보다 많음
   | 'INTERNAL';          // 그 밖의 오류. 서버 로그에만 자세히 남긴다
 ```
 

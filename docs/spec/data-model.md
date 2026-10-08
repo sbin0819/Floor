@@ -33,6 +33,7 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | `app_role` | `user`, `team_member`, `team_admin`, `operator` |
 | `grant_target` | `floor`, `space` |
 | `join_request_status` | `pending`, `approved`, `rejected`, `cancelled` |
+| `notification_type` | `booking_invited`, `booking_changed`, `booking_cancelled`, `booking_removed`, `participant_left`, `booking_reminder` |
 
 ## 테이블
 
@@ -169,16 +170,51 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | team_id | uuid | null 허용, FK → teams. 값이 있으면 "팀 이름으로" 한 예약 |
 | during | tstzrange | not null |
 | title | text | null 허용 |
+| attendee_count | integer | null 허용. 사용 인원. 좌석 예약은 언제나 null (`docs/spec/booking-2.md`) |
 | status | booking_status | not null, 기본값 `confirmed` |
 | cancelled_at | timestamptz | null 허용. 취소한 시각 |
 | cancelled_by | uuid | null 허용, FK → users. 취소한 사람. 본인일 수도, 팀 관리자나 운영자일 수도 있다 |
+| updated_at | timestamptz | null 허용. 예약을 바꾼 시각. 바꾼 적이 없으면 null |
 
 - 겹침 금지 (이름 `bookings_no_overlap`): `EXCLUDE USING gist (space_id WITH =, during WITH &&) WHERE (status = 'confirmed')`
 - 구간 검사 (이름 `bookings_during_valid`): `CHECK (NOT isempty(during) AND NOT lower_inf(during) AND NOT upper_inf(during) AND lower_inc(during) AND NOT upper_inc(during))`. 경계가 `[)`가 아니면 맞닿은 예약이 겹침으로 잡히므로 DB에서 강제한다.
 - 취소 기록 (이름 `bookings_cancel_consistent`): `CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL))`. 취소된 예약에는 취소 시각이 있고, 확정 예약에는 없다.
+- 사용 인원 (이름 `bookings_attendee_count_range`): `CHECK (attendee_count IS NULL OR attendee_count BETWEEN 1 AND 500)`. 정원을 넘는지는 DB가 아니라 예약할 때 서버가 본다.
+- 좌석 예약은 `space_id`가 좌석 행(`type = 'desk'`)인 예약이다. 오전·오후·종일 구간은 따로 저장하지 않고 `during`으로 판정한다 (`docs/spec/booking-2.md`).
 - 예약은 지우지 않는다. 취소하면 상태만 바꾼다. (시드 스크립트가 자기 id의 예약을 다시 넣는 것만 예외다.)
 - 인덱스: `(user_id)`, `(team_id)`
 - 겹치는 예약을 넣으면 Postgres가 SQLSTATE `23P01`을 낸다. 액션 래퍼가 이것을 `BOOKING_CONFLICT`로 바꾼다.
+
+### booking_participants (예약의 참석자)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| booking_id | uuid | not null, FK → bookings, on delete cascade |
+| user_id | uuid | not null, FK → users. 초대받은 사람. 예약한 사람은 넣지 않는다 |
+
+- PK는 `(booking_id, user_id)`다 (`id` 컬럼이 없다).
+- 인덱스: `(user_id)`
+- 한 예약에 20명까지, "예약한 사람 + 참석자"가 정원 이하라는 규칙은 DB가 아니라 서버가 본다 (`docs/spec/booking-2.md`).
+- 참석자가 스스로 빠지거나 예약한 사람이 빼면 행을 지운다. 예약이 취소돼도 행은 남긴다.
+
+### notifications (알림)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| id | uuid | PK |
+| user_id | uuid | not null, FK → users. 받는 사람 |
+| type | notification_type | not null |
+| booking_id | uuid | null 허용, FK → bookings, on delete cascade |
+| actor_id | uuid | null 허용, FK → users. 그 일을 한 사람. 미리 알림은 null |
+| data | jsonb | not null. 알림을 그릴 때 쓰는 그때의 값 (`docs/spec/booking-2.md`의 "알림") |
+| scheduled_for | timestamptz | not null. 보이기 시작하는 시각. 바로 보이는 알림은 넣는 시각 |
+| expires_at | timestamptz | null 허용. 이 시각이 지나면 목록과 읽지 않은 수에서 빠진다. 미리 알림은 예약의 끝 시각, 다른 알림은 null |
+| read_at | timestamptz | null 허용. 읽은 시각 |
+
+- 인덱스: `(user_id, scheduled_for desc)`, 읽지 않은 것만의 부분 인덱스 `(user_id) where read_at is null`, `(booking_id)` (취소·시간 변경·참석 안 함에서 그 예약의 미리 알림을 지울 때 쓴다)
+- 같은 사람, 같은 예약, 같은 시각의 미리 알림은 하나뿐이다: `unique (user_id, booking_id, scheduled_for) where type = 'booking_reminder'` (이름 `notifications_reminder_unique`)
+- 알림을 읽는 조회는 `scheduled_for <= 지금`이고 (`expires_at`이 null이거나 `expires_at > 지금`)인 것만 돌려준다. 미리 알림은 예약이 정해질 때 앞으로의 시각으로 미리 넣어 둔다.
+- `data`의 타입은 `NotificationData`다 (jsonb에 `$type<>`). 이메일과 사용자 id를 넣지 않는다.
 
 ### space_blocks (점검)
 
@@ -333,7 +369,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 
 ## 테스트로 확인할 제약
 
-`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 20개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서, 18–20은 공간 사진 작업에서 만든다.
+`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 23개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서, 18–20은 공간 사진 작업에서, 21은 사용 인원 작업(지시서 14)에서, 22는 참석자 초대 작업(16)에서, 23은 알림 작업(17)에서 만든다.
 
 1. 같은 공간에 시간이 겹치는 `confirmed` 예약 두 개는 들어가지 않는다 (`23P01`).
 2. 끝과 시작이 맞닿은 예약(10:00–11:00, 11:00–12:00)은 들어간다.
@@ -355,3 +391,6 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 18. 한 공간에 `sort_order`가 같은 사진 두 장은 들어가지 않는다. `sort_order`가 -1이거나 10인 사진은 들어가지 않는다. 공간을 지우면 그 공간의 사진도 지워진다.
 19. 경로가 `https://example.com/a.webp`, `//example.com/a.webp`, `/a/../b.webp`, `seed/a.webp`, `/a.gif`, `/A.webp`, `/seed/photos/awebp`, `/seed/photos/a_png`인 사진은 각각 들어가지 않는다. `/seed/photos/a-1.webp`는 들어간다. 뒤의 두 경우는 정규식의 `\.`이 "아무 글자"로 바뀌지 않았는지 확인한다 (Drizzle의 `sql` 템플릿에서는 `\\.`으로 써야 `\.`이 남는다). 대체 글이 빈 문자열이거나 121자인 사진은 들어가지 않는다.
 20. 지점의 대표 사진은 경로만 있거나 대체 글만 있으면 들어가지 않는다. 경로의 형식이 틀려도 들어가지 않는다.
+21. `attendee_count`가 0이거나 501인 예약은 들어가지 않는다. null, 1, 500은 들어간다.
+22. 같은 예약에 같은 사람의 참석자 행 두 개는 들어가지 않는다. 예약을 지우면 그 예약의 참석자 행도 지워진다.
+23. 같은 사람, 같은 예약, 같은 `scheduled_for`의 `booking_reminder` 알림 두 개는 들어가지 않는다. 종류가 다르면(예: `booking_invited`) 들어간다. 예약을 지우면 그 예약의 알림도 지워진다.

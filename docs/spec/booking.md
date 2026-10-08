@@ -2,6 +2,8 @@
 
 멤버가 이용할 지점을 고르고, 층을 고르고, 공간을 골라 시간을 예약하는 흐름을 정한다. 권한 판정은 `docs/spec/roles-and-access.md`, 테이블은 `docs/spec/data-model.md`, 운영자가 지점·층·공간을 입력하는 쪽은 `docs/spec/space-admin.md`에 있다.
 
+좌석 예약, 사용 인원, 인원으로 거르기, 참석자 초대, 알림, 예약 바꾸기와 예약 프로세스 전체의 정리는 `docs/spec/booking-2.md`에 있다. 이 문서와 다르면 그 문서가 맞다.
+
 첫 버전은 평면도(Canvas) 없이 공간 목록으로 만든다. 평면도 렌더러가 들어오면 같은 화면에 "평면도 / 리스트" 전환이 생기고, 이 목록은 리스트 보기와 키보드·스크린 리더용 화면으로 남는다.
 
 ## 사용자 행동과 데이터
@@ -42,8 +44,10 @@
 | `/booking` | 화면이 없다. 내 지점의 첫 층으로 보낸다 (`docs/spec/ui.md`). 쿼리 `date`가 맞는 값이면 층 주소에 붙여 보낸다 (`docs/spec/ui-2.md`) |
 | `/branches` | 지점 목록. 카드를 누르면 그 지점으로 간다. 기본 지점은 "기본 지점으로 설정"으로 따로 정한다 |
 | `/branches/[branchId]` | 그 지점에서 내가 쓸 수 있는 첫 층으로 보낸다. 쓸 수 있는 층이 없으면 안내를 보여준다 |
-| `/branches/[branchId]/floors/[floorId]` | 공간 목록과 예약. 쿼리 `date`(YYYY-MM-DD), `space`(공간 id), `view`(`list`, `timeline`), `detail`(`1`. 시간표에서 공간 상세를 연 상태) |
+| `/branches/[branchId]/floors/[floorId]` | 공간 목록과 예약. 쿼리 `date`(YYYY-MM-DD), `space`(공간 id), `view`(`list`, `timeline`), `detail`(`1`. 시간표에서 공간 상세를 연 상태), `people`(2–50. 인원으로 거르기. `docs/spec/booking-2.md`) |
 | `/bookings` | 내 예약. 쿼리 `tab`(`past`), `view`(`calendar`), `month`(YYYY-MM), `day`(YYYY-MM-DD) |
+| `/bookings/[bookingId]/edit` | 예약 바꾸기 (`docs/spec/booking-2.md`) |
+| `/notifications` | 알림 목록 (`docs/spec/booking-2.md`) |
 
 - 모두 `(app)` 그룹이고 모든 페이지가 `requirePageSession()`을 부른다.
 - 홈의 "공간 예약하기"가 가는 곳: `users.default_branch_id`가 있으면 그 지점, 없으면 내 팀을 이름순으로 봤을 때 `home_branch_id`가 있는 첫 팀의 지점, 그것도 없으면 `/branches`.
@@ -89,7 +93,7 @@ type OpenHours = Partial<Record<DayKey, { open: string; close: string } | null>>
 | 공간 | 보이는 것 |
 | --- | --- |
 | 예약할 수 있는 공간 (`bookable`, 접근 가능) | 이름, 정원, 편의 시설, 상태, 그날의 예약 수 |
-| 예약할 수 없는 공간 (`bookable = false`, 접근 가능) | 이름, 정원, "예약 없이 이용해요". 좌석이 있는 데스크 구역은 "좌석 N석 · 좌석 예약은 준비 중이에요" |
+| 예약할 수 없는 공간 (`bookable = false`, 접근 가능) | 이름, 정원, "예약 없이 이용해요". 좌석이 있는 데스크 구역은 좌석 수와 오전·오후의 빈 자리 (`docs/spec/booking-2.md`의 "층 화면의 데스크 구역") |
 | 접근할 수 없는 공간 | "전용 공간"과 자물쇠만. 이름, 정원, 일정을 서버가 내려보내지 않는다 |
 | 보관된 공간 (`archived_at`이 있음), 좌석 (`type = 'desk'`) | 목록에 없다 |
 
@@ -122,7 +126,7 @@ type OpenHours = Partial<Record<DayKey, { open: string; close: string } | null>>
 - 취소된 예약은 세지 않는다.
 - "며칠 앞"은 시작 날짜가 오늘 + `maxDaysAhead` 이하라는 뜻이다. 0이면 오늘만 된다.
 - 한도 값이 `null`이면 그 항목은 제한이 없다.
-- 넘으면 `LIMIT_EXCEEDED`. 응답의 `message`에 어느 한도인지 구분하는 값(`per_booking`, `per_day`, `days_ahead`)을 넣어 화면이 문구를 고르게 한다. 여러 한도를 넘으면 `per_booking`, `days_ahead`, `per_day` 순으로 먼저 걸린 것을 돌려준다.
+- 넘으면 `LIMIT_EXCEEDED`. 응답의 `message`에 어느 한도인지 구분하는 값(`per_booking`, `per_day`, `days_ahead`, 그리고 좌석 예약의 `desk_per_person`. `docs/spec/booking-2.md`)을 넣어 화면이 문구를 고르게 한다. 여러 한도를 넘으면 `per_booking`, `days_ahead`, `per_day` 순으로 먼저 걸린 것을 돌려준다.
 - "그날"은 예약의 시작이 속한 지점 시간대의 날짜다. 내일 예약을 오늘 만들면 내일의 합계에 들어간다.
 - 진행 중인 예약을 취소하면 그 예약의 시간 전체가 합계에서 빠진다. 지나간 시간만큼만 세는 계산은 하지 않는다.
 - 화면은 고른 방식에 맞는 한 줄을 보여준다: "개인 예약은 하루 2시간까지 · 오늘 1시간 남음".
@@ -266,10 +270,9 @@ data: { branchId: string }
 
 ## 아직 하지 않는 것
 
-- 좌석(`type = 'desk'`) 예약 (PFQV-71)
-- 예약 시간 변경, 연장 (PFQV-25, PFQV-36). 지금은 취소하고 다시 예약한다
+- 예약의 연장 (PFQV-36), 예약의 공간·날짜·방식 바꾸기. 좌석 예약과 시간·인원·참석자·제목 바꾸기는 `docs/spec/booking-2.md`에서 한다
 - 타임라인에서 끌어서 예약 (PFQV-22의 남은 범위)
 - 낙관적 반영과 대안 시간 제안 (PFQV-24), 실시간 상태 (PFQV-19)
 - 예약에 붙는 채팅방 (PFQV-27)
 - 팀 관리자와 운영자가 남의 예약을 모아 보는 화면 (PFQV-59, PFQV-42). 취소 액션의 권한은 지금 만든다
-- 반복 예약, 참석자 지정
+- 반복 예약. 참석자 초대는 `docs/spec/booking-2.md`에서 한다
