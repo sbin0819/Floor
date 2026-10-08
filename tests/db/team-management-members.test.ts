@@ -238,7 +238,6 @@ describe("member removal and team leave cancellation", () => {
       spaceId: actors.deskId,
       userId: actors.member.userId,
       teamId: actors.teamId,
-      kind: "desk_half",
       during: bookingRange("13:00", "18:00"),
     });
     expect((await actions().removeMember(input())).ok).toBe(true);
@@ -364,7 +363,12 @@ describe("member removal and team leave cancellation", () => {
     expect((await actions().removeMember(input())).ok).toBe(true);
     expect(transaction).toHaveBeenCalledTimes(2);
     expect(await database.db.select().from(messages)).toHaveLength(1);
-    expect(publishMany).toHaveBeenCalledTimes(1);
+    expect(
+      events.filter(({ event }) => event.type === "realtime.reauth"),
+    ).toHaveLength(1);
+    expect(
+      events.filter(({ event }) => event.type === "message.created"),
+    ).toHaveLength(1);
     expect(evict).toHaveBeenCalledWith(actors.stranger.userId);
   });
   it("locks every booking before the chat space and all meeting room effects", async () => {

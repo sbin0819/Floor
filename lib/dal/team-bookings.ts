@@ -26,7 +26,7 @@ function futureTeamBookingScope(input: FutureTeamBookingScope) {
   );
 }
 
-export function listFutureTeamBookings(
+export async function listFutureTeamBookings(
   input: FutureTeamBookingScope,
   database: DalDatabase,
 ) {

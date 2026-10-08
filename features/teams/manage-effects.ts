@@ -51,35 +51,30 @@ export async function publishTeamRemovalEffects(
       ...input.bookings.flatMap(({ callUserIds }) => callUserIds),
     ]),
   ];
-  await Promise.all([
-    safe(() =>
-      publishTeamEvents(
-        [
-          ...input.removedUserIds.map((userId) => ({
-            channel: userChannel(userId),
-            event: { type: "realtime.reauth" as const },
-          })),
-          ...(input.spaceId
-            ? [
-                {
-                  channel: spaceChannel(input.spaceId),
-                  event: {
-                    type: "space.changed" as const,
-                    spaceId: input.spaceId,
-                  },
-                },
-              ]
-            : []),
-          ...input.bookings.flatMap(({ chatEvents }) => chatEvents),
-          ...teamNotificationsChanged([
-            ...input.notificationUserIds,
-            ...input.bookings.flatMap(
-              ({ notificationUserIds }) => notificationUserIds,
-            ),
-          ]),
-        ],
-        dependencies,
+  const realtimeGroups = [
+    [...new Set(input.removedUserIds)].map((userId) => ({
+      channel: userChannel(userId),
+      event: { type: "realtime.reauth" as const },
+    })),
+    input.spaceId
+      ? [
+          {
+            channel: spaceChannel(input.spaceId),
+            event: { type: "space.changed" as const, spaceId: input.spaceId },
+          },
+        ]
+      : [],
+    input.bookings.flatMap(({ chatEvents }) => chatEvents),
+    teamNotificationsChanged([
+      ...input.notificationUserIds,
+      ...input.bookings.flatMap(
+        ({ notificationUserIds }) => notificationUserIds,
       ),
+    ]),
+  ];
+  await Promise.all([
+    ...realtimeGroups.map((events) =>
+      safe(() => publishTeamEvents(events, dependencies)),
     ),
     ...callUserIds.map((userId) =>
       safe(() =>

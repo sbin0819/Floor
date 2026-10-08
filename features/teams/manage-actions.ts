@@ -2,6 +2,7 @@
 
 import { createTeamInfoActions } from "./manage-info-factory";
 import { createTeamMemberActions } from "./manage-members-factory";
+import { createTeamDeleteActions } from "./manage-delete-factory";
 
 export async function updateTeam(input: unknown) {
   return createTeamInfoActions().updateTeam(input);
@@ -17,4 +18,7 @@ export async function removeMember(input: unknown) {
 }
 export async function leaveTeam(input: unknown) {
   return createTeamMemberActions().leaveTeam(input);
+}
+export async function deleteTeam(input: unknown) {
+  return createTeamDeleteActions().deleteTeam(input);
 }
