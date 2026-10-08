@@ -63,6 +63,102 @@
         "sat": null,
         "sun": null
       }
+    },
+    {
+      "id": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "name": "홍대점",
+      "address": "서울 마포구 가상마루로 56 (가상 주소)",
+      "timezone": "Asia/Seoul",
+      "openHours": {
+        "mon": {
+          "open": "09:00",
+          "close": "22:00"
+        },
+        "tue": {
+          "open": "09:00",
+          "close": "22:00"
+        },
+        "wed": {
+          "open": "09:00",
+          "close": "22:00"
+        },
+        "thu": {
+          "open": "09:00",
+          "close": "22:00"
+        },
+        "fri": {
+          "open": "09:00",
+          "close": "22:00"
+        },
+        "sat": {
+          "open": "10:00",
+          "close": "20:00"
+        },
+        "sun": null
+      }
+    },
+    {
+      "id": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4",
+      "name": "여의도점",
+      "address": "서울 영등포구 가상빛길 78 (가상 주소)",
+      "timezone": "Asia/Seoul",
+      "openHours": {
+        "mon": {
+          "open": "08:00",
+          "close": "21:00"
+        },
+        "tue": {
+          "open": "08:00",
+          "close": "21:00"
+        },
+        "wed": {
+          "open": "08:00",
+          "close": "21:00"
+        },
+        "thu": {
+          "open": "08:00",
+          "close": "21:00"
+        },
+        "fri": {
+          "open": "08:00",
+          "close": "21:00"
+        },
+        "sat": null,
+        "sun": null
+      }
+    },
+    {
+      "id": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e",
+      "name": "판교점",
+      "address": "경기 성남시 분당구 가상별로 90 (가상 주소)",
+      "timezone": "Asia/Seoul",
+      "openHours": {
+        "mon": {
+          "open": "08:00",
+          "close": "22:00"
+        },
+        "tue": {
+          "open": "08:00",
+          "close": "22:00"
+        },
+        "wed": {
+          "open": "08:00",
+          "close": "22:00"
+        },
+        "thu": {
+          "open": "08:00",
+          "close": "22:00"
+        },
+        "fri": {
+          "open": "08:00",
+          "close": "22:00"
+        },
+        "sat": {
+          "open": "09:00",
+          "close": "18:00"
+        },
+        "sun": null
+      }
     }
   ],
   "floors": [
@@ -106,6 +202,54 @@
       "name": "3F",
       "sortOrder": 1,
       "access": "closed"
+    },
+    {
+      "id": "26b59c6b-5467-5c31-919c-41fe14b5cb41",
+      "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "level": 2,
+      "name": "2F",
+      "sortOrder": 0,
+      "access": "everyone"
+    },
+    {
+      "id": "b17f572b-f5d5-53ad-b584-9632e443fb1f",
+      "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "level": 3,
+      "name": "3F",
+      "sortOrder": 1,
+      "access": "everyone"
+    },
+    {
+      "id": "c9e49e7b-cde4-57d8-99fd-b46c0ac844c9",
+      "branchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4",
+      "level": 10,
+      "name": "10F",
+      "sortOrder": 0,
+      "access": "everyone"
+    },
+    {
+      "id": "07412b2a-e5e9-56a9-9e01-eea5e6b67b94",
+      "branchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4",
+      "level": 11,
+      "name": "11F",
+      "sortOrder": 1,
+      "access": "everyone"
+    },
+    {
+      "id": "3fbb4450-831e-5465-b9f3-ce0be8bc3f67",
+      "branchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e",
+      "level": 4,
+      "name": "4F",
+      "sortOrder": 0,
+      "access": "everyone"
+    },
+    {
+      "id": "79b607cc-194c-5eb5-9629-b47d469c82e0",
+      "branchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e",
+      "level": 5,
+      "name": "5F",
+      "sortOrder": 1,
+      "access": "everyone"
     }
   ],
   "spaces": [
@@ -285,6 +429,306 @@
         "projector"
       ],
       "access": null
+    },
+    {
+      "id": "41db933b-b175-54f6-b22f-93acc0ad977a",
+      "floorId": "26b59c6b-5467-5c31-919c-41fe14b5cb41",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 H2A",
+      "capacity": 4,
+      "bookable": true,
+      "amenities": [
+        "monitor",
+        "whiteboard"
+      ],
+      "access": null
+    },
+    {
+      "id": "b06c7ca6-133a-5d93-b1f6-5c9ff3d2d525",
+      "floorId": "26b59c6b-5467-5c31-919c-41fe14b5cb41",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 H2B",
+      "capacity": 6,
+      "bookable": true,
+      "amenities": [
+        "monitor"
+      ],
+      "access": null
+    },
+    {
+      "id": "44a6acee-5069-5f80-ac0d-ad2a263c352f",
+      "floorId": "26b59c6b-5467-5c31-919c-41fe14b5cb41",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 H2-1",
+      "capacity": 1,
+      "bookable": true,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "c9fca79b-b92c-5288-a4db-cb120a2bb2b2",
+      "floorId": "26b59c6b-5467-5c31-919c-41fe14b5cb41",
+      "parentId": null,
+      "type": "lounge",
+      "name": "2층 라운지",
+      "capacity": null,
+      "bookable": false,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "a9f2daf9-73f8-5816-9430-e2b631dc4aeb",
+      "floorId": "b17f572b-f5d5-53ad-b584-9632e443fb1f",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 H3A",
+      "capacity": 10,
+      "bookable": true,
+      "amenities": [
+        "monitor",
+        "whiteboard",
+        "video_conf"
+      ],
+      "access": null
+    },
+    {
+      "id": "09712979-f2b1-57b9-baaa-657091b74c71",
+      "floorId": "b17f572b-f5d5-53ad-b584-9632e443fb1f",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 H3-1",
+      "capacity": 1,
+      "bookable": true,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "b5154fea-845e-542e-a3ea-8fa1f431a440",
+      "floorId": "b17f572b-f5d5-53ad-b584-9632e443fb1f",
+      "parentId": null,
+      "type": "seminar",
+      "name": "세미나룸 H3",
+      "capacity": 20,
+      "bookable": true,
+      "amenities": [
+        "projector",
+        "video_conf"
+      ],
+      "access": null
+    },
+    {
+      "id": "bdb326da-2c1c-5fde-987b-b4863f45b77d",
+      "floorId": "b17f572b-f5d5-53ad-b584-9632e443fb1f",
+      "parentId": null,
+      "type": "lounge",
+      "name": "3층 라운지",
+      "capacity": null,
+      "bookable": false,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "045174e9-730c-5878-96d1-a8d29ec21903",
+      "floorId": "c9e49e7b-cde4-57d8-99fd-b46c0ac844c9",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 Y10A",
+      "capacity": 4,
+      "bookable": true,
+      "amenities": [
+        "monitor",
+        "whiteboard"
+      ],
+      "access": null
+    },
+    {
+      "id": "7037dafb-cbc1-5802-9503-fd1afffcd6b9",
+      "floorId": "c9e49e7b-cde4-57d8-99fd-b46c0ac844c9",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 Y10B",
+      "capacity": 6,
+      "bookable": true,
+      "amenities": [
+        "monitor"
+      ],
+      "access": null
+    },
+    {
+      "id": "c95de0cd-36a8-568c-97b9-433f40b18673",
+      "floorId": "c9e49e7b-cde4-57d8-99fd-b46c0ac844c9",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 Y10-1",
+      "capacity": 1,
+      "bookable": true,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "28a0f113-6022-5d2f-813a-e5979e9d62f4",
+      "floorId": "c9e49e7b-cde4-57d8-99fd-b46c0ac844c9",
+      "parentId": null,
+      "type": "lounge",
+      "name": "10층 라운지",
+      "capacity": null,
+      "bookable": false,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "9d17ae4b-bdf2-58fd-97ff-33d6de242c97",
+      "floorId": "07412b2a-e5e9-56a9-9e01-eea5e6b67b94",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 Y11A",
+      "capacity": 10,
+      "bookable": true,
+      "amenities": [
+        "monitor",
+        "whiteboard",
+        "video_conf"
+      ],
+      "access": null
+    },
+    {
+      "id": "ec2e25ff-20c1-5690-b361-34aea33d64be",
+      "floorId": "07412b2a-e5e9-56a9-9e01-eea5e6b67b94",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 Y11-1",
+      "capacity": 1,
+      "bookable": true,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "b991f488-210c-58a1-be1c-3bef1273d07e",
+      "floorId": "07412b2a-e5e9-56a9-9e01-eea5e6b67b94",
+      "parentId": null,
+      "type": "seminar",
+      "name": "세미나룸 Y11",
+      "capacity": 20,
+      "bookable": true,
+      "amenities": [
+        "projector",
+        "video_conf"
+      ],
+      "access": null
+    },
+    {
+      "id": "1c5559be-54bb-5026-8f85-9be307647e3d",
+      "floorId": "07412b2a-e5e9-56a9-9e01-eea5e6b67b94",
+      "parentId": null,
+      "type": "lounge",
+      "name": "11층 라운지",
+      "capacity": null,
+      "bookable": false,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "37bb1db5-84d3-51b3-a8d9-d0894c1f5967",
+      "floorId": "3fbb4450-831e-5465-b9f3-ce0be8bc3f67",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 P4A",
+      "capacity": 4,
+      "bookable": true,
+      "amenities": [
+        "monitor",
+        "whiteboard"
+      ],
+      "access": null
+    },
+    {
+      "id": "f0113f91-770f-59c2-a9e0-6f7d8555e77f",
+      "floorId": "3fbb4450-831e-5465-b9f3-ce0be8bc3f67",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 P4B",
+      "capacity": 6,
+      "bookable": true,
+      "amenities": [
+        "monitor"
+      ],
+      "access": null
+    },
+    {
+      "id": "571ed453-7e37-5678-9ee4-26789fd992dd",
+      "floorId": "3fbb4450-831e-5465-b9f3-ce0be8bc3f67",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 P4-1",
+      "capacity": 1,
+      "bookable": true,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "a25a19fa-9e0b-59a9-949e-74a749c99c2c",
+      "floorId": "3fbb4450-831e-5465-b9f3-ce0be8bc3f67",
+      "parentId": null,
+      "type": "lounge",
+      "name": "4층 라운지",
+      "capacity": null,
+      "bookable": false,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "f0ff16b7-1166-525c-b3ef-854f06825213",
+      "floorId": "79b607cc-194c-5eb5-9629-b47d469c82e0",
+      "parentId": null,
+      "type": "meeting_room",
+      "name": "회의실 P5A",
+      "capacity": 10,
+      "bookable": true,
+      "amenities": [
+        "monitor",
+        "whiteboard",
+        "video_conf"
+      ],
+      "access": null
+    },
+    {
+      "id": "ab58f368-a20b-5ca5-913c-2c168cfa41c0",
+      "floorId": "79b607cc-194c-5eb5-9629-b47d469c82e0",
+      "parentId": null,
+      "type": "phone_booth",
+      "name": "폰부스 P5-1",
+      "capacity": 1,
+      "bookable": true,
+      "amenities": [],
+      "access": null
+    },
+    {
+      "id": "bdfbdc4f-66ca-5ec1-8dab-a6bfa55e456b",
+      "floorId": "79b607cc-194c-5eb5-9629-b47d469c82e0",
+      "parentId": null,
+      "type": "seminar",
+      "name": "세미나룸 P5",
+      "capacity": 20,
+      "bookable": true,
+      "amenities": [
+        "projector",
+        "video_conf"
+      ],
+      "access": null
+    },
+    {
+      "id": "cad6c31a-65ce-5009-87cf-0fe50159fa01",
+      "floorId": "79b607cc-194c-5eb5-9629-b47d469c82e0",
+      "parentId": null,
+      "type": "lounge",
+      "name": "5층 라운지",
+      "capacity": null,
+      "bookable": false,
+      "amenities": [],
+      "access": null
     }
   ],
   "gangnam7fAmenities": [
@@ -425,6 +869,18 @@
     {
       "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709",
       "userKey": "admin"
+    },
+    {
+      "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "userKey": "admin"
+    },
+    {
+      "branchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4",
+      "userKey": "admin"
+    },
+    {
+      "branchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e",
+      "userKey": "admin"
     }
   ],
   "accessGrants": [
@@ -560,6 +1016,150 @@
       "title": null,
       "status": "cancelled",
       "cancelledByKey": "member"
+    },
+    {
+      "id": "74cc670c-e5d6-5394-8b16-aa1ca2eeee0a",
+      "spaceId": "41db933b-b175-54f6-b22f-93acc0ad977a",
+      "dayOffset": 0,
+      "start": "10:00",
+      "end": "11:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": "집중 회의",
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "833c57f3-f55a-53e6-977a-bdd9cd52cc75",
+      "spaceId": "09712979-f2b1-57b9-baaa-657091b74c71",
+      "dayOffset": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "userKey": "both",
+      "teamId": null,
+      "title": null,
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "99e49b2c-4337-51f5-a3dd-76481a896eaa",
+      "spaceId": "a9f2daf9-73f8-5816-9430-e2b631dc4aeb",
+      "dayOffset": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "userKey": "designMember",
+      "teamId": null,
+      "title": "개인 리뷰",
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "5c45c115-b8b7-59ac-8437-be0a2c3782f7",
+      "spaceId": "b06c7ca6-133a-5d93-b1f6-5c9ff3d2d525",
+      "dayOffset": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": null,
+      "status": "cancelled",
+      "cancelledByKey": "member"
+    },
+    {
+      "id": "a1e3e078-fc50-58ce-a6bb-928da17d1a4a",
+      "spaceId": "045174e9-730c-5878-96d1-a8d29ec21903",
+      "dayOffset": 0,
+      "start": "10:00",
+      "end": "11:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": "집중 회의",
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "4c22a7a1-234d-5d48-9b20-750157024e27",
+      "spaceId": "ec2e25ff-20c1-5690-b361-34aea33d64be",
+      "dayOffset": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "userKey": "both",
+      "teamId": null,
+      "title": null,
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "d1ab9f1c-0023-58b4-9e27-230413a8357f",
+      "spaceId": "9d17ae4b-bdf2-58fd-97ff-33d6de242c97",
+      "dayOffset": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "userKey": "designMember",
+      "teamId": null,
+      "title": "개인 리뷰",
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "9bc4cb6a-b1e7-5e8e-b2d3-882a84b164d3",
+      "spaceId": "7037dafb-cbc1-5802-9503-fd1afffcd6b9",
+      "dayOffset": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": null,
+      "status": "cancelled",
+      "cancelledByKey": "member"
+    },
+    {
+      "id": "89e5fef2-8fee-5238-a8ea-bde59d2c1243",
+      "spaceId": "37bb1db5-84d3-51b3-a8d9-d0894c1f5967",
+      "dayOffset": 0,
+      "start": "10:00",
+      "end": "11:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": "집중 회의",
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "28da7feb-30fd-5a15-b698-af679344680a",
+      "spaceId": "ab58f368-a20b-5ca5-913c-2c168cfa41c0",
+      "dayOffset": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "userKey": "both",
+      "teamId": null,
+      "title": null,
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "15853ab9-87f9-5ff6-b3b2-1178d720fa9d",
+      "spaceId": "f0ff16b7-1166-525c-b3ef-854f06825213",
+      "dayOffset": 1,
+      "start": "14:00",
+      "end": "15:00",
+      "userKey": "designMember",
+      "teamId": null,
+      "title": "개인 리뷰",
+      "status": "confirmed",
+      "cancelledByKey": null
+    },
+    {
+      "id": "d9dbfeed-c239-5760-bab9-06a098b4b72e",
+      "spaceId": "f0113f91-770f-59c2-a9e0-6f7d8555e77f",
+      "dayOffset": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": null,
+      "status": "cancelled",
+      "cancelledByKey": "member"
     }
   ],
   "spaceBlocks": [
@@ -571,6 +1171,36 @@
       "endDayOffset": 1,
       "end": "12:00",
       "reason": "모니터 교체",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "a8ff325a-32b1-522e-8143-fd084afc4933",
+      "spaceId": "b5154fea-845e-542e-a3ea-8fa1f431a440",
+      "startDayOffset": 0,
+      "start": "15:00",
+      "endDayOffset": 0,
+      "end": "16:00",
+      "reason": "발표 장비 점검",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "98bb1466-e29b-5edf-9626-fb694d71fb6b",
+      "spaceId": "b991f488-210c-58a1-be1c-3bef1273d07e",
+      "startDayOffset": 0,
+      "start": "15:00",
+      "endDayOffset": 0,
+      "end": "16:00",
+      "reason": "발표 장비 점검",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "b09d4901-8389-551c-a896-6deaa40b1c75",
+      "spaceId": "bdfbdc4f-66ca-5ec1-8dab-a6bfa55e456b",
+      "startDayOffset": 0,
+      "start": "15:00",
+      "endDayOffset": 0,
+      "end": "16:00",
+      "reason": "발표 장비 점검",
       "createdByKey": "admin"
     }
   ]

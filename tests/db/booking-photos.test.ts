@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createBookingQueries } from "@/features/bookings/query-factory";
+import { createAdminQueries } from "@/features/admin/query-factory";
 import { createAuth } from "@/lib/auth/auth";
 import * as spaceDal from "@/lib/dal/spaces";
 import { branches, spaces, spacePhotos, users } from "@/lib/db/schema";
@@ -210,5 +211,56 @@ describe("photo DTO privacy and bounded reads", () => {
     ).toBeGreaterThan(
       list.find(({ id }) => id === branchId)!.bookableSpaceCount,
     );
+  });
+
+  it("keeps member and operator listing budgets fixed across all five seeded branches", async () => {
+    const member = await queries();
+    const [operator] = await database.db
+      .select()
+      .from(users)
+      .where(eq(users.email, "admin@floor.com"));
+    if (!operator) throw new Error("Missing seeded operator");
+    const admin = createAdminQueries({
+      database: database.db,
+      requireSession: async () => ({
+        userId: operator.id,
+        name: operator.name,
+        email: operator.email,
+      }),
+      now: () => now,
+    });
+    const meter = createQueryMeter(database.client);
+    try {
+      meter.start();
+      const list = await member.getBranchList();
+      expect(meter.stop()).toEqual({
+        stages: 2,
+        statements: 7,
+        perStage: [6, 1],
+      });
+      expect(list).toHaveLength(5);
+      for (const name of ["홍대점", "여의도점", "판교점"]) {
+        expect(list.find((branch) => branch.name === name)).toMatchObject({
+          accessibleFloorCount: 2,
+          bookableSpaceCount: 6,
+          operatingState: { status: "open" },
+        });
+      }
+      meter.start();
+      const cards = await admin.getOperatorBranchCards();
+      expect(meter.stop()).toEqual({
+        stages: 2,
+        statements: 2,
+        perStage: [1, 1],
+      });
+      expect(cards.branches).toHaveLength(5);
+      for (const name of ["홍대점", "여의도점", "판교점"]) {
+        expect(
+          cards.branches.find((branch) => branch.name === name),
+        ).toMatchObject({ floorCount: 2, spaceCount: 8 });
+      }
+    } finally {
+      meter.restore();
+    }
   });
 });

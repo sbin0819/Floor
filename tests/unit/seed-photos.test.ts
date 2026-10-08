@@ -16,12 +16,12 @@ function first<T>(rows: T[]): T {
 type PhotoFile = typeof photoFile;
 
 describe("independent seed photo source", () => {
-  it("loads 41 ordered photos for 21 spaces and two branch covers without display-only metadata", () => {
+  it("loads 65 ordered photos for 45 spaces and five branch covers without display-only metadata", () => {
     const data = loadSeedPhotos(seed);
-    expect(data.branchCovers).toHaveLength(2);
-    expect(data.spacePhotos).toHaveLength(41);
+    expect(data.branchCovers).toHaveLength(5);
+    expect(data.spacePhotos).toHaveLength(65);
     expect(new Set(data.spacePhotos.map(({ spaceId }) => spaceId)).size).toBe(
-      21,
+      45,
     );
     expect(data).not.toHaveProperty("width");
     expect(data).not.toHaveProperty("height");
@@ -61,6 +61,41 @@ describe("independent seed photo source", () => {
     expect(files).toEqual(paths);
     for (const path of paths)
       expect(existsSync(resolve("public", `.${path}`))).toBe(true);
+  });
+
+  it("uses one existing public photo per added space and never reuses privacy sentinel photos", () => {
+    const branchIds = new Set(
+      seed.branches
+        .filter(({ name }) => ["홍대점", "여의도점", "판교점"].includes(name))
+        .map(({ id }) => id),
+    );
+    expect(branchIds.size).toBe(3);
+    const floorIds = new Set(
+      seed.floors
+        .filter(({ branchId }) => branchIds.has(branchId))
+        .map(({ id }) => id),
+    );
+    const spaces = seed.spaces.filter(({ floorId }) => floorIds.has(floorId));
+    expect(spaces).toHaveLength(24);
+    const data = loadSeedPhotos(seed);
+    const forbiddenAssets = [
+      "meeting-large-clay",
+      "meeting-large-sand",
+      "phone-booth-sage",
+    ];
+    for (const space of spaces) {
+      const photos = data.spacePhotos.filter(
+        ({ spaceId }) => spaceId === space.id,
+      );
+      expect(photos).toHaveLength(1);
+      expect(photos[0]!.sortOrder).toBe(0);
+      expect(photos[0]!.alt).toContain(space.name);
+      for (const forbidden of forbiddenAssets)
+        expect(photos[0]!.path).not.toContain(forbidden);
+    }
+    expect(
+      data.branchCovers.filter(({ branchId }) => branchIds.has(branchId)),
+    ).toHaveLength(3);
   });
 
   it("keeps review room, S-1 booth and all desks without photos", () => {
@@ -166,14 +201,14 @@ describe("independent seed photo source", () => {
       change: (input) => {
         input.spacePhotos.push(structuredClone(first(input.spacePhotos)));
       },
-      path: ["spacePhotos", 21, "spaceId"],
+      path: ["spacePhotos", 45, "spaceId"],
     },
     {
       name: "duplicate branch cover",
       change: (input) => {
         input.branchCovers.push({ ...first(input.branchCovers) });
       },
-      path: ["branchCovers", 2, "branchId"],
+      path: ["branchCovers", 5, "branchId"],
     },
     {
       name: "remote photo",

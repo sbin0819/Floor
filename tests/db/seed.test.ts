@@ -26,6 +26,7 @@ import { createMemoryEmailSender } from "@/lib/email/memory";
 import { canAccess, canAccessFloor } from "@/lib/permissions/can-access";
 import { loadSeedData } from "@/lib/seed/data";
 import { runSeed } from "@/lib/seed/run-seed";
+import { getOpenHours } from "@/lib/time/open-hours";
 import { localDate, localTime } from "@/lib/time/zoned";
 import { createTestDatabase, type TestDatabase } from "./helper";
 
@@ -33,18 +34,18 @@ const now = new Date("2026-10-07T03:00:00Z");
 const fixtures = loadSeedData();
 const expectedCounts = {
   users: 6,
-  branches: 2,
-  floors: 5,
-  spaces: 47,
+  branches: 5,
+  floors: 11,
+  spaces: 71,
   teams: 2,
   teamMembers: 5,
-  branchStaff: 2,
+  branchStaff: 5,
   accessGrants: 2,
   floorPlans: 1,
-  bookings: 9,
-  spaceBlocks: 1,
-  spacePhotos: 41,
-  branchCovers: 2,
+  bookings: 21,
+  spaceBlocks: 4,
+  spacePhotos: 65,
+  branchCovers: 5,
 };
 
 describe("transactional development seed", () => {
@@ -162,8 +163,10 @@ describe("transactional development seed", () => {
       "published",
     );
     const rows = await database.db.select().from(bookings);
-    expect(rows.filter(({ status }) => status === "confirmed")).toHaveLength(8);
-    expect(rows.filter(({ status }) => status === "cancelled")).toHaveLength(1);
+    expect(rows.filter(({ status }) => status === "confirmed")).toHaveLength(
+      17,
+    );
+    expect(rows.filter(({ status }) => status === "cancelled")).toHaveLength(4);
     for (const fixture of fixtures.bookings) {
       const actual = rows.find(({ id }) => id === fixture.id)!;
       if (fixture.status === "cancelled") {
@@ -206,13 +209,66 @@ describe("transactional development seed", () => {
   ])("skips closed days from %s", async (date, first, next) => {
     await seed(new Date(date));
     const rows = await database.db.select().from(bookings);
-    for (const fixture of fixtures.bookings)
+    for (const fixture of fixtures.bookings) {
+      const space = fixtures.spaces.find(({ id }) => id === fixture.spaceId)!;
+      const floor = fixtures.floors.find(({ id }) => id === space.floorId)!;
+      const branch = fixtures.branches.find(({ id }) => id === floor.branchId)!;
+      const weekendClosed =
+        branch.name === "성수점" || branch.name === "여의도점";
+      const actual = rows.find(({ id }) => id === fixture.id)!;
       expect(
         localDate(
           rows.find(({ id }) => id === fixture.id)!.during.start,
           "Asia/Seoul",
         ),
-      ).toBe(fixture.dayOffset === 0 ? first : next);
+      ).toBe(
+        weekendClosed
+          ? fixture.dayOffset === 0
+            ? "2026-10-12"
+            : "2026-10-13"
+          : fixture.dayOffset === 0
+            ? first
+            : next,
+      );
+      const date = localDate(actual.during.start, branch.timezone);
+      const hours = getOpenHours(branch.openHours, date);
+      expect(hours).not.toBeNull();
+      expect(localDate(actual.during.end, branch.timezone)).toBe(date);
+      expect(
+        localTime(actual.during.start, branch.timezone) >= hours!.open,
+      ).toBe(true);
+      expect(
+        localTime(actual.during.end, branch.timezone) <= hours!.close,
+      ).toBe(true);
+    }
+    const blocks = await database.db.select().from(spaceBlocks);
+    for (const branch of fixtures.branches.filter(({ name }) =>
+      ["홍대점", "여의도점", "판교점"].includes(name),
+    )) {
+      const floorIds = new Set(
+        fixtures.floors
+          .filter((floor) => floor.branchId === branch.id)
+          .map(({ id }) => id),
+      );
+      const spaceIds = new Set(
+        fixtures.spaces
+          .filter(({ floorId }) => floorIds.has(floorId))
+          .map(({ id }) => id),
+      );
+      const matching = blocks.filter(({ spaceId }) => spaceIds.has(spaceId));
+      expect(matching).toHaveLength(1);
+      const block = matching[0]!;
+      const date = localDate(block.during.start, branch.timezone);
+      const hours = getOpenHours(branch.openHours, date);
+      expect(hours).not.toBeNull();
+      expect(localDate(block.during.end, branch.timezone)).toBe(date);
+      expect(
+        localTime(block.during.start, branch.timezone) >= hours!.open,
+      ).toBe(true);
+      expect(localTime(block.during.end, branch.timezone) <= hours!.close).toBe(
+        true,
+      );
+    }
   });
 
   it("preserves unrelated accounts, memberships and schedules while skipping a conflicting seed booking", async () => {
@@ -252,7 +308,7 @@ describe("transactional development seed", () => {
       .returning();
     const result = await seed();
     expect(result.skippedBookings).toBe(1);
-    expect(result.counts.bookings).toBe(8);
+    expect(result.counts.bookings).toBe(20);
     expect(
       await database.db
         .select()

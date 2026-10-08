@@ -31,20 +31,23 @@ type InvalidCase = {
 describe("seed data", () => {
   it("loads only the three source files with the required counts", () => {
     const data = loadSeedData();
-    expect(data.branches).toHaveLength(2);
-    expect(data.floors).toHaveLength(5);
-    expect(data.spaces).toHaveLength(47);
+    expect(data.branches).toHaveLength(5);
+    expect(data.floors).toHaveLength(11);
+    expect(data.spaces).toHaveLength(71);
     expect(data.users).toHaveLength(6);
     expect(data.teams).toHaveLength(2);
     expect(data.teamMembers).toHaveLength(5);
-    expect(data.branchStaff).toHaveLength(2);
+    expect(data.branchStaff).toHaveLength(5);
     expect(data.accessGrants).toHaveLength(2);
     expect(data.floorPlans).toHaveLength(1);
-    expect(data.bookings).toHaveLength(9);
+    expect(data.bookings).toHaveLength(21);
     expect(
       data.bookings.filter((row) => row.status === "confirmed"),
-    ).toHaveLength(8);
-    expect(data.spaceBlocks).toHaveLength(1);
+    ).toHaveLength(17);
+    expect(
+      data.bookings.filter((row) => row.status === "cancelled"),
+    ).toHaveLength(4);
+    expect(data.spaceBlocks).toHaveLength(4);
     expect(first(data.floorPlans).document).toEqual(planFile);
     expect(data.users).toEqual(seedFile.users);
   });
@@ -68,6 +71,93 @@ describe("seed data", () => {
     expect(data).not.toHaveProperty("note");
     expect(data).not.toHaveProperty("gangnam7fAmenities");
   });
+
+  it.each([
+    [
+      "홍대점",
+      "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      [2, 3],
+      "09:00",
+      "22:00",
+      { open: "10:00", close: "20:00" },
+    ],
+    [
+      "여의도점",
+      "34db02c8-7a13-5ca1-aae8-d7bcb74189f4",
+      [10, 11],
+      "08:00",
+      "21:00",
+      null,
+    ],
+    [
+      "판교점",
+      "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e",
+      [4, 5],
+      "08:00",
+      "22:00",
+      { open: "09:00", close: "18:00" },
+    ],
+  ] as const)(
+    "adds only public space fixtures and existing actors in %s",
+    (name, branchId, levels, open, close, saturday) => {
+      const data = loadSeedData();
+      const branch = data.branches.find(({ id }) => id === branchId)!;
+      expect(branch.name).toBe(name);
+      expect(branch.address).toContain("가상");
+      expect(branch.timezone).toBe("Asia/Seoul");
+      for (const day of ["mon", "tue", "wed", "thu", "fri"] as const)
+        expect(branch.openHours[day]).toEqual({ open, close });
+      expect(branch.openHours.sat).toEqual(saturday);
+      expect(branch.openHours.sun).toBeNull();
+      const floors = data.floors.filter((floor) => floor.branchId === branchId);
+      expect(floors.map(({ level }) => level)).toEqual(levels);
+      expect(floors.map(({ sortOrder }) => sortOrder)).toEqual([0, 1]);
+      expect(floors.every(({ access }) => access === "everyone")).toBe(true);
+      const floorIds = new Set(floors.map(({ id }) => id));
+      const spaces = data.spaces.filter((space) => floorIds.has(space.floorId));
+      expect(spaces).toHaveLength(8);
+      expect(spaces.filter(({ bookable }) => bookable)).toHaveLength(6);
+      expect(spaces.filter(({ type }) => type === "meeting_room")).toHaveLength(
+        3,
+      );
+      expect(spaces.filter(({ type }) => type === "phone_booth")).toHaveLength(
+        2,
+      );
+      expect(spaces.filter(({ type }) => type === "seminar")).toHaveLength(1);
+      expect(spaces.filter(({ type }) => type === "lounge")).toHaveLength(2);
+      expect(
+        spaces.every(
+          ({ access, parentId }) => access === null && parentId === null,
+        ),
+      ).toBe(true);
+      const spaceIds = new Set(spaces.map(({ id }) => id));
+      const bookings = data.bookings.filter(({ spaceId }) =>
+        spaceIds.has(spaceId),
+      );
+      expect(bookings).toHaveLength(4);
+      expect(
+        bookings.filter(({ status }) => status === "confirmed"),
+      ).toHaveLength(3);
+      expect(
+        bookings.filter(({ status }) => status === "cancelled"),
+      ).toHaveLength(1);
+      expect(bookings.every(({ teamId }) => teamId === null)).toBe(true);
+      expect(
+        data.spaceBlocks.filter(({ spaceId }) => spaceIds.has(spaceId)),
+      ).toHaveLength(1);
+      expect(
+        data.branchStaff.filter((staff) => staff.branchId === branchId),
+      ).toEqual([{ branchId, userKey: "admin" }]);
+      expect(data.floorPlans.some(({ floorId }) => floorIds.has(floorId))).toBe(
+        false,
+      );
+      expect(
+        data.accessGrants.some(
+          ({ targetId }) => floorIds.has(targetId) || spaceIds.has(targetId),
+        ),
+      ).toBe(false);
+    },
+  );
 
   it("does not mutate source JSON and returns independently parsed arrays", () => {
     const input = files();

@@ -14,6 +14,24 @@
       "name": "성수점",
       "path": "/seed/photos/lobby-sage.webp",
       "alt": "성수점 안내 데스크와 입구"
+    },
+    {
+      "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "name": "홍대점",
+      "path": "/seed/photos/lobby-sage.webp",
+      "alt": "홍대점 안내 데스크와 입구"
+    },
+    {
+      "branchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4",
+      "name": "여의도점",
+      "path": "/seed/photos/lobby-oak.webp",
+      "alt": "여의도점 안내 데스크와 입구"
+    },
+    {
+      "branchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e",
+      "name": "판교점",
+      "path": "/seed/photos/lobby-sage.webp",
+      "alt": "판교점 안내 데스크와 입구"
     }
   ],
   "spacePhotos": [
@@ -304,6 +322,246 @@
         {
           "path": "/seed/photos/meeting-large-sage.webp",
           "alt": "회의실 S3 회의 테이블과 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "41db933b-b175-54f6-b22f-93acc0ad977a",
+      "name": "회의실 H2A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-oak.webp",
+          "alt": "홍대점 회의실 H2A 화이트보드와 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "b06c7ca6-133a-5d93-b1f6-5c9ff3d2d525",
+      "name": "회의실 H2B",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-slate.webp",
+          "alt": "홍대점 회의실 H2B 회의 테이블과 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "44a6acee-5069-5f80-ac0d-ad2a263c352f",
+      "name": "폰부스 H2-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-clay.webp",
+          "alt": "홍대점 폰부스 H2-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "c9fca79b-b92c-5288-a4db-cb120a2bb2b2",
+      "name": "2층 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-sage.webp",
+          "alt": "홍대점 2층 라운지 소파와 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "a9f2daf9-73f8-5816-9430-e2b631dc4aeb",
+      "name": "회의실 H3A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-screen-oak.webp",
+          "alt": "홍대점 회의실 H3A 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "09712979-f2b1-57b9-baaa-657091b74c71",
+      "name": "폰부스 H3-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-sand.webp",
+          "alt": "홍대점 폰부스 H3-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "b5154fea-845e-542e-a3ea-8fa1f431a440",
+      "name": "세미나룸 H3",
+      "photos": [
+        {
+          "path": "/seed/photos/seminar-slate.webp",
+          "alt": "홍대점 세미나룸 H3 발표 화면과 좌석"
+        }
+      ]
+    },
+    {
+      "spaceId": "bdb326da-2c1c-5fde-987b-b4863f45b77d",
+      "name": "3층 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-clay.webp",
+          "alt": "홍대점 3층 라운지 소파와 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "045174e9-730c-5878-96d1-a8d29ec21903",
+      "name": "회의실 Y10A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-oak.webp",
+          "alt": "여의도점 회의실 Y10A 화이트보드와 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "7037dafb-cbc1-5802-9503-fd1afffcd6b9",
+      "name": "회의실 Y10B",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-slate.webp",
+          "alt": "여의도점 회의실 Y10B 회의 테이블과 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "c95de0cd-36a8-568c-97b9-433f40b18673",
+      "name": "폰부스 Y10-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-clay.webp",
+          "alt": "여의도점 폰부스 Y10-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "28a0f113-6022-5d2f-813a-e5979e9d62f4",
+      "name": "10층 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-sage.webp",
+          "alt": "여의도점 10층 라운지 소파와 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "9d17ae4b-bdf2-58fd-97ff-33d6de242c97",
+      "name": "회의실 Y11A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-screen-oak.webp",
+          "alt": "여의도점 회의실 Y11A 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "ec2e25ff-20c1-5690-b361-34aea33d64be",
+      "name": "폰부스 Y11-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-sand.webp",
+          "alt": "여의도점 폰부스 Y11-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "b991f488-210c-58a1-be1c-3bef1273d07e",
+      "name": "세미나룸 Y11",
+      "photos": [
+        {
+          "path": "/seed/photos/seminar-slate.webp",
+          "alt": "여의도점 세미나룸 Y11 발표 화면과 좌석"
+        }
+      ]
+    },
+    {
+      "spaceId": "1c5559be-54bb-5026-8f85-9be307647e3d",
+      "name": "11층 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-clay.webp",
+          "alt": "여의도점 11층 라운지 소파와 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "37bb1db5-84d3-51b3-a8d9-d0894c1f5967",
+      "name": "회의실 P4A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-small-oak.webp",
+          "alt": "판교점 회의실 P4A 화이트보드와 테이블"
+        }
+      ]
+    },
+    {
+      "spaceId": "f0113f91-770f-59c2-a9e0-6f7d8555e77f",
+      "name": "회의실 P4B",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-large-slate.webp",
+          "alt": "판교점 회의실 P4B 회의 테이블과 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "571ed453-7e37-5678-9ee4-26789fd992dd",
+      "name": "폰부스 P4-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-clay.webp",
+          "alt": "판교점 폰부스 P4-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "a25a19fa-9e0b-59a9-949e-74a749c99c2c",
+      "name": "4층 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-sage.webp",
+          "alt": "판교점 4층 라운지 소파와 창가"
+        }
+      ]
+    },
+    {
+      "spaceId": "f0ff16b7-1166-525c-b3ef-854f06825213",
+      "name": "회의실 P5A",
+      "photos": [
+        {
+          "path": "/seed/photos/meeting-screen-oak.webp",
+          "alt": "판교점 회의실 P5A 모니터와 화상회의 장비"
+        }
+      ]
+    },
+    {
+      "spaceId": "ab58f368-a20b-5ca5-913c-2c168cfa41c0",
+      "name": "폰부스 P5-1",
+      "photos": [
+        {
+          "path": "/seed/photos/phone-booth-sand.webp",
+          "alt": "판교점 폰부스 P5-1 부스 안의 책상과 조명"
+        }
+      ]
+    },
+    {
+      "spaceId": "bdfbdc4f-66ca-5ec1-8dab-a6bfa55e456b",
+      "name": "세미나룸 P5",
+      "photos": [
+        {
+          "path": "/seed/photos/seminar-slate.webp",
+          "alt": "판교점 세미나룸 P5 발표 화면과 좌석"
+        }
+      ]
+    },
+    {
+      "spaceId": "cad6c31a-65ce-5009-87cf-0fe50159fa01",
+      "name": "5층 라운지",
+      "photos": [
+        {
+          "path": "/seed/photos/lounge-clay.webp",
+          "alt": "판교점 5층 라운지 소파와 창가"
         }
       ]
     }

@@ -60,19 +60,19 @@ describe("transactional photo seeding", () => {
       .from(branches)
       .orderBy(branches.id);
 
-  it("writes 41 ordered photos and two covers, retaining identical rows on rerun", async () => {
+  it("writes 65 ordered photos and five covers, retaining identical rows on rerun", async () => {
     expect((await seed()).counts).toMatchObject({
-      spacePhotos: 41,
-      branchCovers: 2,
+      spacePhotos: 65,
+      branchCovers: 5,
     });
     const firstPhotos = await photos();
     const firstCovers = await covers();
-    expect(firstPhotos).toHaveLength(41);
-    expect(firstCovers).toHaveLength(2);
+    expect(firstPhotos).toHaveLength(65);
+    expect(firstCovers).toHaveLength(5);
     expect(
       firstCovers.every(({ path, alt }) => path !== null && alt !== null),
     ).toBe(true);
-    expect(new Set(firstPhotos.map(({ spaceId }) => spaceId)).size).toBe(21);
+    expect(new Set(firstPhotos.map(({ spaceId }) => spaceId)).size).toBe(45);
     for (const { spaceId } of photoFile.spacePhotos) {
       const group = firstPhotos.filter((photo) => photo.spaceId === spaceId);
       expect(group.map(({ sortOrder }) => sortOrder)).toEqual(
@@ -96,30 +96,24 @@ describe("transactional photo seeding", () => {
     const foreignBranchId = crypto.randomUUID();
     const foreignFloorId = crypto.randomUUID();
     const foreignSpaceId = crypto.randomUUID();
-    await database.db
-      .insert(branches)
-      .values({
-        id: foreignBranchId,
-        name: "시드 밖 지점",
-        coverPhotoPath: "/seed/photos/foreign.webp",
-        coverPhotoAlt: "기존 사진",
-      });
-    await database.db
-      .insert(floors)
-      .values({
-        id: foreignFloorId,
-        branchId: foreignBranchId,
-        level: 1,
-        name: "1F",
-      });
-    await database.db
-      .insert(spaces)
-      .values({
-        id: foreignSpaceId,
-        floorId: foreignFloorId,
-        name: "시드 밖 공간",
-        type: "meeting_room",
-      });
+    await database.db.insert(branches).values({
+      id: foreignBranchId,
+      name: "시드 밖 지점",
+      coverPhotoPath: "/seed/photos/foreign.webp",
+      coverPhotoAlt: "기존 사진",
+    });
+    await database.db.insert(floors).values({
+      id: foreignFloorId,
+      branchId: foreignBranchId,
+      level: 1,
+      name: "1F",
+    });
+    await database.db.insert(spaces).values({
+      id: foreignSpaceId,
+      floorId: foreignFloorId,
+      name: "시드 밖 공간",
+      type: "meeting_room",
+    });
     const [foreignPhoto] = await database.db
       .insert(spacePhotos)
       .values({
@@ -143,7 +137,7 @@ describe("transactional photo seeding", () => {
       photoLoader.parseSeedPhotos(changed, data),
     );
     const result = await seed();
-    expect(result.counts).toMatchObject({ spacePhotos: 37, branchCovers: 1 });
+    expect(result.counts).toMatchObject({ spacePhotos: 61, branchCovers: 4 });
     const rows = await photos();
     expect(
       rows.filter(({ spaceId }) => spaceId === firstGroup.spaceId),
@@ -175,19 +169,17 @@ describe("transactional photo seeding", () => {
   it("removes stale photos from seed spaces absent from the photo source", async () => {
     await seed();
     const room = data.spaces.find(({ name }) => name === "리뷰룸")!;
-    await database.db
-      .insert(spacePhotos)
-      .values({
-        spaceId: room.id,
-        path: "/seed/photos/stale.webp",
-        alt: "남은 사진",
-        sortOrder: 0,
-      });
+    await database.db.insert(spacePhotos).values({
+      spaceId: room.id,
+      path: "/seed/photos/stale.webp",
+      alt: "남은 사진",
+      sortOrder: 0,
+    });
     await seed();
     expect(
       (await photos()).filter(({ spaceId }) => spaceId === room.id),
     ).toEqual([]);
-    expect(await photos()).toHaveLength(41);
+    expect(await photos()).toHaveLength(65);
   });
 
   it("clears all seed-owned photos and covers when the photo file is empty", async () => {
