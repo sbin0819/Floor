@@ -5,11 +5,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SpaceDetailSkeleton } from "./booking-skeletons";
 import { useFloorView } from "./floor-view";
 import { useWideScreen } from "./use-wide-screen";
+import { useFloorSelection } from "./branch-workspace";
 
 export function SpaceDetailLoading() {
   const { effectiveView } = useFloorView();
   const wide = useWideScreen();
-  if (!wide || effectiveView === "list") return <SpaceDetailSkeleton />;
+  const detail = useFloorSelection()?.location.detail === true;
+  if (!wide || effectiveView === "list" || detail)
+    return (
+      <SpaceDetailSkeleton
+        expanded={wide && effectiveView === "timeline" && detail}
+      />
+    );
   return (
     <SkeletonRegion className="space-y-3">
       <div className="grid grid-cols-4 gap-2">

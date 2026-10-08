@@ -129,12 +129,20 @@ export function FloorPageSkeleton() {
   );
 }
 
-export function SpaceDetailSkeleton() {
+export function SpaceDetailSkeleton({
+  expanded = false,
+}: {
+  expanded?: boolean;
+}) {
   return (
     <SkeletonRegion className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
       <Skeleton
         data-slot="skeleton-photo"
-        className="h-[160px] shrink-0 rounded-none [@media(max-height:759px)]:h-[120px]"
+        className={
+          expanded
+            ? "h-[220px] shrink-0 rounded-none [@media(max-height:759px)]:h-[160px]"
+            : "h-[160px] shrink-0 rounded-none [@media(max-height:759px)]:h-[120px]"
+        }
       />
       <div
         data-slot="skeleton-detail-information"

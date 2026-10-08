@@ -101,19 +101,28 @@ async function floorRegions(
   const [listRegion, detailRegion] = Children.toArray(grid.props.children);
   if (
     !isValidElement<{ children: ReactNode }>(listRegion) ||
-    !isValidElement<{ children: ReactNode }>(detailRegion)
+    !isValidElement<{ children: ReactNode; resolution: ReactNode }>(
+      detailRegion,
+    )
   )
     throw new Error("Expected optimistic list and detail regions");
   const list = listRegion.props.children;
-  const detail = detailRegion;
+  expect(detailRegion.type).toBe(SpaceDetailContainer);
+  const detailWrapper = detailRegion.props.children;
+  if (!isValidElement<{ children: ReactNode }>(detailWrapper))
+    throw new Error("Expected stable detail region");
+  const detail = detailWrapper.props.children;
+  const resolution = detailRegion.props.resolution;
   if (
     !isValidElement<SuspenseProps>(list) ||
     list.type !== Suspense ||
     !isValidElement<SuspenseProps>(detail) ||
-    detail.type !== Suspense
+    detail.type !== Suspense ||
+    !isValidElement<SuspenseProps>(resolution) ||
+    resolution.type !== Suspense
   )
     throw new Error("Expected sibling list and detail boundaries");
-  return { list, detail };
+  return { list, detail, resolution, container: detailRegion };
 }
 
 describe("booking page-local streaming", () => {
@@ -191,6 +200,7 @@ describe("booking page guards", () => {
     expect(getSpaceDay).not.toHaveBeenCalled();
     const [, result] = await Promise.all([
       resolvePageContent(regions.list),
+      resolvePageContent(regions.resolution),
       resolvePageContent(regions.detail),
     ]);
     expect(getFloorDay).toHaveBeenCalledWith("branch", "floor", "2026-10-07");
@@ -201,10 +211,9 @@ describe("booking page guards", () => {
       "2026-10-07",
     );
     expect(result.props.spaceId).toBe(selectedSpaceId);
-    const container = result.props.children;
-    expect(isValidElement(container) && container.type).toBe(
-      SpaceDetailContainer,
-    );
+    expect(result.props.children).toBeNull();
+    expect(getSpaceDay).toHaveBeenCalledTimes(1);
+    expect(regions.container.key).toBe(".1");
   });
   it("starts and completes detail while the independent floor list is still pending", async () => {
     const pending =
@@ -212,7 +221,8 @@ describe("booking page guards", () => {
     vi.mocked(getFloorDay).mockReturnValue(pending.promise);
     const regions = await floorRegions({ space: selectedSpaceId });
     const list = resolvePageContent(regions.list);
-    const detail = await resolvePageContent(regions.detail);
+    const detail = await resolvePageContent(regions.resolution);
+    await resolvePageContent(regions.detail);
     expect(getFloorDay).toHaveBeenCalledTimes(1);
     expect(getSpaceDay).toHaveBeenCalledTimes(1);
     expect(detail.props.spaceId).toBe(selectedSpaceId);
@@ -228,12 +238,11 @@ describe("booking page guards", () => {
       date: "2026-10-11",
       space: selectedSpaceId,
     });
-    const result = await resolvePageContent(regions.detail);
+    const result = await resolvePageContent(regions.resolution);
     expect(result.props.spaceId).toBeNull();
-    const container = result.props.children;
     expect(
-      isValidElement<{ closed?: boolean }>(container) && container.props.closed,
-    ).toBe(true);
+      (await resolvePageContent(regions.detail)).props.children,
+    ).toBeNull();
   });
   it("canonicalizes an uppercase selected-space UUID before the independently authorized detail query", async () => {
     const spaceId = "abcdefab-1234-4abc-9def-123456789abc";
@@ -245,7 +254,7 @@ describe("booking page guards", () => {
     detail.space.id = spaceId;
     vi.mocked(getFloorDay).mockResolvedValue(data);
     vi.mocked(getSpaceDay).mockResolvedValue(detail);
-    const { detail: boundary } = await floorRegions({
+    const { resolution: boundary } = await floorRegions({
       space: spaceId.toUpperCase(),
     });
     const result = await resolvePageContent(boundary);
@@ -261,11 +270,11 @@ describe("booking page guards", () => {
   it.each([undefined, "invalid", [selectedSpaceId, otherFloorSpaceId]])(
     "does not query a missing or malformed selection %j",
     async (space) => {
-      const { detail } = await floorRegions({ space });
-      const result = await resolvePageContent(detail);
+      const { detail, resolution } = await floorRegions({ space });
+      const result = await resolvePageContent(resolution);
       expect(getSpaceDay).not.toHaveBeenCalled();
       expect(result.props.spaceId).toBeNull();
-      render(result);
+      render(await resolvePageContent(detail));
       expect(
         screen.getByRole("heading", { name: "공간을 골라 주세요" }),
       ).toBeVisible();
@@ -275,8 +284,8 @@ describe("booking page guards", () => {
     "drops inaccessible or wrong-floor selection %s without turning the page into a 404",
     async (space) => {
       vi.mocked(getSpaceDay).mockRejectedValue(new ActionError("NOT_FOUND"));
-      const { detail } = await floorRegions({ space });
-      const result = await resolvePageContent(detail);
+      const { detail, resolution } = await floorRegions({ space });
+      const result = await resolvePageContent(resolution);
       expect(getSpaceDay).toHaveBeenCalledExactlyOnceWith(
         "branch",
         "floor",
@@ -284,7 +293,7 @@ describe("booking page guards", () => {
         undefined,
       );
       expect(result.props.spaceId).toBeNull();
-      render(result);
+      render(await resolvePageContent(detail));
       expect(
         screen.getByRole("heading", { name: "공간을 골라 주세요" }),
       ).toBeVisible();
@@ -300,9 +309,13 @@ describe("booking page guards", () => {
     const failure = new Error("database failure");
     vi.mocked(getFloorDay).mockRejectedValue(failure);
     vi.mocked(getSpaceDay).mockRejectedValue(failure);
-    const { list, detail } = await floorRegions({ space: selectedSpaceId });
+    const { list, detail, resolution } = await floorRegions({
+      space: selectedSpaceId,
+    });
     await expect(resolvePageContent(list)).rejects.toBe(failure);
     await expect(resolvePageContent(detail)).rejects.toBe(failure);
+    await expect(resolvePageContent(resolution)).rejects.toBe(failure);
+    expect(getSpaceDay).toHaveBeenCalledTimes(1);
   });
   it("keeps the list key stable for space-only changes and resets both boundaries for date changes", async () => {
     const first = await floorRegions({
@@ -328,6 +341,18 @@ describe("booking page guards", () => {
     });
     expect(view.list.key).toBe(first.list.key);
     expect(view.detail.key).toBe(first.detail.key);
+    const expanded = await floorRegions({
+      date: "2026-10-07",
+      space: selectedSpaceId,
+      view: "timeline",
+      detail: "1",
+    });
+    expect(expanded.list.key).toBe(first.list.key);
+    expect(expanded.detail.key).toBe(first.detail.key);
+    expect(expanded.resolution.key).toBe(first.resolution.key);
+    expect(expanded.container.key).toBe(first.container.key);
+    expect(space.container.key).toBe(first.container.key);
+    expect(date.container.key).toBe(first.container.key);
   });
   it.each(["branches", "branch", "floor"] as const)(
     "does not query %s after its session guard rejects",

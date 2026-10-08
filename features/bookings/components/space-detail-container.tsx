@@ -11,10 +11,12 @@ import { BookingStrip } from "./booking-strip";
 
 export function SpaceDetailContainer({
   children,
+  resolution,
   matchMedia,
   closed = false,
 }: {
   children: ReactNode;
+  resolution?: ReactNode;
   matchMedia?: MatchMedia;
   closed?: boolean;
 }) {
@@ -23,59 +25,90 @@ export function SpaceDetailContainer({
   const params = useParams<{ branchId: string }>();
   const search = useSearchParams();
   const { effectiveView } = useFloorView();
-  if (closed || navigation?.floorData?.openHours === null) return null;
-  if (wide && effectiveView === "timeline")
-    return <BookingStrip>{children}</BookingStrip>;
-  if (wide)
+  const rightDetail =
+    wide &&
+    effectiveView === "timeline" &&
+    navigation?.location.detail === true;
+  if (closed || navigation?.floorData?.openHours === null)
+    return resolution ?? null;
+  if (wide && effectiveView === "timeline" && !rightDetail)
     return (
-      <div
-        data-space-detail-layout="panel"
-        className="hidden min-h-0 w-full lg:sticky lg:top-6 lg:block lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:w-[420px]"
-      >
-        {children}
-      </div>
+      <>
+        {resolution}
+        <BookingStrip>{children}</BookingStrip>
+      </>
+    );
+  if (wide && !rightDetail)
+    return (
+      <>
+        {resolution}
+        <div
+          data-space-detail-layout="panel"
+          className="hidden min-h-0 w-full lg:sticky lg:top-6 lg:block lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:w-[420px]"
+        >
+          {children}
+        </div>
+      </>
     );
   const open =
     navigation !== null &&
     !navigation.detailCleared &&
     navigation.location.spaceId !== null;
+  const space = navigation?.floorData?.spaces.find(
+    (space) =>
+      space.kind === "accessible" && space.id === navigation.location.spaceId,
+  );
+  const title =
+    rightDetail && space?.kind === "accessible"
+      ? `${space.name} 상세`
+      : "공간 상세";
   return (
-    <Sheet
-      open={open}
-      onOpenChange={(next) => {
-        if (next || !navigation) return;
-        const location = { ...navigation.location, spaceId: null };
-        navigation.change(
-          location,
-          floorHref(
-            params.branchId,
-            location.floorId,
-            location.date,
-            undefined,
-            search.get("view") ?? undefined,
-          ),
-          { replace: true },
-        );
-      }}
-    >
-      <SheetContent
-        side="bottom"
-        showCloseButton={navigation?.detailPending ?? false}
-        aria-describedby={undefined}
-        className="max-h-[85dvh] gap-0 overflow-hidden rounded-t-xl data-[side=bottom]:h-[85dvh]"
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          navigation?.restoreSpaceTrigger();
+    <>
+      {resolution}
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          if (next || !navigation) return;
+          const location = rightDetail
+            ? { ...navigation.location, detail: false }
+            : { ...navigation.location, spaceId: null, detail: false };
+          navigation.change(
+            location,
+            floorHref(
+              params.branchId,
+              location.floorId,
+              location.date,
+              location.spaceId ?? undefined,
+              search.get("view") ?? undefined,
+            ),
+            { replace: true },
+          );
+          if (rightDetail) navigation.restoreSpaceTrigger();
         }}
       >
-        <SheetTitle className="sr-only">공간 상세</SheetTitle>
-        <div
-          data-space-detail-layout="sheet"
-          className="flex h-full min-h-0 flex-col overflow-hidden"
+        <SheetContent
+          side={rightDetail ? "right" : "bottom"}
+          showCloseButton={navigation?.detailPending ?? false}
+          aria-describedby={undefined}
+          className={
+            rightDetail
+              ? "gap-0 overflow-hidden data-[side=right]:w-[420px] data-[side=right]:sm:max-w-none"
+              : "max-h-[85dvh] gap-0 overflow-hidden rounded-t-xl data-[side=bottom]:h-[85dvh]"
+          }
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            navigation?.restoreSpaceTrigger();
+          }}
         >
-          {children}
-        </div>
-      </SheetContent>
-    </Sheet>
+          <SheetTitle className="sr-only">{title}</SheetTitle>
+          <div
+            data-space-detail-layout={rightDetail ? "detail" : "sheet"}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+          >
+            {children}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

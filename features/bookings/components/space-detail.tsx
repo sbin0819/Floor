@@ -15,15 +15,22 @@ import { useFloorSelection } from "./branch-workspace";
 import { getSpaceDayStatusLine } from "@/features/bookings/space-status-line";
 import { cn } from "@/lib/utils";
 import { localDate } from "@/lib/time/zoned";
+import { useBranchDisplayNow } from "./branch-display-clock";
 
 export function SpaceDetail({ data }: { data: SpaceDayData }) {
   const { effectiveView } = useFloorView();
   const wide = useWideScreen();
   const workspace = useFloorSelection();
-  const status = getSpaceDayStatusLine(data);
+  const displayNow = useBranchDisplayNow({
+    branchId: data.branch.id,
+    now: data.now,
+  });
+  const rightDetail =
+    wide && effectiveView === "timeline" && workspace?.location.detail === true;
+  const status = getSpaceDayStatusLine({ ...data, now: displayNow });
   const isToday =
-    data.date === localDate(new Date(data.now), data.branch.timezone);
-  if (wide && effectiveView === "timeline")
+    data.date === localDate(new Date(displayNow), data.branch.timezone);
+  if (wide && effectiveView === "timeline" && !rightDetail)
     return (
       <BookingForm
         key={`${data.space.id}:${data.date}`}
@@ -43,7 +50,11 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
           name={data.space.name}
           type={data.space.type}
           eager
-          className="h-[160px] [@media(max-height:759px)]:h-[120px]"
+          className={
+            rightDetail
+              ? "h-[220px] [@media(max-height:759px)]:h-[160px]"
+              : "h-[160px] [@media(max-height:759px)]:h-[120px]"
+          }
           sizes="(max-width: 1023px) 100vw, 420px"
         />
         <Button
@@ -53,11 +64,17 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
           className="absolute top-2 right-2 z-10 rounded-full bg-card"
         >
           <FloorNavigationLink
-            href={floorHref(data.branch.id, data.floor.id, data.date)}
+            href={floorHref(
+              data.branch.id,
+              data.floor.id,
+              data.date,
+              rightDetail ? data.space.id : undefined,
+            )}
             location={{
               floorId: data.floor.id,
               date: data.date,
-              spaceId: null,
+              spaceId: rightDetail ? data.space.id : null,
+              detail: false,
             }}
             replace
             aria-label="공간 상세 닫기"

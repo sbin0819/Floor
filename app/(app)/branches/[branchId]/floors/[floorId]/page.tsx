@@ -26,6 +26,7 @@ import { FloorPageSkeleton } from "@/features/bookings/components/booking-skelet
 import { SpaceDetailLoading } from "@/features/bookings/components/space-detail-loading";
 import { PageContainer } from "@/components/page-container";
 import { FloorViewsSkeleton } from "@/features/bookings/components/floor-view-skeleton";
+import type { SpaceDayData } from "@/features/bookings/types";
 
 type Props = {
   params: Promise<{ branchId: string; floorId: string }>;
@@ -47,34 +48,28 @@ async function FloorListContent({
   );
   return <FloorViews data={data} initialView={initialView} />;
 }
-async function FloorDetailContent({
-  branchId,
-  floorId,
-  date,
-  spaceId,
+type ReadDetail = () => Promise<SpaceDayData | null>;
+async function FloorDetailResolution({
+  readDetail,
   selectionKey,
-}: RegionProps & { spaceId: string | null; selectionKey: string }) {
-  let detail = null;
-  if (spaceId) {
-    try {
-      detail = await getSpaceDay(branchId, floorId, spaceId, date);
-    } catch (error) {
-      if (!(error instanceof ActionError && error.code === "NOT_FOUND"))
-        throw error;
-    }
-  }
+}: {
+  readDetail: ReadDetail;
+  selectionKey: string;
+}) {
+  const detail = await readDetail();
   return (
     <ResolvedSpaceSelection
       selectionKey={selectionKey}
       spaceId={detail?.openHours ? detail.space.id : null}
     >
-      <SpaceDetailContainer closed={detail?.openHours === null}>
-        <FloorDetailRegion>
-          {detail ? <SpaceDetail data={detail} /> : <EmptySpaceSelection />}
-        </FloorDetailRegion>
-      </SpaceDetailContainer>
+      {null}
     </ResolvedSpaceSelection>
   );
+}
+async function FloorDetailContent({ readDetail }: { readDetail: ReadDetail }) {
+  const detail = await readDetail();
+  if (detail?.openHours === null) return <>{null}</>;
+  return detail ? <SpaceDetail data={detail} /> : <EmptySpaceSelection />;
 }
 async function FloorContent({ params, searchParams }: Props) {
   const { branchId, floorId } = await params;
@@ -92,6 +87,20 @@ async function FloorContent({ params, searchParams }: Props) {
     query.date,
     query.space,
   );
+  let detailPromise: Promise<SpaceDayData | null> | undefined;
+  const readDetail: ReadDetail = () => {
+    detailPromise ??= spaceId
+      ? getSpaceDay(branchId, floorId, spaceId, query.date).catch(
+          (error: unknown) => {
+            if (error instanceof ActionError && error.code === "NOT_FOUND")
+              return null;
+            throw error;
+          },
+        )
+      : Promise.resolve(null);
+    return detailPromise;
+  };
+  const detailKey = `${floorId}:${spaceId}:${dateKey}`;
   return (
     <PageContainer as="main" width="wide" className="pt-0">
       <FloorScreenLayout>
@@ -108,22 +117,27 @@ async function FloorContent({ params, searchParams }: Props) {
             />
           </Suspense>
         </FloorListRegion>
-        <Suspense
-          key={`${floorId}:${spaceId}:${dateKey}`}
-          fallback={
-            <SpaceDetailContainer>
-              {spaceId ? <SpaceDetailLoading /> : <EmptySpaceSelection />}
-            </SpaceDetailContainer>
+        <SpaceDetailContainer
+          resolution={
+            <Suspense key={detailKey} fallback={null}>
+              <FloorDetailResolution
+                readDetail={readDetail}
+                selectionKey={selectionKey}
+              />
+            </Suspense>
           }
         >
-          <FloorDetailContent
-            branchId={branchId}
-            floorId={floorId}
-            date={query.date}
-            spaceId={spaceId}
-            selectionKey={selectionKey}
-          />
-        </Suspense>
+          <FloorDetailRegion>
+            <Suspense
+              key={detailKey}
+              fallback={
+                spaceId ? <SpaceDetailLoading /> : <EmptySpaceSelection />
+              }
+            >
+              <FloorDetailContent readDetail={readDetail} />
+            </Suspense>
+          </FloorDetailRegion>
+        </SpaceDetailContainer>
       </FloorScreenLayout>
     </PageContainer>
   );
