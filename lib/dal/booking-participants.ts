@@ -13,7 +13,7 @@ import {
 
 export async function listBookingParticipantIds(
   bookingId: string,
-  database: DalDatabase,
+  database: DalDatabase = getDb(),
 ) {
   const rows = await database
     .select({ userId: bookingParticipants.userId })

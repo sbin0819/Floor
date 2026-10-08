@@ -33,7 +33,11 @@ import {
   ownedOrInvitedBooking,
 } from "@/lib/dal/booking-attendance";
 
-export type ScheduleRange = { spaceIds: string[]; during: TimeRange };
+export type ScheduleRange = {
+  spaceIds: string[];
+  during: TimeRange;
+  excludeBookingId?: string;
+};
 export type BookingActor = { userId: string } | { teamId: string };
 type BookingSummary = Pick<
   typeof bookings.$inferSelect,
@@ -54,13 +58,19 @@ export function listSpaceBookings(
 ): Promise<BookingDetail[]>;
 
 export async function listSpaceBookings(
-  { spaceIds, during, summaryOnly }: ScheduleRange & { summaryOnly?: boolean },
+  {
+    spaceIds,
+    during,
+    summaryOnly,
+    excludeBookingId,
+  }: ScheduleRange & { summaryOnly?: boolean },
   database: DalDatabase = getDb(),
 ) {
   if (spaceIds.length === 0) return [];
   const filter = and(
     inArray(bookings.spaceId, spaceIds),
     eq(bookings.status, "confirmed"),
+    excludeBookingId ? ne(bookings.id, excludeBookingId) : undefined,
     sql`${bookings.during} && ${serializeTimeRange(during)}::tstzrange`,
   );
   if (summaryOnly) {
@@ -111,7 +121,13 @@ export async function sumBookedMinutes(
     branchId,
     during,
     actor,
-  }: { branchId: string; during: TimeRange; actor: BookingActor },
+    excludeBookingId,
+  }: {
+    branchId: string;
+    during: TimeRange;
+    actor: BookingActor;
+    excludeBookingId?: string;
+  },
   database: DalDatabase = getDb(),
 ): Promise<number> {
   const [result] = await database
@@ -129,6 +145,7 @@ export async function sumBookedMinutes(
         eq(floors.branchId, branchId),
         ne(spaces.type, "desk"),
         eq(bookings.status, "confirmed"),
+        excludeBookingId ? ne(bookings.id, excludeBookingId) : undefined,
         sql`lower(${bookings.during}) >= ${during.start.toISOString()}::timestamptz`,
         sql`lower(${bookings.during}) < ${during.end.toISOString()}::timestamptz`,
         "teamId" in actor

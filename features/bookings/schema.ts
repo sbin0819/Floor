@@ -24,6 +24,18 @@ export const createBookingSchema = z.strictObject({
 });
 export const cancelBookingSchema = z.strictObject({ bookingId: idSchema });
 export const leaveBookingSchema = z.strictObject({ bookingId: idSchema });
+export const updateBookingSchema = z.strictObject({
+  bookingId: idSchema,
+  start: createBookingSchema.shape.start,
+  end: createBookingSchema.shape.end,
+  attendeeCount: createBookingSchema.shape.attendeeCount.unwrap(),
+  participants: bookingParticipantsSchema,
+  participantIdsAtLoad: z
+    .array(idSchema)
+    .transform((ids) => [...new Set(ids)])
+    .pipe(z.array(z.uuid()).max(20)),
+  title: createBookingSchema.shape.title,
+});
 export const createDeskBookingSchema = z.strictObject({
   deskId: idSchema,
   date: z.string().refine((value) => {
