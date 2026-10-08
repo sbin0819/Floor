@@ -7,6 +7,7 @@ export async function insertSeedParticipants(
   bookingId: string,
   extras: SeedBookings2Data | undefined,
   userIds: ReadonlyMap<string, string>,
+  now: Date,
   database: DalDatabase,
 ) {
   const keys = extras?.participants.find(
@@ -18,5 +19,5 @@ export async function insertSeedParticipants(
     if (!id) throw new SeedError("참석자 시드가 참조하는 계정이 없어요.");
     return id;
   });
-  await insertBookingParticipants(bookingId, ids, database);
+  await insertBookingParticipants(bookingId, ids, now, database);
 }

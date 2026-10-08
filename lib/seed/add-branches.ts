@@ -253,6 +253,7 @@ export async function addSeedBranches(
     await insertSeedBooking(
       {
         ...booking,
+        createdAt: now,
         attendeeCount: attendeeCounts.get(booking.id) ?? null,
         userId: userIds.get(userKey)!,
         during,
@@ -264,7 +265,7 @@ export async function addSeedBranches(
       },
       db,
     );
-    await insertSeedParticipants(booking.id, bookingExtras, userIds, db);
+    await insertSeedParticipants(booking.id, bookingExtras, userIds, now, db);
     await insertSeedReminders({
       booking: { ...booking, during, userId: userIds.get(userKey)! },
       data,

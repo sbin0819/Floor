@@ -233,6 +233,7 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
               await insertBookingParticipants(
                 created.id,
                 participants.map(({ userId }) => userId),
+                now,
                 transaction,
               );
             const snapshot = notificationBookingSnapshot({

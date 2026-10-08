@@ -124,6 +124,7 @@ describe("booking participants and leave action", () => {
       {
         bookingId: result.ok ? result.data.bookingId : "",
         userId: fixture.stranger.userId,
+        createdAt: bookingNow,
       },
     ]);
     expect(publish).toHaveBeenCalledTimes(1);

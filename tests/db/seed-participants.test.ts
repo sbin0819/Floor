@@ -64,6 +64,7 @@ describe("participant seed additions", () => {
     const expected = extras.participants.flatMap(({ bookingId, userKeys }) =>
       userKeys.map((key) => ({
         bookingId,
+        createdAt: now,
         userId: accounts.find(
           ({ email }) =>
             email === data.users.find((user) => user.key === key)!.email,

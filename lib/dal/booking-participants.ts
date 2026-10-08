@@ -157,10 +157,11 @@ export async function deleteCurrentBookingParticipant(
 export async function insertBookingParticipants(
   bookingId: string,
   userIds: readonly string[],
+  now: Date,
   database: DalDatabase,
 ) {
   if (userIds.length)
     await database
       .insert(bookingParticipants)
-      .values(userIds.map((userId) => ({ bookingId, userId })));
+      .values(userIds.map((userId) => ({ bookingId, userId, createdAt: now })));
 }

@@ -15,6 +15,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { branches } from "./branches";
+import { bookings } from "./bookings";
 import { createdAt, id } from "./common";
 import {
   chatRoomKind,
@@ -73,12 +74,15 @@ export const chatRooms = pgTable(
     dmHighUserId: uuid("dm_high_user_id").references(() => users.id, {
       onDelete: "restrict",
     }),
+    bookingId: uuid("booking_id")
+      .unique("chat_rooms_booking_unique")
+      .references(() => bookings.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
   },
   (table) => [
     check(
       "chat_rooms_kind_ref",
-      sql`(${table.kind} IN ('text', 'voice') AND ${table.spaceId} IS NOT NULL AND ${table.name} IS NOT NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL) OR (${table.kind} = 'dm' AND ${table.dmLowUserId} IS NOT NULL AND ${table.dmHighUserId} IS NOT NULL AND ${table.dmLowUserId} < ${table.dmHighUserId} AND ${table.spaceId} IS NULL AND ${table.name} IS NULL) OR (${table.kind} = 'group_dm' AND ${table.spaceId} IS NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL) OR ${table.kind} = 'meeting'`,
+      sql`(${table.kind} IN ('text', 'voice') AND ${table.spaceId} IS NOT NULL AND ${table.name} IS NOT NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL AND ${table.bookingId} IS NULL) OR (${table.kind} = 'dm' AND ${table.dmLowUserId} IS NOT NULL AND ${table.dmHighUserId} IS NOT NULL AND ${table.dmLowUserId} < ${table.dmHighUserId} AND ${table.spaceId} IS NULL AND ${table.name} IS NULL AND ${table.bookingId} IS NULL) OR (${table.kind} = 'group_dm' AND ${table.spaceId} IS NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL AND ${table.bookingId} IS NULL) OR (${table.kind} = 'meeting' AND ${table.bookingId} IS NOT NULL AND ${table.spaceId} IS NULL AND ${table.name} IS NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL)`,
     ),
     check(
       "chat_rooms_name_length",

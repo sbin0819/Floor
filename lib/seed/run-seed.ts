@@ -291,6 +291,7 @@ export async function runSeed({
         await seedDal.insertSeedBooking(
           {
             ...booking,
+            createdAt: now,
             attendeeCount: attendeeCounts.get(booking.id) ?? null,
             userId: userId(userKey),
             during,
@@ -306,6 +307,7 @@ export async function runSeed({
           booking.id,
           bookingExtras,
           userIds,
+          now,
           database,
         );
         await insertSeedReminders({

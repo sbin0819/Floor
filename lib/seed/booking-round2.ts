@@ -518,6 +518,7 @@ export async function applyBookingRound2(
     await insertBookingParticipants(
       row.bookingId,
       row.userKeys.map((key) => userIds.get(key)!),
+      now,
       db,
     );
   for (const row of schedule.bookings) await insertSeedBooking(row, db);

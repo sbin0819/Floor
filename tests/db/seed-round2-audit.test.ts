@@ -308,7 +308,7 @@ describe("read-only booking round2 preservation audit", () => {
           sql`alter table bookings add column attendee_count integer, add column updated_at timestamptz`,
         );
         await tx.execute(
-          sql`create table booking_participants (booking_id uuid not null, user_id uuid not null, primary key (booking_id, user_id))`,
+          sql`create table booking_participants (booking_id uuid not null, user_id uuid not null, created_at timestamptz not null default now(), primary key (booking_id, user_id))`,
         );
         const after = await captureSeedRound2Audit({}, tx);
         expect(compareSeedRound2Audit(before, after)).toEqual({

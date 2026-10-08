@@ -1107,9 +1107,82 @@ describe("database constraints from the real migrations", () => {
     ).rejects.toMatchObject({
       cause: { code: "23505", constraint: "chat_rooms_dm_pair_unique" },
     });
+    const [booking] = await database.db
+      .insert(bookings)
+      .values({ spaceId, userId, during })
+      .returning();
     await database.db
       .insert(chatRooms)
-      .values([{ kind: "group_dm" }, { kind: "meeting" }]);
+      .values([
+        { kind: "group_dm" },
+        { kind: "meeting", bookingId: booking!.id },
+      ]);
+  });
+
+  it("36. requires a unique booking reference only on meeting rooms and cascades booking deletion", async () => {
+    const [booking] = await database.db
+      .insert(bookings)
+      .values({ spaceId, userId, during })
+      .returning();
+    for (const invalid of [
+      { kind: "meeting" as const },
+      { kind: "meeting" as const, bookingId: booking!.id, name: "금지 이름" },
+      {
+        kind: "meeting" as const,
+        bookingId: booking!.id,
+        spaceId: chatSpaceId,
+      },
+      { kind: "meeting" as const, bookingId: booking!.id, dmLowUserId: userId },
+      {
+        kind: "text" as const,
+        bookingId: booking!.id,
+        spaceId: chatSpaceId,
+        name: "금지 참조",
+      },
+      { kind: "group_dm" as const, bookingId: booking!.id },
+    ])
+      await expect(
+        database.db.insert(chatRooms).values(invalid),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "chat_rooms_kind_ref" },
+      });
+    const [meeting] = await database.db
+      .insert(chatRooms)
+      .values({ kind: "meeting", bookingId: booking!.id })
+      .returning();
+    await expect(
+      database.db
+        .insert(chatRooms)
+        .values({ kind: "meeting", bookingId: booking!.id }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "chat_rooms_booking_unique" },
+    });
+    await expect(
+      database.db
+        .insert(chatRooms)
+        .values({ kind: "meeting", bookingId: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ cause: { code: "23503" } });
+    await database.db
+      .insert(messages)
+      .values({
+        roomId: meeting!.id,
+        seq: 1,
+        authorId: userId,
+        body: "보존되다가 예약 삭제 때 함께 지워져요",
+      });
+    await database.db.delete(bookings).where(eq(bookings.id, booking!.id));
+    expect(
+      await database.db
+        .select()
+        .from(chatRooms)
+        .where(eq(chatRooms.id, meeting!.id)),
+    ).toEqual([]);
+    expect(
+      await database.db
+        .select()
+        .from(messages)
+        .where(eq(messages.roomId, meeting!.id)),
+    ).toEqual([]);
   });
 
   it("31. makes room memberships unique and cascades room deletion", async () => {
@@ -1236,15 +1309,13 @@ describe("database constraints from the real migrations", () => {
   it.each(["active", "left"] as const)(
     "34. allows %s memberships without a request timestamp",
     async (status) => {
-      await database.db
-        .insert(chatRoomMembers)
-        .values({
-          roomId,
-          userId,
-          status,
-          joinedAt: during.start,
-          statusChangedAt: during.start,
-        });
+      await database.db.insert(chatRoomMembers).values({
+        roomId,
+        userId,
+        status,
+        joinedAt: during.start,
+        statusChangedAt: during.start,
+      });
       expect(
         (await database.db.select().from(chatRoomMembers))[0]?.requestedAt,
       ).toBeNull();
@@ -1255,25 +1326,7 @@ describe("database constraints from the real migrations", () => {
     "35. requires system data exactly for system messages, not %s with mismatched data",
     async (kind) => {
       await expect(
-        database.db
-          .insert(messages)
-          .values({
-            roomId,
-            seq: 1,
-            kind,
-            authorId: kind === "system" ? null : userId,
-            body: "검사",
-            systemData:
-              kind === "system"
-                ? null
-                : { type: "group_created", actorName: "테스트" },
-          }),
-      ).rejects.toMatchObject({
-        cause: { code: "23514", constraint: "messages_system_data" },
-      });
-      await database.db
-        .insert(messages)
-        .values({
+        database.db.insert(messages).values({
           roomId,
           seq: 1,
           kind,
@@ -1281,9 +1334,23 @@ describe("database constraints from the real migrations", () => {
           body: "검사",
           systemData:
             kind === "system"
-              ? { type: "group_created", actorName: "테스트" }
-              : null,
-        });
+              ? null
+              : { type: "group_created", actorName: "테스트" },
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "messages_system_data" },
+      });
+      await database.db.insert(messages).values({
+        roomId,
+        seq: 1,
+        kind,
+        authorId: kind === "system" ? null : userId,
+        body: "검사",
+        systemData:
+          kind === "system"
+            ? { type: "group_created", actorName: "테스트" }
+            : null,
+      });
       expect(await database.db.select().from(messages)).toHaveLength(1);
     },
   );

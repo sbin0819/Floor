@@ -385,7 +385,12 @@ export function createUpdateBookingAction(
           const retainedIds = latestIds.filter((id) => desiredIds.has(id));
           const finalIds = [...retainedIds, ...addedIds];
           await removeBookingParticipants(locked.id, removedIds, transaction);
-          await insertBookingParticipants(locked.id, addedIds, transaction);
+          await insertBookingParticipants(
+            locked.id,
+            addedIds,
+            now,
+            transaction,
+          );
           if (timeChanged)
             await deleteBookingReminders({ bookingId: locked.id }, transaction);
           else if (removedIds.length)
