@@ -28,6 +28,13 @@ export type SpaceAccessFacts = {
   roleSettings: LoungeRoleSettings;
 };
 
+export const chatSpaceName = sql<string>`case ${chatSpaces}.kind
+  when 'team' then (select name from teams where id = ${chatSpaces}.team_id)
+  when 'branch' then (select name from branches where id = ${chatSpaces}.branch_id)
+  else ${chatSpaces}.name end`;
+export const chatSpaceKindOrder = sql<number>`case ${chatSpaces.kind}
+  when 'team' then 0 when 'branch' then 1 else 2 end`;
+
 export function activeSpaceMembership(
   userId: string | SQL,
   spaceId: SQL = sql`${chatSpaces.id}`,
@@ -76,15 +83,16 @@ export function sharesChatSpace(me: string, other: SQL) {
 }
 
 // 같은 SQL로 가져온 역할 원재료를 목록·방·관리 조회가 함께 해석한다.
+// 단일 테이블 SELECT에서도 상관 컬럼의 테이블명이 생략되지 않게 명시한다.
 export function spaceAccessFields(userId: string | SQL) {
   return {
     spaceKind: chatSpaces.kind,
     teamRole: sql<
       "member" | "admin" | null
-    >`(select m.role from team_members m where m.team_id = ${chatSpaces.teamId} and m.user_id = ${userId}::uuid)`,
-    memberRole: sql<SpaceRole | null>`(select m.role from chat_space_members m where m.space_id = ${chatSpaces.id} and m.user_id = ${userId}::uuid and ${activeSpaceMembership(userId)})`,
-    isStaff: sql<boolean>`exists (select 1 from branch_staff staff where staff.branch_id = ${chatSpaces.branchId} and staff.user_id = ${userId}::uuid)`,
-    roleSettings: sql<LoungeRoleSettings>`coalesce((select jsonb_object_agg(setting.role, setting.permissions) from role_settings setting where setting.branch_id = ${chatSpaces.branchId}), '{}'::jsonb)`,
+    >`(select m.role from team_members m where m.team_id = ${chatSpaces}.team_id and m.user_id = ${userId}::uuid)`,
+    memberRole: sql<SpaceRole | null>`(select m.role from chat_space_members m where m.space_id = ${chatSpaces}.id and m.user_id = ${userId}::uuid and ${activeSpaceMembership(userId)})`,
+    isStaff: sql<boolean>`exists (select 1 from branch_staff staff where staff.branch_id = ${chatSpaces}.branch_id and staff.user_id = ${userId}::uuid)`,
+    roleSettings: sql<LoungeRoleSettings>`coalesce((select jsonb_object_agg(setting.role, setting.permissions) from role_settings setting where setting.branch_id = ${chatSpaces}.branch_id), '{}'::jsonb)`,
   };
 }
 

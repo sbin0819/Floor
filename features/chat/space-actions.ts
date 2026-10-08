@@ -1,6 +1,7 @@
 "use server";
 
 import { createSpaceActions } from "./space-action-factory";
+import { createChannelActions } from "./channel-actions";
 import { createSpaceInviteActions } from "./space-invite-actions";
 
 export async function joinLounge(input: unknown) {
@@ -23,6 +24,22 @@ export async function transferSpaceOwnership(input: unknown) {
 }
 export async function deleteSpace(input: unknown) {
   return createSpaceActions().deleteSpace(input);
+}
+
+export async function createChannel(input: unknown) {
+  return createChannelActions().createChannel(input);
+}
+export async function updateChannel(input: unknown) {
+  return createChannelActions().updateChannel(input);
+}
+export async function archiveChannel(input: unknown) {
+  return createChannelActions().archiveChannel(input);
+}
+export async function banSpaceMember(input: unknown) {
+  return createChannelActions().banSpaceMember(input);
+}
+export async function unbanSpaceMember(input: unknown) {
+  return createChannelActions().unbanSpaceMember(input);
 }
 
 export async function createInviteLink(input: unknown) {
