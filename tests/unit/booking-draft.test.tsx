@@ -12,6 +12,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBooking } from "@/features/bookings/actions";
 import { BookingForm } from "@/features/bookings/components/booking-form";
 import {
+  useBookingDraft,
+  useBookingRange,
+} from "@/features/bookings/components/use-booking-draft";
+import {
   BranchWorkspace,
   ResolvedSpaceSelection,
   useFloorSelection,
@@ -63,6 +67,8 @@ function fixture(spaceId = first): SpaceDayData {
 }
 function Controls({ data }: { data: SpaceDayData }) {
   const workspace = useFloorSelection()!;
+  const draft = useBookingDraft(workspace.draftStore, workspace.bookingScope);
+  const range = useBookingRange(workspace.draftStore, workspace.bookingScope);
   const register = workspace.registerNavigation;
   useEffect(
     () => register(data.branch.id, data.date, data.now),
@@ -70,16 +76,20 @@ function Controls({ data }: { data: SpaceDayData }) {
   );
   return (
     <>
-      <output data-testid="draft">{JSON.stringify(workspace.draft)}</output>
-      <output data-testid="range">{JSON.stringify(workspace.selection)}</output>
+      <output data-testid="draft">{JSON.stringify(draft)}</output>
+      <output data-testid="range">{JSON.stringify(range)}</output>
       <button
-        onClick={() => workspace.changeRange(data.space.id, { start, end })}
+        onClick={() =>
+          workspace.draftStore
+            .getState()
+            .changeRange(workspace.bookingScope, data.space.id, { start, end })
+        }
       >
         구간 고르기
       </button>
       <button
         onClick={() =>
-          workspace.changeDraft(data.space.id, {
+          workspace.draftStore.getState().changeDraft(workspace.bookingScope, {
             title: "새 공간 제목",
             actorId: teamId,
           })
@@ -94,10 +104,12 @@ function Frame({
   client,
   data,
   layout,
+  preserveForm = false,
 }: {
   client: QueryClient;
   data: SpaceDayData;
   layout: Layout;
+  preserveForm?: boolean;
 }) {
   const search = new URLSearchParams(route.query);
   return (
@@ -115,7 +127,7 @@ function Frame({
         >
           <div key={layout} data-testid="layout" data-layout={layout}>
             <BookingForm
-              key={`${data.space.id}:${data.date}`}
+              key={preserveForm ? undefined : `${data.space.id}:${data.date}`}
               data={data}
               variant={layout === "strip" ? "strip" : "panel"}
             />
@@ -125,7 +137,7 @@ function Frame({
     </QueryClientProvider>
   );
 }
-function display(initial = fixture()) {
+function display(initial = fixture(), preserveForm = false) {
   const client = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
@@ -135,14 +147,28 @@ function display(initial = fixture()) {
     route.query = `date=${data.date}&space=${data.space.id}&view=${layout === "panel" ? "list" : "timeline"}${layout === "detail" ? "&detail=1" : ""}`;
   };
   updateRoute();
-  const view = render(<Frame client={client} data={data} layout={layout} />);
+  const view = render(
+    <Frame
+      client={client}
+      data={data}
+      layout={layout}
+      preserveForm={preserveForm}
+    />,
+  );
   return {
     ...view,
     receive(nextLayout: Layout, nextData = data) {
       data = nextData;
       layout = nextLayout;
       updateRoute();
-      view.rerender(<Frame client={client} data={data} layout={layout} />);
+      view.rerender(
+        <Frame
+          client={client}
+          data={data}
+          layout={layout}
+          preserveForm={preserveForm}
+        />,
+      );
     },
   };
 }
@@ -315,4 +341,41 @@ describe("booking form shared draft", () => {
       }),
     );
   });
+  it.each(["space", "date"])(
+    "uses the submitted scope when the same pending form receives another %s",
+    async (change) => {
+      const action =
+        Promise.withResolvers<ActionResult<{ bookingId: string }>>();
+      vi.mocked(createBooking).mockReturnValue(action.promise);
+      const view = display(fixture(), true);
+      const input = title();
+      await userEvent.click(
+        screen.getByRole("button", { name: "구간 고르기" }),
+      );
+      await userEvent.type(input, "처음 제출한 제목");
+      await userEvent.click(screen.getByRole("button", { name: "예약하기" }));
+      await waitFor(() => expect(createBooking).toHaveBeenCalledOnce());
+      view.receive(
+        "strip",
+        change === "space"
+          ? fixture(second)
+          : { ...fixture(), date: "2026-10-08" },
+      );
+      expect(title()).toBe(input);
+      fireEvent.click(screen.getByRole("button", { name: "새 공간 작성" }));
+      fireEvent.click(screen.getByRole("button", { name: "구간 고르기" }));
+      expect(title()).toHaveValue("새 공간 제목");
+      const nextRange = screen.getByTestId("range").textContent;
+      expect(nextRange).toContain(start);
+      await act(async () => {
+        action.resolve({ ok: true, data: { bookingId: "old" } });
+        await action.promise;
+      });
+      await waitFor(() => expect(route.refresh).toHaveBeenCalledOnce());
+      expect(draft()).toEqual({ title: "새 공간 제목", actorId: teamId });
+      expect(title()).toHaveValue("새 공간 제목");
+      expect(screen.getByTestId("range").textContent).toBe(nextRange);
+      expect(actor()).toHaveTextContent("가상 팀으로");
+    },
+  );
 });

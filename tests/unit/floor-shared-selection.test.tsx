@@ -7,6 +7,7 @@ import {
   useFloorSelection,
 } from "@/features/bookings/components/branch-workspace";
 import { floorSelectionKey } from "@/features/bookings/floor-selection";
+import { useBookingRange } from "@/features/bookings/components/use-booking-draft";
 import {
   selectFloorBookingSlot,
   selectableSlots,
@@ -30,6 +31,7 @@ vi.mock("next/navigation", () => ({
 }));
 const first = "abcdefab-1234-4abc-9def-123456789abc";
 const second = "abcdefab-1234-4abc-9def-123456789abd";
+const third = "abcdefab-1234-4abc-9def-123456789abe";
 const today = "2026-10-07";
 const slots = selectableSlots({
   ...spaceDayFixture(),
@@ -40,15 +42,28 @@ const start = slots[0]!.start;
 let completePrevious: (() => void) | undefined;
 function Controls() {
   const state = useFloorSelection()!;
+  const range = useBookingRange(state.draftStore, state.bookingScope);
   const register = state.registerNavigation;
   useEffect(() => register("branch", today, spaceDayFixture().now), [register]);
   return (
     <>
-      <output data-testid="range">{JSON.stringify(state.selection)}</output>
+      <output data-testid="range">{JSON.stringify(range)}</output>
       <output data-testid="detail">
         {String(state.location.detail === true)}
       </output>
       <output data-testid="pending">{String(state.detailPending)}</output>
+      <button
+        onClick={() =>
+          state.selectSlot({
+            spaceId: third,
+            slots,
+            start,
+            href: `?date=${today}&space=${third}`,
+          })
+        }
+      >
+        세 번째 행
+      </button>
       <button
         onClick={() =>
           state.change(
@@ -61,8 +76,9 @@ function Controls() {
       </button>
       <button
         onClick={() => {
-          const clear = state.changeRange;
-          completePrevious = () => clear(first, null);
+          const scope = state.bookingScope;
+          completePrevious = () =>
+            state.draftStore.getState().changeRange(scope, first, null);
         }}
       >
         제출 시작
@@ -92,7 +108,14 @@ function Controls() {
         다른 행
       </button>
       <button
-        onClick={() => state.changeRange(first, { start, end: slots[2]!.end })}
+        onClick={() =>
+          state.draftStore
+            .getState()
+            .changeRange(state.bookingScope, first, {
+              start,
+              end: slots[2]!.end,
+            })
+        }
       >
         끝 바꾸기
       </button>
@@ -105,7 +128,15 @@ function Controls() {
       >
         닫기
       </button>
-      <button onClick={() => state.changeRange(first, null)}>예약 성공</button>
+      <button
+        onClick={() =>
+          state.draftStore
+            .getState()
+            .changeRange(state.bookingScope, first, null)
+        }
+      >
+        예약 성공
+      </button>
       <button
         onClick={() =>
           state.change(
@@ -223,6 +254,25 @@ describe("shared floor booking range", () => {
     expect(selection()).not.toBeNull();
     fireEvent.click(screen.getByText(button));
     expect(selection()).toBeNull();
+  });
+  it("keeps the latest optimistic range through an intermediate URL commit", async () => {
+    const pending = Promise.withResolvers<void>();
+    const navigateAction = vi.fn(() => pending.promise);
+    const view = render(<Frame navigateAction={navigateAction} />);
+    fireEvent.click(screen.getByText("다른 행"));
+    fireEvent.click(screen.getByText("세 번째 행"));
+    expect(selection()).toMatchObject({ spaceId: third, start });
+    route.query = `date=${today}&space=${second}`;
+    view.rerender(<Frame actual={second} navigateAction={navigateAction} />);
+    expect(selection()).toMatchObject({ spaceId: third, start });
+    route.query = `date=${today}&space=${third}`;
+    view.rerender(<Frame actual={third} navigateAction={navigateAction} />);
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
+    expect(selection()).toMatchObject({ spaceId: third, start });
+    expect(navigateAction).toHaveBeenCalledTimes(2);
   });
   it("does not resurrect a range after browser navigation to another floor and back", () => {
     const view = render(<Frame />);

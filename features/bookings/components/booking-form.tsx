@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,11 @@ import { BookingTimeline } from "./booking-timeline";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { useBookingMutation } from "./use-booking-mutation";
 import { useFloorSelection } from "./branch-workspace";
+import {
+  bookingDraftScope,
+  type BookingDraftStore,
+} from "../booking-draft-store";
+import { useBookingDraft, useBookingRange } from "./use-booking-draft";
 import {
   BookingTimeFields,
   BookingTitleField,
@@ -37,19 +42,34 @@ export function BookingForm({
 }) {
   const id = useId();
   const workspace = useFloorSelection();
+  const scope = bookingDraftScope(
+    data.branch.id,
+    data.floor.id,
+    data.date,
+    data.space.id,
+  );
+  const sharedRange = useBookingRange(workspace?.draftStore, scope);
+  const sharedDraft = useBookingDraft(workspace?.draftStore, scope);
+  const currentScope = useRef(scope);
+  useLayoutEffect(() => {
+    currentScope.current = scope;
+  }, [scope]);
+  const submitted = useRef<{
+    scope: string;
+    spaceId: string;
+    store?: BookingDraftStore;
+    onBooked?: () => void;
+  } | null>(null);
   const [localRange, setLocalRange] = useState<{
     start: string;
     end: string;
   } | null>(null);
-  const range = workspace
-    ? workspace.selection?.spaceId === data.space.id
-      ? workspace.selection
-      : null
-    : localRange;
+  const range = workspace ? sharedRange : localRange;
   const start = range?.start ?? "";
   const end = range?.end ?? "";
   const setRange = (next: { start: string; end: string } | null) => {
-    if (workspace) workspace.changeRange(data.space.id, next);
+    if (workspace)
+      workspace.draftStore.getState().changeRange(scope, data.space.id, next);
     else setLocalRange(next);
   };
   const [localTitle, setLocalTitle] = useState("");
@@ -57,14 +77,16 @@ export function BookingForm({
   const [localActorId, setLocalActorId] = useState(
     data.actors[0]?.teamId ?? "personal",
   );
-  const title = workspace ? workspace.draft.title : localTitle;
-  const actorId = workspace ? workspace.draft.actorId : localActorId;
+  const title = workspace ? sharedDraft.title : localTitle;
+  const actorId = workspace ? sharedDraft.actorId : localActorId;
   const setTitle = (value: string) => {
-    if (workspace) workspace.changeDraft(data.space.id, { title: value });
+    if (workspace)
+      workspace.draftStore.getState().changeDraft(scope, { title: value });
     else setLocalTitle(value);
   };
   const setActorId = (value: string) => {
-    if (workspace) workspace.changeDraft(data.space.id, { actorId: value });
+    if (workspace)
+      workspace.draftStore.getState().changeDraft(scope, { actorId: value });
     else setLocalActorId(value);
   };
   const slots = useMemo(() => selectableSlots(data), [data]);
@@ -90,11 +112,24 @@ export function BookingForm({
       restricted: !data.actors.some(({ teamId }) => teamId === null),
     },
     onSuccess: () => {
-      setRange(null);
-      if (workspace) workspace.clearDraftTitle(data.space.id);
-      else setLocalTitle("");
-      setExpanded(false);
-      onBooked?.();
+      // mutation 옵션은 재렌더링으로 바뀔 수 있어 제출 때의 범위로만 정리한다.
+      const completed = submitted.current;
+      submitted.current = null;
+      if (!completed) return;
+      if (completed.store) {
+        completed.store
+          .getState()
+          .changeRange(completed.scope, completed.spaceId, null);
+        completed.store.getState().clearTitle(completed.scope);
+      }
+      if (currentScope.current === completed.scope) {
+        if (!completed.store) {
+          setLocalRange(null);
+          setLocalTitle("");
+        }
+        setExpanded(false);
+      }
+      completed.onBooked?.();
     },
   });
   const [previousErrors, setPreviousErrors] = useState(mutation.fieldErrors);
@@ -254,6 +289,12 @@ export function BookingForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (!actor || !selectedStart || !selectedEnd || disabled) return;
+        submitted.current = {
+          scope,
+          spaceId: data.space.id,
+          store: workspace?.draftStore,
+          onBooked,
+        };
         void mutation.submit({
           spaceId: data.space.id,
           start: selectedStart,

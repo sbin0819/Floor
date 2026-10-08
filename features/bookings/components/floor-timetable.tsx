@@ -26,6 +26,7 @@ import type { FloorDayData } from "@/features/bookings/types";
 import { localTime } from "@/lib/time/zoned";
 import { cn } from "@/lib/utils";
 import { useFloorSelection } from "./branch-workspace";
+import { useBookingRange } from "./use-booking-draft";
 import { FloorTimetableRow } from "./floor-timetable-row";
 import { useBranchDisplayNow } from "./branch-display-clock";
 import { getDisplayOperatingState } from "@/features/bookings/display-operating-state";
@@ -56,13 +57,15 @@ export function FloorTimetable({
   onSelectSlot?: (input: TimetableSlotSelection) => void;
 }) {
   const workspace = useFloorSelection();
+  const sharedRange = useBookingRange(
+    workspace?.draftStore,
+    workspace?.bookingScope,
+  );
   const currentSearch = useSearchParams();
   const search = workspace?.search ?? currentSearch;
   const view = search.get("view") ?? undefined;
   const selection =
-    controlledSelection === undefined
-      ? (workspace?.selection ?? null)
-      : controlledSelection;
+    controlledSelection === undefined ? sharedRange : controlledSelection;
   const displayNow = useBranchDisplayNow({
     branchId: data.branch.id,
     now: data.now,

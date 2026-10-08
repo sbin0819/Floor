@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { FloorViews } from "@/features/bookings/components/floor-views";
+import { useBookingRange } from "@/features/bookings/components/use-booking-draft";
 import { floorDayFixture, spaceDayFixture } from "./booking-ui-fixtures";
 import type { NavigateAction } from "@/components/optimistic-navigation";
 import {
@@ -65,6 +66,10 @@ const slots = selectableSlots(spaceDayFixture());
 const firstStart = "2026-10-07T01:00:00.000Z";
 function WorkspaceControls() {
   const workspace = useFloorSelection()!;
+  const selection = useBookingRange(
+    workspace.draftStore,
+    workspace.bookingScope,
+  );
   const register = workspace.registerNavigation;
   useEffect(() => register("branch", today, spaceDayFixture().now), [register]);
   return (
@@ -72,7 +77,7 @@ function WorkspaceControls() {
       <output data-testid="workspace">
         {JSON.stringify({
           location: workspace.location,
-          selection: workspace.selection,
+          selection,
           pending: workspace.navigationPending,
         })}
       </output>

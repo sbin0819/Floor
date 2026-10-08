@@ -19,6 +19,12 @@ import {
 import { floorSelectionKey } from "@/features/bookings/floor-selection";
 import { floorIdFromSegments } from "@/features/bookings/components/use-branch-route-scope";
 import { SpaceDetailContainer } from "@/features/bookings/components/space-detail-container";
+import {
+  useBookingDraft,
+  useBookingRange,
+} from "@/features/bookings/components/use-booking-draft";
+import type { BookingDraft } from "@/features/bookings/booking-draft-store";
+import type { FloorBookingSelection } from "@/features/bookings/selection";
 
 const route = vi.hoisted(() => ({
   pathname: "/branches/branch-a/floors/floor-a",
@@ -43,15 +49,23 @@ const spaceId = "abcdefab-1234-4abc-9def-123456789abc";
 const date = "2026-10-07";
 const initialQuery = `date=${date}&space=${spaceId}&detail=1&view=timeline`;
 const range = { start: "2026-10-07T01:00:00Z", end: "2026-10-07T02:00:00Z" };
-let current: NonNullable<ReturnType<typeof useFloorSelection>>;
+let current: NonNullable<ReturnType<typeof useFloorSelection>> & {
+  draft: BookingDraft;
+  selection: FloorBookingSelection | null;
+};
 
 function Controls() {
   const workspace = useFloorSelection()!;
+  const draft = useBookingDraft(workspace.draftStore, workspace.bookingScope);
+  const selection = useBookingRange(
+    workspace.draftStore,
+    workspace.bookingScope,
+  );
   const register = workspace.registerNavigation;
   useEffect(() => register(branchId, date, "2026-10-07T01:00:00Z"), [register]);
   useEffect(() => {
-    current = workspace;
-  }, [workspace]);
+    current = { ...workspace, draft, selection };
+  }, [workspace, draft, selection]);
   return (
     <>
       <output data-testid="scope">
@@ -60,14 +74,16 @@ function Controls() {
           location: workspace.location,
           query: workspace.search.toString(),
           active: workspace.routeActive,
-          selection: workspace.selection,
-          draft: workspace.draft,
+          selection,
+          draft,
         })}
       </output>
       <button
         onClick={() => {
-          workspace.changeRange(spaceId, range);
-          workspace.changeDraft(spaceId, {
+          workspace.draftStore
+            .getState()
+            .changeRange(workspace.bookingScope, spaceId, range);
+          workspace.draftStore.getState().changeDraft(workspace.bookingScope, {
             title: "남길 제목",
             actorId: "team",
           });

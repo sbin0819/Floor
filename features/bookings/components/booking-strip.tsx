@@ -11,10 +11,15 @@ import {
   formatBookingTime,
 } from "@/features/bookings/format";
 import { useFloorSelection } from "./branch-workspace";
+import { useBookingRange } from "./use-booking-draft";
 import { FloorNavigationLink } from "./floor-navigation-link";
 
 export function BookingStrip({ children }: { children: ReactNode }) {
   const workspace = useFloorSelection();
+  const sharedRange = useBookingRange(
+    workspace?.draftStore,
+    workspace?.bookingScope,
+  );
   const [photoOpen, setPhotoOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const data = workspace?.floorData;
@@ -31,8 +36,7 @@ export function BookingStrip({ children }: { children: ReactNode }) {
     space.kind !== "accessible"
   )
     return null;
-  const range =
-    workspace.selection?.spaceId === space.id ? workspace.selection : null;
+  const range = sharedRange?.spaceId === space.id ? sharedRange : null;
   const duration = range
     ? (Date.parse(range.end) - Date.parse(range.start)) / 60_000
     : 0;

@@ -25,6 +25,7 @@ import {
 import { FloorViews } from "@/features/bookings/components/floor-views";
 import { SpaceDetailContainer } from "@/features/bookings/components/space-detail-container";
 import { SpaceDetail } from "@/features/bookings/components/space-detail";
+import { useBookingRange } from "@/features/bookings/components/use-booking-draft";
 import { floorSelectionKey } from "@/features/bookings/floor-selection";
 import { floorHref } from "@/features/bookings/format";
 import type { FloorBookingSelection } from "@/features/bookings/selection";
@@ -116,13 +117,10 @@ function floorFixture(): FloorDayData {
 const floorData = floorFixture();
 function ClockAndSelection() {
   const workspace = useFloorSelection()!;
+  const range = useBookingRange(workspace.draftStore, workspace.bookingScope);
   const register = workspace.registerNavigation;
   useEffect(() => register(branchId, date, floorData.now), [register]);
-  return (
-    <output data-testid="shared-range">
-      {JSON.stringify(workspace.selection)}
-    </output>
-  );
+  return <output data-testid="shared-range">{JSON.stringify(range)}</output>;
 }
 function Frame({
   client,
