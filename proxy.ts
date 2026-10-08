@@ -25,5 +25,6 @@ export const config = {
     "/branches/:path*",
     "/bookings",
     "/booking",
+    "/notifications",
   ],
 };

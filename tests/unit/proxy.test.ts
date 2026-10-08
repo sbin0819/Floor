@@ -14,6 +14,7 @@ describe("optimistic route protection", () => {
     "/branches/branch/floors/floor",
     "/bookings",
     "/booking",
+    "/notifications",
   ])("matches protected route %s", (url) => {
     expect(unstable_doesProxyMatch({ config, nextConfig: {}, url })).toBe(true);
   });
@@ -25,6 +26,7 @@ describe("optimistic route protection", () => {
     "/reset-password",
     "/api/auth/sign-in/email",
     "/api/participants/search",
+    "/api/notifications",
     "/favicon.ico",
     "/_next/static/test.js",
   ])("does not touch public route %s", (url) => {
