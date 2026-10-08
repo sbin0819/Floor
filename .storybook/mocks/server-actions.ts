@@ -12,6 +12,8 @@ export const createDeskBooking = readOnlyAction;
 export const cancelBooking = readOnlyAction;
 export const leaveBooking = readOnlyAction;
 export const setDefaultBranch = readOnlyAction;
+export const markNotificationRead = readOnlyAction;
+export const markAllNotificationsRead = () => readOnlyAction(undefined);
 
 export const updateBranch = readOnlyAction;
 export const createFloor = readOnlyAction;
