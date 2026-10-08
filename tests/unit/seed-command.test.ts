@@ -3,6 +3,10 @@ import { parseEnv } from "@/lib/env";
 import { SeedError } from "@/lib/seed/errors";
 import { loadSeedData } from "@/lib/seed/data";
 import {
+  chatSpacesTarget,
+  type ChatSpacesReceipt,
+} from "@/lib/seed/chat-spaces-receipt";
+import {
   bookingRound2HostHash,
   type BookingRound2Receipt,
 } from "@/lib/seed/booking-round2-receipt";
@@ -46,6 +50,15 @@ function dependencies(
       .mockResolvedValue(),
     archiveReceipt: vi
       .fn<SeedCommandDependencies["archiveReceipt"]>()
+      .mockResolvedValue(null),
+    readChatSpacesReceipt: vi
+      .fn<SeedCommandDependencies["readChatSpacesReceipt"]>()
+      .mockResolvedValue(null),
+    writeChatSpacesReceipt: vi
+      .fn<SeedCommandDependencies["writeChatSpacesReceipt"]>()
+      .mockResolvedValue(),
+    archiveChatSpacesReceipt: vi
+      .fn<SeedCommandDependencies["archiveChatSpacesReceipt"]>()
       .mockResolvedValue(null),
     stdout: vi.fn(),
     stderr: vi.fn(),
@@ -534,7 +547,7 @@ describe("explicit full-data reset safety", () => {
     expect(deps.runSeed).toHaveBeenCalledOnce();
     expect(deps.archiveReceipt).toHaveBeenCalledOnce();
     expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
-      "DB 초기화와 시드 재생성은 끝났지만 이전 예약 2차 적용 표식을 보관하지 못했어요. 자동으로 다시 실행하지 말고 이 호스트의 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
+      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
     );
     expect(deps.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
     expect(deps.closeDatabase).toHaveBeenCalledOnce();
@@ -576,6 +589,196 @@ describe("explicit full-data reset safety", () => {
         expect(options).not.toHaveProperty("resetData");
     },
   );
+});
+
+describe("chat-spaces additions command", () => {
+  const target = chatSpacesTarget(connectionString);
+  const receipt: ChatSpacesReceipt = {
+    version: 1,
+    mode: "chat-spaces",
+    targetHash: target.targetHash,
+    manifestHash: "a".repeat(64),
+    bundleHash: "b".repeat(64),
+    appliedAt: currentTime.toISOString(),
+    lounges: [
+      {
+        branchId: "15eeb72a-6e7f-57ca-a905-d8797f988992",
+        spaceId: "8ac46e85-57e5-55cf-aa23-1608a7664b1d",
+        roomId: "04b9ed91-94b2-5940-97bb-c67bca0132e7",
+      },
+    ],
+  };
+  const applied = {
+    counts: { communitySpaces: 1, spaceMembers: 6, chatMessages: 6 },
+    skippedBookings: 0,
+    accounts: ["test1@ai.com"],
+    chatSpaces: { applied: true, receipt },
+  };
+  const deps = () =>
+    dependencies({ AUTH_SECRET: undefined, SEED_ALLOW_HOST: "localhost" });
+  it.each([
+    ["--reset-passwords"],
+    ["--branches", "invalid"],
+    ["--booking-round2"],
+    ["--reset-data", "--confirm-reset"],
+    ["--confirm-reset"],
+  ])("rejects other modes %j before environment/DB reads", async (...other) => {
+    const d = deps();
+    expect(await runSeedCommand(["--chat-spaces", ...other], d)).toBe(1);
+    expect(d.getEnvironment).not.toHaveBeenCalled();
+    expect(d.readChatSpacesReceipt).not.toHaveBeenCalled();
+    expectNoDatabaseUse(d);
+  });
+  it("requires exact allowed host including localhost", async () => {
+    const d = dependencies({ AUTH_SECRET: undefined });
+    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
+    expectNoDatabaseUse(d);
+    expect(d.readChatSpacesReceipt).not.toHaveBeenCalled();
+  });
+  it("writes a private target receipt only after commit and never initializes auth", async () => {
+    const d = deps();
+    let commit!: (value: typeof applied) => void;
+    d.runSeed.mockReturnValue(
+      new Promise((resolve) => {
+        commit = resolve;
+      }),
+    );
+    const command = runSeedCommand(["--chat-spaces"], d);
+    await vi.waitFor(() => expect(d.runSeed).toHaveBeenCalledOnce());
+    expect(d.runSeed).toHaveBeenCalledWith({
+      now: currentTime,
+      resetPasswords: false,
+      chatSpaces: {
+        targetHash: target.targetHash,
+        databaseName: target.databaseName,
+        receipt: null,
+      },
+    });
+    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
+    commit(applied);
+    expect(await command).toBe(0);
+    expect(d.writeChatSpacesReceipt).toHaveBeenCalledExactlyOnceWith(receipt);
+    expect(d.writeReceipt).not.toHaveBeenCalled();
+    expect(d.closeDatabase).toHaveBeenCalledOnce();
+    const output = JSON.stringify([d.stdout.mock.calls, d.stderr.mock.calls]);
+    expect(output).toContain("참조한 기존 계정 (변경 없음)");
+    for (const value of [
+      connectionString,
+      target.databaseName,
+      target.targetHash,
+      "private-db-password",
+      "비밀번호는",
+    ])
+      expect(output).not.toContain(value);
+  });
+  it("reuses a valid receipt without rewriting it", async () => {
+    const d = deps();
+    d.readChatSpacesReceipt.mockResolvedValue(receipt);
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      counts: {},
+      chatSpaces: { applied: false, receipt },
+    });
+    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(0);
+    expect(d.runSeed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chatSpaces: {
+          targetHash: target.targetHash,
+          databaseName: target.databaseName,
+          receipt,
+        },
+      }),
+    );
+    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
+    expect(d.stdout).toHaveBeenCalledWith(
+      "스페이스 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
+    );
+  });
+  it("blocks unreadable receipts before any DB access", async () => {
+    const d = deps();
+    d.readChatSpacesReceipt.mockRejectedValue(new Error("private receipt"));
+    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
+    expectNoDatabaseUse(d);
+    expect(JSON.stringify(d.stderr.mock.calls)).not.toContain("private");
+  });
+  it("reports committed-but-unrecorded failure and never retries", async () => {
+    const d = deps();
+    d.runSeed.mockResolvedValue(applied);
+    d.writeChatSpacesReceipt.mockRejectedValue(new Error("private path"));
+    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
+    expect(d.runSeed).toHaveBeenCalledOnce();
+    expect(d.stderr).toHaveBeenCalledWith(
+      "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
+    );
+    expect(d.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
+  });
+  it("never records failed transactions or a mismatched committed result", async () => {
+    const d = deps();
+    d.runSeed.mockRejectedValue(new SeedError("부분 적용을 확인해 주세요."));
+    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
+    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      chatSpaces: {
+        applied: true,
+        receipt: { ...receipt, targetHash: "f".repeat(64) },
+      },
+    });
+    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
+    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
+  });
+  it("archives both mode receipts only after successful reset", async () => {
+    const d = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      chatSpaces: undefined,
+      reset: { migrationCount: 27, counts: { users: 21 } },
+    });
+    expect(await runSeedCommand(["--reset-data", "--confirm-reset"], d)).toBe(
+      0,
+    );
+    expect(d.archiveChatSpacesReceipt).toHaveBeenCalledExactlyOnceWith(
+      target.targetHash,
+    );
+    expect(
+      d.archiveChatSpacesReceipt.mock.invocationCallOrder[0],
+    ).toBeGreaterThan(d.runSeed.mock.invocationCallOrder[0]!);
+  });
+  it("reports a failed chat receipt archive after the booking receipt was already archived", async () => {
+    const d = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      chatSpaces: undefined,
+      reset: { migrationCount: 27, counts: { users: 21 } },
+    });
+    d.archiveReceipt.mockResolvedValue("booking.reset-archive");
+    d.archiveChatSpacesReceipt.mockRejectedValue(
+      new Error("private receipt path"),
+    );
+    expect(await runSeedCommand(["--reset-data", "--confirm-reset"], d)).toBe(
+      1,
+    );
+    expect(d.runSeed).toHaveBeenCalledOnce();
+    expect(d.archiveReceipt).toHaveBeenCalledOnce();
+    expect(d.archiveChatSpacesReceipt).toHaveBeenCalledExactlyOnceWith(
+      target.targetHash,
+    );
+    expect(d.stderr).toHaveBeenCalledExactlyOnceWith(
+      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
+    );
+    expect(d.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
+    expect(d.closeDatabase).toHaveBeenCalledOnce();
+  });
+  it("rejects doubly encoded DB names before reading receipts or accessing the DB", async () => {
+    const d = dependencies({
+      DATABASE_URL: "postgres://localhost/%2546loor",
+      SEED_ALLOW_HOST: "localhost",
+    });
+    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
+    expect(d.readChatSpacesReceipt).not.toHaveBeenCalled();
+    expectNoDatabaseUse(d);
+    expect(JSON.stringify(d.stderr.mock.calls)).not.toContain("%2546loor");
+  });
 });
 
 describe("booking-round2 command and commit receipts", () => {

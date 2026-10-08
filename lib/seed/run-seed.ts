@@ -44,6 +44,12 @@ import {
 import type { BookingRound2Receipt } from "@/lib/seed/booking-round2-receipt";
 import { resetSeedDatabase } from "@/lib/dal/seed-reset";
 import { seedMigrations } from "./migrations";
+import { applyChatSpacesSeed } from "./chat-spaces";
+import {
+  validateChatSpacesOptions,
+  type ChatSpacesOptions,
+  type ChatSpacesReceipt,
+} from "./chat-spaces-receipt";
 
 export type SeedResult = {
   counts: Record<string, number>;
@@ -52,6 +58,7 @@ export type SeedResult = {
   accounts: string[];
   branchScope?: { addedBranchIds: string[]; skippedBranchIds: string[] };
   bookingRound2?: { applied: boolean; receipt: BookingRound2Receipt };
+  chatSpaces?: { applied: boolean; receipt: ChatSpacesReceipt };
   reset?: { migrationCount: number; counts: Record<string, number> };
 };
 
@@ -62,6 +69,7 @@ export async function runSeed({
   resetPasswords,
   branchIds,
   bookingRound2,
+  chatSpaces,
   resetData = false,
 }: {
   db?: TransactionDatabase;
@@ -70,10 +78,23 @@ export async function runSeed({
   resetPasswords: boolean;
   branchIds?: readonly string[];
   bookingRound2?: BookingRound2Options;
+  chatSpaces?: ChatSpacesOptions;
   resetData?: boolean;
 }): Promise<SeedResult> {
   if (!Number.isFinite(now.getTime()))
     throw new SeedError("시드 기준 시각이 올바르지 않아요.");
+  if (chatSpaces !== undefined) {
+    if (
+      branchIds !== undefined ||
+      bookingRound2 !== undefined ||
+      resetPasswords ||
+      resetData
+    )
+      throw new SeedError(
+        "스페이스 전용 모드는 다른 범위·초기화·비밀번호 재설정과 함께 쓸 수 없어요.",
+      );
+    validateChatSpacesOptions(chatSpaces);
+  }
   if (
     resetData &&
     (branchIds !== undefined || bookingRound2 !== undefined || resetPasswords)
@@ -99,6 +120,17 @@ export async function runSeed({
     const people2 = loadSeedPeople2(data, people);
     const meeting = loadSeedMeeting(data, bookingExtras);
     const migrations = resetData ? seedMigrations() : [];
+    if (chatSpaces !== undefined) {
+      current = "스페이스 추가 전용 데이터";
+      return await withTransaction(
+        (database) =>
+          applyChatSpacesSeed(
+            { ...chatSpaces, data, spaces: spaceChat, now },
+            database,
+          ),
+        db,
+      );
+    }
     const meetingPlans = new Map(
       data.bookings.map(({ id }) => {
         const messages = meeting.messages.filter(
@@ -442,9 +474,9 @@ export async function runSeed({
       throw new SeedError(
         `${current}: 다른 행이 같은 고유 값을 사용하고 있어요. 시드를 되돌렸어요.`,
       );
-    if (resetData)
+    if (resetData || chatSpaces !== undefined)
       throw new SeedError(
-        "초기화 완료 여부를 확인하지 못했어요. 연결 오류는 커밋 응답 유실일 수 있어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.",
+        `${chatSpaces === undefined ? "초기화" : "스페이스 추가"} 완료 여부를 확인하지 못했어요. 연결 오류는 커밋 응답 유실일 수 있어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.`,
       );
     throw new SeedError(
       `${current}: 시드를 완료하지 못했어요. 모든 시드 변경을 되돌렸어요.`,

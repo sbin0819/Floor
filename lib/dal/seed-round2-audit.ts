@@ -9,7 +9,7 @@ import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import type { DalDatabase } from "./database";
 
 // 검증 대상과 키는 코드가 정한다. 이메일·토큰처럼 민감한 값은 키로 쓰지 않는다.
-const protectedTables = {
+export const seedAuditTableKeys = {
   users: ["id"],
   auth_accounts: ["id"],
   auth_sessions: ["id"],
@@ -31,6 +31,14 @@ const protectedTables = {
   floor_plans: ["id"],
   notifications: ["id"],
   chat_rooms: ["id"],
+  chat_room_members: ["room_id", "user_id"],
+  chat_room_reads: ["room_id", "user_id"],
+  chat_space_prefs: ["space_id", "user_id"],
+  message_mentions: ["message_id", "user_id"],
+  message_reactions: ["message_id", "user_id", "emoji"],
+  friendships: ["user_low_id", "user_high_id"],
+  user_blocks: ["blocker_id", "blocked_id"],
+  reports: ["id"],
   messages: ["id"],
   message_attachments: ["id"],
   chat_spaces: ["id"],
@@ -39,6 +47,7 @@ const protectedTables = {
   call_sessions: ["id"],
   call_participants: ["id"],
 } as const;
+const protectedTables = seedAuditTableKeys;
 type ProtectedTable = keyof typeof protectedTables;
 type RowFingerprint = { key: string; hash: string };
 export type SeedRound2Audit = {

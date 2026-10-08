@@ -267,7 +267,19 @@ describe("read-only booking round2 preservation audit", () => {
     });
     const before = await capture();
     expect(await capture()).toEqual(before);
-    expect(before.tables).toHaveLength(28);
+    expect(before.tables).toHaveLength(36);
+    expect(before.tables.map(({ table }) => table)).toEqual(
+      expect.arrayContaining([
+        "chat_room_members",
+        "chat_room_reads",
+        "chat_space_prefs",
+        "message_mentions",
+        "message_reactions",
+        "friendships",
+        "user_blocks",
+        "reports",
+      ]),
+    );
     expect(before.tables.every((table) => table.exists)).toBe(true);
     const account = before.tables.find(
       ({ table }) => table === "auth_accounts",

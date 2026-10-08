@@ -7,8 +7,14 @@ import {
   bookingRound2HostHash,
   type BookingRound2Receipt,
 } from "@/lib/seed/booking-round2-receipt";
+import {
+  chatSpacesTarget,
+  type ChatSpacesOptions,
+  type ChatSpacesReceipt,
+} from "@/lib/seed/chat-spaces-receipt";
 
 export const seedUsage =
+  "pnpm db:seed --chat-spaces (라운지·커뮤니티 추가만, 기존 계정·대화 보존. 다른 모드와 병용 불가)\n" +
   "pnpm db:seed [--reset-passwords] [--help]\npnpm db:seed --branches <UUID,UUID,...> (없는 지점만 추가, 기존 지점·계정은 변경하지 않음)\npnpm db:seed --booking-round2 (예약 2차 추가분만 적용, 다른 범위·비밀번호 초기화와 함께 사용 불가)\npnpm db:seed --reset-data --confirm-reset (기존 개발 데이터 전체 삭제 후 시드 재생성, 복구 불가. 로컬 DB도 정확한 SEED_ALLOW_HOST 필수)";
 
 export type SeedCommandDependencies = {
@@ -25,10 +31,16 @@ export type SeedCommandDependencies = {
     resetData?: boolean;
     branchIds?: readonly string[];
     bookingRound2?: { hostHash: string; receipt: BookingRound2Receipt | null };
+    chatSpaces?: ChatSpacesOptions;
   }) => Promise<SeedResult>;
   readReceipt: (hostHash: string) => Promise<BookingRound2Receipt | null>;
   writeReceipt: (receipt: BookingRound2Receipt) => Promise<void>;
   archiveReceipt: (hostHash: string) => Promise<string | null>;
+  readChatSpacesReceipt: (
+    targetHash: string,
+  ) => Promise<ChatSpacesReceipt | null>;
+  writeChatSpacesReceipt: (receipt: ChatSpacesReceipt) => Promise<void>;
+  archiveChatSpacesReceipt: (targetHash: string) => Promise<string | null>;
   closeDatabase: () => Promise<void>;
   stdout: (message: string) => void;
   stderr: (message: string) => void;
@@ -61,6 +73,19 @@ export async function runSeedCommand(
   if (values.help) {
     dependencies.stdout(seedUsage);
     return 0;
+  }
+  if (
+    values["chat-spaces"] &&
+    (values.branches !== undefined ||
+      values["booking-round2"] ||
+      values["reset-passwords"] ||
+      values["reset-data"] ||
+      values["confirm-reset"])
+  ) {
+    dependencies.stderr(
+      "--chat-spaces는 다른 시드 범위나 초기화 옵션과 함께 쓸 수 없어요.",
+    );
+    return 1;
   }
   if (values["reset-data"] !== values["confirm-reset"]) {
     dependencies.stderr(
@@ -105,6 +130,7 @@ export async function runSeedCommand(
   }
 
   let hostname: string;
+  let chatTarget: ReturnType<typeof chatSpacesTarget> | undefined;
   try {
     const environment = dependencies.getEnvironment();
     if (environment.NODE_ENV === "production") {
@@ -113,7 +139,10 @@ export async function runSeedCommand(
     }
     const missing = [
       ...(!environment.DATABASE_URL ? ["DATABASE_URL"] : []),
-      ...(!branchIds && !values["booking-round2"] && !environment.AUTH_SECRET
+      ...(!branchIds &&
+      !values["booking-round2"] &&
+      !values["chat-spaces"] &&
+      !environment.AUTH_SECRET
         ? ["AUTH_SECRET"]
         : []),
     ];
@@ -124,8 +153,11 @@ export async function runSeedCommand(
       return 1;
     }
     hostname = databaseHost(environment.DATABASE_URL!);
+    if (values["chat-spaces"] || values["reset-data"])
+      chatTarget = chatSpacesTarget(environment.DATABASE_URL!);
     if (
       (values["reset-data"] ||
+        values["chat-spaces"] ||
         (hostname !== "localhost" && hostname !== "127.0.0.1")) &&
       environment.SEED_ALLOW_HOST !== hostname
     ) {
@@ -159,6 +191,23 @@ export async function runSeedCommand(
       return 1;
     }
   }
+  let chatSpaces: ChatSpacesOptions | undefined;
+  if (values["chat-spaces"] && chatTarget) {
+    try {
+      chatSpaces = {
+        targetHash: chatTarget.targetHash,
+        databaseName: chatTarget.databaseName,
+        receipt: await dependencies.readChatSpacesReceipt(
+          chatTarget.targetHash,
+        ),
+      };
+    } catch {
+      dependencies.stderr(
+        "스페이스 적용 표식을 읽지 못했어요. DB를 변경하지 않았어요. 표식과 적용 상태를 확인해 주세요.",
+      );
+      return 1;
+    }
+  }
   let exitCode = 0;
   let appliedWithoutReceipt = false;
   let resetWithoutReceiptArchive = false;
@@ -174,6 +223,7 @@ export async function runSeedCommand(
       ...(values["reset-data"] ? { resetData: true } : {}),
       ...(branchIds ? { branchIds } : {}),
       ...(bookingRound2 ? { bookingRound2 } : {}),
+      ...(chatSpaces ? { chatSpaces } : {}),
     });
     if (values["reset-data"]) {
       if (!result.reset)
@@ -183,6 +233,9 @@ export async function runSeedCommand(
       resetWithoutReceiptArchive = true;
       const archived = await dependencies.archiveReceipt(
         bookingRound2HostHash(hostname),
+      );
+      const archivedChat = await dependencies.archiveChatSpacesReceipt(
+        chatTarget!.targetHash,
       );
       resetWithoutReceiptArchive = false;
       dependencies.stdout(
@@ -196,6 +249,10 @@ export async function runSeedCommand(
           ? `이 호스트의 이전 예약 2차 적용 표식을 같은 폴더에 보관했어요: ${archived}`
           : "이 호스트의 이전 예약 2차 적용 표식은 없어요.",
       );
+      if (archivedChat)
+        dependencies.stdout(
+          "이 DB의 이전 스페이스 적용 표식을 같은 폴더에 보관했어요.",
+        );
     }
     if (bookingRound2) {
       if (!result.bookingRound2)
@@ -218,6 +275,27 @@ export async function runSeedCommand(
         "다음 건수는 이번에 추가·보완한 행이며 DB 전체 건수가 아니에요.",
       );
     }
+    if (chatSpaces) {
+      if (!result.chatSpaces)
+        throw new SeedError(
+          "스페이스 적용 결과를 확인하지 못했어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.",
+        );
+      if (result.chatSpaces.applied) {
+        appliedWithoutReceipt = true;
+        if (result.chatSpaces.receipt.targetHash !== chatSpaces.targetHash)
+          throw new Error("Receipt target mismatch");
+        await dependencies.writeChatSpacesReceipt(result.chatSpaces.receipt);
+        appliedWithoutReceipt = false;
+      }
+      dependencies.stdout(
+        result.chatSpaces.applied
+          ? "라운지·커뮤니티 추가분을 적용하고 완료 표식을 저장했어요."
+          : "스페이스 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
+      );
+      dependencies.stdout(
+        "다음 건수는 이번에 추가한 행이며 DB 전체 건수가 아니에요.",
+      );
+    }
     dependencies.stdout("시드 데이터를 준비했어요.");
     if (result.branchScope) {
       dependencies.stdout(
@@ -238,14 +316,14 @@ export async function runSeedCommand(
         `건너뛴 회의 메시지: ${result.skippedMeetingMessages}개`,
       );
     dependencies.stdout(
-      `${result.branchScope || bookingRound2 ? "참조한 기존 계정 (변경 없음)" : "계정"}: ${result.accounts.join(", ")}`,
+      `${result.branchScope || bookingRound2 || chatSpaces ? "참조한 기존 계정 (변경 없음)" : "계정"}: ${result.accounts.join(", ")}`,
     );
-    if (!result.branchScope && !bookingRound2)
+    if (!result.branchScope && !bookingRound2 && !chatSpaces)
       dependencies.stdout("비밀번호는 README에 있어요.");
   } catch (error) {
     dependencies.stderr(
       resetWithoutReceiptArchive
-        ? "DB 초기화와 시드 재생성은 끝났지만 이전 예약 2차 적용 표식을 보관하지 못했어요. 자동으로 다시 실행하지 말고 이 호스트의 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요."
+        ? "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요."
         : appliedWithoutReceipt
           ? "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요."
           : error instanceof SeedError
@@ -274,6 +352,7 @@ function parseSeedArguments(args: string[]) {
       "reset-data": { type: "boolean", default: false },
       "confirm-reset": { type: "boolean", default: false },
       "booking-round2": { type: "boolean", default: false },
+      "chat-spaces": { type: "boolean", default: false },
       branches: { type: "string" },
       help: { type: "boolean", default: false },
     },
