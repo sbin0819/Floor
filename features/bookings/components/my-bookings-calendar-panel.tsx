@@ -24,6 +24,7 @@ import {
 import { BookingTime } from "./booking-time";
 import { LeaveBookingButton } from "./leave-booking-button";
 import { BookingParticipantsSummary } from "./booking-participants-summary";
+import { EditBookingLink } from "./edit-booking-link";
 import {
   CalendarBookingData,
   type CalendarBookings,
@@ -104,6 +105,7 @@ function CalendarBookingCards({
                     <Link href={spaceHref}>공간 보기</Link>
                   </Button>
                 )}
+                <EditBookingLink booking={booking} now={now} />
                 {canLeaveBooking(booking, now) ? (
                   <LeaveBookingButton bookingId={booking.id} />
                 ) : (

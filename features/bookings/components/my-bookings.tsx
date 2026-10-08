@@ -31,6 +31,7 @@ import { BookingTime } from "./booking-time";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { LeaveBookingButton } from "./leave-booking-button";
 import { BookingParticipantsSummary } from "./booking-participants-summary";
+import { EditBookingLink } from "./edit-booking-link";
 import { MyBookingsViewLinks } from "./my-bookings-view-links";
 
 export type BookingHistoryTab = "upcoming" | "past";
@@ -131,6 +132,9 @@ function BookingList({
                       >
                         {status}
                       </Badge>
+                    )}
+                    {upcoming && (
+                      <EditBookingLink booking={booking} now={now} />
                     )}
                     {upcoming && canLeaveBooking(booking, now) ? (
                       <LeaveBookingButton bookingId={booking.id} />

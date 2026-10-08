@@ -50,3 +50,18 @@ export function canLeaveBooking(
 ): boolean {
   return booking.relation === "invited" && isUnfinishedBooking(booking, now);
 }
+
+export function canEditBooking(
+  booking: Pick<
+    MyBooking,
+    "relation" | "status" | "end" | "desk" | "spaceType"
+  >,
+  now: string,
+): boolean {
+  return (
+    booking.relation === "owner" &&
+    !booking.desk &&
+    booking.spaceType !== "desk" &&
+    isUnfinishedBooking(booking, now)
+  );
+}
