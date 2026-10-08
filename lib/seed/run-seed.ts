@@ -20,11 +20,14 @@ import { SeedError } from "@/lib/seed/errors";
 import { loadSeedPhotos } from "@/lib/seed/photos";
 import { getOperatingDate } from "@/lib/time/open-hours";
 import { zonedDateTime } from "@/lib/time/zoned";
+import { addSeedBranches } from "@/lib/seed/add-branches";
+import { selectSeedBranches, validateSeedBranchIds } from "@/lib/seed/scope";
 
 export type SeedResult = {
   counts: Record<string, number>;
   skippedBookings: number;
   accounts: string[];
+  branchScope?: { addedBranchIds: string[]; skippedBranchIds: string[] };
 };
 
 export async function runSeed({
@@ -32,11 +35,13 @@ export async function runSeed({
   auth,
   now,
   resetPasswords,
+  branchIds,
 }: {
   db?: TransactionDatabase;
   auth?: AuthInstance;
   now: Date;
   resetPasswords: boolean;
+  branchIds?: readonly string[];
 }): Promise<SeedResult> {
   if (!Number.isFinite(now.getTime()))
     throw new SeedError("시드 기준 시각이 올바르지 않아요.");
@@ -44,6 +49,14 @@ export async function runSeed({
   try {
     const data = loadSeedData();
     const photos = loadSeedPhotos(data);
+    if (branchIds !== undefined) {
+      const ids = validateSeedBranchIds(branchIds, data, resetPasswords);
+      const scope = selectSeedBranches(data, photos, ids);
+      return await withTransaction(
+        (database) => addSeedBranches(scope, database, now),
+        db,
+      );
+    }
     const instance = auth ?? getAuth();
     return await withTransaction(async (database) => {
       const provisioning = await createProvisioningAuth({

@@ -1,8 +1,11 @@
 import { parseArgs } from "node:util";
 import { SeedError } from "@/lib/seed/errors";
 import type { SeedResult } from "@/lib/seed/run-seed";
+import { loadSeedData } from "@/lib/seed/data";
+import { validateSeedBranchIds } from "@/lib/seed/scope";
 
-export const seedUsage = "pnpm db:seed [--reset-passwords] [--help]";
+export const seedUsage =
+  "pnpm db:seed [--reset-passwords] [--help]\npnpm db:seed --branches <UUID,UUID,...> (없는 지점만 추가, 기존 지점·계정은 변경하지 않음)";
 
 export type SeedCommandDependencies = {
   getEnvironment: () => {
@@ -15,6 +18,7 @@ export type SeedCommandDependencies = {
   runSeed: (options: {
     now: Date;
     resetPasswords: boolean;
+    branchIds?: readonly string[];
   }) => Promise<SeedResult>;
   closeDatabase: () => Promise<void>;
   stdout: (message: string) => void;
@@ -49,6 +53,21 @@ export async function runSeedCommand(
     dependencies.stdout(seedUsage);
     return 0;
   }
+  let branchIds: string[] | undefined;
+  if (values.branches !== undefined) {
+    try {
+      branchIds = validateSeedBranchIds(
+        values.branches.split(","),
+        loadSeedData(),
+        values["reset-passwords"],
+      );
+    } catch {
+      dependencies.stderr(
+        "추가할 시드 지점 ID를 중복 없이 확인해 주세요. --branches와 --reset-passwords는 함께 쓸 수 없어요.",
+      );
+      return 1;
+    }
+  }
 
   let hostname: string;
   try {
@@ -59,7 +78,7 @@ export async function runSeedCommand(
     }
     const missing = [
       ...(!environment.DATABASE_URL ? ["DATABASE_URL"] : []),
-      ...(!environment.AUTH_SECRET ? ["AUTH_SECRET"] : []),
+      ...(!branchIds && !environment.AUTH_SECRET ? ["AUTH_SECRET"] : []),
     ];
     if (missing.length > 0) {
       dependencies.stderr(
@@ -91,13 +110,27 @@ export async function runSeedCommand(
     const result = await dependencies.runSeed({
       now: dependencies.now(),
       resetPasswords: values["reset-passwords"],
+      ...(branchIds ? { branchIds } : {}),
     });
     dependencies.stdout("시드 데이터를 준비했어요.");
+    if (result.branchScope) {
+      dependencies.stdout(
+        `추가한 지점: ${result.branchScope.addedBranchIds.length}개`,
+      );
+      dependencies.stdout(
+        `이미 있어 건너뛴 지점: ${result.branchScope.skippedBranchIds.length}개`,
+      );
+      dependencies.stdout(
+        "다음 건수는 이번에 추가한 행이며 DB 전체 건수가 아니에요.",
+      );
+    }
     for (const [table, count] of Object.entries(result.counts))
       dependencies.stdout(`${table}: ${count}개`);
     dependencies.stdout(`건너뛴 예약: ${result.skippedBookings}개`);
-    dependencies.stdout(`계정: ${result.accounts.join(", ")}`);
-    dependencies.stdout("비밀번호는 README에 있어요.");
+    dependencies.stdout(
+      `${result.branchScope ? "참조한 기존 계정 (변경 없음)" : "계정"}: ${result.accounts.join(", ")}`,
+    );
+    if (!result.branchScope) dependencies.stdout("비밀번호는 README에 있어요.");
   } catch (error) {
     dependencies.stderr(
       error instanceof SeedError
@@ -123,6 +156,7 @@ function parseSeedArguments(args: string[]) {
     allowPositionals: false,
     options: {
       "reset-passwords": { type: "boolean", default: false },
+      branches: { type: "string" },
       help: { type: "boolean", default: false },
     },
   }).values;

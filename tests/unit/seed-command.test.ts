@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { parseEnv } from "@/lib/env";
 import { SeedError } from "@/lib/seed/errors";
+import { loadSeedData } from "@/lib/seed/data";
 import {
   runSeedCommand,
   seedUsage,
@@ -45,6 +46,71 @@ function expectNoDatabaseUse(deps: ReturnType<typeof dependencies>) {
 }
 
 describe("seed command safety and output", () => {
+  const branchIds = loadSeedData()
+    .branches.slice(0, 2)
+    .map(({ id }) => id);
+
+  it.each([
+    "",
+    "invalid",
+    crypto.randomUUID(),
+    `${branchIds[0]},${branchIds[0]}`,
+  ])(
+    "rejects invalid branch selection before environment access: %s",
+    async (ids) => {
+      const deps = dependencies();
+      expect(await runSeedCommand(["--branches", ids], deps)).toBe(1);
+      expect(deps.getEnvironment).not.toHaveBeenCalled();
+      expectNoDatabaseUse(deps);
+    },
+  );
+
+  it("rejects branch selection with password reset before environment access", async () => {
+    const deps = dependencies();
+    expect(
+      await runSeedCommand(
+        ["--branches", branchIds.join(","), "--reset-passwords"],
+        deps,
+      ),
+    ).toBe(1);
+    expect(deps.getEnvironment).not.toHaveBeenCalled();
+    expectNoDatabaseUse(deps);
+  });
+
+  it("runs additive selection without an auth secret and reports only newly inserted counts", async () => {
+    const deps = dependencies({ AUTH_SECRET: undefined });
+    deps.runSeed.mockResolvedValue({
+      counts: { branches: 1, users: 0 },
+      skippedBookings: 0,
+      accounts: ["admin@floor.com"],
+      branchScope: {
+        addedBranchIds: [branchIds[0]!],
+        skippedBranchIds: [branchIds[1]!],
+      },
+    });
+    expect(
+      await runSeedCommand(
+        ["--branches", branchIds.map((id) => id.toUpperCase()).join(",")],
+        deps,
+      ),
+    ).toBe(0);
+    expect(deps.runSeed).toHaveBeenCalledExactlyOnceWith({
+      now: currentTime,
+      resetPasswords: false,
+      branchIds,
+    });
+    expect(deps.stdout).toHaveBeenCalledWith("추가한 지점: 1개");
+    expect(deps.stdout).toHaveBeenCalledWith("이미 있어 건너뛴 지점: 1개");
+    expect(deps.stdout).toHaveBeenCalledWith(
+      "다음 건수는 이번에 추가한 행이며 DB 전체 건수가 아니에요.",
+    );
+    expect(deps.stdout).toHaveBeenCalledWith(
+      "참조한 기존 계정 (변경 없음): admin@floor.com",
+    );
+    expect(JSON.stringify(deps.stdout.mock.calls)).not.toContain("비밀번호는");
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+  });
+
   it("shows help without reading settings or using the database", async () => {
     const deps = dependencies();
     deps.getEnvironment.mockImplementation(() => {
