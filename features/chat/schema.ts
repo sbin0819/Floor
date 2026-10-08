@@ -12,3 +12,8 @@ export const sendMessageSchema = z.strictObject({
   clientId: z.uuid(),
   body: messageBodySchema,
 });
+
+export const markRoomReadSchema = z.strictObject({
+  roomId: z.uuid(),
+  seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+});

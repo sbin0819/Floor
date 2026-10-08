@@ -3,7 +3,8 @@ import {
   type ActionDependencies,
 } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
-import { canWriteRoom } from "@/lib/dal/chat-access";
+import { canReadRoom, canWriteRoom } from "@/lib/dal/chat-access";
+import { advanceRoomRead } from "@/lib/dal/chat-reads";
 import * as chatWrite from "@/lib/dal/chat-write";
 import {
   withTransaction,
@@ -17,7 +18,7 @@ import {
 import { roomChannel } from "@/lib/realtime/channels";
 import type { RealtimePublisher } from "@/lib/realtime/types";
 import { getRealtimePublisher } from "@/lib/realtime/server";
-import { sendMessageSchema } from "./schema";
+import { markRoomReadSchema, sendMessageSchema } from "./schema";
 import type { ChatMessage } from "./types";
 
 const limiter = createMemoryRateLimiter();
@@ -41,6 +42,33 @@ async function requireWritable(
 
 export function createChatActions(dependencies: ChatActionDependencies = {}) {
   return {
+    markRoomRead: createAction(
+      {
+        input: markRoomReadSchema,
+        authorize: "none",
+        async handler({ session, input }) {
+          if (
+            !(await canReadRoom(
+              session.userId,
+              input.roomId,
+              dependencies.database,
+            ))
+          )
+            throw new ActionError("NOT_FOUND");
+          const cursor = await advanceRoomRead(
+            {
+              ...input,
+              userId: session.userId,
+              now: dependencies.now?.() ?? new Date(),
+            },
+            dependencies.database,
+          );
+          if (!cursor) throw new ActionError("NOT_FOUND");
+          return cursor;
+        },
+      },
+      dependencies,
+    ),
     sendMessage: createAction(
       {
         input: sendMessageSchema,
@@ -72,10 +100,28 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
             if (existing) {
               if (existing.authorId !== session.userId)
                 throw new ActionError("INVALID_INPUT");
+              await advanceRoomRead(
+                {
+                  roomId: input.roomId,
+                  userId: session.userId,
+                  seq: existing.seq,
+                  now,
+                },
+                transaction,
+              );
               return { message: existing, inserted: false };
             }
             const message = await chatWrite.insertChatMessage(
               { ...input, authorId: session.userId, now },
+              transaction,
+            );
+            await advanceRoomRead(
+              {
+                roomId: input.roomId,
+                userId: session.userId,
+                seq: message.seq,
+                now,
+              },
               transaction,
             );
             return { message, inserted: true };
