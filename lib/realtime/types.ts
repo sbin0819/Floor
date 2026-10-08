@@ -8,6 +8,8 @@ export type RealtimeEvent =
       id: string;
       seq: number;
       authorId: string | null;
+      authorName: string | null;
+      clientId: string | null;
       kind: "text" | "system";
       body: string;
       createdAt: string;

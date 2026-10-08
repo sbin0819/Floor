@@ -8,6 +8,7 @@ const envSchema = z
   .object({
     DATABASE_URL: optionalValue,
     SEED_ALLOW_HOST: optionalValue,
+    ABLY_API_KEY: optionalValue,
     AUTH_SECRET: optionalValue.refine(
       (value) =>
         value === undefined || new TextEncoder().encode(value).length >= 32,

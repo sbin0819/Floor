@@ -9,3 +9,7 @@ export function roomChannel(roomId: string): string {
 export function userChannel(userId: string): string {
   return `user:${userId}`;
 }
+
+export function spaceChannel(spaceId: string): string {
+  return `space:${spaceId}`;
+}

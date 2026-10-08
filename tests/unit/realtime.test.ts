@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   floorChannel,
   roomChannel,
+  spaceChannel,
   userChannel,
 } from "@/lib/realtime/channels";
 import { createMemoryRealtime } from "@/lib/realtime/memory";
@@ -16,6 +17,7 @@ describe("realtime channel helpers", () => {
     expect(floorChannel("a")).toBe("floor:a");
     expect(roomChannel("a")).toBe("room:a");
     expect(userChannel("a")).toBe("user:a");
+    expect(spaceChannel("a")).toBe("space:a");
   });
 });
 
@@ -71,6 +73,8 @@ describe("memory realtime", () => {
       id: "message-a",
       seq: 3,
       authorId: null,
+      authorName: null,
+      clientId: null,
       kind: "system",
       body: "예약이 변경되었어요.",
       createdAt: "2026-10-07T00:00:00Z",

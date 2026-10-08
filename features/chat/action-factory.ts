@@ -16,7 +16,7 @@ import {
 } from "@/lib/rate-limit/memory";
 import { roomChannel } from "@/lib/realtime/channels";
 import type { RealtimePublisher } from "@/lib/realtime/types";
-import { noopRealtime } from "@/lib/realtime/noop";
+import { getRealtimePublisher } from "@/lib/realtime/server";
 import { sendMessageSchema } from "./schema";
 import type { ChatMessage } from "./types";
 
@@ -92,7 +92,7 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
           };
           if (result.inserted) {
             try {
-              await (dependencies.publisher ?? noopRealtime).publish(
+              await (dependencies.publisher ?? getRealtimePublisher()).publish(
                 roomChannel(input.roomId),
                 { type: "message.created", roomId: input.roomId, ...message },
               );
