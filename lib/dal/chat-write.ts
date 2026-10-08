@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { ActionError } from "@/lib/actions/result";
 import {
   chatRooms,
@@ -20,19 +20,24 @@ import {
 import { emptyMessageDetails, type ChatMessage } from "@/features/chat/types";
 
 export async function createTeamSpace(teamId: string, database: DalDatabase) {
-  await database
+  const [inserted] = await database
     .insert(chatSpaces)
     .values({ kind: "team", teamId })
-    .onConflictDoNothing({ target: chatSpaces.teamId });
-  const [space] = await database
-    .select({ id: chatSpaces.id })
-    .from(chatSpaces)
-    .where(eq(chatSpaces.teamId, teamId));
+    .onConflictDoNothing({ target: chatSpaces.teamId })
+    .returning({ id: chatSpaces.id });
+  const space =
+    inserted ??
+    (
+      await database
+        .select({ id: chatSpaces.id })
+        .from(chatSpaces)
+        .where(eq(chatSpaces.teamId, teamId))
+    )[0];
   if (!space) throw new ActionError("INTERNAL");
-  await database
-    .insert(chatRooms)
-    .values({ kind: "text", spaceId: space.id, name: "일반" })
-    .onConflictDoNothing();
+  if (inserted)
+    await database
+      .insert(chatRooms)
+      .values({ kind: "text", spaceId: space.id, name: "일반" });
   const [room] = await database
     .select({ id: chatRooms.id })
     .from(chatRooms)
@@ -41,11 +46,35 @@ export async function createTeamSpace(teamId: string, database: DalDatabase) {
         eq(chatRooms.spaceId, space.id),
         eq(chatRooms.kind, "text"),
         eq(chatRooms.name, "일반"),
-        isNull(chatRooms.archivedAt),
       ),
-    );
-  if (!room) throw new ActionError("INTERNAL");
-  return { spaceId: space.id, roomId: room.id };
+    )
+    .orderBy(asc(chatRooms.createdAt), asc(chatRooms.id))
+    .limit(1);
+  return { spaceId: space.id, roomId: room?.id ?? null };
+}
+
+export async function createBranchLounge(
+  branchId: string,
+  database: DalDatabase,
+) {
+  const [inserted] = await database
+    .insert(chatSpaces)
+    .values({ kind: "branch", branchId })
+    .onConflictDoNothing({ target: chatSpaces.branchId })
+    .returning({ id: chatSpaces.id });
+  if (inserted) {
+    await database.insert(chatRooms).values([
+      { kind: "text", spaceId: inserted.id, name: "라운지" },
+      { kind: "text", spaceId: inserted.id, name: "공지", adminOnly: true },
+    ]);
+    return { spaceId: inserted.id };
+  }
+  const [space] = await database
+    .select({ id: chatSpaces.id })
+    .from(chatSpaces)
+    .where(eq(chatSpaces.branchId, branchId));
+  if (!space) throw new ActionError("INTERNAL");
+  return { spaceId: space.id };
 }
 
 export async function lockUsersForKeyShare(

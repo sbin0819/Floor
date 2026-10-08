@@ -56,7 +56,7 @@ const expectedCounts = {
   spaceBlocks: 5,
   spacePhotos: 65,
   branchCovers: 5,
-  chatSpaces: 2,
+  chatSpaces: fixtures.teams.length + fixtures.branches.length,
   chatMessages: 44,
   meetingRooms: 21,
   friendships: 3,

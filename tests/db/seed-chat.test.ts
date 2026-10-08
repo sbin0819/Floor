@@ -97,12 +97,13 @@ describe("transactional team chat seed", () => {
 
   it("writes two general channels and eight sequenced messages, keeping channels and timestamps on rerun", async () => {
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 2,
+      chatSpaces: 7,
       chatMessages: 44,
     });
     const first = await state();
-    expect(first.spaces).toHaveLength(2);
-    expect(first.rooms).toHaveLength(2);
+    expect(first.spaces).toHaveLength(7);
+    expect(first.spaces.filter(({ kind }) => kind === "team")).toHaveLength(2);
+    expect(first.rooms).toHaveLength(12);
     expect(first.messages).toHaveLength(8);
     for (const team of data.teams) {
       const space = first.spaces.find(({ teamId }) => teamId === team.id)!;
@@ -152,6 +153,7 @@ describe("transactional team chat seed", () => {
       .values({ name: "시드 밖 팀", createdBy: author!.id })
       .returning();
     const foreign = await createTeamSpace(foreignTeam!.id, database.db);
+    if (!foreign.roomId) throw new Error("Expected a default team channel.");
     const [foreignMessage] = await database.db
       .insert(messages)
       .values({
@@ -340,6 +342,23 @@ describe("transactional team chat seed", () => {
     ).toBe("실패 뒤에도 남는 지점명");
   });
 
+  it("rolls back when the seed default channel has been renamed instead of selecting another channel", async () => {
+    await seed();
+    const [teamSpace] = await database.db
+      .select()
+      .from(chatSpaces)
+      .where(eq(chatSpaces.teamId, data.teams[0]!.id));
+    await database.db
+      .update(chatRooms)
+      .set({ name: "보존할 채널 이름" })
+      .where(eq(chatRooms.spaceId, teamSpace!.id));
+    const before = await state();
+    await expect(seed()).rejects.toThrow(
+      "시드 팀의 기본 채널을 찾을 수 없어요",
+    );
+    expect(await state()).toEqual(before);
+  });
+
   it("validates chat references before entering a database transaction", async () => {
     const input = structuredClone(chatFile);
     input.messages[0]!.authorKey = "unknown-author";
@@ -373,7 +392,7 @@ describe("transactional team chat seed", () => {
     await seed();
     vi.spyOn(chatLoader, "loadSeedChat").mockReturnValue({ messages: [] });
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 2,
+      chatSpaces: 7,
       chatMessages: 36,
     });
     const after = await state();

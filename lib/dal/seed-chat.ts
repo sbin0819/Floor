@@ -16,8 +16,14 @@ export async function syncSeedChat(
 ): Promise<{ chatSpaces: number; chatMessages: number }> {
   if (!teamIds.length) return { chatSpaces: 0, chatMessages: 0 };
   const channels = new Map<string, { spaceId: string; roomId: string }>();
-  for (const teamId of teamIds)
-    channels.set(teamId, await createTeamSpace(teamId, database));
+  for (const teamId of teamIds) {
+    const channel = await createTeamSpace(teamId, database);
+    if (!channel.roomId)
+      throw new SeedError(
+        "시드 팀의 기본 채널을 찾을 수 없어요. 기존 채널을 변경하지 않았어요.",
+      );
+    channels.set(teamId, { ...channel, roomId: channel.roomId });
+  }
   const sequence = new Map<string, number>();
   const rows = chat.messages.map(({ teamId, authorKey, minutesAgo, body }) => {
     const channel = channels.get(teamId);

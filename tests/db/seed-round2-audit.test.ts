@@ -24,6 +24,8 @@ import {
   branches,
   chatRooms,
   chatSpaces,
+  chatSpaceMembers,
+  chatSpaceInvites,
   messages,
   floors,
   notifications,
@@ -60,6 +62,50 @@ describe("read-only booking round2 preservation audit", () => {
   const capture = (allowSeedAttendeeCounts = false) =>
     captureSeedRound2Audit({ allowSeedAttendeeCounts }, database.db);
 
+  it("protects space members and invitation counters without exposing invitation codes", async () => {
+    const [space] = await database.db
+      .insert(chatSpaces)
+      .values({
+        kind: "community",
+        name: "보존할 모임",
+        createdBy: actors.person.userId,
+      })
+      .returning();
+    await database.db
+      .insert(chatSpaceMembers)
+      .values({
+        spaceId: space!.id,
+        userId: actors.person.userId,
+        role: "owner",
+        joinedAt: bookingNow,
+        statusChangedAt: bookingNow,
+      });
+    const [invite] = await database.db
+      .insert(chatSpaceInvites)
+      .values({
+        spaceId: space!.id,
+        createdBy: actors.person.userId,
+        code: "private-invitation-code",
+      })
+      .returning();
+    const before = await capture();
+    expect(JSON.stringify(before)).not.toContain("private-invitation-code");
+    await database.db
+      .update(chatSpaceMembers)
+      .set({ status: "banned" })
+      .where(eq(chatSpaceMembers.spaceId, space!.id));
+    await database.db
+      .update(chatSpaceInvites)
+      .set({ useCount: 1 })
+      .where(eq(chatSpaceInvites.id, invite!.id));
+    const difference = compareSeedRound2Audit(before, await capture());
+    expect(difference.ok).toBe(false);
+    expect(difference.issues.map(({ table }) => table).sort()).toEqual([
+      "chat_space_invites",
+      "chat_space_members",
+    ]);
+  });
+
   it("returns stable PK-only fingerprints, never account secrets or personal fields", async () => {
     const accountId = crypto.randomUUID();
     const passwordHash = "private-test-password-hash";
@@ -85,7 +131,7 @@ describe("read-only booking round2 preservation audit", () => {
     });
     const before = await capture();
     expect(await capture()).toEqual(before);
-    expect(before.tables).toHaveLength(23);
+    expect(before.tables).toHaveLength(25);
     expect(before.tables.every((table) => table.exists)).toBe(true);
     const account = before.tables.find(
       ({ table }) => table === "auth_accounts",

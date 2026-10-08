@@ -14,14 +14,12 @@ export async function seedChatActors(database: TestDatabase) {
   const member = actor("팀원");
   const outsider = actor("외부인");
   const operator = actor("운영자");
-  await database.db
-    .insert(users)
-    .values(
-      [admin, member, outsider, operator].map(({ userId, ...user }) => ({
-        id: userId,
-        ...user,
-      })),
-    );
+  await database.db.insert(users).values(
+    [admin, member, outsider, operator].map(({ userId, ...user }) => ({
+      id: userId,
+      ...user,
+    })),
+  );
   const [team] = await database.db
     .insert(teams)
     .values({ name: "가상 채팅팀", createdBy: admin.userId })
@@ -50,6 +48,8 @@ export async function seedChatActors(database: TestDatabase) {
   ]);
   const space = await createTeamSpace(team!.id, database.db);
   const otherSpace = await createTeamSpace(otherTeam!.id, database.db);
+  if (!space.roomId || !otherSpace.roomId)
+    throw new Error("Expected default team channels.");
   const [secondRoom] = await database.db
     .insert(chatRooms)
     .values({ kind: "text", spaceId: space.spaceId, name: "자료" })
@@ -62,7 +62,8 @@ export async function seedChatActors(database: TestDatabase) {
     teamId: team!.id,
     otherTeamId: otherTeam!.id,
     ...space,
-    otherSpace,
+    roomId: space.roomId,
+    otherSpace: { ...otherSpace, roomId: otherSpace.roomId },
     secondRoomId: secondRoom!.id,
   };
 }

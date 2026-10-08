@@ -16,6 +16,9 @@ import {
   authSessions,
   authVerifications,
   branches,
+  chatSpaces,
+  chatSpaceMembers,
+  chatSpaceInvites,
   users,
 } from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
@@ -129,6 +132,45 @@ describe("explicit full development reset", () => {
       (await inspectSeedReset(seedMigrations(), database.db)).counts,
     ).toEqual(first);
     expect(await migrations()).toEqual(journal);
+  }, 60000);
+
+  it("explicitly includes space memberships and invitations in the reset allowlist", async () => {
+    const before = (await inspectSeedReset(seedMigrations(), database.db))
+      .counts;
+    const [user] = await database.db.select().from(users).limit(1);
+    const [space] = await database.db
+      .insert(chatSpaces)
+      .values({ kind: "community", name: "초기화 대상", createdBy: user!.id })
+      .returning();
+    await database.db.insert(chatSpaceMembers).values({
+      spaceId: space!.id,
+      userId: user!.id,
+      role: "owner",
+      joinedAt: now,
+      statusChangedAt: now,
+    });
+    await database.db.insert(chatSpaceInvites).values({
+      spaceId: space!.id,
+      code: "reset-invitation-test",
+      createdBy: user!.id,
+    });
+    const result = await reset();
+    expect(result.reset?.counts).toMatchObject({
+      chat_space_members: before.chat_space_members! + 1,
+      chat_space_invites: before.chat_space_invites! + 1,
+    });
+    expect(
+      await database.db
+        .select()
+        .from(chatSpaceMembers)
+        .where(eq(chatSpaceMembers.spaceId, space!.id)),
+    ).toEqual([]);
+    expect(
+      await database.db
+        .select()
+        .from(chatSpaceInvites)
+        .where(eq(chatSpaceInvites.spaceId, space!.id)),
+    ).toEqual([]);
   }, 60000);
 
   it("restores every previous row when account preparation succeeded but later seeding fails", async () => {

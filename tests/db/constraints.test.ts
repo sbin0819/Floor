@@ -13,6 +13,8 @@ import {
   chatRoomMembers,
   chatSpaces,
   chatSpacePrefs,
+  chatSpaceMembers,
+  chatSpaceInvites,
   floorPlans,
   friendships,
   floors,
@@ -1162,14 +1164,12 @@ describe("database constraints from the real migrations", () => {
         .insert(chatRooms)
         .values({ kind: "meeting", bookingId: crypto.randomUUID() }),
     ).rejects.toMatchObject({ cause: { code: "23503" } });
-    await database.db
-      .insert(messages)
-      .values({
-        roomId: meeting!.id,
-        seq: 1,
-        authorId: userId,
-        body: "보존되다가 예약 삭제 때 함께 지워져요",
-      });
+    await database.db.insert(messages).values({
+      roomId: meeting!.id,
+      seq: 1,
+      authorId: userId,
+      body: "보존되다가 예약 삭제 때 함께 지워져요",
+    });
     await database.db.delete(bookings).where(eq(bookings.id, booking!.id));
     expect(
       await database.db
@@ -1354,6 +1354,169 @@ describe("database constraints from the real migrations", () => {
       expect(await database.db.select().from(messages)).toHaveLength(1);
     },
   );
+});
+
+describe("space membership and invitation constraints", () => {
+  let database: TestDatabase;
+  let spaceId: string;
+  let branchId: string;
+  let userIds: string[];
+  beforeAll(async () => {
+    database = await createTestDatabase();
+  });
+  afterAll(async () => {
+    await database.client.close();
+  });
+  beforeEach(async () => {
+    await database.db.execute(sql`TRUNCATE users, branches CASCADE`);
+    userIds = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    await database.db
+      .insert(users)
+      .values(
+        userIds.map((id) => ({
+          id,
+          name: "검사 회원",
+          email: `${id}@example.test`,
+        })),
+      );
+    const [branch] = await database.db
+      .insert(branches)
+      .values({ name: "검사 지점" })
+      .returning();
+    branchId = branch!.id;
+    const [space] = await database.db
+      .insert(chatSpaces)
+      .values({
+        kind: "community",
+        name: "검사 커뮤니티",
+        createdBy: userIds[0]!,
+      })
+      .returning();
+    spaceId = space!.id;
+  });
+  const member = (
+    userId: string,
+    role: "owner" | "admin" | "member" = "member",
+  ) => ({
+    spaceId,
+    userId,
+    role,
+    joinedAt: during.start,
+    statusChangedAt: during.start,
+  });
+
+  it("37. rejects duplicate members and a second owner but permits multiple administrators", async () => {
+    await database.db
+      .insert(chatSpaceMembers)
+      .values(member(userIds[0]!, "owner"));
+    await expect(
+      database.db.insert(chatSpaceMembers).values(member(userIds[0]!)),
+    ).rejects.toMatchObject({
+      cause: {
+        code: "23505",
+        constraint: "chat_space_members_space_id_user_id_pk",
+      },
+    });
+    await expect(
+      database.db.insert(chatSpaceMembers).values(member(userIds[1]!, "owner")),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "chat_space_members_one_owner" },
+    });
+    await database.db
+      .insert(chatSpaceMembers)
+      .values(userIds.slice(1).map((id) => member(id, "admin")));
+    expect(await database.db.select().from(chatSpaceMembers)).toHaveLength(3);
+    await expect(
+      database.db
+        .update(chatSpaceMembers)
+        .set({ status: "banned", role: "owner" })
+        .where(eq(chatSpaceMembers.userId, userIds[1]!)),
+    ).rejects.toMatchObject({
+      cause: { constraint: "chat_space_members_one_owner" },
+    });
+  });
+
+  it("38. rejects duplicate invitation codes across spaces", async () => {
+    const input = {
+      spaceId,
+      code: "fixed-invitation-code",
+      createdBy: userIds[0]!,
+    };
+    await database.db.insert(chatSpaceInvites).values(input);
+    await expect(
+      database.db.insert(chatSpaceInvites).values(input),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "chat_space_invites_code_unique" },
+    });
+  });
+
+  it.each([
+    { useCount: -1, maxUses: null },
+    { useCount: 0, maxUses: 0 },
+    { useCount: 2, maxUses: 1 },
+  ])("38. rejects invalid invitation counters %j", async (values) => {
+    await expect(
+      database.db
+        .insert(chatSpaceInvites)
+        .values({
+          spaceId,
+          code: crypto.randomUUID(),
+          createdBy: userIds[0]!,
+          ...values,
+        }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "chat_space_invites_uses" },
+    });
+  });
+
+  it("38. permits bounded and unlimited invitation counters", async () => {
+    await database.db.insert(chatSpaceInvites).values(
+      [
+        { maxUses: 1, useCount: 1 },
+        { maxUses: 10, useCount: 10 },
+        { maxUses: null, useCount: 20 },
+      ].map((values) => ({
+        spaceId,
+        code: crypto.randomUUID(),
+        createdBy: userIds[0]!,
+        ...values,
+      })),
+    );
+    expect(await database.db.select().from(chatSpaceInvites)).toHaveLength(3);
+  });
+
+  it("39. allows only one lounge per branch and only declared icon colors", async () => {
+    const [lounge] = await database.db
+      .insert(chatSpaces)
+      .values({ kind: "branch", branchId })
+      .returning();
+    expect(lounge?.iconColor).toBe("blue");
+    await expect(
+      database.db.insert(chatSpaces).values({ kind: "branch", branchId }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "chat_spaces_branch_unique" },
+    });
+    await expect(
+      database.db.execute(
+        sql`UPDATE chat_spaces SET icon_color = 'unknown' WHERE id = ${spaceId}`,
+      ),
+    ).rejects.toMatchObject({ cause: { code: "22P02" } });
+    for (const color of [
+      "blue",
+      "green",
+      "orange",
+      "purple",
+      "pink",
+      "teal",
+      "yellow",
+      "gray",
+    ] as const) {
+      await database.db
+        .update(chatSpaces)
+        .set({ iconColor: color })
+        .where(eq(chatSpaces.id, spaceId));
+    }
+  });
 });
 
 describe("booking foundation upgrade", () => {

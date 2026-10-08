@@ -3,6 +3,7 @@ import "server-only";
 // 고정된 가상 데이터만 다루는 시드 전용 쓰기다. 기능 액션에서 사용하지 않는다.
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { DalDatabase } from "@/lib/dal/database";
+import { createBranchLounge } from "./chat-write";
 import { serializeTimeRange, type TimeRange } from "@/lib/db/range";
 import {
   accessGrants,
@@ -21,10 +22,13 @@ export async function upsertSeedBranch(
   input: typeof branches.$inferInsert,
   db: DalDatabase,
 ) {
-  await db
+  const [branch] = await db
     .insert(branches)
     .values(input)
-    .onConflictDoUpdate({ target: branches.id, set: input });
+    .onConflictDoUpdate({ target: branches.id, set: input })
+    .returning({ id: branches.id });
+  if (!branch) throw new Error("Seed branch was not saved.");
+  await createBranchLounge(branch.id, db);
 }
 export async function upsertSeedFloor(
   input: Omit<typeof floors.$inferInsert, "publishedPlanId">,

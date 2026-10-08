@@ -27,6 +27,25 @@ export const chatSpaceKind = pgEnum("chat_space_kind", [
   "branch",
   "community",
 ]);
+export const spaceIconColor = pgEnum("space_icon_color", [
+  "blue",
+  "green",
+  "orange",
+  "purple",
+  "pink",
+  "teal",
+  "yellow",
+  "gray",
+]);
+export const chatSpaceRole = pgEnum("chat_space_role", [
+  "owner",
+  "admin",
+  "member",
+]);
+export const chatSpaceMemberStatus = pgEnum("chat_space_member_status", [
+  "active",
+  "banned",
+]);
 export const chatRoomKind = pgEnum("chat_room_kind", [
   "text",
   "voice",
@@ -88,4 +107,5 @@ export const notificationType = pgEnum("notification_type", [
   "friend_request",
   "friend_accepted",
   "message_request",
+  "space_invite",
 ]);

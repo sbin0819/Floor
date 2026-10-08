@@ -3,6 +3,7 @@ import "server-only";
 // 지점 추가 전용이다. 기존 행의 UPDATE/DELETE나 충돌 무시는 허용하지 않는다.
 import { inArray, or, sql } from "drizzle-orm";
 import type { DalDatabase } from "./database";
+import { createBranchLounge } from "./chat-write";
 import {
   accessGrants,
   bookings,
@@ -220,6 +221,7 @@ export async function insertSeedBranchStructure(
       })),
     );
   if (data.floors.length) await db.insert(floors).values(data.floors);
+  for (const branch of data.branches) await createBranchLounge(branch.id, db);
   const remaining = new Map(data.spaces.map((space) => [space.id, space]));
   while (remaining.size) {
     const ready = [...remaining.values()].filter(

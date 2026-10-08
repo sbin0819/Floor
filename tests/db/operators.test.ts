@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { createAuth, type AuthInstance } from "@/lib/auth/auth";
+import * as authModule from "@/lib/auth/auth";
 import { createOperator } from "@/lib/auth/operators";
 import * as dal from "@/lib/dal";
 import {
@@ -17,6 +18,8 @@ import {
   authSessions,
   branches,
   branchStaff,
+  chatSpaces,
+  chatRooms,
   users,
 } from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
@@ -462,6 +465,40 @@ describe("operator provisioning", () => {
     expect(await database.db.select().from(authAccounts)).toHaveLength(0);
     expect(await database.db.select().from(branches)).toHaveLength(2);
     expect(await database.db.select().from(branchStaff)).toHaveLength(0);
+    expect(await database.db.select().from(chatSpaces)).toHaveLength(0);
+    expect(await database.db.select().from(chatRooms)).toHaveLength(0);
+  });
+
+  it("rolls back the new branch and lounge when user creation fails after provisioning the rooms", async () => {
+    const original = authModule.createProvisioningAuth;
+    vi.spyOn(authModule, "createProvisioningAuth").mockImplementationOnce(
+      async (input) => {
+        const provisioning = await original(input);
+        return {
+          ...provisioning,
+          createVerifiedUser: async () => {
+            expect(await input.db.select().from(chatSpaces)).toHaveLength(1);
+            expect(await input.db.select().from(chatRooms)).toHaveLength(2);
+            throw new Error("Injected account creation failure");
+          },
+        };
+      },
+    );
+    await expect(
+      createOperator(
+        {
+          email: "failed@example.test",
+          name: "운영자",
+          branch: "생성 실패 지점",
+          createBranch: true,
+        },
+        { auth, db: database.db },
+      ),
+    ).rejects.toMatchObject({ code: "INTERNAL" });
+    expect(await database.db.select().from(branches)).toHaveLength(2);
+    expect(await database.db.select().from(chatSpaces)).toEqual([]);
+    expect(await database.db.select().from(chatRooms)).toEqual([]);
+    expect(await database.db.select().from(users)).toEqual([]);
   });
 
   it("rolls back password, verification, and session revocation when a later write fails", async () => {

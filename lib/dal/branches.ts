@@ -1,4 +1,5 @@
 import "server-only";
+import { createBranchLounge } from "./chat-write";
 
 import { and, asc, eq } from "drizzle-orm";
 import { cache } from "react";
@@ -184,15 +185,13 @@ export async function getBranchesByName(
     .limit(2);
 }
 
-export async function createBranch(
-  name: string,
-  database: DalDatabase = getDb(),
-) {
+export async function createBranch(name: string, database: DalDatabase) {
   const [branch] = await database
     .insert(branches)
     .values({ name })
     .returning({ id: branches.id, name: branches.name });
   if (!branch) throw new Error("Failed to create the requested branch.");
+  await createBranchLounge(branch.id, database);
   return branch;
 }
 

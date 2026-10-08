@@ -17,6 +17,7 @@ export const personNotificationTypes = [
 export const notificationTypes = [
   ...bookingNotificationTypes,
   ...personNotificationTypes,
+  "space_invite",
 ] as const;
 
 export type NotificationType = (typeof notificationTypes)[number];
@@ -99,6 +100,7 @@ export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null {
+  if (type === "space_invite") return null;
   if (isPersonNotificationType(type)) {
     const result = personNotificationDataSchema.safeParse(input);
     return result.success ? result.data : null;
@@ -131,6 +133,7 @@ export function parseNotificationContent(
   input: unknown,
   bookingId: string | null,
 ): NotificationContent | null {
+  if (type === "space_invite") return null;
   if (isPersonNotificationType(type)) {
     const data = parseNotificationData(type, input);
     return data ? { type, data, bookingId: null } : null;

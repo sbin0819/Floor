@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   index,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
@@ -21,6 +22,9 @@ import {
   chatRoomKind,
   chatMemberStatus,
   chatSpaceKind,
+  chatSpaceMemberStatus,
+  chatSpaceRole,
+  spaceIconColor,
   messageKind,
   reactionEmoji,
 } from "./enums";
@@ -33,6 +37,7 @@ export const chatSpaces = pgTable(
   {
     id: id(),
     kind: chatSpaceKind("kind").notNull(),
+    iconColor: spaceIconColor("icon_color").notNull().default("blue"),
     teamId: uuid("team_id")
       .unique("chat_spaces_team_unique")
       .references(() => teams.id, { onDelete: "restrict" }),
@@ -51,6 +56,69 @@ export const chatSpaces = pgTable(
       "chat_spaces_kind_ref",
       sql`(${table.kind} = 'team' AND ${table.teamId} IS NOT NULL AND ${table.branchId} IS NULL AND ${table.name} IS NULL) OR (${table.kind} = 'branch' AND ${table.branchId} IS NOT NULL AND ${table.teamId} IS NULL AND ${table.name} IS NULL) OR (${table.kind} = 'community' AND ${table.name} IS NOT NULL AND ${table.createdBy} IS NOT NULL AND ${table.teamId} IS NULL AND ${table.branchId} IS NULL)`,
     ),
+  ],
+);
+
+export const chatSpaceMembers = pgTable(
+  "chat_space_members",
+  {
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => chatSpaces.id, { onDelete: "restrict" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    role: chatSpaceRole("role").notNull().default("member"),
+    status: chatSpaceMemberStatus("status").notNull().default("active"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull(),
+    statusChangedAt: timestamp("status_changed_at", {
+      withTimezone: true,
+    }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.spaceId, table.userId] }),
+    index("chat_space_members_user_id_idx").on(table.userId),
+    uniqueIndex("chat_space_members_one_owner")
+      .on(table.spaceId)
+      .where(sql`${table.role} = 'owner'`),
+  ],
+);
+
+export const chatSpaceInvites = pgTable(
+  "chat_space_invites",
+  {
+    id: id(),
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => chatSpaces.id, { onDelete: "restrict" }),
+    code: text("code").notNull().unique("chat_space_invites_code_unique"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    targetUserId: uuid("target_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    maxUses: integer("max_uses"),
+    useCount: integer("use_count").notNull().default(0),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    check(
+      "chat_space_invites_uses",
+      sql`${table.useCount} >= 0 AND (${table.maxUses} IS NULL OR (${table.maxUses} >= 1 AND ${table.useCount} <= ${table.maxUses}))`,
+    ),
+    index("chat_space_invites_space_created_idx").on(
+      table.spaceId,
+      table.createdAt,
+    ),
+    index("chat_space_invites_creator_created_idx").on(
+      table.createdBy,
+      table.createdAt,
+    ),
+    index("chat_space_invites_target_user_idx").on(table.targetUserId),
   ],
 );
 

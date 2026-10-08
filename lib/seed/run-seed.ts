@@ -379,6 +379,7 @@ export async function runSeed({
       return {
         counts: {
           ...chatCounts,
+          chatSpaces: chatCounts.chatSpaces + data.branches.length,
           ...peopleCounts,
           groupRooms: people2Counts.groupRooms,
           directRooms: peopleCounts.directRooms + people2Counts.directRooms,

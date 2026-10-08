@@ -68,6 +68,8 @@ const protectedTables = [
   "chat_spaces",
   "chat_room_reads",
   "chat_room_members",
+  "chat_space_members",
+  "chat_space_invites",
 ];
 
 describe("receipt-backed booking round 2 additions", () => {

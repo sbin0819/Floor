@@ -38,7 +38,9 @@ describe("authenticated query execution budgets", () => {
   beforeAll(async () => {
     database = await createTestDatabase();
     actors = await seedBookingActors(database);
-    chat = await createTeamSpace(actors.teamId, database.db);
+    const created = await createTeamSpace(actors.teamId, database.db);
+    if (!created.roomId) throw new Error("Expected a default team channel.");
+    chat = { ...created, roomId: created.roomId };
     editableBookingId = (await insertFixtureBooking(database, actors)).id;
     await database.db.insert(teamInvites).values({
       teamId: actors.teamId,
