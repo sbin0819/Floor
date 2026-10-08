@@ -81,6 +81,54 @@ describe("realtime token capabilities", () => {
       clientId: actors.member.userId,
     });
   });
+  it("grants only the selected readable space without presence or publish capabilities", async () => {
+    const value = await token()({
+      rooms: [actors.roomId],
+      spaces: [actors.spaceId],
+    });
+    expect(JSON.parse(value.capability)).toEqual({
+      [`user:${actors.member.userId}`]: ["subscribe"],
+      [`room:${actors.roomId}`]: ["subscribe", "presence"],
+      [`space:${actors.spaceId}`]: ["subscribe"],
+    });
+    expect(value.clientId).toBe(actors.member.userId);
+    expect(value.ttl).toBe(600_000);
+    expect(value.capability).not.toMatch(/publish|\*/);
+    const foreign = await token()({
+      rooms: [],
+      spaces: [actors.otherSpace.spaceId],
+    });
+    expect(JSON.parse(foreign.capability)).toEqual({
+      [`user:${actors.member.userId}`]: ["subscribe"],
+    });
+    const operator = await token({
+      requireSession: async () => actors.operator,
+    })({ rooms: [], spaces: [actors.spaceId] });
+    expect(JSON.parse(operator.capability)).toEqual({
+      [`user:${actors.operator.userId}`]: ["subscribe"],
+    });
+  });
+  it("omits a previously readable space after membership removal or deletion", async () => {
+    await database.db
+      .delete(teamMembers)
+      .where(eq(teamMembers.userId, actors.member.userId));
+    expect(
+      JSON.parse(
+        (await token()({ rooms: [], spaces: [actors.spaceId] })).capability,
+      ),
+    ).not.toHaveProperty(`space:${actors.spaceId}`);
+    await database.db
+      .update(chatSpaces)
+      .set({ deletedAt: chatNow })
+      .where(eq(chatSpaces.id, actors.spaceId));
+    const value = await token({ requireSession: async () => actors.admin })({
+      rooms: [],
+      spaces: [actors.spaceId],
+    });
+    expect(JSON.parse(value.capability)).not.toHaveProperty(
+      `space:${actors.spaceId}`,
+    );
+  });
   it("checks the current membership and deleted state on every request", async () => {
     await database.db
       .delete(teamMembers)
@@ -125,6 +173,8 @@ describe("realtime token capabilities", () => {
     { rooms: ["invalid"] },
     { rooms: Array.from({ length: 4 }, () => crypto.randomUUID()) },
     { rooms: [], userId: "foreign" },
+    { rooms: [], spaces: ["invalid"] },
+    { rooms: [], spaces: [crypto.randomUUID(), crypto.randomUUID()] },
   ])("rejects malformed input without issuing a token", async (input) => {
     await expect(token()(input)).rejects.toMatchObject({
       code: "INVALID_INPUT",

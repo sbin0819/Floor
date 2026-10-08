@@ -15,8 +15,8 @@ import {
   createMemoryRateLimiter,
   type RateLimiter,
 } from "@/lib/rate-limit/memory";
-import { roomChannel } from "@/lib/realtime/channels";
-import type { RealtimePublisher } from "@/lib/realtime/types";
+import { roomChannel, spaceChannel } from "@/lib/realtime/channels";
+import type { RealtimeEvent, RealtimePublisher } from "@/lib/realtime/types";
 import { getRealtimePublisher } from "@/lib/realtime/server";
 import { markRoomReadSchema, sendMessageSchema } from "./schema";
 import type { ChatMessage } from "./types";
@@ -91,7 +91,11 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
           const result = await withTransaction(async (transaction) => {
             await chatWrite.lockMessageAuthor(session.userId, transaction);
             await chatWrite.lockRoomForMessage(input.roomId, transaction);
-            await requireWritable(session.userId, input.roomId, transaction);
+            const room = await requireWritable(
+              session.userId,
+              input.roomId,
+              transaction,
+            );
             const existing = await chatWrite.findClientMessage(
               input.roomId,
               input.clientId,
@@ -109,7 +113,11 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                 },
                 transaction,
               );
-              return { message: existing, inserted: false };
+              return {
+                message: existing,
+                inserted: false,
+                spaceId: room.spaceId,
+              };
             }
             const message = await chatWrite.insertChatMessage(
               { ...input, authorId: session.userId, now },
@@ -124,7 +132,7 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
               },
               transaction,
             );
-            return { message, inserted: true };
+            return { message, inserted: true, spaceId: room.spaceId };
           }, dependencies.database);
           const message: ChatMessage = {
             id: result.message.id,
@@ -137,16 +145,39 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
             createdAt: result.message.createdAt.toISOString(),
           };
           if (result.inserted) {
-            try {
-              await (dependencies.publisher ?? getRealtimePublisher()).publish(
-                roomChannel(input.roomId),
-                { type: "message.created", roomId: input.roomId, ...message },
-              );
-            } catch {
-              (dependencies.logError ?? console.error)(
-                "Chat realtime publication failed.",
-              );
-            }
+            const events: { channel: string; event: RealtimeEvent }[] = [
+              {
+                channel: roomChannel(input.roomId),
+                event: {
+                  type: "message.created",
+                  roomId: input.roomId,
+                  ...message,
+                },
+              },
+              {
+                channel: spaceChannel(result.spaceId),
+                event: {
+                  type: "room.activity",
+                  spaceId: result.spaceId,
+                  roomId: input.roomId,
+                  seq: message.seq,
+                  authorId: message.authorId,
+                },
+              },
+            ];
+            await Promise.all(
+              events.map(async ({ channel, event }) => {
+                try {
+                  await (
+                    dependencies.publisher ?? getRealtimePublisher()
+                  ).publish(channel, event);
+                } catch {
+                  (dependencies.logError ?? console.error)(
+                    "Chat realtime publication failed.",
+                  );
+                }
+              }),
+            );
           }
           return message;
         },

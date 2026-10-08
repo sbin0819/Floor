@@ -153,6 +153,30 @@ describe("Ably SDK bridge", () => {
     expect(sdk.unsubscribe).toHaveBeenCalledExactlyOnceWith(callback);
     expect(sdk.detach).toHaveBeenCalledTimes(1);
   });
+  it("accepts minimal space activity and strips message content", async () => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const channel = client.channel("space:a");
+    const listener = vi.fn();
+    await channel.subscribe(listener);
+    sdk.subscribe.mock.calls[0]?.[0]({
+      data: {
+        type: "room.activity",
+        spaceId: "a",
+        roomId: "b",
+        seq: 3,
+        authorId: "other",
+        body: "private body",
+        email: "private@example.test",
+      },
+    });
+    expect(listener).toHaveBeenCalledExactlyOnceWith({
+      type: "room.activity",
+      spaceId: "a",
+      roomId: "b",
+      seq: 3,
+      authorId: "other",
+    });
+  });
   it("observes attached and attached-update continuity flags and unsubscribes", async () => {
     const client = await loadAblyBrowserClient(vi.fn());
     const channel = client.channel("room:a");

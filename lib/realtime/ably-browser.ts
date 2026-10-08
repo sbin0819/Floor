@@ -53,8 +53,8 @@ export function createAblyBrowserRealtime({
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
   let dirty = false;
-  let tokenRooms: string[] = [];
-  let authorizedRooms: string | undefined;
+  let tokenInput: RealtimeTokenInput = { rooms: [], spaces: [] };
+  let authorizedChannels: string | undefined;
 
   const setState = (next: RealtimeConnectionState) => {
     if (next === state) return;
@@ -64,11 +64,15 @@ export function createAblyBrowserRealtime({
   const emit = (event: RealtimeLifecycleEvent) => {
     for (const notify of lifecycleListeners) notify(event);
   };
-  const currentRooms = () =>
+  const channelIds = (prefix: string) =>
     [...listeners.keys()]
-      .filter((channel) => channel.startsWith("room:"))
-      .map((channel) => channel.slice(5))
+      .filter((channel) => channel.startsWith(prefix))
+      .map((channel) => channel.slice(prefix.length))
       .sort();
+  const currentChannels = (): RealtimeTokenInput => ({
+    rooms: channelIds("room:"),
+    spaces: channelIds("space:"),
+  });
 
   function close() {
     active = false;
@@ -84,7 +88,7 @@ export function createAblyBrowserRealtime({
     bindings.clear();
     client?.close();
     client = undefined;
-    authorizedRooms = undefined;
+    authorizedChannels = undefined;
     setState("closed");
   }
 
@@ -111,11 +115,11 @@ export function createAblyBrowserRealtime({
 
   async function initialize(version: number) {
     let firstToken: TokenRequest | undefined;
-    tokenRooms = currentRooms();
+    tokenInput = currentChannels();
     try {
       // 키가 없는 환경에서는 SDK를 불러오거나 Ably에 연결하지 않는다.
-      firstToken = await requestToken({ rooms: tokenRooms });
-      authorizedRooms = JSON.stringify(tokenRooms);
+      firstToken = await requestToken(tokenInput);
+      authorizedChannels = JSON.stringify(tokenInput);
     } catch (error) {
       if (version !== generation || !active || stopForAuth(error)) return;
     }
@@ -131,7 +135,7 @@ export function createAblyBrowserRealtime({
         callback(null, token);
         return;
       }
-      void requestToken({ rooms: tokenRooms }).then(
+      void requestToken(tokenInput).then(
         (token) => {
           if (active && version === generation) callback(null, token);
           else callback("실시간 연결이 종료되었어요.", null);
@@ -176,14 +180,14 @@ export function createAblyBrowserRealtime({
         bindings.delete(name);
       }
       if (!active || version !== generation) return;
-      tokenRooms = currentRooms();
-      const desiredRooms = JSON.stringify(tokenRooms);
-      if (authorizedRooms !== desiredRooms) {
+      tokenInput = currentChannels();
+      const desiredChannels = JSON.stringify(tokenInput);
+      if (authorizedChannels !== desiredChannels) {
         await client.authorize();
-        authorizedRooms = desiredRooms;
+        authorizedChannels = desiredChannels;
       }
       if (!active || version !== generation) return;
-      if (JSON.stringify(currentRooms()) !== desiredRooms) {
+      if (JSON.stringify(currentChannels()) !== desiredChannels) {
         dirty = true;
         return;
       }

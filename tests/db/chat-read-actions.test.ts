@@ -162,16 +162,14 @@ describe("chat read actions", () => {
   });
   it("preserves preferences and creation time while advancing updatedAt", async () => {
     const initial = new Date(chatNow.getTime() - 1000);
-    await database.db
-      .insert(chatRoomReads)
-      .values({
-        roomId: actors.roomId,
-        userId: actors.member.userId,
-        lastReadSeq: 1,
-        muted: true,
-        createdAt: initial,
-        updatedAt: initial,
-      });
+    await database.db.insert(chatRoomReads).values({
+      roomId: actors.roomId,
+      userId: actors.member.userId,
+      lastReadSeq: 1,
+      muted: true,
+      createdAt: initial,
+      updatedAt: initial,
+    });
     await actions().markRoomRead(input(3));
     expect(await database.db.select().from(chatRoomReads)).toEqual([
       expect.objectContaining({
@@ -206,7 +204,11 @@ describe("chat read actions", () => {
     expect(await database.db.select().from(chatRoomReads)).toEqual([
       expect.objectContaining({ lastReadSeq: 6 }),
     ]);
-    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish.mock.calls.map(([, event]) => event.type)).toEqual([
+      "message.created",
+      "room.activity",
+    ]);
   });
   it("rolls message and sequence allocation back when read persistence fails", async () => {
     const original = readDal.advanceRoomRead;

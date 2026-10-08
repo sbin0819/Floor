@@ -67,7 +67,10 @@ describe("shell realtime provider", () => {
     expect(screen.getByRole("status", { name: "연결 상태" })).toHaveTextContent(
       "connected",
     );
-    expect(requestToken).toHaveBeenCalledExactlyOnceWith({ rooms: ["a"] });
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith({
+      rooms: ["a"],
+      spaces: [],
+    });
     expect(client.channel("user:user-a").subscribe).toHaveBeenCalledTimes(1);
     unmount();
     expect(client.close).toHaveBeenCalledTimes(1);

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
-import { canReadRoom } from "@/lib/dal/chat-access";
+import { canReadRoom, canReadSpace } from "@/lib/dal/chat-access";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getEnv } from "@/lib/env";
 import {
@@ -12,10 +12,18 @@ import {
   type RateLimiter,
 } from "@/lib/rate-limit/memory";
 import { createAblyRestClient } from "@/lib/realtime/ably-server";
-import { roomChannel, userChannel } from "@/lib/realtime/channels";
+import {
+  roomChannel,
+  spaceChannel,
+  userChannel,
+} from "@/lib/realtime/channels";
 
 const tokenSchema = z.strictObject({
   rooms: z.array(z.uuid().transform((id) => id.toLowerCase())).max(3),
+  spaces: z
+    .array(z.uuid().transform((id) => id.toLowerCase()))
+    .max(1)
+    .default([]),
 });
 const limiter = createMemoryRateLimiter();
 export class RealtimeDisabledError extends Error {}
@@ -54,12 +62,16 @@ export function createRealtimeToken(
     const capability: Record<string, ("subscribe" | "presence")[]> = {
       [userChannel(session.userId)]: ["subscribe"],
     };
-    await Promise.all(
-      [...new Set(parsed.data.rooms)].map(async (roomId) => {
+    await Promise.all([
+      ...[...new Set(parsed.data.rooms)].map(async (roomId) => {
         if (await canReadRoom(session.userId, roomId, dependencies.database))
           capability[roomChannel(roomId)] = ["subscribe", "presence"];
       }),
-    );
+      ...parsed.data.spaces.map(async (spaceId) => {
+        if (await canReadSpace(session.userId, spaceId, dependencies.database))
+          capability[spaceChannel(spaceId)] = ["subscribe"];
+      }),
+    ]);
     const params: TokenParams = {
       clientId: session.userId,
       ttl: 600_000,

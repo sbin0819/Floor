@@ -70,8 +70,9 @@ describe("sendMessage transaction", () => {
       .from(chatRooms)
       .where(eq(chatRooms.id, actors.roomId));
     expect(room).toMatchObject({ lastSeq: 3, lastMessageAt: chatNow });
-    expect(publish).toHaveBeenCalledTimes(3);
-    expect(publish).toHaveBeenLastCalledWith(
+    expect(publish).toHaveBeenCalledTimes(6);
+    expect(publish).toHaveBeenNthCalledWith(
+      5,
       `room:${actors.roomId}`,
       expect.objectContaining({
         type: "message.created",
@@ -79,6 +80,13 @@ describe("sendMessage transaction", () => {
         authorName: actors.member.name,
       }),
     );
+    expect(publish).toHaveBeenLastCalledWith(`space:${actors.spaceId}`, {
+      type: "room.activity",
+      spaceId: actors.spaceId,
+      roomId: actors.roomId,
+      seq: 3,
+      authorId: actors.member.userId,
+    });
     expect(JSON.stringify(publish.mock.calls)).not.toContain("@");
   });
 
@@ -88,7 +96,7 @@ describe("sendMessage transaction", () => {
     expect(await actions().sendMessage({ ...request, body: "변경" })).toEqual(
       first,
     );
-    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(2);
     expect(await actions(actors.admin).sendMessage(request)).toEqual({
       ok: false,
       code: "INVALID_INPUT",
@@ -229,9 +237,32 @@ describe("sendMessage transaction", () => {
       (await actions(actors.member, { logError }).sendMessage(input())).ok,
     ).toBe(true);
     expect(await database.db.select().from(messages)).toHaveLength(1);
+    expect(logError.mock.calls).toEqual([
+      ["Chat realtime publication failed."],
+      ["Chat realtime publication failed."],
+    ]);
+  });
+  it("still publishes room activity when the message event fails", async () => {
+    const logError = vi.fn();
+    publish
+      .mockRejectedValueOnce(new Error("private failure"))
+      .mockResolvedValue(undefined);
+    const result = await actions(actors.member, { logError }).sendMessage(
+      input(),
+    );
+    expect(result.ok).toBe(true);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish).toHaveBeenLastCalledWith(`space:${actors.spaceId}`, {
+      type: "room.activity",
+      spaceId: actors.spaceId,
+      roomId: actors.roomId,
+      seq: 1,
+      authorId: actors.member.userId,
+    });
     expect(logError).toHaveBeenCalledExactlyOnceWith(
       "Chat realtime publication failed.",
     );
+    expect(await database.db.select().from(messages)).toHaveLength(1);
   });
   it("rolls back cursor updates on an insertion failure", async () => {
     const logError = vi.fn();

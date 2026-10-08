@@ -5,6 +5,7 @@ import type { RealtimeEvent } from "@/lib/realtime/types";
 
 export interface RealtimeTokenInput {
   rooms: string[];
+  spaces?: string[];
 }
 
 export class RealtimeTokenError extends Error {
@@ -40,6 +41,13 @@ export async function fetchRealtimeToken(
 }
 
 const eventSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("room.activity"),
+    spaceId: z.string(),
+    roomId: z.string(),
+    seq: z.number().int().positive(),
+    authorId: z.string().nullable(),
+  }),
   z.object({ type: z.literal("booking.changed"), spaceId: z.string() }),
   z.object({ type: z.literal("space.status_changed"), spaceId: z.string() }),
   z.object({

@@ -1,4 +1,11 @@
 export type RealtimeEvent =
+  | {
+      type: "room.activity";
+      spaceId: string;
+      roomId: string;
+      seq: number;
+      authorId: string | null;
+    }
   | { type: "booking.changed"; spaceId: string }
   | { type: "space.status_changed"; spaceId: string }
   | { type: "plan.published"; floorId: string; version: number }

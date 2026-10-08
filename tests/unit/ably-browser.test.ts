@@ -41,6 +41,51 @@ afterEach(() => {
 });
 
 describe("Ably browser connection ownership", () => {
+  it("switches the single selected space by detaching before reauthorization", async () => {
+    const { realtime, client, requestToken, calls } = setup();
+    const stopSpace = realtime.subscribe("space:a", vi.fn());
+    const stopRoom = realtime.subscribe("room:one", vi.fn());
+    realtime.start();
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenLastCalledWith({
+      rooms: ["one"],
+      spaces: ["a"],
+    });
+    calls.length = 0;
+    stopSpace();
+    stopRoom();
+    const onEvent = vi.fn();
+    realtime.subscribe("space:b", onEvent);
+    realtime.subscribe("room:two", vi.fn());
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenLastCalledWith({
+      rooms: ["two"],
+      spaces: ["b"],
+    });
+    expect(calls.indexOf("detach:space:a")).toBeLessThan(
+      calls.indexOf("authorize"),
+    );
+    expect(calls.indexOf("detach:room:one")).toBeLessThan(
+      calls.indexOf("authorize"),
+    );
+    client
+      .channel("space:b")
+      .emit({
+        type: "room.activity",
+        spaceId: "b",
+        roomId: "two",
+        seq: 1,
+        authorId: "other",
+      });
+    expect(onEvent).toHaveBeenCalledExactlyOnceWith({
+      type: "room.activity",
+      spaceId: "b",
+      roomId: "two",
+      seq: 1,
+      authorId: "other",
+    });
+    expect(client.channel("space:a").detach).toHaveBeenCalledTimes(1);
+  });
   it("does no work before activation and starts just one connection", async () => {
     const { realtime, requestToken, loadClient, client } = setup();
     realtime.subscribe("room:a", vi.fn());
@@ -51,7 +96,10 @@ describe("Ably browser connection ownership", () => {
     await vi.runAllTimersAsync();
     expect(loadClient).toHaveBeenCalledTimes(1);
     expect(client.connect).toHaveBeenCalledTimes(1);
-    expect(requestToken).toHaveBeenCalledExactlyOnceWith({ rooms: ["a"] });
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith({
+      rooms: ["a"],
+      spaces: [],
+    });
     expect(realtime.getSnapshot()).toBe("connected");
   });
 
@@ -76,7 +124,7 @@ describe("Ably browser connection ownership", () => {
     stopSecond();
     await vi.runAllTimersAsync();
     expect(channel.detach).toHaveBeenCalledTimes(1);
-    expect(requestToken).toHaveBeenLastCalledWith({ rooms: [] });
+    expect(requestToken).toHaveBeenLastCalledWith({ rooms: [], spaces: [] });
     channel.emit(event);
     expect(second).toHaveBeenCalledTimes(1);
   });
@@ -100,7 +148,10 @@ describe("Ably browser connection ownership", () => {
       calls.indexOf("subscribe:room:b"),
     );
     expect(client.authorize).toHaveBeenCalledTimes(1);
-    expect(requestToken).toHaveBeenLastCalledWith({ rooms: ["b", "c"] });
+    expect(requestToken).toHaveBeenLastCalledWith({
+      rooms: ["b", "c"],
+      spaces: [],
+    });
     expect(client.channel("room:b").subscribe).toHaveBeenCalledTimes(1);
   });
 
@@ -222,7 +273,7 @@ describe("Ably browser connection ownership", () => {
     stopA();
     const stopB = realtime.subscribe("room:b", vi.fn());
     await vi.advanceTimersByTimeAsync(25);
-    expect(requestToken).toHaveBeenLastCalledWith({ rooms: ["b"] });
+    expect(requestToken).toHaveBeenLastCalledWith({ rooms: ["b"], spaces: [] });
     stopB();
     realtime.subscribe("room:c", vi.fn());
     finishB?.(fakeTokenRequest);
@@ -230,9 +281,9 @@ describe("Ably browser connection ownership", () => {
     expect(calls).not.toContain("subscribe:room:b");
     expect(client.channel("room:c").subscribe).toHaveBeenCalledTimes(1);
     expect(requestToken.mock.calls).toEqual([
-      [{ rooms: ["a"] }],
-      [{ rooms: ["b"] }],
-      [{ rooms: ["c"] }],
+      [{ rooms: ["a"], spaces: [] }],
+      [{ rooms: ["b"], spaces: [] }],
+      [{ rooms: ["c"], spaces: [] }],
     ]);
     expect(calls.indexOf("detach:room:a")).toBeLessThan(
       calls.indexOf("authorize"),
