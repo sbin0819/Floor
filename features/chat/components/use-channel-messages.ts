@@ -12,7 +12,7 @@ import type { ChannelView, ChatMessage } from "../types";
 import { useChannelCatchUp } from "./use-channel-catch-up";
 import { useChatSendQueue } from "./use-chat-send-queue";
 import type { SendChatMessage } from "../send-queue";
-import { applyMessageEvent, createMessageSync } from "../message-sync";
+import { createMessageSync } from "../message-sync";
 import { withReactionIntents } from "./use-message-mutations";
 import {
   mergeChatMessages,
@@ -85,10 +85,11 @@ export function useChannelMessages(
     (incoming: ChatMessage[]) => {
       client.setQueryData<DisplayMessage[]>(
         roomMessagesKey(roomId),
-        (current = []) => mergeChatMessages(current, incoming, userId),
+        (current = []) =>
+          sync.project(mergeChatMessages(current, incoming, userId)),
       );
     },
-    [client, roomId, userId],
+    [client, roomId, userId, sync],
   );
   useEffect(() => {
     merge(data.messages);
@@ -96,16 +97,10 @@ export function useChannelMessages(
   useRealtimeChannel(roomChannel(roomId), (event) => {
     if (event.type === "message.updated" || event.type === "message.deleted") {
       if (event.roomId !== roomId) return;
-      client.setQueryData<DisplayMessage[]>(
-        roomMessagesKey(roomId),
-        (rows = []) =>
-          applyMessageEvent(
-            rows,
-            event,
-            new Map(data.members.map((member) => [member.id, member.name])),
-          ),
+      sync.receiveChange(
+        event,
+        new Map(data.members.map((member) => [member.id, member.name])),
       );
-      sync.changed(event.seq, event.id);
       return;
     }
     if (event.type === "reaction.changed") {
@@ -150,14 +145,27 @@ export function useChannelMessages(
       if (buffer.messages.length === 1)
         queueMicrotask(() => {
           if (!buffer.active) return;
-          setLiveBatch({ roomId, messages: buffer.messages });
+          const confirmed =
+            client.getQueryData<DisplayMessage[]>(roomMessagesKey(roomId)) ??
+            [];
+          setLiveBatch({
+            roomId,
+            messages: buffer.messages.flatMap((received) => {
+              const saved = confirmed.find((row) => row.id === received.id);
+              return saved && !saved.deletedAt ? [saved] : [];
+            }),
+          });
           buffer.messages = [];
         });
     }
   });
-  const messages: DisplayMessage[] = query.data ?? data.messages;
+  const rows: DisplayMessage[] = query.data ?? data.messages;
+  const messages = useMemo(
+    () => sync.project(rows).map(withReactionIntents),
+    [rows, sync],
+  );
   return {
-    messages: messages.map(withReactionIntents),
+    messages,
     reportVisible: sync.visible,
     submit: sending.submit,
     retry: sending.retry,

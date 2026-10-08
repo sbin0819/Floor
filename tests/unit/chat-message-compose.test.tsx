@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { useState } from "react";
+import { Activity, useState } from "react";
 import { MessageComposer } from "@/features/chat/components/message-composer";
 import { MessageEditor } from "@/features/chat/components/message-editor";
 import { MessageList } from "@/features/chat/components/message-list";
@@ -183,6 +183,37 @@ describe("reply, editing, and selected mention composition", () => {
     expect(cancel).not.toHaveBeenCalled();
     expect(input).toHaveValue("수정한 내용");
     expect(input).toBeEnabled();
+  });
+  it("does not strand a pending editor when Activity is hidden before its response", async () => {
+    let finish!: (value: boolean) => void;
+    const cancel = vi.fn();
+    const save = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const tree = (hidden: boolean) => (
+      <Activity mode={hidden ? "hidden" : "visible"}>
+        <MessageEditor
+          messageId="message"
+          body="원문"
+          names={names}
+          members={members}
+          allowEveryone={false}
+          onSave={save}
+          onCancel={cancel}
+        />
+      </Activity>
+    );
+    const result = render(tree(false));
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+    result.rerender(tree(true));
+    await act(async () => finish(true));
+    expect(cancel).not.toHaveBeenCalled();
+    result.rerender(tree(false));
+    expect(screen.getByRole("combobox")).toBeEnabled();
+    expect(screen.getByRole("combobox")).toHaveValue("원문");
   });
 });
 

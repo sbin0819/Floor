@@ -16,7 +16,13 @@ export async function findMessageTarget(
   database: DalDatabase = getDb(),
 ) {
   const [row] = await database
-    .select({ id: messages.id, roomId: messages.roomId })
+    .select({
+      id: messages.id,
+      roomId: messages.roomId,
+      authorId: messages.authorId,
+      kind: messages.kind,
+      deletedAt: messages.deletedAt,
+    })
     .from(messages)
     .where(eq(messages.id, messageId));
   return row ?? null;
@@ -96,7 +102,8 @@ export async function editChatMessage(
     .set({
       body: input.body,
       mentionsEveryone: input.mentionsEveryone,
-      editedAt: input.now,
+      // 잠금 대기 중 요청 순서가 바뀌어도 편집 이벤트의 시각이 거꾸로 가지 않는다.
+      editedAt: sql`greatest(${input.now.toISOString()}::timestamptz, ${messages.editedAt} + interval '1 millisecond')`,
     })
     .where(
       and(

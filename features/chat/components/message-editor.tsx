@@ -51,7 +51,7 @@ export function MessageEditor({
       if ((await onSave(messageId, result.data)) && active.current) onCancel();
     } finally {
       locked.current = false;
-      if (active.current) setBusy(false);
+      setBusy(false);
     }
   };
   return (

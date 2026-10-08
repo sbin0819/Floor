@@ -60,7 +60,7 @@ function deferred<T>() {
 }
 function updated(
   extra: Partial<Extract<RealtimeEvent, { type: "message.updated" }>> = {},
-): RealtimeEvent {
+): Extract<RealtimeEvent, { type: "message.updated" }> {
   return {
     type: "message.updated",
     roomId,
@@ -322,6 +322,43 @@ describe("loaded message page reconciliation", () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+
+  it("preserves unseen changes across stop/start and projects hidden cache arrivals safely", () => {
+    const { client, sync, read } = setup([message(2)]);
+    sync.receiveChange(deleted, new Map());
+    sync.stop();
+    client.setQueryData(roomMessagesKey(roomId), [message(1), message(2)]);
+    expect(sync.project(read())[0]).toMatchObject({
+      body: "",
+      deletedAt: expect.any(String),
+    });
+    sync.start();
+    expect(read()[0]).toMatchObject({
+      body: "",
+      deletedAt: expect.any(String),
+    });
+    sync.receiveChange(updated(), new Map());
+    expect(read()[0]?.body).toBe("");
+  });
+
+  it("isolates unseen changes by room and drops the pending edit after a row is reconciled", () => {
+    const { client, sync, read } = setup([message(2)]);
+    sync.receiveChange(updated(), new Map());
+    const otherRows = [message(1, { body: "다른 방" })];
+    client.setQueryData(roomMessagesKey("room-b"), otherRows);
+    expect(client.getQueryData(roomMessagesKey("room-b"))).toEqual(otherRows);
+    client.setQueryData(roomMessagesKey(roomId), [message(1), message(2)]);
+    expect(read()[0]?.body).toContain("새 본문");
+    client.setQueryData(roomMessagesKey(roomId), [
+      message(1, {
+        body: "최신 서버 응답",
+        editedAt: "2026-10-08T00:03:00.000Z",
+      }),
+      message(2),
+    ]);
+    expect(read()[0]?.body).toBe("최신 서버 응답");
+    expect(sync.project(read())[0]?.body).toBe("최신 서버 응답");
   });
 });
 

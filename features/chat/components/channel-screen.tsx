@@ -30,6 +30,7 @@ import { MessageList } from "./message-list";
 import { MessageDeleteDialog } from "./message-delete-dialog";
 import { MessageEditor } from "./message-editor";
 import { ChatMuteButton } from "./chat-mute-button";
+import { TypingIndicator } from "./typing-indicator";
 import { useMessageMutations } from "./use-message-mutations";
 import { useTyping } from "./use-typing";
 import type { DisplayMessage } from "./message-state";
@@ -326,14 +327,7 @@ export function ChannelScreen({
                 : "이 채널에는 관리자만 쓸 수 있어요"}
             </p>
           )}
-          <p
-            role="status"
-            aria-live="polite"
-            className="min-h-6 shrink-0 px-4 pb-1 text-xs text-muted-foreground md:px-6"
-            data-chat-typing
-          >
-            {typing.label}
-          </p>
+          <TypingIndicator label={typing.label} />
         </div>
         {wide && membersOpen && (
           <aside

@@ -48,7 +48,13 @@ export function createMessageActions(
             input.messageId,
             dependencies.database,
           );
-          if (!target) throw new ActionError("NOT_FOUND");
+          if (
+            !target ||
+            target.authorId !== session.userId ||
+            target.kind !== "text" ||
+            target.deletedAt
+          )
+            throw new ActionError("NOT_FOUND");
           const access = await canWriteRoom(
             session.userId,
             target.roomId,
@@ -151,7 +157,7 @@ export function createMessageActions(
                 body: message.body,
                 mentions: message.mentions,
                 mentionsEveryone: message.mentionsEveryone,
-                editedAt: now.toISOString(),
+                editedAt: message.editedAt!,
               },
             },
           ];

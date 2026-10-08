@@ -8,6 +8,11 @@ import {
   type DisplayMessage,
 } from "./components/message-state";
 
+type MessageChange = Extract<
+  RealtimeEvent,
+  { type: "message.updated" | "message.deleted" }
+>;
+
 export function applyMessageEvent(
   rows: readonly DisplayMessage[],
   event: RealtimeEvent,
@@ -83,12 +88,42 @@ export function createMessageSync(
   const revisions = new Map<number, number>();
   const pending = new Set<number>();
   const requests = new Map<number, AbortController>();
+  const unseen = new Map<
+    string,
+    { event: MessageChange; names: ReadonlyMap<string, string> }
+  >();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let unsubscribe: (() => void) | undefined;
   let active = false;
   let lifetime = 0;
   let visibleSeq: number | null = null;
   const rows = () =>
     client.getQueryData<DisplayMessage[]>(roomMessagesKey(roomId)) ?? [];
+  function project(current: DisplayMessage[]) {
+    let result = current;
+    for (const { event, names } of unseen.values())
+      if (
+        result.some(
+          (row) => row.id === event.id || row.replyTo?.id === event.id,
+        )
+      )
+        result = applyMessageEvent(result, event, names);
+    return result;
+  }
+  function settleUnseen() {
+    if (!unseen.size) return;
+    let current = rows();
+    const arrived = [...unseen].filter(([id]) =>
+      current.some((row) => row.id === id && !row.delivery),
+    );
+    if (!arrived.length) return;
+    // 서버 응답·전송 확인도 같은 캐시로 들어온다. 재진입 전에 지워 한 번만 보정한다.
+    for (const [id, { event, names }] of arrived) {
+      unseen.delete(id);
+      current = applyMessageEvent(current, event, names);
+    }
+    client.setQueryData(roomMessagesKey(roomId), current);
+  }
   async function refresh(page: number) {
     if (!active || requests.has(page)) return;
     const controller = new AbortController();
@@ -169,8 +204,22 @@ export function createMessageSync(
   };
   return {
     start() {
+      if (active) return;
       active = true;
       lifetime++;
+      settleUnseen();
+      unsubscribe = client.getQueryCache().subscribe(({ type, query }) => {
+        const key = query.queryKey;
+        if (
+          type === "updated" &&
+          key.length === 4 &&
+          key[0] === "chat" &&
+          key[1] === "room" &&
+          key[2] === roomId &&
+          key[3] === "messages"
+        )
+          settleUnseen();
+      });
       let rooms = activeSyncs.get(client);
       if (!rooms) {
         rooms = new Map();
@@ -187,6 +236,8 @@ export function createMessageSync(
       activeSyncs.get(client)?.get(roomId)?.delete(changed);
       active = false;
       lifetime++;
+      unsubscribe?.();
+      unsubscribe = undefined;
       clearTimeout(timer);
       pending.clear();
       for (const request of requests.values()) request.abort();
@@ -194,6 +245,25 @@ export function createMessageSync(
     },
     visible(seq: number | null) {
       visibleSeq = seq;
+    },
+    project,
+    receiveChange(event: MessageChange, names: ReadonlyMap<string, string>) {
+      if (!active || event.roomId !== roomId) return;
+      const previous = unseen.get(event.id);
+      if (
+        previous?.event.type === "message.deleted" ||
+        (previous?.event.type === "message.updated" &&
+          event.type === "message.updated" &&
+          previous.event.editedAt > event.editedAt)
+      )
+        return;
+      if (!rows().some((row) => row.id === event.id && !row.delivery))
+        unseen.set(event.id, { event, names });
+      client.setQueryData<DisplayMessage[]>(
+        roomMessagesKey(roomId),
+        (current = []) => applyMessageEvent(current, event, names),
+      );
+      changed(event.seq, event.id);
     },
     changed,
     revalidate() {

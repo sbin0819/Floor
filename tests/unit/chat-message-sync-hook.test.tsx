@@ -1,6 +1,6 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PropsWithChildren } from "react";
+import { Activity, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChannelMessages } from "@/features/chat/components/use-channel-messages";
 import {
@@ -233,6 +233,149 @@ describe("channel message reconciliation integration", () => {
     expect(result.current.liveMessages).toEqual([]);
     await tick(250);
     expect(requestMessagePage).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a not-yet-loaded message deleted when its created event arrives later", async () => {
+    const { read, result } = setup();
+    emit({
+      type: "message.deleted",
+      roomId: "room-a",
+      id: "message-2",
+      seq: 2,
+    });
+    expect(read().map((row) => row.seq)).toEqual([1]);
+    emit({
+      ...message(2, { body: "늦은 비밀 원문" }),
+      type: "message.created",
+      roomId: "room-a",
+      editedAt: null,
+      deletedAt: null,
+      reactions: [],
+    });
+    await tick(1);
+    expect(read()[1]).toMatchObject({
+      id: "message-2",
+      body: "",
+      deletedAt: expect.any(String),
+    });
+    expect(JSON.stringify(result.current.messages)).not.toContain(
+      "늦은 비밀 원문",
+    );
+    expect(result.current.liveMessages).toEqual([]);
+  });
+
+  it("retains the newest unseen edit over older edits and a delayed created event", async () => {
+    const { read, result } = setup();
+    const update: RealtimeEvent = {
+      type: "message.updated",
+      roomId: "room-a",
+      id: "message-2",
+      seq: 2,
+      body: "먼저 도착한 최신 편집",
+      mentions: [],
+      mentionsEveryone: false,
+      editedAt: "2026-10-08T00:02:00.000Z",
+    };
+    emit(update);
+    emit({
+      ...update,
+      body: "나중에 도착한 옛 편집",
+      editedAt: "2026-10-08T00:01:00.000Z",
+    });
+    expect(read()).toHaveLength(1);
+    emit({
+      ...message(2),
+      type: "message.created",
+      roomId: "room-a",
+      editedAt: null,
+      deletedAt: null,
+      reactions: [],
+    });
+    await tick(1);
+    expect(read()[1]).toMatchObject({
+      body: update.body,
+      editedAt: update.editedAt,
+    });
+    expect(result.current.liveMessages).toEqual([
+      expect.objectContaining({ body: update.body }),
+    ]);
+  });
+
+  it("preserves an unseen tombstone over a later edit and an HTTP cache acknowledgment", async () => {
+    const { client, read, result } = setup();
+    emit({
+      type: "message.deleted",
+      roomId: "room-a",
+      id: "message-2",
+      seq: 2,
+    });
+    emit({
+      type: "message.updated",
+      roomId: "room-a",
+      id: "message-2",
+      seq: 2,
+      body: "삭제 뒤 늦은 편집",
+      mentions: [],
+      mentionsEveryone: false,
+      editedAt: "2026-10-08T00:02:00.000Z",
+    });
+    act(() =>
+      client.setQueryData(roomMessagesKey("room-a"), [
+        ...read(),
+        message(2, { body: "삭제 전 HTTP 본문" }),
+      ]),
+    );
+    await tick(1);
+    expect(read()[1]).toMatchObject({
+      body: "",
+      deletedAt: expect.any(String),
+    });
+    expect(result.current.messages[1]?.body).toBe("");
+  });
+
+  it("keeps unseen deletion safe when a preserved Activity receives its HTTP result while hidden", async () => {
+    const client = new QueryClient();
+    clients.push(client);
+    const data = view();
+    function Reader() {
+      const state = useChannelMessages(data);
+      return (
+        <output aria-label="보존된 채널">
+          {JSON.stringify(state.messages)}
+        </output>
+      );
+    }
+    const ui = (mode: "visible" | "hidden") => (
+      <QueryClientProvider client={client}>
+        <Activity mode={mode}>
+          <Reader />
+        </Activity>
+      </QueryClientProvider>
+    );
+    const rendered = render(ui("visible"));
+    unmounts.push(rendered.unmount);
+    emit({
+      type: "message.deleted",
+      roomId: "room-a",
+      id: "message-2",
+      seq: 2,
+    });
+    rendered.rerender(ui("hidden"));
+    expect(realtime.events.has("room:room-a")).toBe(false);
+    act(() =>
+      client.setQueryData(roomMessagesKey("room-a"), [
+        message(1),
+        message(2, { body: "숨김 중 늦은 원문" }),
+      ]),
+    );
+    rendered.rerender(ui("visible"));
+    await tick(1);
+    expect(screen.getByLabelText("보존된 채널")).not.toHaveTextContent(
+      "숨김 중 늦은 원문",
+    );
+    expect(
+      client.getQueryData<DisplayMessage[]>(roomMessagesKey("room-a"))?.[1],
+    ).toMatchObject({ body: "", deletedAt: expect.any(String) });
   });
 
   it("protects a newer event from an in-flight stale server page", async () => {

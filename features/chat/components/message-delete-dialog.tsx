@@ -44,7 +44,7 @@ export function MessageDeleteDialog({
       if ((await onDelete(message.id)) && scope.active) onClose();
     } finally {
       lock.current = false;
-      if (scope.active) setBusy(false);
+      setBusy(false);
     }
   };
   return (
