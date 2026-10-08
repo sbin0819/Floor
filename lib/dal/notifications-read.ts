@@ -7,15 +7,23 @@ import {
   eq,
   gt,
   isNull,
-  lte,
   notExists,
   or,
   sql,
+  type SQLWrapper,
 } from "drizzle-orm";
 import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db/client";
 import { notifications } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
+
+export function visibleNotificationWindow(
+  now: Date,
+  scheduledFor: SQLWrapper = notifications.scheduledFor,
+  expiresAt: SQLWrapper = notifications.expiresAt,
+) {
+  return sql<boolean>`(${scheduledFor} <= ${now.toISOString()}::timestamptz and (${expiresAt} is null or ${expiresAt} > ${now.toISOString()}::timestamptz))`;
+}
 
 function visible(
   userId: string,
@@ -28,8 +36,7 @@ function visible(
 ) {
   return and(
     eq(table.userId, userId),
-    lte(table.scheduledFor, now),
-    or(isNull(table.expiresAt), gt(table.expiresAt, now)),
+    visibleNotificationWindow(now, table.scheduledFor, table.expiresAt),
   );
 }
 

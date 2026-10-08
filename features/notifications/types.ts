@@ -46,9 +46,15 @@ export const bookingNotificationDataSchema = z
 export const personNotificationDataSchema = z.strictObject({
   actorName: z.string().min(1),
 });
+export const spaceInviteNotificationDataSchema = z.strictObject({
+  actorName: z.string().min(1),
+  spaceName: z.string().min(1),
+  inviteCode: z.string().regex(/^[A-Za-z0-9_-]{22}$/),
+});
 export const notificationDataSchema = z.union([
   bookingNotificationDataSchema,
   personNotificationDataSchema,
+  spaceInviteNotificationDataSchema,
 ]);
 export type BookingNotificationData = z.infer<
   typeof bookingNotificationDataSchema
@@ -56,7 +62,13 @@ export type BookingNotificationData = z.infer<
 export type PersonNotificationData = z.infer<
   typeof personNotificationDataSchema
 >;
-export type NotificationData = BookingNotificationData | PersonNotificationData;
+export type SpaceInviteNotificationData = z.infer<
+  typeof spaceInviteNotificationDataSchema
+>;
+export type NotificationData =
+  | BookingNotificationData
+  | PersonNotificationData
+  | SpaceInviteNotificationData;
 export type NotificationSnapshot =
   | {
       [Type in BookingNotificationType]: {
@@ -69,7 +81,8 @@ export type NotificationSnapshot =
         type: Type;
         data: PersonNotificationData;
       };
-    }[PersonNotificationType];
+    }[PersonNotificationType]
+  | { type: "space_invite"; data: SpaceInviteNotificationData };
 export type NotificationContent = NotificationSnapshot & {
   bookingId: string | null;
 };
@@ -93,6 +106,10 @@ export function parseNotificationData(
   input: unknown,
 ): PersonNotificationData | null;
 export function parseNotificationData(
+  type: "space_invite",
+  input: unknown,
+): SpaceInviteNotificationData | null;
+export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null;
@@ -100,7 +117,10 @@ export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null {
-  if (type === "space_invite") return null;
+  if (type === "space_invite") {
+    const result = spaceInviteNotificationDataSchema.safeParse(input);
+    return result.success ? result.data : null;
+  }
   if (isPersonNotificationType(type)) {
     const result = personNotificationDataSchema.safeParse(input);
     return result.success ? result.data : null;
@@ -133,7 +153,10 @@ export function parseNotificationContent(
   input: unknown,
   bookingId: string | null,
 ): NotificationContent | null {
-  if (type === "space_invite") return null;
+  if (type === "space_invite") {
+    const data = parseNotificationData(type, input);
+    return data ? { type, data, bookingId: null } : null;
+  }
   if (isPersonNotificationType(type)) {
     const data = parseNotificationData(type, input);
     return data ? { type, data, bookingId: null } : null;

@@ -32,6 +32,7 @@ export function NotificationRow({
   const booking =
     item.type !== "friend_request" &&
     item.type !== "friend_accepted" &&
+    item.type !== "space_invite" &&
     item.type !== "message_request"
       ? item
       : null;

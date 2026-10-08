@@ -28,6 +28,7 @@ export function notificationHref({
   if (type === "friend_request") return "/friends?tab=received";
   if (type === "friend_accepted") return "/friends";
   if (type === "message_request") return "/friends?tab=requests";
+  if (type === "space_invite") return `/s/join/${data.inviteCode}`;
   if (type === "booking_removed") return null;
   if (type === "booking_cancelled") return "/bookings?tab=past";
   if (type === "booking_reminder") return bookingId ? `/m/${bookingId}` : null;
@@ -36,6 +37,19 @@ export function notificationHref({
 }
 
 export function notificationPresentation({ type, data }: NotificationSnapshot) {
+  if (type === "space_invite") {
+    const parts = [
+      { text: data.actorName, strong: true },
+      { text: " 님이 ", strong: false },
+      { text: data.spaceName, strong: true },
+      { text: " 스페이스에 초대했어요", strong: false },
+    ];
+    return {
+      parts,
+      text: parts.map((part) => part.text).join(""),
+      dateTime: undefined,
+    };
+  }
   if (
     type === "friend_request" ||
     type === "friend_accepted" ||

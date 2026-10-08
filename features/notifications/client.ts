@@ -4,6 +4,7 @@ import {
   bookingNotificationTypes,
   personNotificationDataSchema,
   personNotificationTypes,
+  spaceInviteNotificationDataSchema,
   parseNotificationData,
   type NotificationSummary,
 } from "./types";
@@ -35,6 +36,11 @@ const itemSchema = z
       ...itemFields,
       type: z.enum(personNotificationTypes),
       data: personNotificationDataSchema,
+    }),
+    z.strictObject({
+      ...itemFields,
+      type: z.literal("space_invite"),
+      data: spaceInviteNotificationDataSchema,
     }),
   ])
   .refine((item) => parseNotificationData(item.type, item.data) !== null);
