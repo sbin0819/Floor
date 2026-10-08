@@ -17,6 +17,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // /api/uploads는 포함하지 않는다. Proxy의 몸통 복제가 25MB 스트림을 잘라낼 수 있다.
   matcher: [
     "/",
     "/admin/:path*",
