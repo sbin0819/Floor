@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Grid2X2, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import {
   Suspense,
   useCallback,
@@ -19,11 +19,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { ChatRailNavigation } from "@/components/chat-navigation";
 import {
   CloseOnRouteChange,
   MemberSectionName,
@@ -35,13 +31,17 @@ export type AppShellFrameProps = {
   accountCard: ReactNode;
   accountAvatar: ReactNode;
   notifications: ReactNode;
+  rail?: ReactNode;
+  sidebarTitle?: ReactNode;
 };
 
 function AppRail({
   avatar,
+  navigation,
   drawer = false,
 }: {
   avatar?: ReactNode;
+  navigation?: ReactNode;
   drawer?: boolean;
 }) {
   return (
@@ -52,29 +52,13 @@ function AppRail({
         drawer ? "flex h-full" : "sticky top-0 hidden h-dvh self-start md:flex",
       )}
     >
-      <div className="relative flex w-full shrink-0 justify-center">
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-2 left-0 w-1 rounded-r bg-primary"
-        />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link
-              href="/"
-              aria-label="Floor 홈"
-              aria-current="true"
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              <Grid2X2 aria-hidden="true" className="size-5" />
-            </Link>
-          </TooltipTrigger>
-          <TooltipContent side="right">홈</TooltipContent>
-        </Tooltip>
-      </div>
-      <div
-        aria-hidden="true"
-        className="mx-4 mt-3 h-px w-10 shrink-0 bg-sidebar-border"
-      />
+      {navigation ?? (
+        <Suspense
+          fallback={<div aria-hidden="true" className="h-[57px] w-11" />}
+        >
+          <ChatRailNavigation spaces={[]} />
+        </Suspense>
+      )}
       {!drawer && (
         <div className="mt-auto pt-4 pb-[env(safe-area-inset-bottom)] xl:hidden">
           {avatar}
@@ -87,8 +71,11 @@ function AppRail({
 function AppSidebar({
   menu,
   accountCard,
+  sidebarTitle,
   drawer = false,
-}: Pick<AppShellFrameProps, "menu" | "accountCard"> & { drawer?: boolean }) {
+}: Pick<AppShellFrameProps, "menu" | "accountCard" | "sidebarTitle"> & {
+  drawer?: boolean;
+}) {
   return (
     <div
       data-slot={drawer ? "drawer-sidebar" : "app-sidebar"}
@@ -98,12 +85,14 @@ function AppSidebar({
       )}
     >
       <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border px-4">
-        <Link
-          href="/"
-          className="inline-flex min-h-11 items-center rounded-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          Floor
-        </Link>
+        {sidebarTitle ?? (
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center rounded-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Floor
+          </Link>
+        )}
         {drawer && (
           <SheetClose asChild>
             <Button variant="ghost" size="icon" aria-label="메뉴 닫기">
@@ -126,6 +115,8 @@ export function AppShellFrame({
   accountCard,
   accountAvatar,
   notifications,
+  rail,
+  sidebarTitle,
 }: AppShellFrameProps) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -155,8 +146,12 @@ export function AppShellFrame({
         data-slot="app-shell"
         className="grid min-h-dvh grid-cols-1 md:grid-cols-[72px_minmax(0,1fr)] xl:grid-cols-[72px_248px_minmax(0,1fr)]"
       >
-        <AppRail avatar={accountAvatar} />
-        <AppSidebar menu={menu} accountCard={accountCard} />
+        <AppRail avatar={accountAvatar} navigation={rail} />
+        <AppSidebar
+          menu={menu}
+          accountCard={accountCard}
+          sidebarTitle={sidebarTitle}
+        />
         <div className="min-w-0">
           <header className="sticky top-0 z-[45] flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 md:px-8">
             <div className="flex min-w-0 items-center gap-2">
@@ -203,8 +198,13 @@ export function AppShellFrame({
         }}
       >
         <SheetTitle className="sr-only">메뉴</SheetTitle>
-        <AppRail drawer />
-        <AppSidebar drawer menu={menu} accountCard={accountCard} />
+        <AppRail drawer navigation={rail} />
+        <AppSidebar
+          drawer
+          menu={menu}
+          accountCard={accountCard}
+          sidebarTitle={sidebarTitle}
+        />
       </SheetContent>
     </Sheet>
   );

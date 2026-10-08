@@ -3,7 +3,7 @@ import { MemberNav } from "@/components/member-nav";
 
 export function MobileNav() {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-2 pb-[env(safe-area-inset-bottom)] md:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-2 pb-[env(safe-area-inset-bottom)] md:hidden [#content:has([data-chat-screen])_&]:hidden">
       <Suspense
         fallback={
           <div

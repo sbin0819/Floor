@@ -16,7 +16,7 @@ describe("member layout integration", () => {
     const [content, mobile] = layout.props.children;
     expect(content.type).toBe("div");
     expect(content.props.className).toBe(
-      "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+      "pb-[calc(4rem+env(safe-area-inset-bottom))] has-[[data-chat-screen]]:pb-0 md:pb-0",
     );
     expect(content.props.children.type).toBe(Suspense);
     expect(content.props.children.props.children).toBe(child);

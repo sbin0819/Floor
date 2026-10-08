@@ -375,7 +375,7 @@ describe("member app shell frame", () => {
     ["/", "홈"],
     ["/branches/a/floors/b", "공간 예약"],
     ["/bookings/x/edit", "내 예약"],
-    ["/teams/start", "팀"],
+    ["/teams/start", "팀 관리"],
     ["/notifications", "알림"],
     ["/notifications/x", "알림"],
     ["/notificationsx", null],

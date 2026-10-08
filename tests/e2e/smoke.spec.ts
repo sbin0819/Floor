@@ -1,5 +1,25 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 메시지 화면은 로그인으로, 실시간 토큰은 401로 안내해요", async ({
+  page,
+  request,
+}) => {
+  const response = await request.post("/api/realtime/token", {
+    data: { rooms: [] },
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(401);
+  expect(response.headers()["cache-control"]).toBe("private, no-store");
+  expect(response.headers().location).toBeUndefined();
+  await page.goto("/messages");
+  await expect(
+    page.getByRole("heading", { name: "Floor에 로그인", exact: true }),
+  ).toBeVisible();
+  const url = new URL(page.url());
+  expect(url.pathname).toBe("/login");
+  expect(url.searchParams.get("next")).toBe("/messages");
+});
+
 test("비로그인 예약 수정 화면은 로그인으로 안내해요", async ({ page }) => {
   const path = "/bookings/11111111-1111-4111-8111-111111111111/edit";
   await page.goto(path);

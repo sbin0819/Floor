@@ -2,8 +2,21 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { isValidElement, Suspense, type SuspenseProps } from "react";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AppShell, HeaderNotifications } from "@/components/app-shell";
+import {
+  AppShell,
+  HeaderNotifications,
+  ShellRealtimeSession,
+} from "@/components/app-shell";
 import { AppShellFrame } from "@/components/app-shell-frame";
+import {
+  RealtimeProvider,
+  RealtimeSession,
+} from "@/components/realtime-provider";
+import {
+  ChatRailSlot,
+  ChatSidebarSlot,
+  ChatSidebarTitleSlot,
+} from "@/components/chat-shell-navigation";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 
@@ -11,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   account: vi.fn(),
   summary: vi.fn(),
+  nav: vi.fn(),
   pathname: vi.fn(() => "/"),
 }));
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.session }));
@@ -20,6 +34,7 @@ vi.mock("@/features/auth/queries", () => ({
 vi.mock("@/features/notifications/queries", () => ({
   getNotificationSummary: mocks.summary,
 }));
+vi.mock("@/features/chat/queries", () => ({ getMyChatNav: mocks.nav }));
 vi.mock("@/features/notifications/components/notification-bell", () => ({
   NotificationBell: () => null,
 }));
@@ -34,11 +49,28 @@ beforeEach(() => {
 });
 
 describe("member shell streaming", () => {
-  it.each(["menu", "accountCard", "accountAvatar", "notifications"] as const)(
+  function frame() {
+    const shell = AppShell({ children: <main>페이지 내용</main> });
+    expect(shell.type).toBe(RealtimeProvider);
+    const [session, body] = shell.props.children;
+    expect(session.type).toBe(Suspense);
+    expect(session.props.fallback).toBeNull();
+    expect(session.props.children.type).toBe(ShellRealtimeSession);
+    expect(body.type).toBe(AppShellFrame);
+    return body;
+  }
+
+  it.each([
+    "menu",
+    "accountCard",
+    "accountAvatar",
+    "notifications",
+    "rail",
+    "sidebarTitle",
+  ] as const)(
     "renders the %s fallback synchronously without reading session or data",
     (slot) => {
-      const shell = AppShell({ children: <main>페이지 내용</main> });
-      expect(shell.type).toBe(AppShellFrame);
+      const shell = frame();
       const boundary = shell.props[slot];
       if (!isValidElement<SuspenseProps>(boundary))
         throw new Error("Missing boundary");
@@ -51,8 +83,30 @@ describe("member shell streaming", () => {
       expect(mocks.session).not.toHaveBeenCalled();
       expect(mocks.account).not.toHaveBeenCalled();
       expect(mocks.summary).not.toHaveBeenCalled();
+      expect(mocks.nav).not.toHaveBeenCalled();
     },
   );
+
+  it("does not read chat navigation or start realtime without a session", async () => {
+    mocks.session.mockResolvedValue(null);
+    expect(await ShellRealtimeSession()).toBeNull();
+    for (const slot of [ChatRailSlot, ChatSidebarSlot, ChatSidebarTitleSlot]) {
+      expect((await slot()).props.spaces).toEqual([]);
+    }
+    expect(mocks.nav).not.toHaveBeenCalled();
+  });
+
+  it("passes only the authenticated user id to the realtime session leaf", async () => {
+    mocks.session.mockResolvedValue({
+      userId: "member",
+      name: "가상 회원",
+      email: "private@example.test",
+    });
+    const session = await ShellRealtimeSession();
+    expect(session?.type).toBe(RealtimeSession);
+    expect(session?.props).toEqual({ userId: "member" });
+    expect(mocks.nav).not.toHaveBeenCalled();
+  });
 
   it("keeps the document shell and page rendered while route leaves suspend", () => {
     const pending = new Promise<never>(() => {});
@@ -106,7 +160,7 @@ describe("member shell streaming", () => {
   });
 
   it("reserves four 44px menu rows and matching account/bell dimensions", () => {
-    const shell = AppShell({ children: null });
+    const shell = frame();
     for (const [slot, expectedClass] of [
       ["accountCard", "h-14"],
       ["accountAvatar", "size-11"],

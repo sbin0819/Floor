@@ -11,10 +11,13 @@ describe("member section name", () => {
     ["/bookings", "내 예약"],
     ["/bookings/past", "내 예약"],
     ["/bookings/x/edit", "내 예약"],
-    ["/teams", "팀"],
-    ["/teams/start", "팀"],
-    ["/teams/team-a", "팀"],
-    ["/invite/private-token", "팀"],
+    ["/teams", "팀 관리"],
+    ["/teams/start", "팀 관리"],
+    ["/teams/team-a", "팀 관리"],
+    ["/invite/private-token", "팀 관리"],
+    ["/messages", "메시지"],
+    ["/s/space", "메시지"],
+    ["/s/space/room", "메시지"],
     ["/notifications", "알림"],
     ["/notifications/item", "알림"],
     ["/bookings-extra", null],
@@ -24,6 +27,8 @@ describe("member section name", () => {
     ["/admin", null],
     ["/notificationsx", null],
     ["/unknown", null],
+    ["/messages-extra", null],
+    ["/spaces", null],
   ])("labels %s as %s", (pathname, expected) => {
     expect(memberSectionName(pathname)).toBe(expected);
   });

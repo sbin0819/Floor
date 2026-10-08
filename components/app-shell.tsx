@@ -1,6 +1,16 @@
 import { Suspense, type ReactNode } from "react";
 import { AppShellFrame } from "@/components/app-shell-frame";
-import { MemberNav } from "@/components/member-nav";
+import {
+  ChatRailSlot,
+  ChatRailPlaceholder,
+  ChatSidebarSlot,
+  ChatSidebarTitleSlot,
+  ChatSidebarTitlePlaceholder,
+} from "@/components/chat-shell-navigation";
+import {
+  RealtimeProvider,
+  RealtimeSession,
+} from "@/components/realtime-provider";
 import {
   HeaderAccount,
   AccountMenuPlaceholder,
@@ -44,29 +54,49 @@ export function MemberNavPlaceholder() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <AppShellFrame
-      menu={
-        <Suspense fallback={<MemberNavPlaceholder />}>
-          <MemberNav />
-        </Suspense>
-      }
-      accountCard={
-        <Suspense fallback={<AccountMenuPlaceholder variant="card" />}>
-          <HeaderAccount variant="card" />
-        </Suspense>
-      }
-      accountAvatar={
-        <Suspense fallback={<AccountMenuPlaceholder variant="avatar" />}>
-          <HeaderAccount variant="avatar" />
-        </Suspense>
-      }
-      notifications={
-        <Suspense fallback={<NotificationBellPlaceholder />}>
-          <HeaderNotifications />
-        </Suspense>
-      }
-    >
-      {children}
-    </AppShellFrame>
+    <RealtimeProvider>
+      <Suspense fallback={null}>
+        <ShellRealtimeSession />
+      </Suspense>
+      <AppShellFrame
+        rail={
+          <Suspense fallback={<ChatRailPlaceholder />}>
+            <ChatRailSlot />
+          </Suspense>
+        }
+        sidebarTitle={
+          <Suspense fallback={<ChatSidebarTitlePlaceholder />}>
+            <ChatSidebarTitleSlot />
+          </Suspense>
+        }
+        menu={
+          <Suspense fallback={<MemberNavPlaceholder />}>
+            <ChatSidebarSlot />
+          </Suspense>
+        }
+        accountCard={
+          <Suspense fallback={<AccountMenuPlaceholder variant="card" />}>
+            <HeaderAccount variant="card" />
+          </Suspense>
+        }
+        accountAvatar={
+          <Suspense fallback={<AccountMenuPlaceholder variant="avatar" />}>
+            <HeaderAccount variant="avatar" />
+          </Suspense>
+        }
+        notifications={
+          <Suspense fallback={<NotificationBellPlaceholder />}>
+            <HeaderNotifications />
+          </Suspense>
+        }
+      >
+        {children}
+      </AppShellFrame>
+    </RealtimeProvider>
   );
+}
+
+export async function ShellRealtimeSession() {
+  const session = await getSession();
+  return session ? <RealtimeSession userId={session.userId} /> : null;
 }

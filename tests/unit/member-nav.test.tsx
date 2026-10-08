@@ -62,10 +62,10 @@ describe("member navigation", () => {
     ["/booking/entry", "공간 예약"],
     ["/bookings", "내 예약"],
     ["/bookings/past", "내 예약"],
-    ["/teams", "팀"],
-    ["/teams/start", "팀"],
-    ["/teams/team-a", "팀"],
-    ["/invite/private-token", "팀"],
+    ["/teams", "팀 관리"],
+    ["/teams/start", "팀 관리"],
+    ["/teams/team-a", "팀 관리"],
+    ["/invite/private-token", "팀 관리"],
   ])("selects exactly one item at %s", (pathname, label) => {
     mocks.pathname = pathname;
     render(<MemberNav />);
@@ -77,7 +77,7 @@ describe("member navigation", () => {
       "href",
       "/booking",
     );
-    expect(screen.getByRole("link", { name: "팀" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "팀 관리" })).toHaveAttribute(
       "href",
       "/teams",
     );
@@ -136,14 +136,14 @@ describe("member navigation", () => {
   });
 
   it("uses the same selection in a 64px safe-area-aware mobile bar", () => {
-    mocks.pathname = "/invite/token";
+    mocks.pathname = "/messages";
     const { container } = render(<MobileNav />);
     const navigation = screen.getByRole("navigation", {
       name: "하단 회원 메뉴",
     });
     expect(navigation).toHaveClass("h-16", "grid-cols-4");
     expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
-      "팀",
+      "메시지",
     );
     expect(screen.getByRole("link", { current: "page" })).toHaveClass(
       "text-primary",
@@ -156,8 +156,38 @@ describe("member navigation", () => {
       "fixed",
       "md:hidden",
       "pb-[env(safe-area-inset-bottom)]",
+      "[#content:has([data-chat-screen])_&]:hidden",
     );
   });
+
+  it.each(["/teams", "/teams/start", "/invite/token"])(
+    "has no selected bottom tab while managing teams at %s",
+    (pathname) => {
+      mocks.pathname = pathname;
+      render(<MobileNav />);
+      expect(
+        screen.queryByRole("link", { current: "page" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "메시지" })).toHaveAttribute(
+        "href",
+        "/messages",
+      );
+      expect(
+        screen.queryByRole("link", { name: "팀 관리" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["/messages", "/s/space/room"])(
+    "selects messages in the bottom tab at %s",
+    (pathname) => {
+      mocks.pathname = pathname;
+      render(<MemberNav mobile />);
+      expect(screen.getByRole("link", { current: "page" })).toHaveTextContent(
+        "메시지",
+      );
+    },
+  );
 
   it("shows a pending hint without changing the destination or dimensions", () => {
     mocks.pending = true;

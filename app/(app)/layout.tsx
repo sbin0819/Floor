@@ -6,7 +6,7 @@ import { HomeDashboardSkeleton } from "@/features/bookings/components/home-skele
 export default function MemberLayout({ children }: { children: ReactNode }) {
   return (
     <AppShell>
-      <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+      <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] has-[[data-chat-screen]]:pb-0 md:pb-0">
         <Suspense fallback={<HomeDashboardSkeleton />}>{children}</Suspense>
       </div>
       <MobileNav />

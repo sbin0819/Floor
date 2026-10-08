@@ -16,6 +16,9 @@ describe("optimistic route protection", () => {
     "/bookings/11111111-1111-4111-8111-111111111111/edit",
     "/booking",
     "/notifications",
+    "/messages",
+    "/s/11111111-1111-4111-8111-111111111111",
+    "/s/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222",
   ])("matches protected route %s", (url) => {
     expect(unstable_doesProxyMatch({ config, nextConfig: {}, url })).toBe(true);
   });
@@ -28,6 +31,7 @@ describe("optimistic route protection", () => {
     "/api/auth/sign-in/email",
     "/api/participants/search",
     "/api/notifications",
+    "/api/realtime/token",
     "/favicon.ico",
     "/_next/static/test.js",
   ])("does not touch public route %s", (url) => {
