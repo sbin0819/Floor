@@ -17,8 +17,13 @@ import { CancelBookingButton } from "./cancel-booking-button";
 import {
   bookingSpaceHref,
   bookingSpaceLabel,
+  bookingPhoto,
+  canLeaveBooking,
+  isUnfinishedBooking,
 } from "@/features/bookings/booking-presentation";
 import { BookingTime } from "./booking-time";
+import { LeaveBookingButton } from "./leave-booking-button";
+import { BookingParticipantsSummary } from "./booking-participants-summary";
 import {
   CalendarBookingData,
   type CalendarBookings,
@@ -40,11 +45,14 @@ function CalendarBookingCards({
   return (
     <ul className="space-y-4">
       {bookings.map((booking) => {
+        const spaceHref = bookingSpaceHref(booking);
         const kind = bookingChipKind(booking, now);
         const status =
-          kind === "past"
-            ? "이용 종료"
-            : relativeBookingStatus(booking.start, booking.end, now);
+          booking.status === "cancelled"
+            ? "취소됨"
+            : kind === "past"
+              ? "이용 종료"
+              : relativeBookingStatus(booking.start, booking.end, now);
         return (
           <li
             key={booking.id}
@@ -52,7 +60,7 @@ function CalendarBookingCards({
           >
             <div className="flex items-start gap-3">
               <SpacePhoto
-                photo={booking.photo}
+                photo={bookingPhoto(booking)}
                 type={booking.spaceType}
                 decorative
               />
@@ -70,6 +78,7 @@ function CalendarBookingCards({
               {booking.teamName ?? "개인"}
               {booking.title ? ` · ${booking.title}` : ""}
             </p>
+            <BookingParticipantsSummary booking={booking} />
             {booking.desk && <Badge variant="secondary">좌석</Badge>}
             {status && (
               <Badge
@@ -88,16 +97,23 @@ function CalendarBookingCards({
                 {booking.attendeeCount}명
               </Badge>
             )}
-            {kind !== "past" && (
+            {isUnfinishedBooking(booking, now) && (
               <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline">
-                  <Link href={bookingSpaceHref(booking)}>공간 보기</Link>
-                </Button>
-                {booking.canCancel && (
-                  <CancelBookingButton
-                    bookingId={booking.id}
-                    triggerLabel="예약 취소"
-                  />
+                {spaceHref && (
+                  <Button asChild variant="outline">
+                    <Link href={spaceHref}>공간 보기</Link>
+                  </Button>
+                )}
+                {canLeaveBooking(booking, now) ? (
+                  <LeaveBookingButton bookingId={booking.id} />
+                ) : (
+                  booking.relation === "owner" &&
+                  booking.canCancel && (
+                    <CancelBookingButton
+                      bookingId={booking.id}
+                      triggerLabel="예약 취소"
+                    />
+                  )
                 )}
               </div>
             )}

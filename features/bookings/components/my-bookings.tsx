@@ -23,9 +23,14 @@ import type { MyBooking, MyBookingsData } from "@/features/bookings/types";
 import {
   bookingSpaceHref,
   bookingSpaceLabel,
+  bookingPhoto,
+  canLeaveBooking,
+  isUnfinishedBooking,
 } from "@/features/bookings/booking-presentation";
 import { BookingTime } from "./booking-time";
 import { CancelBookingButton } from "./cancel-booking-button";
+import { LeaveBookingButton } from "./leave-booking-button";
+import { BookingParticipantsSummary } from "./booking-participants-summary";
 import { MyBookingsViewLinks } from "./my-bookings-view-links";
 
 export type BookingHistoryTab = "upcoming" | "past";
@@ -67,6 +72,7 @@ function BookingList({
           <h2 className="text-sm font-medium tabular-nums">{group.title}</h2>
           <ul className="divide-y divide-border rounded-xl border border-border bg-card">
             {group.bookings.map((booking) => {
+              const spaceHref = bookingSpaceHref(booking);
               const status = upcoming
                 ? relativeBookingStatus(booking.start, booking.end, now)
                 : booking.status === "cancelled"
@@ -79,7 +85,7 @@ function BookingList({
                 >
                   <div className="flex min-w-0 items-start gap-3">
                     <SpacePhoto
-                      photo={booking.photo}
+                      photo={bookingPhoto(booking)}
                       type={booking.spaceType}
                       decorative
                     />
@@ -88,10 +94,10 @@ function BookingList({
                         <BookingTime booking={booking} />
                       </p>
                       <p className="font-medium">
-                        {upcoming ? (
+                        {upcoming && spaceHref ? (
                           <Link
                             className="inline-flex min-h-11 items-center rounded-lg underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
-                            href={bookingSpaceHref(booking)}
+                            href={spaceHref}
                           >
                             {bookingSpaceLabel(booking)}
                           </Link>
@@ -99,6 +105,7 @@ function BookingList({
                           bookingSpaceLabel(booking)
                         )}
                       </p>
+                      <BookingParticipantsSummary booking={booking} />
                       <p className="text-xs text-muted-foreground">
                         {booking.branchName} · {booking.floorName} ·{" "}
                         {booking.teamName ?? "개인"}
@@ -125,7 +132,13 @@ function BookingList({
                         {status}
                       </Badge>
                     )}
-                    {upcoming && <CancelBookingButton bookingId={booking.id} />}
+                    {upcoming && canLeaveBooking(booking, now) ? (
+                      <LeaveBookingButton bookingId={booking.id} />
+                    ) : upcoming &&
+                      booking.relation === "owner" &&
+                      isUnfinishedBooking(booking, now) ? (
+                      <CancelBookingButton bookingId={booking.id} />
+                    ) : null}
                   </div>
                 </li>
               );

@@ -4,6 +4,7 @@ import { SpacePhoto } from "@/components/photos/space-photo";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { bookingChipKind } from "@/features/bookings/booking-chip-state";
 import { floorHref } from "@/features/bookings/format";
+import { myBookingsCalendarHref } from "@/features/bookings/calendar";
 import type {
   HomeFrequentSpacesData,
   HomeWeekBookingsData,
@@ -59,11 +60,9 @@ export function HomeWeekBookings({ data }: { data: HomeWeekBookingsData }) {
                 bookings.map((booking) => (
                   <Link
                     key={booking.id}
-                    href={floorHref(
-                      booking.branchId,
-                      booking.floorId,
+                    href={myBookingsCalendarHref(
+                      booking.date.slice(0, 7),
                       booking.date,
-                      booking.spaceId,
                     )}
                     className="flex min-h-11 items-center rounded-md focus-visible:outline-2 focus-visible:outline-ring"
                   >

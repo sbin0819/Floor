@@ -133,7 +133,7 @@ it("shows seven days, today, branch closed days, empty days and plain booking li
   const link = screen.getByRole("link", { name: "15:00 회의실 C" });
   expect(link).toHaveAttribute(
     "href",
-    "/branches/branch/floors/floor?date=2026-10-07&space=space",
+    "/bookings?view=calendar&month=2026-10&day=2026-10-07",
   );
   expect(link.querySelector("button")).toBeNull();
   expect(screen.getByRole("link", { name: "달력으로 보기" })).toHaveAttribute(

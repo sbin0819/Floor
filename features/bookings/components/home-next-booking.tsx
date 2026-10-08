@@ -15,9 +15,14 @@ import { CancelBookingButton } from "./cancel-booking-button";
 import {
   bookingSpaceHref,
   bookingSpaceLabel,
+  bookingPhoto,
+  canLeaveBooking,
+  isUnfinishedBooking,
 } from "@/features/bookings/booking-presentation";
 import { deskPartLabels } from "@/features/bookings/desk-parts";
 import { BookingTime } from "./booking-time";
+import { LeaveBookingButton } from "./leave-booking-button";
+import { BookingParticipantsSummary } from "./booking-participants-summary";
 
 const linkClass =
   "inline-flex min-h-11 items-center gap-1 rounded-lg text-sm text-primary focus-visible:outline-2 focus-visible:outline-ring hover:underline";
@@ -38,6 +43,7 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
       </section>
     );
   const status = homeBookingStatus(booking, data.now);
+  const spaceHref = bookingSpaceHref(booking);
   const nextToday = next ? localDate(new Date(data.now), next.timezone) : null;
   return (
     <section
@@ -45,9 +51,9 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
       className="overflow-hidden rounded-xl border border-border bg-card shadow-card"
     >
       <h2 className="px-5 pt-5 font-semibold">다음 예약</h2>
-      <div className="flex flex-col gap-5 p-5 md:flex-row md:items-center">
+      <div className="flex flex-col gap-5 p-5 has-[[data-cancelling=true]]:opacity-50 md:flex-row md:items-center">
         <SpacePhoto
-          photo={booking.photo}
+          photo={bookingPhoto(booking)}
           type={booking.spaceType}
           size="fill"
           eager
@@ -81,15 +87,24 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
               {booking.title && ` · ${booking.title}`}
             </p>
           </div>
+          <BookingParticipantsSummary booking={booking} />
           <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline">
-              <Link href={bookingSpaceHref(booking)}>일정 보기</Link>
-            </Button>
-            {booking.canCancel && (
-              <CancelBookingButton
-                bookingId={booking.id}
-                triggerLabel="예약 취소"
-              />
+            {spaceHref && (
+              <Button asChild variant="outline">
+                <Link href={spaceHref}>일정 보기</Link>
+              </Button>
+            )}
+            {canLeaveBooking(booking, data.now) ? (
+              <LeaveBookingButton bookingId={booking.id} />
+            ) : (
+              booking.relation === "owner" &&
+              booking.canCancel &&
+              isUnfinishedBooking(booking, data.now) && (
+                <CancelBookingButton
+                  bookingId={booking.id}
+                  triggerLabel="예약 취소"
+                />
+              )
             )}
           </div>
         </div>
@@ -110,6 +125,7 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
             <span className="text-muted-foreground">
               {bookingSpaceLabel(next)} · {next.branchName} {next.floorName}
             </span>
+            <BookingParticipantsSummary booking={next} />
             {relativeBookingStatus(next.start, next.end, data.now) && (
               <span className="rounded-md bg-muted px-2 py-1">
                 {relativeBookingStatus(next.start, next.end, data.now)}

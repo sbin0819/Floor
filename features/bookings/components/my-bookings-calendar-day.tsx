@@ -57,6 +57,7 @@ export function CalendarDayBookings({
                   booking.timezone,
                 ).split("–")[0]}{" "}
             {bookingSpaceLabel(booking)}
+            {booking.relation === "invited" && " · 초대받음"}
           </BookingChip>
         ))}
         {bookings.length > 2 && (

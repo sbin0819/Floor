@@ -49,6 +49,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Empty: Story = {};
 export const One: Story = { args: { bookings: [booking] } };
+export const Invited: Story = {
+  args: {
+    bookings: [
+      {
+        ...booking,
+        relation: "invited",
+        invitedByName: "최민준",
+        participantNames: ["김하은"],
+        canCancel: false,
+      },
+    ],
+  },
+};
 export const Three: Story = {
   args: {
     bookings: [

@@ -73,6 +73,33 @@ export const Tomorrow: Story = {
 export const Empty: Story = {
   args: { data: { now: "2026-10-07T03:00:00Z", bookings: [] } },
 };
+export const InvitedReservation: Story = {
+  args: {
+    data: {
+      now: "2026-10-07T03:00:00Z",
+      bookings: [
+        {
+          ...booking,
+          relation: "invited",
+          invitedByName: "최민준",
+          participantNames: ["김하은", "이서연"],
+          canCancel: false,
+          photo: null,
+        },
+      ],
+    },
+  },
+};
+export const WithParticipants: Story = {
+  args: {
+    data: {
+      now: "2026-10-07T03:00:00Z",
+      bookings: [
+        { ...booking, participantNames: ["이서연", "정민지", "최민준"] },
+      ],
+    },
+  },
+};
 export const DeskReservation: Story = {
   args: {
     data: {
