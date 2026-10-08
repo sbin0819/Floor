@@ -12,6 +12,7 @@ import { userChannel } from "@/lib/realtime/channels";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 import type { ChatNav } from "../types";
 import { groupDisplayName } from "../group-name";
+import { unreadTitle } from "../unread-title";
 import {
   CHAT_NAV_KEY,
   applyDirectActivity,
@@ -69,12 +70,26 @@ export function ChatMentions({
   }, [refresh]);
   useEffect(() => {
     const apply = () => {
-      const base = document.title.replace(/^\(\d+\)\s*/, "");
-      const title = count > 0 ? `(${count}) ${base}` : base;
-      if (document.title !== title) document.title = title;
+      if (!document.head.querySelector("title")) return;
+      const current = document.title;
+      const title = unreadTitle(current, count);
+      if (title !== null && current !== title) document.title = title;
     };
     apply();
-    const observer = new MutationObserver(apply);
+    const observer = new MutationObserver((records) => {
+      const titleChanged = records.some((record) => {
+        if (record.target.nodeName === "TITLE") return true;
+        if (record.type === "characterData") {
+          return record.target.parentElement?.tagName === "TITLE";
+        }
+        return [...record.addedNodes, ...record.removedNodes].some(
+          (node) =>
+            node instanceof Element &&
+            (node.tagName === "TITLE" || node.querySelector("title") !== null),
+        );
+      });
+      if (titleChanged) apply();
+    });
     observer.observe(document.head, {
       childList: true,
       subtree: true,
