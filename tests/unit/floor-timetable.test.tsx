@@ -50,7 +50,7 @@ describe("floor timetable", () => {
     ).toEqual([
       "회의실 A최대 6인 · 모니터",
       "회의실 B최대 6인 · 모니터",
-      "데스크 구역최대 6인 · 모니터",
+      "데스크 구역좌석 12석 · 모니터",
       "라운지최대 6인 · 모니터",
     ]);
     expect(
@@ -127,8 +127,9 @@ describe("floor timetable", () => {
       screen.getByRole("button", { name: "회의실 A, 10:00, 비어 있음" })
         .parentElement,
     ).not.toHaveClass("border-l");
+    expect(screen.getByText("좌석 12석 · 모니터")).toBeVisible();
     expect(
-      screen.getByText("좌석 12석 · 좌석 예약은 준비 중이에요"),
+      screen.getByRole("rowheader", { name: "데스크 구역 1곳 · 좌석 12석" }),
     ).toBeVisible();
     expect(
       screen.queryByRole("button", { name: /라운지,/ }),

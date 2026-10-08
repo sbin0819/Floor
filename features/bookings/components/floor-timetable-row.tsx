@@ -15,7 +15,12 @@ import type {
 import { amenityKeys, amenityLabels } from "@/lib/spaces/amenities";
 import { cn } from "@/lib/utils";
 import { FloorNavigationLink } from "./floor-navigation-link";
-import type { TimetableSlotSelection } from "./floor-timetable";
+import type {
+  TimetableSlotSelection,
+  TimetableDeskSelection,
+} from "./floor-timetable";
+import { hasDeskSeats } from "@/features/bookings/space-detail-mode";
+import { FloorTimetableDeskParts } from "./floor-timetable-desk-parts";
 
 const blockLabels = {
   other: "예약됨",
@@ -23,7 +28,7 @@ const blockLabels = {
   maintenance: "점검",
 } as const;
 
-type FocusProps = {
+export type TimetableFocusProps = {
   tabIndex: number;
   ref: (element: HTMLElement | null) => void;
   onFocus: () => void;
@@ -44,6 +49,7 @@ export function FloorTimetableRow({
   windowStart,
   focusProps,
   onSelectSlot,
+  onSelectDeskPart,
 }: {
   row: TimetableRowData;
   branchId: string;
@@ -56,8 +62,9 @@ export function FloorTimetableRow({
   columns: number;
   pastColumns: number;
   windowStart: number | null;
-  focusProps: (position: TimetableFocus) => FocusProps;
+  focusProps: (position: TimetableFocus) => TimetableFocusProps;
   onSelectSlot?: (input: TimetableSlotSelection) => void;
+  onSelectDeskPart?: (input: TimetableDeskSelection) => void;
 }) {
   const rowColumns = "var(--timetable-label-width) minmax(0, 1fr)";
   const timeColumns = `repeat(${columns}, minmax(0, 1fr))`;
@@ -90,6 +97,7 @@ export function FloorTimetableRow({
       </div>
     );
   const visible = row.space;
+  const deskArea = hasDeskSeats(visible);
   const href = floorHref(branchId, floorId, date, space.id, view);
   const isSelected = selectedSpaceId === space.id;
   const detailHref = floorHref(branchId, floorId, date, space.id, view, true);
@@ -146,9 +154,11 @@ export function FloorTimetableRow({
               {visible.name}
             </span>
             <span className="mt-1 block truncate text-xs text-muted-foreground tabular-nums">
-              {visible.capacity === null
-                ? spaceTypeLabels[visible.type]
-                : `최대 ${visible.capacity}인`}
+              {deskArea
+                ? `좌석 ${visible.deskCount}석`
+                : visible.capacity === null
+                  ? spaceTypeLabels[visible.type]
+                  : `최대 ${visible.capacity}인`}
               {amenityKeys
                 .filter((amenity) => visible.amenities.includes(amenity))
                 .map((amenity) => ` · ${amenityLabels[amenity]}`)
@@ -169,7 +179,19 @@ export function FloorTimetableRow({
         className="relative grid"
         style={{ gridTemplateColumns: timeColumns }}
       >
-        {!visible.bookable ? (
+        {deskArea ? (
+          <FloorTimetableDeskParts
+            parts={visible.deskParts ?? []}
+            spaceId={space.id}
+            spaceName={visible.name}
+            timeZone={timeZone}
+            href={detailHref}
+            columns={columns}
+            windowStart={windowStart}
+            focusProps={focusProps}
+            onSelect={onSelectDeskPart}
+          />
+        ) : !visible.bookable ? (
           <div
             role="gridcell"
             aria-colindex={2}
@@ -177,9 +199,7 @@ export function FloorTimetableRow({
             className="col-span-full flex items-center bg-muted/30 px-4 text-xs text-muted-foreground"
           >
             <span className="sticky left-[calc(var(--timetable-label-width)+16px)]">
-              {visible.deskCount
-                ? `좌석 ${visible.deskCount}석 · 좌석 예약은 준비 중이에요`
-                : "예약 없이 이용해요"}
+              예약 없이 이용해요
             </span>
           </div>
         ) : (

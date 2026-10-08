@@ -1,5 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { BookingSelection, FloorBookingSelection } from "./selection";
+import type { DeskPart } from "./desk-parts";
 
 export type BookingDraft = Readonly<{
   title: string;
@@ -27,6 +28,8 @@ export type BookingDraftState = {
   scope: string | null;
   draft: BookingDraft;
   range: FloorBookingSelection | null;
+  deskPart: DeskPart | null;
+  deskId: string | null;
   activate: (scope: string) => void;
   changeDraft: (scope: string, patch: Partial<BookingDraft>) => void;
   changeRange: (
@@ -35,6 +38,8 @@ export type BookingDraftState = {
     range: BookingSelection | null,
   ) => void;
   clearBookingContent: (scope: string) => void;
+  changeDeskPart: (scope: string, part: DeskPart | null) => void;
+  changeDesk: (scope: string, deskId: string | null) => void;
 };
 
 export function createBookingDraftStore() {
@@ -42,11 +47,19 @@ export function createBookingDraftStore() {
     scope: null,
     draft: emptyBookingDraft,
     range: null,
+    deskPart: null,
+    deskId: null,
     activate: (scope) =>
       set((state) =>
         state.scope === scope
           ? state
-          : { scope, draft: emptyBookingDraft, range: null },
+          : {
+              scope,
+              draft: emptyBookingDraft,
+              range: null,
+              deskPart: null,
+              deskId: null,
+            },
       ),
     changeDraft: (scope, patch) =>
       set((state) => {
@@ -85,6 +98,16 @@ export function createBookingDraftStore() {
               },
             }
           : state,
+      ),
+    changeDeskPart: (scope, deskPart) =>
+      set((state) =>
+        state.scope === scope && state.deskPart !== deskPart
+          ? { deskPart }
+          : state,
+      ),
+    changeDesk: (scope, deskId) =>
+      set((state) =>
+        state.scope === scope && state.deskId !== deskId ? { deskId } : state,
       ),
   }));
 }

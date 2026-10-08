@@ -12,6 +12,7 @@ import type {
   SpaceType,
 } from "@/features/bookings/types";
 import { localDate, SLOT_MINUTES } from "@/lib/time/zoned";
+import { localTime } from "@/lib/time/zoned";
 
 const step = SLOT_MINUTES * 60_000;
 const spaceOrder: SpaceType[] = [
@@ -128,7 +129,15 @@ export function floorTimetableLayout(
         return {
           kind: "accessible",
           space,
-          slots: [],
+          slots: (space.deskParts ?? [])
+            .filter((part) => part.part !== "day")
+            .map((part) => ({
+              start: part.start,
+              end: part.end,
+              label: localTime(new Date(part.start), data.branch.timezone),
+              endLabel: localTime(new Date(part.end), data.branch.timezone),
+              state: part.selectable ? "free" : "past",
+            })),
           blocks: [],
           laneCount: 1,
         };

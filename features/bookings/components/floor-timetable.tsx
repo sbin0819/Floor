@@ -30,11 +30,19 @@ import { useBookingRange } from "./use-booking-draft";
 import { FloorTimetableRow } from "./floor-timetable-row";
 import { useBranchDisplayNow } from "./branch-display-clock";
 import { getDisplayOperatingState } from "@/features/bookings/display-operating-state";
+import type { DeskPart } from "@/features/bookings/desk-parts";
+import { bookingDraftScope } from "@/features/bookings/booking-draft-store";
 
 export type TimetableSlotSelection = {
   spaceId: string;
   slots: SelectableSlot[];
   start: string;
+  href: string;
+  trigger?: HTMLElement;
+};
+export type TimetableDeskSelection = {
+  spaceId: string;
+  part: DeskPart;
   href: string;
   trigger?: HTMLElement;
 };
@@ -51,12 +59,36 @@ export function FloorTimetable({
   data,
   selection: controlledSelection,
   onSelectSlot,
+  onSelectDeskPart,
 }: {
   data: FloorDayData;
   selection?: FloorBookingSelection | null;
   onSelectSlot?: (input: TimetableSlotSelection) => void;
+  onSelectDeskPart?: (input: TimetableDeskSelection) => void;
 }) {
   const workspace = useFloorSelection();
+  const selectDeskPart = (input: TimetableDeskSelection) => {
+    if (!workspace?.isCurrentRoute()) return;
+    const scope = bookingDraftScope(
+      data.branch.id,
+      data.floor.id,
+      data.date,
+      input.spaceId,
+    );
+    workspace.draftStore.getState().activate(scope);
+    workspace.draftStore.getState().changeDeskPart(scope, input.part);
+    if (input.trigger)
+      workspace.rememberSpaceTrigger(input.trigger, input.spaceId);
+    workspace.change(
+      {
+        floorId: data.floor.id,
+        date: data.date,
+        spaceId: input.spaceId,
+        detail: true,
+      },
+      input.href,
+    );
+  };
   const sharedRange = useBookingRange(
     workspace?.draftStore,
     workspace?.bookingScope,
@@ -280,9 +312,11 @@ export function FloorTimetable({
                 >
                   {spaceTypeLabels[group.type]}{" "}
                   <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                    {group.freeCount === null
-                      ? `${group.totalCount}곳`
-                      : `${group.totalCount}곳 · 지금 ${group.freeCount}곳 비어 있음`}
+                    {group.type === "desk_area"
+                      ? `${group.totalCount}곳${group.rows.some((row) => row.kind === "accessible" && row.space.deskCount > 0) ? ` · 좌석 ${group.rows.reduce((total, row) => total + (row.kind === "accessible" ? row.space.deskCount : 0), 0)}석` : ""}`
+                      : group.freeCount === null
+                        ? `${group.totalCount}곳`
+                        : `${group.totalCount}곳 · 지금 ${group.freeCount}곳 비어 있음`}
                   </span>
                 </div>
               </div>
@@ -302,6 +336,7 @@ export function FloorTimetable({
                   windowStart={layout.start}
                   focusProps={focusProps}
                   onSelectSlot={onSelectSlot ?? workspace?.selectSlot}
+                  onSelectDeskPart={onSelectDeskPart ?? selectDeskPart}
                 />
               ))}
             </div>

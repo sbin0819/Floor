@@ -41,13 +41,16 @@ const floor = { id: "floor", name: "7F", level: 7, sortOrder: 0 };
 function TimetableStory({
   anotherDate = false,
   restricted = false,
+  desks = false,
 }: {
   anotherDate?: boolean;
   restricted?: boolean;
+  desks?: boolean;
 }) {
   const [selection, setSelection] = useState<FloorBookingSelection | null>(
     null,
   );
+  const [deskPart, setDeskPart] = useState<string | null>(null);
   const date = anotherDate ? "2026-10-14" : "2026-10-07";
   const at = (hour: number, minute = 0) =>
     `${date}T${String(hour - 9).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00.000Z`;
@@ -126,11 +129,45 @@ function TimetableStory({
       },
     ],
   };
+  if (desks) {
+    data.groups.push({ type: "desk_area", totalCount: 1, freeCount: null });
+    data.spaces.push({
+      ...base,
+      id: "desk-area",
+      name: "오픈 데스크",
+      type: "desk_area",
+      capacity: null,
+      bookable: false,
+      deskCount: 24,
+      photo: null,
+      deskParts: [
+        {
+          part: "am",
+          start: `${date}T08:00:00+09:00`,
+          end: `${date}T13:00:00+09:00`,
+          selectable: anotherDate,
+          freeCount: 17,
+          myDeskName: null,
+        },
+        {
+          part: "pm",
+          start: `${date}T13:00:00+09:00`,
+          end: `${date}T22:00:00+09:00`,
+          selectable: true,
+          freeCount: 16,
+          myDeskName: "A-15",
+        },
+      ],
+    });
+  }
   return (
     <div className="w-full max-w-[1184px] p-4">
       <FloorTimetable
         data={data}
         selection={selection}
+        onSelectDeskPart={({ part }) =>
+          setDeskPart(part === "am" ? "오전" : "오후")
+        }
         onSelectSlot={({ spaceId, slots, start }) =>
           setSelection((previous) =>
             selectFloorBookingSlot(spaceId, slots, previous, start),
@@ -138,9 +175,11 @@ function TimetableStory({
         }
       />
       <p className="mt-4 text-sm text-muted-foreground" aria-live="polite">
-        {selection
-          ? "고른 시간으로 예약할 수 있어요"
-          : "빈 칸을 눌러 시간을 골라 주세요"}
+        {deskPart
+          ? `${deskPart} 좌석을 고를 수 있어요`
+          : selection
+            ? "고른 시간으로 예약할 수 있어요"
+            : "빈 칸을 눌러 시간을 골라 주세요"}
       </p>
     </div>
   );
@@ -156,3 +195,5 @@ type Story = StoryObj<typeof meta>;
 export const Today: Story = {};
 export const AnotherDate: Story = { args: { anotherDate: true } };
 export const RestrictedAndMaintenance: Story = { args: { restricted: true } };
+export const DeskParts: Story = { args: { desks: true, anotherDate: true } };
+export const ExpiredMorning: Story = { args: { desks: true } };

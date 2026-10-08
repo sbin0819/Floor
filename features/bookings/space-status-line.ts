@@ -41,7 +41,7 @@ function statusLine(
       kind: "none",
       label:
         space.deskCount > 0
-          ? `좌석 ${space.deskCount}석 · 좌석 예약은 준비 중이에요`
+          ? `좌석 ${space.deskCount}석`
           : "예약 없이 이용해요",
     };
   const bookingLabel =

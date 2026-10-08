@@ -166,7 +166,7 @@ describe("space status line for the list and detail", () => {
 
   it.each([
     [0, "예약 없이 이용해요"],
-    [12, "좌석 12석 · 좌석 예약은 준비 중이에요"],
+    [12, "좌석 12석"],
   ])(
     "preserves the non-bookable space explanation (%i desks)",
     (deskCount, label) => {

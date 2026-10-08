@@ -38,3 +38,17 @@ export function useBookingAttendeeCount(
   );
   return { attendeeCount, attendeeCountTouched };
 }
+
+export function useBookingDeskSelection(
+  store?: BookingDraftStore,
+  scope?: string,
+) {
+  const draftStore = useDraftStore(store);
+  const deskPart = useStore(draftStore, (state) =>
+    state.scope === scope ? state.deskPart : null,
+  );
+  const deskId = useStore(draftStore, (state) =>
+    state.scope === scope ? state.deskId : null,
+  );
+  return { deskPart, deskId };
+}

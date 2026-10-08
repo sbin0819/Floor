@@ -12,6 +12,8 @@ import type { FloorDayData, SpaceType } from "@/features/bookings/types";
 import { useFloorSelection } from "./branch-workspace";
 import { FloorNavigationLink } from "./floor-navigation-link";
 import { AvailabilityBar } from "./availability-bar";
+import { hasDeskSeats } from "@/features/bookings/space-detail-mode";
+import { DeskPartBadges } from "./desk-part-badges";
 
 const types: SpaceType[] = [
   "meeting_room",
@@ -50,6 +52,14 @@ export function FloorDay({ data }: { data: FloorDayData }) {
           );
         if (!rows.length) return null;
         const group = data.groups.find((item) => item.type === type);
+        const deskCount =
+          type === "desk_area"
+            ? rows.reduce(
+                (total, space) =>
+                  total + (space.kind === "accessible" ? space.deskCount : 0),
+                0,
+              )
+            : 0;
         const freeCount =
           data.isToday && data.operatingState.status === "open"
             ? group?.freeCount
@@ -66,15 +76,21 @@ export function FloorDay({ data }: { data: FloorDayData }) {
               </h2>
               <p className="text-sm text-muted-foreground tabular-nums">
                 {group?.totalCount ?? rows.length}곳
-                {freeCount && freeCount > 0
-                  ? ` · 지금 ${freeCount}곳 비어 있음`
-                  : ""}
+                {type === "desk_area"
+                  ? deskCount > 0
+                    ? ` · 좌석 ${deskCount}석`
+                    : ""
+                  : freeCount && freeCount > 0
+                    ? ` · 지금 ${freeCount}곳 비어 있음`
+                    : ""}
               </p>
             </div>
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
               {rows.map((space) => {
+                const deskArea =
+                  space.kind === "accessible" && hasDeskSeats(space);
                 const status =
-                  space.kind === "accessible"
+                  space.kind === "accessible" && !deskArea
                     ? getFloorSpaceStatusLine(data, space)
                     : null;
                 return (
@@ -101,11 +117,14 @@ export function FloorDay({ data }: { data: FloorDayData }) {
                           data.floor.id,
                           data.date,
                           space.id,
+                          undefined,
+                          deskArea,
                         )}
                         location={{
                           floorId: data.floor.id,
                           date: data.date,
                           spaceId: space.id,
+                          detail: deskArea,
                         }}
                         aria-current={
                           selectedSpaceId === space.id ? "true" : undefined
@@ -130,9 +149,11 @@ export function FloorDay({ data }: { data: FloorDayData }) {
                         </h3>
                         <p className="col-start-2 row-start-3 min-w-0 text-xs text-muted-foreground tabular-nums md:row-start-2">
                           {[
-                            space.capacity === null
-                              ? ""
-                              : `최대 ${space.capacity}인`,
+                            deskArea
+                              ? `좌석 ${space.deskCount}석`
+                              : space.capacity === null
+                                ? ""
+                                : `최대 ${space.capacity}인`,
                             ...space.amenities
                               .map((key) => amenityLabels[key as AmenityKey])
                               .filter(Boolean),
@@ -147,6 +168,11 @@ export function FloorDay({ data }: { data: FloorDayData }) {
                           >
                             {status.label}
                           </StatusLine>
+                        )}
+                        {deskArea && (
+                          <span className="col-start-2 row-start-2 min-w-0 md:col-start-3 md:row-span-2 md:row-start-1">
+                            <DeskPartBadges parts={space.deskParts ?? []} />
+                          </span>
                         )}
                         {space.bookable && (
                           <AvailabilityBar

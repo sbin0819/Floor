@@ -20,6 +20,8 @@ describe("scoped booking draft store", () => {
         attendeeCountTouched: false,
       },
       range: null,
+      deskPart: null,
+      deskId: null,
     });
     expect(store.getInitialState()).toBe(store.getState());
     expect(bookingDraftScope("BRANCH", "FLOOR", "2026-10-07", "SPACE-A")).toBe(
@@ -160,5 +162,41 @@ describe("scoped booking draft store", () => {
       attendeeCount: null,
       attendeeCountTouched: false,
     });
+  });
+
+  it("shares seat/part selection for the same scope without publishing unrelated draft updates", () => {
+    const store = createBookingDraftStore();
+    store.getState().activate(first);
+    store.getState().changeDraft(first, { title: "회의", actorId: "team" });
+    const draft = store.getState().draft;
+    store.getState().changeDeskPart(first, "pm");
+    store.getState().changeDesk(first, "seat-1");
+    const selected = store.getState();
+    store.getState().activate(first);
+    store.getState().changeDeskPart(first, "pm");
+    store.getState().changeDesk(first, "seat-1");
+    expect(store.getState()).toBe(selected);
+    expect(store.getState().draft).toBe(draft);
+    store.getState().changeDesk(first, null);
+    expect(store.getState()).toMatchObject({
+      deskPart: "pm",
+      deskId: null,
+      draft: { actorId: "team" },
+    });
+  });
+
+  it("resets seats on a new scope and rejects stale selection/cleanup", () => {
+    const store = createBookingDraftStore();
+    store.getState().activate(first);
+    store.getState().changeDeskPart(first, "day");
+    store.getState().changeDesk(first, "seat-1");
+    store.getState().activate(second);
+    expect(store.getState()).toMatchObject({ deskPart: null, deskId: null });
+    store.getState().changeDeskPart(second, "am");
+    store.getState().changeDesk(second, "seat-2");
+    const selected = store.getState();
+    store.getState().changeDesk(first, null);
+    store.getState().changeDeskPart(first, "pm");
+    expect(store.getState()).toBe(selected);
   });
 });
