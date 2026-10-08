@@ -5,7 +5,6 @@ import { StatusLine } from "@/components/status-line";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  floorHref,
   formatBookingTime,
   relativeBookingStatus,
 } from "@/features/bookings/format";
@@ -13,6 +12,12 @@ import { homeBookingStatus } from "@/features/bookings/home-booking-status";
 import type { HomeUpcomingBookingsData } from "@/features/bookings/types";
 import { addDays, localDate } from "@/lib/time/zoned";
 import { CancelBookingButton } from "./cancel-booking-button";
+import {
+  bookingSpaceHref,
+  bookingSpaceLabel,
+} from "@/features/bookings/booking-presentation";
+import { deskPartLabels } from "@/features/bookings/desk-parts";
+import { BookingTime } from "./booking-time";
 
 const linkClass =
   "inline-flex min-h-11 items-center gap-1 rounded-lg text-sm text-primary focus-visible:outline-2 focus-visible:outline-ring hover:underline";
@@ -60,10 +65,11 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
             )}
           </div>
           <p className="text-[28px] leading-tight font-bold tabular-nums">
-            {formatBookingTime(booking.start, booking.end, booking.timezone)}
+            <BookingTime booking={booking} />
           </p>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <h3 className="font-semibold">{booking.spaceName}</h3>
+            <h3 className="font-semibold">{bookingSpaceLabel(booking)}</h3>
+            {booking.desk && <Badge variant="secondary">좌석</Badge>}
             {booking.attendeeCount != null && (
               <Badge variant="secondary" className="tabular-nums">
                 {booking.attendeeCount}명
@@ -77,16 +83,7 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild variant="outline">
-              <Link
-                href={floorHref(
-                  booking.branchId,
-                  booking.floorId,
-                  booking.date,
-                  booking.spaceId,
-                )}
-              >
-                일정 보기
-              </Link>
+              <Link href={bookingSpaceHref(booking)}>일정 보기</Link>
             </Button>
             {booking.canCancel && (
               <CancelBookingButton
@@ -108,9 +105,10 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
                   ? "내일"
                   : next.date}{" "}
               {formatBookingTime(next.start, next.end, next.timezone)}
+              {next.desk?.part && ` · ${deskPartLabels[next.desk.part]}`}
             </strong>
             <span className="text-muted-foreground">
-              {next.spaceName} · {next.branchName} {next.floorName}
+              {bookingSpaceLabel(next)} · {next.branchName} {next.floorName}
             </span>
             {relativeBookingStatus(next.start, next.end, data.now) && (
               <span className="rounded-md bg-muted px-2 py-1">

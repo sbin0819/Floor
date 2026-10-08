@@ -16,12 +16,15 @@ import {
   type NavigateAction,
 } from "@/components/optimistic-navigation";
 import {
-  floorHref,
   formatBookingDayHeading,
-  formatBookingTime,
   relativeBookingStatus,
 } from "@/features/bookings/format";
 import type { MyBooking, MyBookingsData } from "@/features/bookings/types";
+import {
+  bookingSpaceHref,
+  bookingSpaceLabel,
+} from "@/features/bookings/booking-presentation";
+import { BookingTime } from "./booking-time";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { MyBookingsViewLinks } from "./my-bookings-view-links";
 
@@ -82,27 +85,18 @@ function BookingList({
                     />
                     <div className="min-w-0 space-y-2">
                       <p className="font-medium tabular-nums">
-                        {formatBookingTime(
-                          booking.start,
-                          booking.end,
-                          booking.timezone,
-                        )}
+                        <BookingTime booking={booking} />
                       </p>
                       <p className="font-medium">
                         {upcoming ? (
                           <Link
                             className="inline-flex min-h-11 items-center rounded-lg underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
-                            href={floorHref(
-                              booking.branchId,
-                              booking.floorId,
-                              booking.date,
-                              booking.spaceId,
-                            )}
+                            href={bookingSpaceHref(booking)}
                           >
-                            {booking.spaceName}
+                            {bookingSpaceLabel(booking)}
                           </Link>
                         ) : (
-                          booking.spaceName
+                          bookingSpaceLabel(booking)
                         )}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -113,6 +107,7 @@ function BookingList({
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {booking.desk && <Badge variant="secondary">좌석</Badge>}
                     {booking.attendeeCount != null && (
                       <Badge variant="secondary" className="tabular-nums">
                         {booking.attendeeCount}명

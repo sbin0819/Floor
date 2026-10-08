@@ -3,6 +3,8 @@ import { BookingChip } from "@/components/booking-chip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { bookingChipKind } from "@/features/bookings/booking-chip-state";
 import { formatBookingTime } from "@/features/bookings/format";
+import { bookingSpaceLabel } from "@/features/bookings/booking-presentation";
+import { deskPartLabels } from "@/features/bookings/desk-parts";
 import type { MyCalendarBooking } from "@/features/bookings/types";
 import type { CalendarDay } from "@/lib/calendar/month";
 
@@ -47,14 +49,14 @@ export function CalendarDayBookings({
       >
         {bookings.slice(0, 2).map((booking) => (
           <BookingChip key={booking.id} kind={bookingChipKind(booking, now)}>
-            {
-              formatBookingTime(
-                booking.start,
-                booking.end,
-                booking.timezone,
-              ).split("–")[0]
-            }{" "}
-            {booking.spaceName}
+            {booking.desk?.part
+              ? deskPartLabels[booking.desk.part]
+              : formatBookingTime(
+                  booking.start,
+                  booking.end,
+                  booking.timezone,
+                ).split("–")[0]}{" "}
+            {bookingSpaceLabel(booking)}
           </BookingChip>
         ))}
         {bookings.length > 2 && (

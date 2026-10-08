@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { bookingChipKind } from "@/features/bookings/booking-chip-state";
 import {
-  floorHref,
   formatBookingDate,
-  formatBookingTime,
   relativeBookingStatus,
 } from "@/features/bookings/format";
 import type {
@@ -16,6 +14,11 @@ import type {
 } from "@/features/bookings/types";
 import { addDays } from "@/lib/time/zoned";
 import { CancelBookingButton } from "./cancel-booking-button";
+import {
+  bookingSpaceHref,
+  bookingSpaceLabel,
+} from "@/features/bookings/booking-presentation";
+import { BookingTime } from "./booking-time";
 import {
   CalendarBookingData,
   type CalendarBookings,
@@ -55,13 +58,11 @@ function CalendarBookingCards({
               />
               <div className="min-w-0 space-y-1">
                 <p className="text-sm font-semibold tabular-nums">
-                  {formatBookingTime(
-                    booking.start,
-                    booking.end,
-                    booking.timezone,
-                  )}
+                  <BookingTime booking={booking} />
                 </p>
-                <h3 className="text-sm font-semibold">{booking.spaceName}</h3>
+                <h3 className="text-sm font-semibold">
+                  {bookingSpaceLabel(booking)}
+                </h3>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -69,6 +70,7 @@ function CalendarBookingCards({
               {booking.teamName ?? "개인"}
               {booking.title ? ` · ${booking.title}` : ""}
             </p>
+            {booking.desk && <Badge variant="secondary">좌석</Badge>}
             {status && (
               <Badge
                 variant="secondary"
@@ -89,16 +91,7 @@ function CalendarBookingCards({
             {kind !== "past" && (
               <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline">
-                  <Link
-                    href={floorHref(
-                      booking.branchId,
-                      booking.floorId,
-                      booking.date,
-                      booking.spaceId,
-                    )}
-                  >
-                    공간 보기
-                  </Link>
+                  <Link href={bookingSpaceHref(booking)}>공간 보기</Link>
                 </Button>
                 {booking.canCancel && (
                   <CancelBookingButton
