@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "home_checklist_dismissed_at" timestamp with time zone;

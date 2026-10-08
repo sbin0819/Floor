@@ -26,6 +26,7 @@ const fields = {
   tabBadge: users.tabBadge,
   reminderMinutes: users.reminderMinutes,
   defaultBranchId: users.defaultBranchId,
+  homeChecklistDismissedAt: users.homeChecklistDismissedAt,
 };
 
 describe("seed and public authentication preserve custom settings", () => {
@@ -56,6 +57,7 @@ describe("seed and public authentication preserve custom settings", () => {
         chatToasts: true,
         tabBadge: true,
         reminderMinutes: [30, 10, 5, 0],
+        homeChecklistDismissedAt: null,
       });
   });
 
@@ -78,6 +80,7 @@ describe("seed and public authentication preserve custom settings", () => {
           reminderMinutes:
             index % 3 === 0 ? [] : index % 3 === 1 ? [10, 0] : [30, 5],
           defaultBranchId: data.branches[index % data.branches.length]!.id,
+          homeChecklistDismissedAt: index % 2 === 0 ? now : null,
         })
         .where(eq(users.id, original.id));
     }
@@ -93,6 +96,7 @@ describe("seed and public authentication preserve custom settings", () => {
         chatToasts: false,
         tabBadge: false,
         reminderMinutes: [],
+        homeChecklistDismissedAt: now,
       })
       .returning();
     const before = await harness.db
@@ -149,6 +153,8 @@ describe("seed and public authentication preserve custom settings", () => {
       tab_badge: false,
       reminderMinutes: [],
       reminder_minutes: [],
+      homeChecklistDismissedAt: now.toISOString(),
+      home_checklist_dismissed_at: now.toISOString(),
     });
     expect(response.status).toBe(200);
     const [created] = await harness.db
@@ -163,10 +169,11 @@ describe("seed and public authentication preserve custom settings", () => {
       chatToasts: true,
       tabBadge: true,
       reminderMinutes: [30, 10, 5, 0],
+      homeChecklistDismissedAt: null,
     });
     const serialized = JSON.stringify(await response.json());
     expect(serialized).not.toMatch(
-      /avatarColor|avatarPhoto|chatToasts|tabBadge|reminderMinutes|injected/,
+      /avatarColor|avatarPhoto|chatToasts|tabBadge|reminderMinutes|homeChecklistDismissedAt|injected/,
     );
   });
 

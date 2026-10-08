@@ -324,6 +324,10 @@ export function excerptOf(
     | AttachmentSummary
     | null,
 ): string {
+  const singleLine = (value: string) =>
+    Array.from(value.replace(/\r\n|[\r\n]/gu, " "))
+      .slice(0, 80)
+      .join("");
   if (!body.trim() && attachments) {
     const summary =
       "images" in attachments
@@ -335,13 +339,15 @@ export function excerptOf(
           };
     const total = summary.images + summary.files;
     if (total)
-      return summary.files === 0
-        ? total === 1
-          ? "사진"
-          : `사진 ${total}장`
-        : total === 1
-          ? `파일: ${summary.firstName}`
-          : `파일 ${total}개`;
+      return singleLine(
+        summary.files === 0
+          ? total === 1
+            ? "사진"
+            : `사진 ${total}장`
+          : total === 1
+            ? `파일: ${summary.firstName}`
+            : `파일 ${total}개`,
+      );
   }
   const text = mentionSpans(body)
     .map(({ start, end, part }) =>
@@ -350,5 +356,5 @@ export function excerptOf(
         : body.slice(start, end),
     )
     .join("");
-  return Array.from(text).slice(0, 80).join("");
+  return singleLine(text);
 }

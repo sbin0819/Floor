@@ -169,6 +169,13 @@
       "when": 1791491690048,
       "tag": "0023_nasty_morlun",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791493856291,
+      "tag": "0024_cheerful_network",
+      "breakpoints": true
     }
   ]
 }

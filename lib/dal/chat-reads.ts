@@ -52,13 +52,17 @@ export function firstUnreadSequence(userId: string) {
     ) else null end`.mapWith(Number);
 }
 
-export function unreadMentionCount(userId: string) {
-  const unread = sql`candidate.room_id = ${chatRooms.id}
+export function unreadMentionCondition(userId: string) {
+  return sql`candidate.room_id = ${chatRooms.id}
     and candidate.seq > coalesce(${chatRoomReads.lastReadSeq}, 0)
     and candidate.created_at > ${roomJoinedAt(userId)}
     and candidate.author_id is distinct from ${userId}
     and candidate.deleted_at is null
     and not ${blockedBy(sql`${userId}::uuid`, sql`candidate.author_id`)}`;
+}
+
+export function unreadMentionCount(userId: string) {
+  const unread = unreadMentionCondition(userId);
   // 두 인덱스로 후보를 찾고 UNION으로 @모두·개인 멘션이 겹친 메시지를 한 번만 센다.
   return sql<number>`(select count(*)::integer from (
     select candidate.id from messages candidate

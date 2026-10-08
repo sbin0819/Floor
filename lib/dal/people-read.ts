@@ -207,6 +207,12 @@ export async function listMessageContacts(
   }));
 }
 
+export function receivedFriendRequestCount(me: string) {
+  return sql<number>`(select count(*)::int from friendships f
+    where ${me}::uuid in (f.user_low_id, f.user_high_id)
+      and f.status = 'pending' and f.requested_by <> ${me}::uuid)`;
+}
+
 export async function readFriendsList(
   me: string,
   tab: FriendsTab,
@@ -228,8 +234,7 @@ export async function readFriendsList(
       ))`;
   const [row] = await database
     .select({
-      receivedCount: sql<number>`(select count(*)::int from friendships f
-      where ${me}::uuid in (f.user_low_id, f.user_high_id) and f.status = 'pending' and f.requested_by <> ${me}::uuid)`,
+      receivedCount: receivedFriendRequestCount(me),
       messageRequestCount: messageRequestCount(me),
       rows:
         tab === "requests"

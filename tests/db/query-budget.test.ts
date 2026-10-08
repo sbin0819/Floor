@@ -4,6 +4,7 @@ import { createAdminQueries } from "@/features/admin/query-factory";
 import { createBookingQueries } from "@/features/bookings/query-factory";
 import { createTeamQueries } from "@/features/teams/query-factory";
 import { createChatQueries } from "@/features/chat/query-factory";
+import { createHomeQueries } from "@/features/home/query-factory";
 import { createTeamSpace } from "@/lib/dal/chat-write";
 import type { Session } from "@/lib/auth/types";
 import { getOperatorBranches } from "@/lib/dal";
@@ -25,12 +26,18 @@ import {
 } from "./booking-helper";
 import { createTestDatabase, type TestDatabase } from "./helper";
 import { createQueryMeter, type QueryMeasurement } from "./query-meter";
+import {
+  addHomeRecentMessage,
+  addHomeRecentRoom,
+  seedHomeRecentChats,
+} from "./home-recent-helper";
 
 describe("authenticated query execution budgets", () => {
   let database: TestDatabase;
   let actors: BookingActors;
   let editableBookingId: string;
   let chat: { spaceId: string; roomId: string };
+  let recent: Awaited<ReturnType<typeof seedHomeRecentChats>>;
   let meter: ReturnType<typeof createQueryMeter>;
   const token = "query-budget-recipient-token";
   const measured: Record<string, QueryMeasurement> = {};
@@ -41,6 +48,11 @@ describe("authenticated query execution budgets", () => {
     const created = await createTeamSpace(actors.teamId, database.db);
     if (!created.roomId) throw new Error("Expected a default team channel.");
     chat = { ...created, roomId: created.roomId };
+    recent = await seedHomeRecentChats(
+      database,
+      actors.member.userId,
+      bookingNow,
+    );
     editableBookingId = (await insertFixtureBooking(database, actors)).id;
     await database.db.insert(teamInvites).values({
       teamId: actors.teamId,
@@ -86,6 +98,12 @@ describe("authenticated query execution budgets", () => {
     });
   const chatQueries = () =>
     createChatQueries({
+      database: database.db,
+      requireSession: async () => actors.member,
+      now: () => bookingNow,
+    });
+  const home = () =>
+    createHomeQueries({
       database: database.db,
       requireSession: async () => actors.member,
       now: () => bookingNow,
@@ -162,7 +180,9 @@ describe("authenticated query execution budgets", () => {
       "bookings.getBookingForEdit",
       () => bookings(actors.person).getBookingForEdit(editableBookingId),
     ],
-    ["teams.getHomeData", () => teams().getHomeData()],
+    ["home.getHomeTodo", () => home().getHomeTodo()],
+    ["home.getHomeChecklist", () => home().getHomeChecklist()],
+    ["home.getHomeRecentChats", () => home().getHomeRecentChats()],
     ["teams.getTeamStartData.search", () => teams().getTeamStartData("그로스")],
     ["teams.getTeamStartData.noSearch", () => teams().getTeamStartData()],
     [
@@ -212,7 +232,7 @@ describe("authenticated query execution budgets", () => {
     "measures %s after session validation",
     async (name, query) => {
       meter.start();
-      await query();
+      const data = await query();
       const result = meter.stop();
       measured[name] = result;
       expect(result.stages).toBeGreaterThan(0);
@@ -230,6 +250,28 @@ describe("authenticated query execution budgets", () => {
           : 2,
       );
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
+      if (name === "home.getHomeTodo" || name === "home.getHomeChecklist") {
+        expect(result.stages).toBe(1);
+        expect(result.statements).toBeLessThanOrEqual(
+          name === "home.getHomeTodo" ? 6 : 2,
+        );
+      }
+      if (name === "home.getHomeRecentChats") {
+        expect(data).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              kind: "dm",
+              excerpt: expect.stringContaining(actors.member.name),
+            }),
+            expect.objectContaining({
+              kind: "group_dm",
+              excerpt: expect.stringContaining("사진 2장"),
+            }),
+            expect.objectContaining({ kind: "mention" }),
+          ]),
+        );
+        expect(result.stages).toBe(2);
+      }
       if (name === "chat.getMyChatNav" || name === "chat.getRoomMessagesPage") {
         expect(result.stages).toBe(1);
         expect(result.statements).toBeLessThanOrEqual(
@@ -239,7 +281,7 @@ describe("authenticated query execution budgets", () => {
     },
   );
 
-  it("keeps statement counts independent of eight additional floors and team memberships", async () => {
+  it("keeps statement counts independent of eight additional floors, team memberships, and populated chat rooms", async () => {
     const extraFloors = Array.from({ length: 8 }, (_, index) => ({
       id: crypto.randomUUID(),
       branchId: actors.branchId,
@@ -266,12 +308,24 @@ describe("authenticated query execution budgets", () => {
         userId: actors.member.userId,
       })),
     );
+    for (let index = 0; index < 8; index++) {
+      const roomId = await addHomeRecentRoom(
+        database,
+        actors.member.userId,
+        recent.peerId,
+      );
+      await addHomeRecentMessage(database, roomId, recent.peerId, {
+        createdAt: bookingNow,
+      });
+    }
     for (const name of [
       "bookings.getSpaceDay.memberTwoTeams",
       "bookings.getBranchFloors",
       "bookings.getHomeFreeSpaces",
       "bookings.getBranchList",
       "admin.getAdminBranch.twoFloors",
+      "home.getHomeTodo",
+      "home.getHomeRecentChats",
     ] as const) {
       const query = cases.find(([key]) => key === name)?.[1];
       if (!query) throw new Error("Missing query budget case.");

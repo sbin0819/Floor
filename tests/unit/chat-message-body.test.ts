@@ -238,7 +238,7 @@ describe("mention extraction and excerpts", () => {
 
   it("leaves code literal in excerpts just as in the rendered message", () => {
     expect(excerptOf(`\`<@${userId}>\``, names)).toBe(`\`<@${userId}>\``);
-    expect(excerptOf("**강조**\n다음 줄", names)).toBe("**강조**\n다음 줄");
+    expect(excerptOf("**강조**\n다음 줄", names)).toBe("**강조** 다음 줄");
   });
 });
 

@@ -3,6 +3,16 @@ import { excerptOf } from "@/features/chat/message-text";
 import type { AttachmentSummary } from "@/features/chat/types";
 
 describe("attachment-aware message excerpts", () => {
+  it("turns every line ending into one space before the Unicode length limit", () => {
+    expect(excerptOf("첫째\r\n둘째\n셋째\r넷째")).toBe("첫째 둘째 셋째 넷째");
+    expect(excerptOf(`${"😀".repeat(79)}\r\n뒤`)).toBe(`${"😀".repeat(79)} `);
+    expect(excerptOf("", {}, [{ kind: "file", name: "두\n줄.txt" }])).toBe(
+      "파일: 두 줄.txt",
+    );
+    expect(
+      Array.from(excerptOf("", {}, [{ kind: "file", name: "😀".repeat(100) }])),
+    ).toHaveLength(80);
+  });
   it.each([
     [[{ kind: "image", name: "가.jpg" }], "사진"],
     [

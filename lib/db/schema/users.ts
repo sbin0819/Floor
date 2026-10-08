@@ -30,6 +30,9 @@ export const users = pgTable(
       .default(sql`'{30,10,5,0}'::smallint[]`),
     username: text("username").unique("users_username_unique"),
     usernameChangedAt: timestamp("username_changed_at", { withTimezone: true }),
+    homeChecklistDismissedAt: timestamp("home_checklist_dismissed_at", {
+      withTimezone: true,
+    }),
     status: userStatus("status").notNull().default("online"),
     defaultBranchId: uuid("default_branch_id").references(() => branches.id, {
       onDelete: "set null",
