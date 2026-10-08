@@ -17,6 +17,7 @@ export type RealtimeEvent =
   | { type: "friend.changed" }
   | { type: "notifications.changed" }
   | { type: "room.changed"; roomId: string }
+  | { type: "space.changed"; spaceId: string }
   | { type: "realtime.reauth" }
   | { type: "status.changed"; status: "online" | "away" | "dnd" }
   | { type: "booking.changed"; spaceId: string }

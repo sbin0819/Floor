@@ -129,6 +129,11 @@ export function createAction<Input, Output>(
             "report_daily",
             "request_daily",
             "request_pending",
+            "space_count",
+            "space_join_count",
+            "invite_count",
+            "channel_count",
+            "space_full",
           ].includes(error.details.message ?? "")) ||
           (code === "OVER_CAPACITY" &&
             ["attendee_count", "participants"].includes(
