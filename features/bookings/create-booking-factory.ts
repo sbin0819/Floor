@@ -1,6 +1,16 @@
 import { canBookAs } from "@/features/bookings/access";
 import { assertAttendeeCapacity } from "@/features/bookings/capacity";
 import {
+  assertParticipantCapacity,
+  assertParticipantEligibility,
+  invalidParticipants,
+} from "@/features/bookings/participant-validation";
+import {
+  getParticipantEligibility,
+  insertBookingParticipants,
+  lockParticipantBookingActor,
+} from "@/lib/dal/booking-participants";
+import {
   bookingActionDependencies,
   publishBookingChange,
   type BookingDependencies,
@@ -71,7 +81,26 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
           const space = await getSpaceForAccess(input.spaceId, db);
           if (!space || space.archivedAt) throw new ActionError("NOT_FOUND");
           assertBookable(space);
+          const participants = input.participants ?? [];
+          if (participants.some(({ userId }) => userId === session.userId))
+            invalidParticipants();
           assertAttendeeCapacity(space.capacity, input.attendeeCount);
+          if (participants.length) {
+            assertParticipantCapacity({
+              capacity: space.capacity,
+              attendeeCount: input.attendeeCount,
+              participantCount: participants.length,
+            });
+            assertParticipantEligibility(
+              session.userId,
+              participants,
+              await getParticipantEligibility(
+                session.userId,
+                participants.map(({ userId }) => userId),
+                db,
+              ),
+            );
+          }
           const branch = await getBranch(space.floor.branchId, db);
           if (!branch) throw new ActionError("NOT_FOUND");
           const during = {
@@ -96,12 +125,32 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
               throw new ActionError("NOT_FOUND");
             assertBookable(locked);
             if (
-              !(await lockBookingActor(
-                { userId: session.userId, teamId: input.teamId },
-                transaction,
-              ))
-            )
+              !(await (participants.length
+                ? lockParticipantBookingActor(
+                    {
+                      userId: session.userId,
+                      teamId: input.teamId,
+                      participantIds: participants.map(({ userId }) => userId),
+                    },
+                    transaction,
+                  )
+                : lockBookingActor(
+                    { userId: session.userId, teamId: input.teamId },
+                    transaction,
+                  )))
+            ) {
+              if (participants.length)
+                assertParticipantEligibility(
+                  session.userId,
+                  participants,
+                  await getParticipantEligibility(
+                    session.userId,
+                    participants.map(({ userId }) => userId),
+                    transaction,
+                  ),
+                );
               throw new ActionError("FORBIDDEN");
+            }
             // 운영자의 변경과 겹쳐도 잠금 전에 읽은 접근 결과를 재사용하지 않는다.
             const current = await getSpaceForAccess(space.id, transaction);
             const context = await loadPermissionContext(
@@ -112,6 +161,22 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
             if (!current || !canBookAs(context, current, input.teamId))
               throw new ActionError("FORBIDDEN");
             assertAttendeeCapacity(current.capacity, input.attendeeCount);
+            if (participants.length) {
+              assertParticipantCapacity({
+                capacity: current.capacity,
+                attendeeCount: input.attendeeCount,
+                participantCount: participants.length,
+              });
+              assertParticipantEligibility(
+                session.userId,
+                participants,
+                await getParticipantEligibility(
+                  session.userId,
+                  participants.map(({ userId }) => userId),
+                  transaction,
+                ),
+              );
+            }
             const settings = await getRoleSettings(branch.id, transaction);
             const role = bookingLimitRole(context, branch.id, input.teamId);
             const limits = resolveBookingLimits(role, settings[role]?.limits);
@@ -158,6 +223,12 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
               },
               transaction,
             );
+            if (participants.length)
+              await insertBookingParticipants(
+                created.id,
+                participants.map(({ userId }) => userId),
+                transaction,
+              );
             await fillBookingDefaultBranch(
               session.userId,
               branch.id,

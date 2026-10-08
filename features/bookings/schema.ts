@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { addDays } from "@/lib/time/zoned";
+import { bookingParticipantsSchema } from "./participant-input";
 
 const idSchema = z.uuid().transform((value) => value.toLowerCase());
 
@@ -9,6 +10,7 @@ export const createBookingSchema = z.strictObject({
   end: z.iso.datetime({ offset: true }),
   teamId: idSchema.nullable(),
   attendeeCount: z.number().int().min(1).max(500).nullable().optional(),
+  participants: bookingParticipantsSchema.optional(),
   title: z
     .string()
     .trim()
@@ -21,6 +23,7 @@ export const createBookingSchema = z.strictObject({
     .transform((value) => value || null),
 });
 export const cancelBookingSchema = z.strictObject({ bookingId: idSchema });
+export const leaveBookingSchema = z.strictObject({ bookingId: idSchema });
 export const createDeskBookingSchema = z.strictObject({
   deskId: idSchema,
   date: z.string().refine((value) => {
