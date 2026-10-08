@@ -26,12 +26,19 @@ import { getOperatingDate } from "@/lib/time/open-hours";
 import { zonedDateTime } from "@/lib/time/zoned";
 import { addSeedBranches } from "@/lib/seed/add-branches";
 import { selectSeedBranches, validateSeedBranchIds } from "@/lib/seed/scope";
+import {
+  applyBookingRound2,
+  validateBookingRound2Options,
+  type BookingRound2Options,
+} from "@/lib/seed/booking-round2";
+import type { BookingRound2Receipt } from "@/lib/seed/booking-round2-receipt";
 
 export type SeedResult = {
   counts: Record<string, number>;
   skippedBookings: number;
   accounts: string[];
   branchScope?: { addedBranchIds: string[]; skippedBranchIds: string[] };
+  bookingRound2?: { applied: boolean; receipt: BookingRound2Receipt };
 };
 
 export async function runSeed({
@@ -40,20 +47,45 @@ export async function runSeed({
   now,
   resetPasswords,
   branchIds,
+  bookingRound2,
 }: {
   db?: TransactionDatabase;
   auth?: AuthInstance;
   now: Date;
   resetPasswords: boolean;
   branchIds?: readonly string[];
+  bookingRound2?: BookingRound2Options;
 }): Promise<SeedResult> {
   if (!Number.isFinite(now.getTime()))
     throw new SeedError("시드 기준 시각이 올바르지 않아요.");
+  if (bookingRound2 !== undefined) {
+    if (branchIds !== undefined || resetPasswords)
+      throw new SeedError(
+        "예약 2차 전용 모드는 지점 선택·비밀번호 재설정과 함께 쓸 수 없어요.",
+      );
+    validateBookingRound2Options(bookingRound2);
+  }
   let current = "시드 데이터";
   try {
     const data = loadSeedData();
     const photos = loadSeedPhotos(data);
     const bookingExtras = loadSeedBookings2(data);
+    if (bookingRound2 !== undefined) {
+      current = "예약 2차 추가 데이터";
+      return await withTransaction(
+        (database) =>
+          applyBookingRound2(
+            {
+              ...bookingRound2,
+              data,
+              extras: bookingExtras,
+              now,
+            },
+            database,
+          ),
+        db,
+      );
+    }
     const attendeeCounts = new Map(
       bookingExtras.attendeeCounts.map(({ bookingId, attendeeCount }) => [
         bookingId,

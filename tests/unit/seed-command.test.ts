@@ -3,6 +3,10 @@ import { parseEnv } from "@/lib/env";
 import { SeedError } from "@/lib/seed/errors";
 import { loadSeedData } from "@/lib/seed/data";
 import {
+  bookingRound2HostHash,
+  type BookingRound2Receipt,
+} from "@/lib/seed/booking-round2-receipt";
+import {
   runSeedCommand,
   seedUsage,
   type SeedCommandDependencies,
@@ -33,6 +37,12 @@ function dependencies(
     }),
     closeDatabase: vi
       .fn<SeedCommandDependencies["closeDatabase"]>()
+      .mockResolvedValue(),
+    readReceipt: vi
+      .fn<SeedCommandDependencies["readReceipt"]>()
+      .mockResolvedValue(null),
+    writeReceipt: vi
+      .fn<SeedCommandDependencies["writeReceipt"]>()
       .mockResolvedValue(),
     stdout: vi.fn(),
     stderr: vi.fn(),
@@ -356,4 +366,146 @@ describe("seed command safety and output", () => {
       "데이터베이스 연결을 정리하지 못했어요.",
     );
   });
+});
+
+describe("booking-round2 command and commit receipts", () => {
+  const hostHash = bookingRound2HostHash("localhost");
+  const receipt: BookingRound2Receipt = {
+    version: 1,
+    mode: "booking-round2",
+    hostHash,
+    manifestHash: "a".repeat(64),
+    appliedAt: currentTime.toISOString(),
+    bundleHash: "b".repeat(64),
+  };
+  const appliedResult = {
+    counts: {
+      attendeeCounts: 6,
+      bookingParticipants: 5,
+      bookings: 9,
+      spaceBlocks: 1,
+    },
+    skippedBookings: 0,
+    accounts: ["member@floor.com"],
+    bookingRound2: { applied: true, receipt },
+  };
+
+  it.each([
+    { other: ["--branches", "invalid"] },
+    { other: ["--reset-passwords"] },
+    { other: ["--branches", "", "--reset-passwords"] },
+  ])(
+    "rejects mutually exclusive arguments %j before configuration or receipt reads",
+    async ({ other }) => {
+      const deps = dependencies();
+      expect(await runSeedCommand(["--booking-round2", ...other], deps)).toBe(
+        1,
+      );
+      expect(deps.getEnvironment).not.toHaveBeenCalled();
+      expect(deps.readReceipt).not.toHaveBeenCalled();
+      expect(deps.writeReceipt).not.toHaveBeenCalled();
+      expect(deps.stderr).toHaveBeenCalledWith(
+        "--booking-round2는 --branches나 --reset-passwords와 함께 쓸 수 없어요.",
+      );
+      expectNoDatabaseUse(deps);
+    },
+  );
+
+  it("does not require authentication configuration and only writes a receipt after the committed result", async () => {
+    const deps = dependencies({ AUTH_SECRET: undefined });
+    let commit!: (result: typeof appliedResult) => void;
+    deps.runSeed.mockReturnValue(
+      new Promise((resolve) => {
+        commit = resolve;
+      }),
+    );
+    const command = runSeedCommand(["--booking-round2"], deps);
+    await vi.waitFor(() => expect(deps.runSeed).toHaveBeenCalledOnce());
+    expect(deps.readReceipt).toHaveBeenCalledExactlyOnceWith(hostHash);
+    expect(deps.writeReceipt).not.toHaveBeenCalled();
+    expect(deps.runSeed).toHaveBeenCalledExactlyOnceWith({
+      now: currentTime,
+      resetPasswords: false,
+      bookingRound2: { hostHash, receipt: null },
+    });
+    commit(appliedResult);
+    expect(await command).toBe(0);
+    expect(deps.writeReceipt).toHaveBeenCalledExactlyOnceWith(receipt);
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+    const output = JSON.stringify(deps.stdout.mock.calls);
+    expect(output).toContain("참조한 기존 계정 (변경 없음)");
+    expect(output).not.toContain("비밀번호는");
+    expect(output).not.toContain(receipt.bundleHash);
+    expect(output).not.toContain(connectionString);
+  });
+
+  it("passes an existing receipt to the core and leaves it untouched on a validated rerun", async () => {
+    const deps = dependencies({ AUTH_SECRET: undefined });
+    deps.readReceipt.mockResolvedValue(receipt);
+    deps.runSeed.mockResolvedValue({
+      ...appliedResult,
+      counts: {},
+      bookingRound2: { applied: false, receipt },
+    });
+    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(0);
+    expect(deps.runSeed).toHaveBeenCalledWith({
+      now: currentTime,
+      resetPasswords: false,
+      bookingRound2: { hostHash, receipt },
+    });
+    expect(deps.writeReceipt).not.toHaveBeenCalled();
+    expect(deps.stdout).toHaveBeenCalledWith(
+      "예약 2차 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
+    );
+  });
+
+  it("blocks malformed or unreadable receipts before any database work without exposing contents", async () => {
+    const deps = dependencies();
+    deps.readReceipt.mockRejectedValue(
+      new Error("private token receipt contents"),
+    );
+    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
+    expectNoDatabaseUse(deps);
+    expect(deps.writeReceipt).not.toHaveBeenCalled();
+    expect(JSON.stringify(deps.stderr.mock.calls)).not.toContain("private");
+  });
+
+  it("fails closed after receipt persistence failure and never retries or claims a rollback", async () => {
+    const deps = dependencies();
+    deps.runSeed.mockResolvedValue(appliedResult);
+    deps.writeReceipt.mockRejectedValue(
+      new Error("private receipt path and token"),
+    );
+    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
+    expect(deps.runSeed).toHaveBeenCalledOnce();
+    expect(deps.writeReceipt).toHaveBeenCalledOnce();
+    expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
+      "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
+    );
+    expect(deps.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+  });
+
+  it("never writes a receipt when the transaction fails", async () => {
+    const deps = dependencies();
+    deps.runSeed.mockRejectedValue(
+      new SeedError("부분 적용 상태를 확인해 주세요."),
+    );
+    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
+    expect(deps.writeReceipt).not.toHaveBeenCalled();
+    expect(deps.closeDatabase).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { NODE_ENV: "production" as const },
+    { DATABASE_URL: "postgres://user:private@remote.example.test/floor" },
+  ])(
+    "keeps existing production and remote-host guards for %j",
+    async (environment) => {
+      const deps = dependencies(environment);
+      expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
+      expect(deps.readReceipt).not.toHaveBeenCalled();
+      expectNoDatabaseUse(deps);
+    },
+  );
 });

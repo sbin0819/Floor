@@ -47,3 +47,4 @@ debug-storybook.log
 next-env.d.ts
 
 *storybook.log
+/.floor-local/seed-receipts/
