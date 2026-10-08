@@ -89,6 +89,7 @@ export type DayBooking = {
   isMine: boolean;
   canCancel: boolean;
   title?: string | null;
+  attendeeCount?: number | null;
 };
 export type BookingActor = {
   teamId: string | null;
@@ -116,6 +117,7 @@ export type MyBooking = {
   date: string;
   timezone: string;
   title: string | null;
+  attendeeCount: number | null;
   teamName: string | null;
   status: "confirmed" | "cancelled";
   cancelledAt: string | null;

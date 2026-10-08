@@ -70,6 +70,7 @@ const booking: MyCalendarBooking = {
   date: "2026-10-08",
   timezone: "Asia/Seoul",
   title: "가상 회의",
+  attendeeCount: null,
   teamName: null,
   status: "confirmed",
   cancelledAt: null,

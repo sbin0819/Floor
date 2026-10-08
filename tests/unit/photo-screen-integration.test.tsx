@@ -28,6 +28,11 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/features/bookings/components/floor-view", () => ({
   useFloorView: () => ({ effectiveView: "list" }),
+  useFloorPeople: () => ({
+    people: null,
+    override: undefined,
+    setOverride: undefined,
+  }),
 }));
 vi.mock("@/features/bookings/actions", () => ({
   setDefaultBranch: vi.fn(),
@@ -49,6 +54,7 @@ function bookingFixture(): MyBooking {
     date: "2026-10-07",
     timezone: "Asia/Seoul",
     title: null,
+    attendeeCount: null,
     teamName: null,
     status: "confirmed",
     cancelledAt: null,

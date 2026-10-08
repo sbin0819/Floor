@@ -17,6 +17,7 @@ const booking: MyCalendarBooking = {
   spaceName: "회의실 C",
   spaceType: "meeting_room",
   title: "주간 회의",
+  attendeeCount: null,
   teamName: "디자인 스튜디오",
   status: "confirmed",
   cancelledAt: null,

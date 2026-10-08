@@ -29,6 +29,7 @@ const booking: MyCalendarBooking = {
   spaceName: "회의실 C",
   spaceType: "meeting_room",
   title: "가상 모임",
+  attendeeCount: null,
   teamName: null,
   status: "confirmed",
   cancelledAt: null,

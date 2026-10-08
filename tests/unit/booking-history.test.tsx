@@ -86,6 +86,7 @@ it("shows upcoming links, plain past entries and a confirmation before cancellat
     date: "2026-10-07",
     timezone: "Asia/Seoul",
     title: "팀 회의",
+    attendeeCount: null,
     teamName: "가상 팀",
     status: "confirmed" as const,
     cancelledAt: null,

@@ -137,6 +137,7 @@ const myBookingDto = (
   date: localDate(row.booking.during.start, row.branch.timezone),
   timezone: row.branch.timezone,
   title: row.booking.title,
+  attendeeCount: row.booking.attendeeCount,
   teamName: row.teamName,
   status: row.booking.status,
   cancelledAt: row.booking.cancelledAt?.toISOString() ?? null,
@@ -841,7 +842,7 @@ export function createBookingQueries(
             booking.during.end > current &&
             canCancelBooking(context, booking, branch.id),
           ...(canSeeBookingTitle(context, booking, branch.id)
-            ? { title: booking.title }
+            ? { title: booking.title, attendeeCount: booking.attendeeCount }
             : {}),
         })),
         blocks: blocks.map((block) => ({

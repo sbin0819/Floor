@@ -9,6 +9,7 @@ const booking: MyCalendarBooking = {
   date: "2026-10-08",
   timezone: "Asia/Seoul",
   title: null,
+  attendeeCount: null,
   teamName: null,
   status: "confirmed",
   cancelledAt: null,
