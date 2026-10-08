@@ -144,7 +144,9 @@ async function inspectCatalog(database: DalDatabase) {
     database
       .select({
         table: sql<string>`c.relname`,
-        columns: sql<string[]>`array_agg(a.attname order by key.ordinality)`,
+        columns: sql<
+          string[]
+        >`array_agg(a.attname::text order by key.ordinality)`,
       })
       .from(
         sql`pg_catalog.pg_constraint con join pg_catalog.pg_class c on c.oid = con.conrelid join pg_catalog.pg_namespace n on n.oid = c.relnamespace

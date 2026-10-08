@@ -1,5 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
+import { types } from "@neondatabase/serverless";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -94,6 +95,28 @@ async function lounge(client: PGlite) {
 }
 
 describe("additive chat-space seed preservation audit", () => {
+  it("returns catalog keys as text arrays understood by the installed Neon parser", async () =>
+    withDatabase(async (_database, client) => {
+      const queries: string[] = [];
+      const database = drizzle({
+        client,
+        schema,
+        logger: { logQuery: (query) => queries.push(query) },
+      });
+      await captureChatSpacesAudit({}, database);
+      const metadataQuery = queries.find((query) =>
+        query.includes("array_agg"),
+      );
+      expect(metadataQuery).toBeDefined();
+      const metadata = await client.query(metadataQuery!);
+      expect(metadata.fields[1]?.dataTypeID).toBe(1009);
+      const parsed: unknown = types.getTypeParser(
+        metadata.fields[1]!.dataTypeID,
+        "text",
+      )("{id,user_id}");
+      expect(parsed).toEqual(["id", "user_id"]);
+    }));
+
   it("captures exactly 36 app tables with keys and hashes, never raw personal or authentication values", async () =>
     withDatabase(async (database) => {
       const audit = await captureChatSpacesAudit({}, database);
