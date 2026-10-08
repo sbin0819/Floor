@@ -7,6 +7,7 @@ export const createBookingSchema = z.strictObject({
   start: z.iso.datetime({ offset: true }),
   end: z.iso.datetime({ offset: true }),
   teamId: idSchema.nullable(),
+  attendeeCount: z.number().int().min(1).max(500).nullable().optional(),
   title: z
     .string()
     .trim()

@@ -1,4 +1,5 @@
 import { canBookAs } from "@/features/bookings/access";
+import { assertAttendeeCapacity } from "@/features/bookings/capacity";
 import {
   bookingActionDependencies,
   publishBookingChange,
@@ -70,6 +71,7 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
           const space = await getSpaceForAccess(input.spaceId, db);
           if (!space || space.archivedAt) throw new ActionError("NOT_FOUND");
           assertBookable(space);
+          assertAttendeeCapacity(space.capacity, input.attendeeCount);
           const branch = await getBranch(space.floor.branchId, db);
           if (!branch) throw new ActionError("NOT_FOUND");
           const during = {
@@ -109,6 +111,7 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
             );
             if (!current || !canBookAs(context, current, input.teamId))
               throw new ActionError("FORBIDDEN");
+            assertAttendeeCapacity(current.capacity, input.attendeeCount);
             const settings = await getRoleSettings(branch.id, transaction);
             const role = bookingLimitRole(context, branch.id, input.teamId);
             const limits = resolveBookingLimits(role, settings[role]?.limits);
@@ -149,6 +152,7 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
                 userId: session.userId,
                 teamId: input.teamId,
                 title: input.title,
+                attendeeCount: input.attendeeCount ?? null,
                 during,
                 createdAt: now,
               },
