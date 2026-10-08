@@ -31,7 +31,12 @@ import {
   type FloorLocation,
 } from "@/features/bookings/floor-selection";
 
+type BookingDraft = { title: string; actorId: string | null };
+const emptyDraft: BookingDraft = { title: "", actorId: null };
 type SelectionContext = {
+  draft: BookingDraft;
+  changeDraft: (spaceId: string, patch: Partial<BookingDraft>) => void;
+  clearDraftTitle: (spaceId: string) => void;
   floorData: FloorDayData | null;
   registerFloor: (data: FloorDayData) => () => void;
   closeAfterBooking: (spaceId: string, date: string) => void;
@@ -245,14 +250,44 @@ export function BranchWorkspace({
     scope: string;
     selection: FloorBookingSelection;
   } | null>(null);
+  const [draft, setDraft] = useState<{
+    scope: string;
+    value: BookingDraft;
+  } | null>(null);
   if (rangeScope !== lastRangeScope) {
     setLastRangeScope(rangeScope);
     // 새 행 클릭으로 미리 정한 구간은 해당 주소가 도착해도 유지한다.
     if (range?.scope !== rangeScope) setRange(null);
+    if (draft?.scope !== rangeScope) setDraft(null);
   }
   const visibleScope = `${branchId}|${navigation.value.floorId}|${navigation.value.date}|${navigation.value.spaceId ?? ""}`;
   const bookingSelection =
     range?.scope === visibleScope ? range.selection : null;
+  const visibleDraft = draft?.scope === visibleScope ? draft.value : emptyDraft;
+  const changeDraft = useCallback<SelectionContext["changeDraft"]>(
+    (spaceId, patch) => {
+      const scope = `${branchId}|${navigation.value.floorId}|${navigation.value.date}|${spaceId}`;
+      setDraft((current) => ({
+        scope,
+        value: {
+          ...(current?.scope === scope ? current.value : emptyDraft),
+          ...patch,
+        },
+      }));
+    },
+    [branchId, navigation.value.floorId, navigation.value.date],
+  );
+  const clearDraftTitle = useCallback<SelectionContext["clearDraftTitle"]>(
+    (spaceId) => {
+      const scope = `${branchId}|${navigation.value.floorId}|${navigation.value.date}|${spaceId}`;
+      setDraft((current) =>
+        current?.scope === scope
+          ? { ...current, value: { ...current.value, title: "" } }
+          : current,
+      );
+    },
+    [branchId, navigation.value.floorId, navigation.value.date],
+  );
   const changeLocation = navigation.change;
   const rememberPending = useCallback(
     (next: FloorLocation, href: string) => {
@@ -283,8 +318,10 @@ export function BranchWorkspace({
         next.date !== navigation.value.date ||
         next.spaceId !== navigation.value.spaceId ||
         next.spaceId === null
-      )
+      ) {
         setRange(null);
+        setDraft(null);
+      }
       changeLocation(next, href, options);
     },
     [locationKey, changeLocation, navigation.value, rememberPending],
@@ -343,6 +380,7 @@ export function BranchWorkspace({
       if (element) rememberSpaceTrigger(element, spaceId);
       setDismissedKey(null);
       if (spaceId !== navigation.value.spaceId || navigation.value.detail) {
+        if (spaceId !== navigation.value.spaceId) setDraft(null);
         const nextLocation = { ...navigation.value, spaceId, detail: false };
         rememberPending(nextLocation, href);
         changeLocation(nextLocation, href);
@@ -371,6 +409,9 @@ export function BranchWorkspace({
     (detailChanged && navigation.value.spaceId === null);
   const value = useMemo(
     () => ({
+      draft: visibleDraft,
+      changeDraft,
+      clearDraftTitle,
       floorData,
       registerFloor,
       closeAfterBooking,
@@ -392,6 +433,9 @@ export function BranchWorkspace({
       restoreSpaceTrigger,
     }),
     [
+      visibleDraft,
+      changeDraft,
+      clearDraftTitle,
       floorData,
       registerFloor,
       closeAfterBooking,

@@ -50,8 +50,8 @@ const photo = {
   path: "/seed/photos/meeting-small-oak.webp",
   alt: "테스트 회의실 사진",
 };
-const href = (spaceId?: string) =>
-  floorHref(branchId, floorId, date, spaceId, "timeline");
+const href = (spaceId?: string, detail = false) =>
+  floorHref(branchId, floorId, date, spaceId, "timeline", detail);
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ branchId, floorId }),
@@ -155,8 +155,8 @@ function Frame({
     </QueryClientProvider>
   );
 }
-function setRoute(spaceId?: string) {
-  const url = href(spaceId);
+function setRoute(spaceId?: string, detail = false) {
+  const url = href(spaceId, detail);
   route.query = url.split("?")[1]!;
   window.history.replaceState(null, "", url);
 }
@@ -172,8 +172,8 @@ function display(
   );
   return {
     ...view,
-    receive: (next: SpaceDayData | null) => {
-      setRoute(next?.space.id);
+    receive: (next: SpaceDayData | null, detail = false) => {
+      setRoute(next?.space.id, detail);
       view.rerender(
         <Frame client={client} detail={next} navigateAction={navigateAction} />,
       );
@@ -280,6 +280,10 @@ describe("shared floor timetable booking strip", () => {
     ).toBeDisabled();
     await userEvent.tab();
     expect(
+      screen.getByRole("button", { name: "현재 시간으로 이동" }),
+    ).toHaveFocus();
+    await userEvent.tab();
+    expect(
       within(screen.getByRole("grid")).getByRole("link", { name: /회의실 A/ }),
     ).toHaveFocus();
     await userEvent.keyboard("{ArrowRight}{Enter}");
@@ -304,6 +308,84 @@ describe("shared floor timetable booking strip", () => {
     await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(trigger).toHaveFocus());
     expect(range()).toEqual({ spaceId: first, start, end });
+  });
+
+  it("keeps the actual title, actor and range through the right detail Sheet and returns focus to the space link", async () => {
+    setRoute(first);
+    const opening = Promise.withResolvers<void>();
+    const closing = Promise.withResolvers<void>();
+    const navigate = vi
+      .fn<NavigateAction>()
+      .mockImplementationOnce(() => opening.promise)
+      .mockImplementationOnce(() => closing.promise);
+    const data = detailFixture();
+    const teamId = "abcdefab-1234-4abc-9def-123456789ab4";
+    data.hasTeams = true;
+    data.actors.push({ ...data.actors[0]!, teamId, name: "기획 팀으로" });
+    const view = display(data, navigate);
+    await userEvent.click(firstCell());
+    const strip = screen.getByRole("region", { name: "예약" });
+    await userEvent.type(
+      within(strip).getByRole("textbox", { name: "제목 (선택)" }),
+      "공유된 기획 회의",
+    );
+    await userEvent.click(
+      within(strip).getByRole("combobox", { name: "예약 방식" }),
+    );
+    await userEvent.click(screen.getByRole("option", { name: "기획 팀으로" }));
+    const spaceLink = within(screen.getByRole("grid")).getByRole("link", {
+      name: /회의실 A/,
+    });
+    await userEvent.click(spaceLink);
+    const sheet = await screen.findByRole("dialog", { name: "회의실 A 상세" });
+    expect(sheet).toHaveAttribute("data-side", "right");
+    expect(
+      screen.queryByRole("region", { name: "예약" }),
+    ).not.toBeInTheDocument();
+    expect(navigate).toHaveBeenNthCalledWith(1, href(first, true), {
+      replace: undefined,
+    });
+    view.receive(data, true);
+    await finish(opening);
+    expect(screen.getByRole("dialog", { name: "회의실 A 상세" })).toBe(sheet);
+    expect(
+      within(sheet).getByRole("heading", { name: "회의실 A" }),
+    ).toBeVisible();
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "시간·제목 바꾸기" }),
+    );
+    expect(
+      within(sheet).getByRole("textbox", { name: "제목 (선택)" }),
+    ).toHaveValue("공유된 기획 회의");
+    expect(
+      within(sheet).getByRole("combobox", { name: "예약 방식" }),
+    ).toHaveTextContent("기획 팀으로");
+    expect(
+      within(sheet).getByRole("combobox", { name: "시작" }),
+    ).toHaveTextContent("10:00");
+    expect(
+      within(sheet).getByRole("combobox", { name: "끝" }),
+    ).toHaveTextContent("11:00");
+    expect(document.querySelectorAll("form")).toHaveLength(1);
+    const close = within(sheet).getByRole("link", { name: "공간 상세 닫기" });
+    expect(close).toHaveAttribute("href", href(first));
+    await userEvent.click(close);
+    expect(navigate).toHaveBeenNthCalledWith(2, href(first), { replace: true });
+    view.receive(data);
+    await finish(closing);
+    expect(
+      screen.queryByRole("dialog", { name: "회의실 A 상세" }),
+    ).not.toBeInTheDocument();
+    const restored = screen.getByRole("region", { name: "예약" });
+    expect(
+      within(restored).getByRole("textbox", { name: "제목 (선택)" }),
+    ).toHaveValue("공유된 기획 회의");
+    expect(
+      within(restored).getByRole("combobox", { name: "예약 방식" }),
+    ).toHaveTextContent("기획 팀으로");
+    expect(range()).toEqual({ spaceId: first, start, end });
+    expect(document.querySelectorAll("form")).toHaveLength(1);
+    await waitFor(() => expect(spaceLink).toHaveFocus());
   });
 
   it("closes with replace, preserves date/view, clears the range and returns focus to the chosen cell", async () => {

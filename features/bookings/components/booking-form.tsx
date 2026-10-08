@@ -113,9 +113,21 @@ export function BookingForm({
     if (workspace) workspace.changeRange(data.space.id, next);
     else setLocalRange(next);
   };
-  const [title, setTitle] = useState("");
+  const [localTitle, setLocalTitle] = useState("");
   const [expanded, setExpanded] = useState(false);
-  const [actorId, setActorId] = useState(data.actors[0]?.teamId ?? "personal");
+  const [localActorId, setLocalActorId] = useState(
+    data.actors[0]?.teamId ?? "personal",
+  );
+  const title = workspace ? workspace.draft.title : localTitle;
+  const actorId = workspace ? workspace.draft.actorId : localActorId;
+  const setTitle = (value: string) => {
+    if (workspace) workspace.changeDraft(data.space.id, { title: value });
+    else setLocalTitle(value);
+  };
+  const setActorId = (value: string) => {
+    if (workspace) workspace.changeDraft(data.space.id, { actorId: value });
+    else setLocalActorId(value);
+  };
   const slots = useMemo(() => selectableSlots(data), [data]);
   const selectedStart = slots.some(
     (slot) => slot.start === start && slot.state === "free",
@@ -140,7 +152,8 @@ export function BookingForm({
     },
     onSuccess: () => {
       setRange(null);
-      setTitle("");
+      if (workspace) workspace.clearDraftTitle(data.space.id);
+      else setLocalTitle("");
       setExpanded(false);
       onBooked?.();
     },
@@ -331,6 +344,7 @@ export function BookingForm({
           className="min-h-[280px] flex-1 overflow-y-auto overscroll-contain p-3"
         >
           <BookingTimeline
+            branchId={data.branch.id}
             slots={slots}
             bookings={data.bookings}
             blocks={data.blocks}
