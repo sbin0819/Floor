@@ -164,7 +164,7 @@ describe("member floor rows", () => {
 
   it.each([
     [0, "예약 없이 이용해요"],
-    [8, "좌석 8석 · 좌석 예약은 준비 중이에요"],
+    [8, "좌석 8석"],
   ])(
     "omits the bar for a non-bookable space with %i desks",
     (deskCount, text) => {
