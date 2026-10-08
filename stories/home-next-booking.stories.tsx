@@ -18,6 +18,7 @@ const booking: MyCalendarBooking = {
   spaceType: "meeting_room",
   title: "주간 회의",
   attendeeCount: null,
+  desk: null,
   teamName: "디자인 스튜디오",
   status: "confirmed",
   cancelledAt: null,
@@ -68,4 +69,26 @@ export const Tomorrow: Story = {
 };
 export const Empty: Story = {
   args: { data: { now: "2026-10-07T03:00:00Z", bookings: [] } },
+};
+export const DeskReservation: Story = {
+  args: {
+    data: {
+      now: "2026-10-07T06:25:00Z",
+      bookings: [
+        {
+          ...booking,
+          start: "2026-10-07T04:00:00Z",
+          end: "2026-10-07T13:00:00Z",
+          spaceName: "오픈 데스크",
+          spaceType: "desk_area",
+          title: null,
+          desk: { id: "desk", name: "A-15", part: "pm" },
+          photo: {
+            path: "/seed/photos/open-desk-oak.webp",
+            alt: "가상 오픈 데스크 좌석",
+          },
+        },
+      ],
+    },
+  },
 };

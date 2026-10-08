@@ -7,6 +7,37 @@ import type {
 import type { OperatingState } from "@/features/bookings/operating-state";
 import type { Photo } from "@/lib/photos/schema";
 import type { MyBookingsMonthSelection } from "@/features/bookings/calendar";
+import type { DeskPart } from "@/features/bookings/desk-parts";
+
+export type DeskPartSummary = {
+  part: DeskPart;
+  start: string;
+  end: string;
+  selectable: boolean;
+  freeCount: number;
+  myDeskName: string | null;
+};
+export type DeskState = "free" | "booked" | "mine" | "blocked" | "unavailable";
+export type DeskSeat = {
+  id: string;
+  name: string;
+  row: number;
+  column: number;
+  states: Partial<Record<DeskPart, DeskState>>;
+};
+export type DeskDayData = {
+  parts: DeskPartSummary[];
+  seats: DeskSeat[];
+  myBookings: {
+    id: string;
+    deskId: string;
+    deskName: string;
+    start: string;
+    end: string;
+    part: DeskPart | null;
+    canCancel: boolean;
+  }[];
+};
 
 export type SpaceType =
   "meeting_room" | "seminar" | "phone_booth" | "desk_area" | "desk" | "lounge";
@@ -70,6 +101,7 @@ export type RestrictedSpace = {
 export type FloorVisibleSpace = VisibleSpace & {
   intervals: AvailabilityInterval[];
   summary: AvailabilitySummary | null;
+  deskParts?: DeskPartSummary[];
 };
 export type FloorDayData = BranchFloorsData & {
   floor: FloorSummary;
@@ -98,6 +130,7 @@ export type BookingActor = {
   remainingMinutes: number | null;
 };
 export type SpaceDayData = {
+  desk: DeskDayData | null;
   space: VisibleSpace;
   photos: Photo[];
   branch: BranchDetails;
@@ -111,6 +144,7 @@ export type SpaceDayData = {
   hasTeams: boolean;
 };
 export type MyBooking = {
+  desk: { id: string; name: string; part: DeskPart | null } | null;
   id: string;
   start: string;
   end: string;

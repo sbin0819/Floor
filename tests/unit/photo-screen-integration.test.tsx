@@ -48,6 +48,7 @@ const photo = {
 };
 function bookingFixture(): MyBooking {
   return {
+    desk: null,
     id: "booking",
     start: "2026-10-07T02:00:00Z",
     end: "2026-10-07T03:00:00Z",

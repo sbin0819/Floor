@@ -10,6 +10,7 @@ const booking: MyCalendarBooking = {
   timezone: "Asia/Seoul",
   title: null,
   attendeeCount: null,
+  desk: null,
   teamName: null,
   status: "confirmed",
   cancelledAt: null,

@@ -3,6 +3,7 @@ import { getOperatingState } from "@/features/bookings/operating-state";
 
 export function spaceDayFixture(): SpaceDayData {
   return {
+    desk: null,
     branch: {
       id: "branch",
       name: "가상 지점",

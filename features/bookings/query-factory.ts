@@ -1,4 +1,11 @@
 import { z } from "zod";
+import { loadDeskDay } from "@/features/bookings/desk-day-loader";
+import {
+  createDeskParts,
+  classifyDeskPart,
+} from "@/features/bookings/desk-parts";
+import { summarizeDesks } from "@/features/bookings/desk-states";
+import { readFloorDeskSchedule } from "@/lib/dal/desk-floor";
 import {
   myBookingsMonthReadRange,
   normalizeMyBookingsMonth,
@@ -131,6 +138,21 @@ const floorDto = (floor: FloorSummary): FloorSummary => ({
 const myBookingDto = (
   row: Awaited<ReturnType<typeof listMyBookings>>["upcoming"][number],
 ): MyBooking => ({
+  desk:
+    row.space.type === "desk"
+      ? {
+          id: row.space.id,
+          name: row.space.name,
+          part: classifyDeskPart(
+            row.booking.during,
+            createDeskParts({
+              date: localDate(row.booking.during.start, row.branch.timezone),
+              timeZone: row.branch.timezone,
+              openHours: row.branch.openHours,
+            }),
+          ),
+        }
+      : null,
   id: row.booking.id,
   start: row.booking.during.start.toISOString(),
   end: row.booking.during.end.toISOString(),
@@ -145,9 +167,9 @@ const myBookingDto = (
   branchName: row.branch.name,
   floorId: row.floor.id,
   floorName: row.floor.name,
-  spaceId: row.space.id,
-  spaceName: row.space.name,
-  spaceType: row.space.type,
+  spaceId: (row.area ?? row.space).id,
+  spaceName: (row.area ?? row.space).name,
+  spaceType: (row.area ?? row.space).type,
   photo: row.photo,
 });
 const order: SpaceType[] = [
@@ -608,15 +630,20 @@ export function createBookingQueries(
       const allowedIds = accessRows
         .filter((space) => canAccess(context, { ...space, floor }))
         .map(({ id }) => id);
-      const [metadata, bookings, blocks, desks] = await Promise.all([
+      const [metadata, bookings, blocks, deskSchedule] = await Promise.all([
         getSpacesByIds(allowedIds, db),
         listSpaceBookings(
           { spaceIds: allowedIds, during, summaryOnly: true },
           db,
         ),
         listSpaceBlocks({ spaceIds: allowedIds, during }, db),
-        getDeskCounts(allowedIds, db),
+        readFloorDeskSchedule({ parentIds: allowedIds, during }, db),
       ]);
+      const {
+        desks,
+        bookings: deskBookings,
+        blocks: deskBlocks,
+      } = deskSchedule;
       const isToday = date === localDate(current, branch.timezone);
       const operatingState = getOperatingState(
         current,
@@ -637,6 +664,22 @@ export function createBookingQueries(
         const space = metadata.find(({ id }) => id === row.id);
         if (!space || space.archivedAt || space.type === "desk") continue;
         const schedule = bookings.filter(({ spaceId }) => spaceId === space.id);
+        const areaDesks = desks.filter(({ parentId }) => parentId === space.id);
+        const deskSummary =
+          space.type === "desk_area" && !space.bookable && areaDesks.length > 0
+            ? summarizeDesks({
+                desks: areaDesks,
+                bookings: deskBookings,
+                blocks: deskBlocks,
+                parts: createDeskParts({
+                  date,
+                  timeZone: branch.timezone,
+                  openHours: branch.openHours,
+                }),
+                userId: session.userId,
+                now: current,
+              })
+            : null;
         const availability = {
           window,
           now: current,
@@ -660,8 +703,14 @@ export function createBookingQueries(
           photo: space.photo,
           amenities: space.amenities,
           bookable: space.bookable,
-          deskCount:
-            desks.find(({ parentId }) => parentId === space.id)?.count ?? 0,
+          deskCount: areaDesks.length,
+          ...(deskSummary
+            ? {
+                deskParts: deskSummary.parts.filter(
+                  ({ part }) => part !== "day",
+                ),
+              }
+            : {}),
           bookingCount: schedule.length,
           intervals: space.bookable
             ? buildAvailabilityIntervals(availability)
@@ -749,6 +798,19 @@ export function createBookingQueries(
       if (!identity || !canAccess(context, { ...identity, floor }))
         throw new ActionError("NOT_FOUND");
       const date = normalizeBookingDate(value, current, branch.timezone);
+      if (identity.type === "desk_area" && !identity.bookable) {
+        return loadDeskDay({
+          id,
+          branch,
+          floor: floorDto(floor),
+          identity: { ...identity, floor },
+          date,
+          current,
+          context,
+          settings,
+          db,
+        });
+      }
       const during = bookingDayRange(date, branch.timezone);
       const actorIds = availableBookingActors(context, { ...identity, floor });
       const [metadata, bookings, blocks, teams, usage, desks] =
@@ -798,6 +860,7 @@ export function createBookingQueries(
       return {
         branch,
         floor: floorDto(floor),
+        desk: null,
         date,
         now: current.toISOString(),
         openHours: getOpenHours(branch.openHours, date),

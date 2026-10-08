@@ -71,6 +71,7 @@ const booking: MyCalendarBooking = {
   timezone: "Asia/Seoul",
   title: "가상 회의",
   attendeeCount: null,
+  desk: null,
   teamName: null,
   status: "confirmed",
   cancelledAt: null,
