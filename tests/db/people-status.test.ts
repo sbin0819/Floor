@@ -123,6 +123,8 @@ describe("persisted self status and private navigation metadata", () => {
       const value = await queries.getMyChatNav();
       const measurement = meter.stop();
       expect(value).toEqual({
+        chatToasts: true,
+        tabBadge: true,
         filesEnabled: false,
         callsEnabled: false,
         calls: [],
@@ -150,6 +152,13 @@ describe("persisted self status and private navigation metadata", () => {
       const value = await readAccountMenu(actors.member.userId, database.db);
       const measurement = meter.stop();
       expect(value).toEqual({
+        name: actors.member.name,
+        avatar: {
+          id: actors.member.userId,
+          avatarColor: null,
+          avatarPhoto: false,
+          avatarUrl: null,
+        },
         myStatus: "away",
         username: "floor.member",
         isOperator: false,

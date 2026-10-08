@@ -83,3 +83,9 @@ export const declineTeamInvite = readOnlyAction;
 
 export const joinCall = readOnlyAction;
 export const declineCall = readOnlyAction;
+export const updateName = readOnlyAction;
+export const updateAvatar = readOnlyAction;
+export const changePassword = readOnlyAction;
+export const revokeSession = readOnlyAction;
+export const revokeOtherSessions = readOnlyAction;
+export const updatePreferences = readOnlyAction;

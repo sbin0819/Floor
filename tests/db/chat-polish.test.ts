@@ -12,6 +12,7 @@ import {
 import { createChatActions } from "@/features/chat/action-factory";
 import { createChatQueries } from "@/features/chat/query-factory";
 import { emptyMessageDetails } from "@/features/chat/types";
+import { avatarColorFor } from "@/lib/avatar";
 import * as readDal from "@/lib/dal/chat-reads";
 import * as schema from "@/lib/db/schema";
 import {
@@ -127,6 +128,10 @@ describe("message replies and mentions", () => {
       seq: 2,
       authorId: actors.member.userId,
       authorName: actors.member.name,
+      authorAvatar: {
+        color: avatarColorFor(actors.member.userId, null),
+        photoUrl: null,
+      },
       kind: "text",
       body: "답장이에요",
       clientId: expect.any(String),
@@ -247,6 +252,7 @@ describe("message replies and mentions", () => {
       expect(Object.keys(page.messages[1]!).sort()).toEqual(
         [
           "attachments",
+          "authorAvatar",
           "id",
           "systemData",
           "seq",

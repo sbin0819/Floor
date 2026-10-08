@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+test("비로그인 계정 설정은 로그인 복귀 주소를 보존해요", async ({ page }) => {
+  await page.goto("/settings/account");
+  await expect(
+    page.getByRole("heading", { name: "Floor에 로그인", exact: true }),
+  ).toBeVisible();
+  const url = new URL(page.url());
+  expect(url.pathname).toBe("/login");
+  expect(url.searchParams.get("next")).toBe("/settings/account");
+});
+
 test("로그인하지 않은 파일 내려받기는 401이에요", async ({ request }) => {
   const response = await request.get(
     "/api/files/48db9ea0-4f45-4168-a2b1-e44a26c59791",

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createSpaceInviteQueries } from "@/features/chat/space-invite-queries";
 import { createSpaceInviteActions } from "@/features/chat/space-invite-actions";
 import { ActionError } from "@/lib/actions/result";
+import { avatarColorFor } from "@/lib/avatar";
 import {
   chatSpaceMembers,
   chatSpaceInvites,
@@ -85,6 +86,10 @@ describe("community invitation queries and quotas", () => {
       codePrefix: ownerLink.code.slice(0, 6),
       code: ownerLink.code,
       createdByName: actors.admin.name,
+      createdByAvatar: {
+        color: avatarColorFor(actors.admin.userId, null),
+        photoUrl: null,
+      },
       expiresAt: null,
       useCount: 0,
       maxUses: null,
@@ -174,7 +179,12 @@ describe("community invitation queries and quotas", () => {
     expect(await queries().getInviteCandidates(actors.communityId)).toEqual(
       candidates
         .slice(0, 3)
-        .map(({ id: userId, name, username }) => ({ userId, name, username })),
+        .map(({ id: userId, name, username }) => ({
+          userId,
+          name,
+          username,
+          avatar: { color: avatarColorFor(userId, null), photoUrl: null },
+        })),
     );
     expect(
       await actions().inviteToSpace({

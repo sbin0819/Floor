@@ -1,26 +1,29 @@
-import { Suspense, isValidElement, type ReactNode } from "react";
+import { Children, Suspense, isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FriendsPage from "@/app/(app)/friends/page";
 import SettingsPage from "@/app/(app)/settings/page";
+import SettingsLayout from "@/app/(app)/settings/layout";
 import { requirePageSession } from "@/lib/auth/session";
-import {
-  getFriendsView,
-  getUsernameSettings,
-  getMessageRequests,
-} from "@/features/people/queries";
+import { getFriendsView, getMessageRequests } from "@/features/people/queries";
+import { getProfileSettings } from "@/features/settings/queries";
+import type { ProfileSettings } from "@/features/settings/types";
+import { SettingsSkeleton } from "@/features/settings/components/settings-shell";
+import { SettingsTabLinks } from "@/features/settings/components/settings-tabs";
 import { resolvePageContent } from "./page-test-utils";
 
 vi.mock("@/lib/auth/session", () => ({ requirePageSession: vi.fn() }));
 vi.mock("@/features/people/queries", () => ({
   getFriendsView: vi.fn(),
-  getUsernameSettings: vi.fn(),
   getMessageRequests: vi.fn(),
+}));
+vi.mock("@/features/settings/queries", () => ({
+  getProfileSettings: vi.fn(),
 }));
 vi.mock("@/features/people/components/friends-screen", () => ({
   FriendsScreen: () => null,
 }));
-vi.mock("@/features/people/components/settings-screen", () => ({
-  SettingsScreen: () => null,
+vi.mock("@/features/settings/components/profile-settings", () => ({
+  ProfileSettings: () => null,
 }));
 
 const settings = {
@@ -29,6 +32,26 @@ const settings = {
   nextChangeAt: null,
   now: "2030-01-01T00:00:00Z",
   suggestion: null,
+};
+const profile: ProfileSettings = {
+  userId: "me",
+  name: "프로필에서 읽은 이름",
+  avatar: { color: "blue", photoUrl: null },
+  photo: false,
+  photoProvider: null,
+  photoUrl: null,
+  usernameSettings: settings,
+  preview: {
+    userId: "me",
+    name: "프로필에서 읽은 이름",
+    avatar: { color: "blue", photoUrl: null },
+    username: settings.username,
+    isMe: true,
+    relation: null,
+    sharedSpaces: [],
+    directRoomId: null,
+    canDirectMessage: false,
+  },
 };
 function content(page: ReactNode) {
   if (!isValidElement<{ children: ReactNode }>(page))
@@ -45,7 +68,7 @@ beforeEach(() => {
     name: "김하은",
     email: "own@example.test",
   });
-  vi.mocked(getUsernameSettings).mockResolvedValue(settings);
+  vi.mocked(getProfileSettings).mockResolvedValue(profile);
   vi.mocked(getMessageRequests).mockResolvedValue([]);
   vi.mocked(getFriendsView).mockResolvedValue({
     settings,
@@ -78,23 +101,49 @@ describe("people pages maintain direct guards and static shells", () => {
       else expect(getMessageRequests).not.toHaveBeenCalled();
     },
   );
-  it("guards settings before loading its data and takes the display name from the session", async () => {
+  it("keeps the settings layout static and guards its page-local profile lookup", async () => {
     const page = SettingsPage();
-    expect(page.props.title).toBe("설정");
+    const layout = SettingsLayout({ children: page });
+    const [heading, tabs, child] = Children.toArray(layout.props.children);
+    expect(
+      isValidElement<{ children: ReactNode }>(heading) && heading.type,
+    ).toBe("h1");
+    expect(
+      isValidElement<{ children: ReactNode }>(heading) &&
+        heading.props.children,
+    ).toBe("설정");
+    expect(isValidElement<{ fallback: ReactNode }>(tabs) && tabs.type).toBe(
+      Suspense,
+    );
+    const fallback =
+      isValidElement<{ fallback: ReactNode }>(tabs) && tabs.props.fallback;
+    expect(isValidElement(fallback) && fallback.type).toBe(SettingsTabLinks);
+    expect(child).toEqual(expect.objectContaining({ type: Suspense }));
+    expect(page.type).toBe(Suspense);
+    expect(page.props.fallback.type).toBe(SettingsSkeleton);
+    expect(page.props.fallback.props.tab).toBe("profile");
     expect(requirePageSession).not.toHaveBeenCalled();
-    const result = await content(page);
+    expect(getProfileSettings).not.toHaveBeenCalled();
+    const result = await resolvePageContent(page);
     expect(requirePageSession).toHaveBeenCalledExactlyOnceWith("/settings");
-    expect(result.props.name).toBe("김하은");
+    expect(getProfileSettings).toHaveBeenCalledExactlyOnceWith();
+    expect(
+      vi.mocked(requirePageSession).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(getProfileSettings).mock.invocationCallOrder[0]!);
+    expect(result.props.data).toBe(profile);
+    expect(profile.name).not.toBe("김하은");
     expect(result.props).not.toHaveProperty("email");
-    expect(getUsernameSettings).toHaveBeenCalledOnce();
+    expect(result.props.data).not.toHaveProperty("email");
   });
   it("never reads protected queries when the page session guard redirects", async () => {
     vi.mocked(requirePageSession).mockRejectedValue(new Error("redirect"));
-    await expect(content(SettingsPage())).rejects.toThrow("redirect");
+    await expect(resolvePageContent(SettingsPage())).rejects.toThrow(
+      "redirect",
+    );
     await expect(
       content(FriendsPage({ searchParams: Promise.resolve({}) })),
     ).rejects.toThrow("redirect");
-    expect(getUsernameSettings).not.toHaveBeenCalled();
+    expect(getProfileSettings).not.toHaveBeenCalled();
     expect(getFriendsView).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,7 @@ import {
 } from "@/features/chat/query-factory";
 import { emptyMessageDetails } from "@/features/chat/types";
 import { ActionError } from "@/lib/actions/result";
+import { avatarColorFor } from "@/lib/avatar";
 import * as accessDal from "@/lib/dal/chat-access";
 import * as readDal from "@/lib/dal/chat-read";
 import {
@@ -98,6 +99,10 @@ describe("authenticated chat message pages", () => {
       seq: 1,
       authorId: actors.member.userId,
       authorName: actors.member.name,
+      authorAvatar: {
+        color: avatarColorFor(actors.member.userId, null),
+        photoUrl: null,
+      },
       kind: "text",
       body: "가상 메시지 1",
       createdAt: chatNow.toISOString(),

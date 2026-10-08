@@ -187,8 +187,8 @@ describe("chat block boundaries", () => {
         expect(
           view?.members.map((member) => Object.keys(member).sort()),
         ).toEqual([
-          ["admin", "id", "name"],
-          ["admin", "id", "name"],
+          ["admin", "avatar", "id", "name"],
+          ["admin", "avatar", "id", "name"],
         ]);
         meter.start();
         const nav = await queries().getMyChatNav();
