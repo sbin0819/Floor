@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Grid2X2 } from "lucide-react";
 import {
-  ChatRailNavigation,
-  ChatSidebarNavigation,
-  ChatSidebarTitle,
-} from "@/components/chat-navigation";
+  LiveChatRail,
+  LiveChatSidebar,
+  LiveChatSidebarTitle,
+  ChatNavSync,
+} from "@/features/chat/components/chat-nav";
 import { getSession } from "@/lib/auth/session";
 import { getMyChatNav } from "@/features/chat/queries";
 
@@ -13,15 +14,22 @@ async function readNavigation() {
 }
 
 export async function ChatRailSlot() {
-  return <ChatRailNavigation spaces={await readNavigation()} />;
+  return <LiveChatRail spaces={await readNavigation()} />;
 }
 
 export async function ChatSidebarSlot() {
-  return <ChatSidebarNavigation spaces={await readNavigation()} />;
+  return <LiveChatSidebar spaces={await readNavigation()} />;
 }
 
 export async function ChatSidebarTitleSlot() {
-  return <ChatSidebarTitle spaces={await readNavigation()} />;
+  return <LiveChatSidebarTitle spaces={await readNavigation()} />;
+}
+
+export async function ChatNavSyncSlot() {
+  const session = await getSession();
+  return session ? (
+    <ChatNavSync userId={session.userId} initialData={await getMyChatNav()} />
+  ) : null;
 }
 
 export function ChatRailPlaceholder() {

@@ -33,10 +33,17 @@ export function ChatRailNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
     chatLocation(pathname).spaceId,
   );
   const entries = [
-    { id: null, name: "홈", label: "Floor 홈", href: "/", initial: null },
+    {
+      id: null,
+      name: "홈",
+      label: "Floor 홈",
+      href: "/",
+      initial: null,
+      unread: false,
+    },
     ...spaces.map((space) => ({
       ...space,
-      label: space.name,
+      label: space.unread ? `${space.name}, 안 읽은 메시지 있음` : space.name,
       href: `/s/${space.id}`,
     })),
   ];
@@ -50,10 +57,14 @@ export function ChatRailNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
             className="flex w-full flex-col items-center gap-3"
           >
             <div className="relative flex w-full justify-center">
-              {selected && (
+              {(selected || entry.unread) && (
                 <span
                   aria-hidden="true"
-                  className="absolute inset-y-2 left-0 w-1 rounded-r bg-primary"
+                  data-unread={entry.unread || undefined}
+                  className={cn(
+                    "absolute top-1/2 left-0 w-1 -translate-y-1/2 rounded-r bg-foreground",
+                    selected ? "h-7" : "h-2",
+                  )}
                 />
               )}
               <Tooltip>
@@ -132,6 +143,11 @@ export function ChatSidebarNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
               key={channel.id}
               href={href}
               aria-current={selected ? "page" : undefined}
+              aria-label={
+                channel.unread
+                  ? `${channel.name}, 안 읽은 메시지 있음`
+                  : channel.name
+              }
               onClick={(event) => {
                 if (!shouldInterceptNavigation(event)) return;
                 event.preventDefault();
@@ -142,6 +158,7 @@ export function ChatSidebarNavigation({ spaces }: { spaces: ChatSpaceNav[] }) {
                 selected
                   ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
                   : "text-muted-foreground hover:bg-sidebar-accent/60",
+                channel.unread && "font-bold text-foreground",
               )}
             >
               <LinkPending />

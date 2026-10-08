@@ -6,6 +6,7 @@ import {
   ChatSidebarSlot,
   ChatSidebarTitleSlot,
   ChatSidebarTitlePlaceholder,
+  ChatNavSyncSlot,
 } from "@/components/chat-shell-navigation";
 import {
   RealtimeProvider,
@@ -92,6 +93,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {children}
       </AppShellFrame>
+      <Suspense fallback={null}>
+        <ChatNavSyncSlot />
+      </Suspense>
     </RealtimeProvider>
   );
 }
