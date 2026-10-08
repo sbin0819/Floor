@@ -30,6 +30,7 @@ export type ActionErrorDetails = {
     | "per_booking"
     | "per_day"
     | "days_ahead"
+    | "send_rate"
     | "desk_per_person"
     | "attendee_count"
     | "participants";
