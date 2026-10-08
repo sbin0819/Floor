@@ -1,0 +1,88 @@
+{
+  "note": "사람 시드(지시서 23): 사용자 이름, 친구 관계, 1:1 DM. userKey·authorKey·requestedBy·to는 seed.json의 users[].key다. 관리자(admin)는 사용자 이름을 비워 둔다(처음 정하기 화면을 보려고). friendships의 minutesAgo는 요청한 시각(대기면 알림 시각도 같다). DM의 users는 두 사람이고, 이 파일에서 accepted인 친구이거나 seed.json에서 같은 팀이어야 한다. DM 메시지의 minutesAgo는 DM마다 줄어드는 순서이고, 번호(seq)는 목록 순서대로 1부터다. 다시 돌려도 같아야 한다.",
+  "usernames": [
+    {
+      "userKey": "member",
+      "username": "haeun"
+    },
+    {
+      "userKey": "designAdmin",
+      "username": "jihoon.park"
+    },
+    {
+      "userKey": "designMember",
+      "username": "seoyeon"
+    },
+    {
+      "userKey": "growthAdmin",
+      "username": "minjun"
+    },
+    {
+      "userKey": "both",
+      "username": "yuna_j"
+    }
+  ],
+  "friendships": [
+    {
+      "requestedBy": "member",
+      "to": "designMember",
+      "status": "accepted",
+      "minutesAgo": 4320
+    },
+    {
+      "requestedBy": "growthAdmin",
+      "to": "member",
+      "status": "pending",
+      "minutesAgo": 180
+    },
+    {
+      "requestedBy": "member",
+      "to": "both",
+      "status": "pending",
+      "minutesAgo": 60
+    }
+  ],
+  "directMessages": [
+    {
+      "users": [
+        "member",
+        "designMember"
+      ],
+      "messages": [
+        {
+          "authorKey": "designMember",
+          "minutesAgo": 2000,
+          "body": "하은 님, 지난번에 말한 강남점 라운지 자리 어땠어요?"
+        },
+        {
+          "authorKey": "member",
+          "minutesAgo": 1990,
+          "body": "창가 쪽이 조용해서 좋았어요. 다음에 같이 가요!"
+        },
+        {
+          "authorKey": "designMember",
+          "minutesAgo": 30,
+          "body": "이번 주 금요일 오후 어때요?"
+        }
+      ]
+    },
+    {
+      "users": [
+        "designAdmin",
+        "designMember"
+      ],
+      "messages": [
+        {
+          "authorKey": "designAdmin",
+          "minutesAgo": 400,
+          "body": "서연 님, 리뷰 자료 초안 먼저 봐 줄 수 있어요?"
+        },
+        {
+          "authorKey": "designMember",
+          "minutesAgo": 395,
+          "body": "네, 점심 먹고 바로 볼게요."
+        }
+      ]
+    }
+  ]
+}

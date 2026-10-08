@@ -28,6 +28,9 @@
 | 20 | `docs/codex/20-chat-foundation.md` | 채팅 기반: 테이블, 팀 스페이스와 `# 일반`, 메시지 보내기, Ably 실시간, 채널 화면, 아래 탭의 "메시지" | 다음에 할 것 |
 | 21 | `docs/codex/21-chat-reads.md` | 읽음과 연결: 안 읽음 표시, "새 메시지" 줄, 이전 메시지(가상 목록), 다시 연결 보정, 보내기 대기열 | 20 다음 |
 | 22 | `docs/codex/22-message-polish.md` | 메시지 다듬기: 답장, 수정·삭제, 리액션, 멘션, 본문 꾸밈, 입력 중, 빨간 수와 탭 제목, 토스트, 음소거 | 21 다음 |
+| 23 | `docs/codex/23-people-and-dm.md` | 사람 1: 사용자 이름, 사람 찾기, 친구 요청, 1:1 DM, DM 읽음 표시, 프로필 카드, 설정 화면 | 22 다음 |
+| 24 | `docs/codex/24-people-requests-groups.md` | 사람 2: 메시지 요청, 그룹 DM과 시스템 메시지, 차단·신고, 상태(모든 스페이스의 presence) | 23 다음 |
+| 25 | `docs/codex/25-meeting-channel.md` | 회의 채널: 시간 예약마다 방, 채우기, 예약의 시스템 메시지, 사이드바의 회의 칸, 내 예약의 오른쪽 시트 | 24 다음 |
 
 번호 순서대로 하나씩 맡긴다. 뒤의 지시서는 앞의 결과 위에서 동작하고, 앞의 것이 없으면 시작하지 않게 적어 두었다. 하나가 끝나면 결과를 직접 확인한 뒤 다음을 맡긴다.
 
@@ -356,6 +359,46 @@ Next.js의 레이아웃, Suspense, Cache Components는 기억에 의존하지 �
 | 5 | `docs/codex/22-message-polish.md의 8–10단계를 수행해줘.` | 입력 중 표시, 빨간 수, 탭 제목, 멘션 토스트, 알림 끄기 |
 
 1번이 끝나면 `pnpm db:migrate`. 끝나면 PFQV-100의 상태를 바꾼다.
+
+### 23 (사람 1)
+
+| 순서 | 첫 줄 | 끝나면 보이는 것 |
+| --- | --- | --- |
+| 1 | `docs/codex/23-people-and-dm.md의 1–3단계만 수행해줘.` | 알림 종에 친구 요청 알림이 보일 수 있음 (테이블, 사용자 이름 규칙과 액션, 시드) |
+| 2 | `docs/codex/23-people-and-dm.md의 4–5단계만 수행해줘.` | 화면은 그대로 (친구 액션, 사람 찾기와 프로필 조회) |
+| 3 | `docs/codex/23-people-and-dm.md의 6–7단계만 수행해줘.` | 화면은 그대로 (DM의 서버 쪽과 실시간) |
+| 4 | `docs/codex/23-people-and-dm.md의 8단계만 수행해줘.` | DM 화면, 사이드바의 DM 칸, 새 메시지, DM 토스트 |
+| 5 | `docs/codex/23-people-and-dm.md의 9단계만 수행해줘.` | 친구 화면, 설정, 알림 종의 실시간 |
+| 6 | `docs/codex/23-people-and-dm.md의 10–11단계를 수행해줘.` | 프로필 카드 |
+
+1번이 끝나면 `pnpm db:migrate`와 `pnpm db:seed`. 끝나면 PFQV-101의 상태를 바꾼다.
+
+### 24 (사람 2)
+
+| 순서 | 첫 줄 | 끝나면 보이는 것 |
+| --- | --- | --- |
+| 1 | `docs/codex/24-people-requests-groups.md의 1단계만 수행해줘.` | 화면은 그대로 (테이블, 시스템 메시지, 시드의 그룹 DM과 메시지 요청) |
+| 2 | `docs/codex/24-people-requests-groups.md의 2단계만 수행해줘.` | 화면은 거의 그대로 (차단·신고의 서버 쪽, 찾기에서 차단한 사람이 빠짐) |
+| 3 | `docs/codex/24-people-requests-groups.md의 3단계만 수행해줘.` | 화면은 그대로 (메시지 요청의 서버 쪽) |
+| 4 | `docs/codex/24-people-requests-groups.md의 4–5단계만 수행해줘.` | DM 목록에 그룹 줄 (이름만) |
+| 5 | `docs/codex/24-people-requests-groups.md의 6단계만 수행해줘.` | 다른 스페이스의 안 읽음이 바로 바뀜, 방해 금지에서 토스트 없음 |
+| 6 | `docs/codex/24-people-requests-groups.md의 7단계만 수행해줘.` | 메시지 요청 탭과 띠, 차단 탭, 신고, 접힌 메시지 |
+| 7 | `docs/codex/24-people-requests-groups.md의 8단계만 수행해줘.` | 그룹 DM 만들기와 화면, 시스템 메시지 |
+| 8 | `docs/codex/24-people-requests-groups.md의 9–10단계를 수행해줘.` | 내 카드의 상태, 멤버 목록의 상태 점 |
+
+1번이 끝나면 `pnpm db:migrate`와 `pnpm db:seed`. 끝나면 PFQV-102의 상태를 바꾼다.
+
+### 25 (회의 채널)
+
+| 순서 | 첫 줄 | 끝나면 보이는 것 |
+| --- | --- | --- |
+| 1 | `docs/codex/25-meeting-channel.md의 1–2단계만 수행해줘.` | 화면은 그대로 (방과 채우기, 예약 액션의 시스템 메시지) |
+| 2 | `docs/codex/25-meeting-channel.md의 3–4단계만 수행해줘.` | 화면은 그대로 (판정, 조회, 시드) |
+| 3 | `docs/codex/25-meeting-channel.md의 5단계만 수행해줘.` | 회의 채널 화면, 사이드바의 회의 칸 |
+| 4 | `docs/codex/25-meeting-channel.md의 6단계만 수행해줘.` | 내 예약·홈의 "채팅" 링크, 미리 알림이 회의 채널로 |
+| 5 | `docs/codex/25-meeting-channel.md의 7–8단계를 수행해줘.` | 내 예약의 오른쪽 시트 |
+
+1번이 끝나면 `pnpm db:migrate`. 2번이 끝나면 `pnpm db:seed`. 끝나면 PFQV-27의 상태를 바꾼다.
 
 ## 10이 끝난 뒤 직접 할 일
 

@@ -1,0 +1,50 @@
+{
+  "note": "사람 시드 2(지시서 24): 고른 상태, 그룹 DM, 메시지 요청. 키는 seed.json의 users[].key다. statuses에 없는 시드 사용자는 online이다. groupDirectMessages: createdBy와 members(만든 사람 포함 3–10명. 멤버는 만든 사람의 친구(seed-people.json의 accepted)이거나 seed.json에서 같은 팀). 첫 메시지는 시드가 넣는 group_created 시스템 메시지이고 그 시각이 minutesAgo다. 멤버의 joined_at은 그 시스템 메시지와 같은 시각이다. messages의 minutesAgo는 그보다 작고 줄어드는 순서다. messageRequests: from과 to는 친구도 같은 팀도 아닌 두 사람, 메시지 1–3개. 받는 사람 행은 requested이고 requested_at은 첫 메시지의 시각. 다시 돌려도 같아야 한다.",
+  "statuses": [
+    {
+      "userKey": "designAdmin",
+      "status": "dnd"
+    }
+  ],
+  "groupDirectMessages": [
+    {
+      "name": "점심 메뉴",
+      "createdBy": "designAdmin",
+      "members": [
+        "designAdmin",
+        "designMember",
+        "both"
+      ],
+      "minutesAgo": 600,
+      "messages": [
+        {
+          "authorKey": "designAdmin",
+          "minutesAgo": 599,
+          "body": "오늘 점심 뭐 먹을까요? 강남점 1층 새로 생긴 곳 어때요?"
+        },
+        {
+          "authorKey": "both",
+          "minutesAgo": 590,
+          "body": "좋아요! 12시 반에 로비에서 봐요."
+        },
+        {
+          "authorKey": "designMember",
+          "minutesAgo": 585,
+          "body": "저도 갈게요 🙌"
+        }
+      ]
+    }
+  ],
+  "messageRequests": [
+    {
+      "from": "growthAdmin",
+      "to": "designMember",
+      "messages": [
+        {
+          "minutesAgo": 120,
+          "body": "안녕하세요, 그로스팀 최민준이에요. 온보딩 화면 디자인 관련해서 여쭤봐도 될까요?"
+        }
+      ]
+    }
+  ]
+}

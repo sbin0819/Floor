@@ -86,6 +86,12 @@ Tailwind에서 `bg-status-free`처럼 쓸 수 있게 테마에 등록한다. 상
 | `--sidebar-primary` | `#3A5BD9` | 강조 |
 | `--sidebar-primary-foreground` | `#FFFFFF` | 강조 위 글자 |
 | `--sidebar-ring` | `#3A5BD9` | 포커스 고리 |
+| `--presence-online` | `#2F9E7E` | 사람의 상태 점: 온라인 (지시서 24) |
+| `--presence-away` | `#D99A2B` | 자리 비움 (초승달 모양) |
+| `--presence-dnd` | `#D64545` | 방해 금지 (가운데 가로줄) |
+| `--presence-offline` | `#A3A19B` | 오프라인 (속이 빈 원) |
+
+상태 점은 공간 상태 토큰(`--status-*`)과 이름을 나눈다. 색만으로 구분하지 않고 모양과 접근성 이름을 같이 쓴다.
 
 그 밖의 기능 화면에서 참고할 값이다.
 

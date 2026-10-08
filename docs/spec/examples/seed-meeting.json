@@ -1,0 +1,10 @@
+{
+  "note": "회의 채널의 시드(지시서 25). 시드가 시간 예약마다 회의 채널과 booking_created 시스템 메시지를 넣은 뒤, 아래 메시지를 그 예약의 방에 순서대로 넣는다. bookingId는 seed.json의 bookings[].id, authorKey는 seed.json의 users[].key이고 작성자는 그 예약의 예약한 사람이거나 seed-bookings-2.json의 참석자여야 한다. minutesAgo는 시드를 돌린 시각에서 뺀 분이고 예약마다 줄어드는 순서다. 메시지가 있는 예약은 예약·참석자·시스템 메시지의 시각을 첫 메시지보다 2분 앞으로 맞춘다. 다시 돌려도 같아야 한다.",
+  "messages": [
+    { "bookingId": "0b67bf8e-1ac3-5b0c-86ce-1b89d5bbd6fe", "authorKey": "designAdmin", "minutesAgo": 180, "body": "리뷰 자료는 피그마 링크로 올려 둘게요. 온보딩부터 볼게요." },
+    { "bookingId": "0b67bf8e-1ac3-5b0c-86ce-1b89d5bbd6fe", "authorKey": "designMember", "minutesAgo": 170, "body": "네! 저는 온보딩 화면 두 장 가져갈게요." },
+    { "bookingId": "0b67bf8e-1ac3-5b0c-86ce-1b89d5bbd6fe", "authorKey": "both", "minutesAgo": 20, "body": "5분 정도 늦을 것 같아요 🙏" },
+    { "bookingId": "389a05bd-250b-5cc5-9b3e-f42a74ea6b67", "authorKey": "growthAdmin", "minutesAgo": 90, "body": "내일 스프린트 계획 전에 백로그 한 번씩 봐 주세요." },
+    { "bookingId": "389a05bd-250b-5cc5-9b3e-f42a74ea6b67", "authorKey": "member", "minutesAgo": 60, "body": "확인했어요. 질문은 회의 때 할게요." }
+  ]
+}
