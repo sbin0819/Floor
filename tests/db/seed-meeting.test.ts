@@ -109,7 +109,7 @@ describe("transactional booking meeting seed", () => {
 
   it("creates 21 time-booking rooms, 21 systems and five texts, but no room for any of nine desks", async () => {
     expect(await seed()).toMatchObject({
-      counts: { bookings: 30, meetingRooms: 21, chatMessages: 44 },
+      counts: { bookings: 30, meetingRooms: 21, chatMessages: 50 },
       skippedMeetingMessages: 0,
     });
     const current = await state();
@@ -272,7 +272,7 @@ describe("transactional booking meeting seed", () => {
         title: "겹치는 비시드 예약",
       });
     expect(await seed()).toMatchObject({
-      counts: { meetingRooms: 20, chatMessages: 40 },
+      counts: { meetingRooms: 20, chatMessages: 46 },
       skippedBookings: 1,
       skippedMeetingMessages: 3,
     });

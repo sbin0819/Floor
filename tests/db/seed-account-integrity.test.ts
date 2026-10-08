@@ -145,8 +145,8 @@ describe("the canonical 21 development seed accounts", () => {
     const rows = await database.db.select().from(messages);
     const reads = await database.db.select().from(chatRoomReads);
     const members = await database.db.select().from(chatRoomMembers);
-    expect(rows).toHaveLength(44);
-    expect(rooms).toHaveLength(37);
+    expect(rows).toHaveLength(50);
+    expect(rooms).toHaveLength(39);
     for (const room of rooms) {
       const conversation = rows
         .filter(({ roomId }) => roomId === room.id)

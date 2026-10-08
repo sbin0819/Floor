@@ -138,7 +138,7 @@ describe("transactional group and request seed", () => {
     expect((await seed()).counts).toMatchObject({
       directRooms: 3,
       groupRooms: 1,
-      chatMessages: 44,
+      chatMessages: 50,
     });
     const snapshot = await state();
     const userIds = await ids();
@@ -209,9 +209,20 @@ describe("transactional group and request seed", () => {
         .filter(({ kind }) => kind === "meeting")
         .map(({ id }) => id),
     );
+    const directRoomIds = new Set(
+      snapshot.rooms
+        .filter(({ kind }) => kind === "dm" || kind === "group_dm")
+        .map(({ id }) => id),
+    );
     expect(
-      snapshot.reads.filter(({ roomId }) => !meetingRoomIds.has(roomId)),
+      snapshot.reads.filter(({ roomId }) => directRoomIds.has(roomId)),
     ).toHaveLength(8);
+    expect(
+      snapshot.reads.filter(
+        ({ roomId }) =>
+          !meetingRoomIds.has(roomId) && !directRoomIds.has(roomId),
+      ),
+    ).toHaveLength(6);
     expect(
       snapshot.reads.filter(({ roomId }) => meetingRoomIds.has(roomId)),
     ).toHaveLength(24);

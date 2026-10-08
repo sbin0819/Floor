@@ -167,8 +167,8 @@ describe("transactional people and direct-message seed", () => {
 
   it("writes exact names, friendships, notification snapshots, direct sequences and authored read cursors", async () => {
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 7,
-      chatMessages: 44,
+      chatSpaces: 8,
+      chatMessages: 50,
       friendships: 3,
       directRooms: 3,
       groupRooms: 1,

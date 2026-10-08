@@ -3,6 +3,7 @@ import type { SeedData } from "./data";
 import { SeedError } from "./errors";
 import type { SeedPhotoData } from "./photos";
 import type { SeedBookings2Data } from "./bookings-2";
+import { selectSeedLounges, type SeedSpacesData } from "./spaces";
 
 export function validateSeedBranchIds(
   branchIds: readonly string[],
@@ -30,6 +31,11 @@ export function selectSeedBranches(
   photos: SeedPhotoData,
   branchIds: readonly string[],
   bookingExtras?: SeedBookings2Data,
+  spaceChat: SeedSpacesData = {
+    loungeMembers: [],
+    loungeMessages: [],
+    communities: [],
+  },
 ) {
   const selected = new Set(branchIds);
   const branches = data.branches.filter(({ id }) => selected.has(id));
@@ -51,6 +57,9 @@ export function selectSeedBranches(
     (targetType === "floor" ? floorIds : spaceIds).has(targetId),
   );
   const userKeys = new Set([
+    ...spaceChat.loungeMembers
+      .filter(({ branchId }) => selected.has(branchId))
+      .flatMap(({ userKeys }) => userKeys),
     ...(bookingExtras?.participants
       .filter(({ bookingId }) => bookings.some(({ id }) => id === bookingId))
       .flatMap(({ userKeys }) => userKeys) ?? []),
@@ -68,6 +77,7 @@ export function selectSeedBranches(
     ...branchStaff.map(({ userKey }) => userKey),
   ]);
   return {
+    spaceChat: selectSeedLounges(spaceChat, branchIds),
     data: {
       branches,
       floors,
@@ -95,7 +105,7 @@ export function selectSeedBranches(
 
 export type SeedBranchScope = ReturnType<typeof selectSeedBranches>;
 
-export function seedBranchCounts({ data, photos }: SeedBranchScope) {
+export function seedBranchCounts({ data, photos, spaceChat }: SeedBranchScope) {
   return {
     users: 0,
     branches: data.branches.length,
@@ -110,5 +120,11 @@ export function seedBranchCounts({ data, photos }: SeedBranchScope) {
     spaceBlocks: data.spaceBlocks.length,
     spacePhotos: photos.spacePhotos.length,
     branchCovers: photos.branchCovers.length,
+    chatSpaces: data.branches.length,
+    communitySpaces: 0,
+    spaceMembers: spaceChat.loungeMembers.reduce(
+      (count, row) => count + row.userKeys.length,
+      0,
+    ),
   };
 }

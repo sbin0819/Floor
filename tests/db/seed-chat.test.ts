@@ -60,50 +60,44 @@ describe("transactional team chat seed", () => {
   });
   const seed = () =>
     runSeed({ db: database.db, auth, now, resetPasswords: false });
+  const teamRooms = () =>
+    database.db
+      .select({ id: chatRooms.id })
+      .from(chatRooms)
+      .innerJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
+      .where(and(eq(chatRooms.kind, "text"), eq(chatSpaces.kind, "team")));
   const state = async () => ({
-    spaces: await database.db.select().from(chatSpaces).orderBy(chatSpaces.id),
+    spaces: await database.db
+      .select()
+      .from(chatSpaces)
+      .where(eq(chatSpaces.kind, "team"))
+      .orderBy(chatSpaces.id),
     rooms: await database.db
       .select()
       .from(chatRooms)
-      .where(eq(chatRooms.kind, "text"))
+      .where(inArray(chatRooms.id, teamRooms()))
       .orderBy(chatRooms.id),
     messages: await database.db
       .select()
       .from(messages)
-      .where(
-        inArray(
-          messages.roomId,
-          database.db
-            .select({ id: chatRooms.id })
-            .from(chatRooms)
-            .where(eq(chatRooms.kind, "text")),
-        ),
-      )
+      .where(inArray(messages.roomId, teamRooms()))
       .orderBy(messages.roomId, messages.seq),
     reads: await database.db
       .select()
       .from(chatRoomReads)
-      .where(
-        inArray(
-          chatRoomReads.roomId,
-          database.db
-            .select({ id: chatRooms.id })
-            .from(chatRooms)
-            .where(eq(chatRooms.kind, "text")),
-        ),
-      )
+      .where(inArray(chatRoomReads.roomId, teamRooms()))
       .orderBy(chatRoomReads.roomId, chatRoomReads.userId),
   });
 
   it("writes two general channels and eight sequenced messages, keeping channels and timestamps on rerun", async () => {
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 7,
-      chatMessages: 44,
+      chatSpaces: 8,
+      chatMessages: 50,
     });
     const first = await state();
-    expect(first.spaces).toHaveLength(7);
+    expect(first.spaces).toHaveLength(2);
     expect(first.spaces.filter(({ kind }) => kind === "team")).toHaveLength(2);
-    expect(first.rooms).toHaveLength(12);
+    expect(first.rooms).toHaveLength(2);
     expect(first.messages).toHaveLength(8);
     for (const team of data.teams) {
       const space = first.spaces.find(({ teamId }) => teamId === team.id)!;
@@ -392,8 +386,8 @@ describe("transactional team chat seed", () => {
     await seed();
     vi.spyOn(chatLoader, "loadSeedChat").mockReturnValue({ messages: [] });
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 7,
-      chatMessages: 36,
+      chatSpaces: 8,
+      chatMessages: 42,
     });
     const after = await state();
     expect(after.messages).toEqual([]);

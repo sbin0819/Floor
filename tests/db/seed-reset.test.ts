@@ -110,7 +110,7 @@ describe("explicit full development reset", () => {
       spaces: 71,
       bookings: 30,
       meetingRooms: 21,
-      chatMessages: 44,
+      chatMessages: 50,
     });
     expect(
       await database.db.select().from(users).where(eq(users.id, legacy!.id)),

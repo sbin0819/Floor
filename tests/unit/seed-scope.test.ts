@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedPhotos } from "@/lib/seed/photos";
+import { loadSeedSpaces } from "@/lib/seed/spaces";
 import { runSeed } from "@/lib/seed/run-seed";
 import {
   seedBranchCounts,
@@ -89,5 +90,38 @@ describe("additive seed scope", () => {
       teamMembers: 0,
     });
     expect({ data, photos }).toEqual(before);
+  });
+
+  it("includes lounge-only account references but excludes every community from a branch scope", () => {
+    const spaceChat = loadSeedSpaces(data);
+    const scopedChat = {
+      ...spaceChat,
+      loungeMembers: [{ branchId: branch.id, userKeys: ["both"] }],
+      loungeMessages: [
+        {
+          branchId: branch.id,
+          authorKey: "both",
+          body: "새 라운지",
+          minutesAgo: 1,
+        },
+      ],
+    };
+    const selected = selectSeedBranches(
+      data,
+      photos,
+      [branch.id],
+      undefined,
+      scopedChat,
+    );
+    expect(selected.data.users.map(({ key }) => key)).toEqual([
+      "admin",
+      "both",
+    ]);
+    expect(selected.spaceChat).toEqual({ ...scopedChat, communities: [] });
+    expect(seedBranchCounts(selected)).toMatchObject({
+      chatSpaces: 1,
+      communitySpaces: 0,
+      spaceMembers: 1,
+    });
   });
 });

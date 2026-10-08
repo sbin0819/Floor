@@ -12,6 +12,7 @@ import {
 } from "@/lib/dal";
 import * as seedDal from "@/lib/dal/seed";
 import { syncSeedChat } from "@/lib/dal/seed-chat";
+import { syncSeedChatSpaces } from "@/lib/dal/seed-chat-spaces";
 import { syncSeedPeople } from "@/lib/dal/seed-people";
 import { syncSeedPeople2 } from "@/lib/dal/seed-people-2";
 import { insertSeedMeeting } from "@/lib/dal/seed-meeting";
@@ -22,6 +23,7 @@ import {
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { loadSeedChat } from "@/lib/seed/chat";
+import { loadSeedSpaces } from "@/lib/seed/spaces";
 import { loadSeedPeople } from "@/lib/seed/people";
 import { loadSeedPeople2 } from "@/lib/seed/people-2";
 import { loadSeedMeeting, seedMeetingCreatedAt } from "@/lib/seed/meeting";
@@ -92,6 +94,7 @@ export async function runSeed({
     const photos = loadSeedPhotos(data);
     const bookingExtras = loadSeedBookings2(data);
     const chat = loadSeedChat(data);
+    const spaceChat = loadSeedSpaces(data);
     const people = loadSeedPeople(data);
     const people2 = loadSeedPeople2(data, people);
     const meeting = loadSeedMeeting(data, bookingExtras);
@@ -131,7 +134,13 @@ export async function runSeed({
     );
     if (branchIds !== undefined) {
       const ids = validateSeedBranchIds(branchIds, data, resetPasswords);
-      const scope = selectSeedBranches(data, photos, ids, bookingExtras);
+      const scope = selectSeedBranches(
+        data,
+        photos,
+        ids,
+        bookingExtras,
+        spaceChat,
+      );
       return await withTransaction(
         (database) =>
           addSeedBranches(scope, database, now, bookingExtras, meeting),
@@ -219,6 +228,14 @@ export async function runSeed({
       const chatCounts = await syncSeedChat(
         data.teams.map(({ id }) => id),
         chat,
+        userIds,
+        now,
+        database,
+      );
+      current = "라운지와 커뮤니티";
+      const spaceChatCounts = await syncSeedChatSpaces(
+        spaceChat,
+        data.branches.map(({ id }) => id),
         userIds,
         now,
         database,
@@ -379,12 +396,18 @@ export async function runSeed({
       return {
         counts: {
           ...chatCounts,
-          chatSpaces: chatCounts.chatSpaces + data.branches.length,
+          chatSpaces:
+            chatCounts.chatSpaces +
+            data.branches.length +
+            spaceChatCounts.communitySpaces,
+          communitySpaces: spaceChatCounts.communitySpaces,
+          spaceMembers: spaceChatCounts.spaceMembers,
           ...peopleCounts,
           groupRooms: people2Counts.groupRooms,
           directRooms: peopleCounts.directRooms + people2Counts.directRooms,
           chatMessages:
             chatCounts.chatMessages +
+            spaceChatCounts.chatMessages +
             peopleCounts.chatMessages +
             people2Counts.chatMessages +
             meetingMessages,

@@ -180,6 +180,9 @@ describe("transactional additive-only branch seed", () => {
     branchCovers: 1,
     meetingRooms: 2,
     chatMessages: 2,
+    chatSpaces: 1,
+    communitySpaces: 0,
+    spaceMembers: 0,
   };
   beforeAll(async () => {
     database = await createTestDatabase();

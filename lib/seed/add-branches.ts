@@ -1,6 +1,7 @@
 import type { DalDatabase } from "@/lib/dal";
 import { insertSeedBlock, insertSeedBooking } from "@/lib/dal/seed";
 import { insertSeedMeeting } from "@/lib/dal/seed-meeting";
+import { syncSeedChatSpaces } from "@/lib/dal/seed-chat-spaces";
 import {
   insertSeedBranchStructure,
   readSeedScopeRows,
@@ -14,6 +15,7 @@ import { insertSeedParticipants } from "./participants";
 import { insertSeedReminders } from "./reminders";
 import { SeedError } from "./errors";
 import { loadSeedPhotos } from "./photos";
+import { loadSeedSpaces } from "./spaces";
 import {
   loadSeedMeeting,
   seedMeetingCreatedAt,
@@ -158,6 +160,7 @@ async function prepareAddition(
       scope.photos,
       addedBranchIds,
       bookingExtras,
+      scope.spaceChat,
     ),
     userIds,
     addedBranchIds,
@@ -177,9 +180,10 @@ export async function preflightSeedBranches({
   const photos = loadSeedPhotos(data);
   const extras = loadSeedBookings2(data);
   const meeting = loadSeedMeeting(data, extras);
+  const spaceChat = loadSeedSpaces(data);
   const ids = validateSeedBranchIds(branchIds, data);
   const plan = await prepareAddition(
-    selectSeedBranches(data, photos, ids, extras),
+    selectSeedBranches(data, photos, ids, extras, spaceChat),
     db,
     extras,
   );
@@ -196,6 +200,7 @@ export async function preflightSeedBranches({
       meetingRooms: counts.bookings,
       chatMessages:
         counts.bookings +
+        plan.addition.spaceChat.loungeMessages.length +
         meeting.messages.filter(({ bookingId }) => bookingIds.has(bookingId))
           .length,
     },
@@ -220,6 +225,14 @@ export async function addSeedBranches(
   );
   // 존재 여부를 먼저 읽었어도 다른 실행과 경합할 수 있으므로 INSERT 충돌을 숨기지 않는다.
   await insertSeedBranchStructure(addition, userIds, db);
+  const spaceChatCounts = await syncSeedChatSpaces(
+    addition.spaceChat,
+    addedBranchIds,
+    userIds,
+    now,
+    db,
+    { newLoungesOnly: true },
+  );
   const branches = new Map(data.branches.map((branch) => [branch.id, branch]));
   const floors = new Map(data.floors.map((floor) => [floor.id, floor]));
   const spaces = new Map(data.spaces.map((space) => [space.id, space]));
@@ -329,6 +342,7 @@ export async function addSeedBranches(
       meetingRooms: counts.bookings,
       chatMessages:
         counts.bookings +
+        spaceChatCounts.chatMessages +
         meeting.messages.filter(({ bookingId }) => bookingIds.has(bookingId))
           .length,
     },
