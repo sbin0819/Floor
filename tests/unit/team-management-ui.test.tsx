@@ -17,6 +17,9 @@ import {
   TeamRouteDialog,
   useCloseTeamDialog,
 } from "@/features/teams/components/team-route-dialog";
+import { TeamSettings } from "@/features/teams/components/team-settings";
+import { TeamDelete } from "@/features/teams/components/team-delete";
+import { TeamBookings } from "@/features/teams/components/team-bookings";
 import { TeamRemoval } from "@/features/teams/components/team-removal";
 import { selectedTeamTab } from "@/features/teams/navigation";
 import type { ActionResult } from "@/lib/actions/result";
@@ -26,6 +29,7 @@ import {
   memberId,
   teamAdmin,
   teamMember,
+  teamBookings,
 } from "../helpers/team-management";
 
 const mocks = vi.hoisted(() => ({
@@ -413,5 +417,169 @@ describe("stable team preview dialogs", () => {
     window.history.replaceState(null, "", "/friends");
     await act(async () => result.resolve({ ok: true, data: { teamId } }));
     expect(mocks.push).not.toHaveBeenCalled();
+  });
+});
+
+describe("team settings, deletion and bookings", () => {
+  it("does not describe ongoing reservations as future cancellations", () => {
+    renderUi(
+      <TeamSettings data={{ ...teamAdmin, upcomingBookingCount: 25 }} />,
+    );
+    expect(screen.getByRole("region", { name: "팀 지우기" })).toHaveTextContent(
+      "아직 시작하지 않은 팀 예약이 취소되고",
+    );
+    expect(
+      screen.getByRole("region", { name: "팀 지우기" }),
+    ).not.toHaveTextContent("25건");
+  });
+  it("does not mislabel an unknown but valid branch filter as all branches", () => {
+    renderUi(
+      <TeamBookings
+        data={{
+          ...teamBookings,
+          branchId: "00000000-0000-4000-8000-000000000099",
+          bookings: [],
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("combobox", { name: "지점 거르기" }),
+    ).toHaveTextContent("선택한 지점을 찾을 수 없어요");
+    expect(
+      screen.getByRole("combobox", { name: "지점 거르기" }),
+    ).not.toHaveTextContent("모든 지점");
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+  it("requires missing historic fields and a branch only when branches exist", async () => {
+    renderUi(
+      <TeamSettings
+        data={{
+          ...teamAdmin,
+          headcount: null,
+          homeBranchId: null,
+          contactPhone: null,
+        }}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(screen.getByRole("combobox")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByLabelText("인원 규모")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  });
+  it("preserves edits on name conflicts, resets to server fields, and sends one argument", async () => {
+    mocks.update.mockResolvedValue({ ok: false, code: "TEAM_NAME_TAKEN" });
+    renderUi(<TeamSettings data={teamAdmin} />);
+    expect(screen.getByRole("combobox")).toHaveTextContent("강남점");
+    fireEvent.change(screen.getByLabelText("팀 이름"), {
+      target: { value: "다른 팀" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(
+      await screen.findByText("같은 이름의 팀이 이미 있어요"),
+    ).toBeVisible();
+    expect(screen.getByLabelText("팀 이름")).toHaveValue("다른 팀");
+    expect(mocks.update.mock.calls[0]).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "되돌리기" }));
+    expect(screen.getByLabelText("팀 이름")).toHaveValue("디자인팀");
+  });
+  it("requires the normalized exact team name and lists deletion impacts", async () => {
+    renderUi(
+      <TeamDelete
+        teamName="디자인팀"
+        preview={{
+          teamId,
+          memberCount: 2,
+          inviteCount: 1,
+          requestCount: 2,
+          bookingCount: 3,
+          accessGrants: [
+            {
+              targetType: "space",
+              floorId: "floor",
+              spaceId: "space",
+              branchName: "강남점",
+              floorName: "2F",
+              spaceName: "회의실 A",
+            },
+          ],
+        }}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "팀 지우기" });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/강남점 2F 회의실 A/)).toBeVisible();
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "  디자인팀  " },
+    });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(mocks.destroy).toHaveBeenCalledWith({
+      teamId,
+      confirmName: "  디자인팀  ",
+    });
+    expect(mocks.push).toHaveBeenCalledWith("/teams");
+  });
+  it("renders only authorized chat/cancel links and local dates without photos or edit", () => {
+    const view = renderUi(<TeamBookings data={teamBookings} />);
+    expect(screen.getByRole("link", { name: "채팅" })).toHaveAttribute(
+      "href",
+      `/m/${teamBookings.bookings[0]!.id}`,
+    );
+    expect(screen.getByRole("button", { name: "취소" })).toBeVisible();
+    expect(screen.getByText("곧 시작")).toBeVisible();
+    expect(screen.getByText(/전용/)).toBeVisible();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    view.unmount();
+    renderUi(
+      <TeamBookings
+        data={{
+          ...teamBookings,
+          view: "cancelled",
+          bookings: teamBookings.bookings.map((row) => ({
+            ...row,
+            canChat: false,
+            canCancel: true,
+            kind: "desk",
+          })),
+        }}
+      />,
+    );
+    expect(
+      screen.queryByRole("link", { name: "채팅" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "취소" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("오전")).toBeVisible();
+    expect(screen.queryByText("곧 시작")).not.toBeInTheDocument();
+  });
+  it("preserves branch filters in real links and gives an empty booking destination", () => {
+    renderUi(
+      <TeamBookings
+        data={{
+          ...teamBookings,
+          branchId: teamAdmin.homeBranchId,
+          bookings: [],
+        }}
+      />,
+    );
+    const link = screen.getByRole("link", { name: "지난 30일" });
+    expect(link).toHaveAttribute(
+      "href",
+      `/teams/${teamId}?tab=bookings&view=past&branch=${teamAdmin.homeBranchId}`,
+    );
+    fireEvent.click(link, { metaKey: true });
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(screen.getByText("팀 이름으로 잡은 예약이 없어요")).toBeVisible();
+    expect(screen.getByRole("link", { name: "공간 예약하기" })).toHaveAttribute(
+      "href",
+      "/booking",
+    );
   });
 });

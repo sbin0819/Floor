@@ -21,6 +21,7 @@ import {
   getInvitePageData,
   getTeamPageData,
   getTeamStartData,
+  getTeamBookings,
   getTeamRemovalPreview,
   getTeamDeletePreview,
 } from "@/features/teams/queries";
@@ -38,8 +39,17 @@ vi.mock("@/features/teams/queries", () => ({
 vi.mock("@/features/teams/components/team-detail", () => ({
   TeamDetail: () => null,
 }));
+vi.mock("@/features/teams/components/team-settings", () => ({
+  TeamSettings: () => null,
+}));
+vi.mock("@/features/teams/components/team-bookings", () => ({
+  TeamBookings: () => null,
+}));
 vi.mock("@/features/teams/components/team-removal", () => ({
   TeamRemoval: () => null,
+}));
+vi.mock("@/features/teams/components/team-delete", () => ({
+  TeamDelete: () => null,
 }));
 vi.mock("@/features/teams/components/team-start", () => ({
   TeamStart: () => null,
@@ -84,6 +94,36 @@ describe("team page session guards", () => {
       `/teams/${managedTeamId}?tab=settings&dialog=delete`,
     );
   });
+  it("ignores invalid booking filters before calling the strict query and preserves valid branch", async () => {
+    vi.mocked(getTeamPageData).mockResolvedValue(teamAdmin);
+    vi.mocked(getTeamBookings).mockResolvedValue({
+      teamId: managedTeamId,
+      view: "upcoming",
+      branchId: null,
+      branches: [],
+      bookings: [],
+      now: "2026-10-09T03:00:00Z",
+    });
+    for (const query of [
+      { tab: "bookings", view: "bad", branch: "bad" },
+      { tab: "bookings", view: "past", branch: teamAdmin.homeBranchId! },
+    ]) {
+      const page = await resolvePageContent(
+        TeamPage({
+          params: Promise.resolve({ teamId: managedTeamId }),
+          searchParams: Promise.resolve(query),
+        }),
+      );
+      await resolvePageContent(childElements(page)[0]);
+    }
+    expect(getTeamBookings).toHaveBeenNthCalledWith(1, managedTeamId, {
+      view: "upcoming",
+    });
+    expect(getTeamBookings).toHaveBeenNthCalledWith(2, managedTeamId, {
+      view: "past",
+      branchId: teamAdmin.homeBranchId,
+    });
+  });
   it("renders private or unknown tabs as members without reading a management preview", async () => {
     vi.mocked(getTeamPageData).mockResolvedValue(teamMember);
     const page = await resolvePageContent(
@@ -99,7 +139,7 @@ describe("team page session guards", () => {
     );
     expect(getTeamDeletePreview).not.toHaveBeenCalled();
   });
-  it.each(["remove"])(
+  it.each(["remove", "delete"])(
     "keeps a revoked %s preview within its dialog without exposing errors",
     async (dialog) => {
       vi.mocked(getTeamPageData).mockResolvedValue(teamAdmin);

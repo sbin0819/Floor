@@ -18,7 +18,10 @@ import {
 } from "@/components/ui/dialog";
 import { teamHref } from "../navigation";
 
-const CloseTeamDialog = createContext({
+const CloseTeamDialog = createContext<{
+  close: () => void;
+  isCurrent: () => boolean;
+}>({
   close: () => {},
   isCurrent: () => true,
 });
