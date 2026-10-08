@@ -64,6 +64,13 @@
       "when": 1791427114940,
       "tag": "0008_motionless_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791429335318,
+      "tag": "0009_true_spitfire",
+      "breakpoints": true
     }
   ]
 }

@@ -83,6 +83,42 @@ export function parseSeedBookings2(
           issue("attendeeCount", "사용 인원이 공간의 정원보다 많아요.");
       });
       const userKeys = new Set(seed.users.map(({ key }) => key));
+      const participantBookings = new Set<string>();
+      data.participants.forEach((row, index) => {
+        const issue = (message: string) =>
+          context.addIssue({
+            code: "custom",
+            path: ["participants", index],
+            message,
+          });
+        const booking = bookings.get(row.bookingId);
+        if (!booking) {
+          issue("참석자 시드에 없는 예약이에요.");
+          return;
+        }
+        if (participantBookings.has(row.bookingId))
+          issue("같은 예약의 참석자 목록이 두 번 있어요.");
+        participantBookings.add(row.bookingId);
+        if (new Set(row.userKeys).size !== row.userKeys.length)
+          issue("같은 참석자가 두 번 있어요.");
+        if (row.userKeys.some((key) => !userKeys.has(key)))
+          issue("참석자 시드에 없는 계정이에요.");
+        if (row.userKeys.includes(booking.userKey))
+          issue("예약한 사람은 참석자에 넣을 수 없어요.");
+        const space = spaces.get(booking.spaceId);
+        if (!space || space.type === "desk")
+          issue("참석자는 시간 예약에만 넣을 수 있어요.");
+        else if (
+          space.capacity !== null &&
+          row.userKeys.length + 1 > space.capacity
+        )
+          issue("예약한 사람과 참석자가 공간의 정원보다 많아요.");
+        const count = data.attendeeCounts.find(
+          ({ bookingId }) => bookingId === row.bookingId,
+        )?.attendeeCount;
+        if (count !== undefined && row.userKeys.length + 1 > count)
+          issue("예약한 사람과 참석자가 사용 인원보다 많아요.");
+      });
       const teamIds = new Set(seed.teams.map(({ id }) => id));
       const scheduleIds = new Set(
         [...seed.bookings, ...seed.spaceBlocks].map(({ id }) => id),

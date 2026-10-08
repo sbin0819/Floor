@@ -100,12 +100,46 @@ describe("independent booking round two seed source", () => {
     );
   });
 
-  it("validates desk references while participant references are still deferred", () => {
+  it("validates participant references and desk part shapes", () => {
     const source = structuredClone(bookingFile);
     source.participants[0]!.bookingId = crypto.randomUUID();
-    expect(parseSeedBookings2(source, seed).deskBookings).toHaveLength(9);
+    expect(() => parseSeedBookings2(source, seed)).toThrow(/없는 예약/);
+    source.participants[0]!.bookingId = bookingFile.participants[0]!.bookingId;
     source.deskBookings[0]!.part = "unknown";
     expect(() => parseSeedBookings2(source, seed)).toThrow(z.ZodError);
+  });
+
+  it.each([
+    "user",
+    "owner",
+    "duplicate-user",
+    "duplicate-booking",
+    "capacity",
+    "attendee-count",
+    "desk",
+  ])("rejects invalid participant seed %s", (kind) => {
+    const source = structuredClone(bookingFile);
+    const data = structuredClone(seed);
+    const entry = source.participants[0]!;
+    const booking = data.bookings.find(({ id }) => id === entry.bookingId)!;
+    const space = data.spaces.find(({ id }) => id === booking.spaceId)!;
+    if (kind === "user") entry.userKeys[0] = "missing";
+    if (kind === "owner") entry.userKeys[0] = booking.userKey;
+    if (kind === "duplicate-user") entry.userKeys.push(entry.userKeys[0]!);
+    if (kind === "duplicate-booking") source.participants.push({ ...entry });
+    if (kind === "capacity") {
+      space.capacity = 2;
+      source.attendeeCounts.find(
+        ({ bookingId }) => bookingId === booking.id,
+      )!.attendeeCount = 2;
+    }
+    if (kind === "attendee-count")
+      source.attendeeCounts.find(
+        ({ bookingId }) => bookingId === booking.id,
+      )!.attendeeCount = 2;
+    if (kind === "desk")
+      booking.spaceId = data.spaces.find(({ type }) => type === "desk")!.id;
+    expect(() => parseSeedBookings2(source, data)).toThrow(z.ZodError);
   });
 
   it.each([

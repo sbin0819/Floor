@@ -51,6 +51,9 @@ export function selectSeedBranches(
     (targetType === "floor" ? floorIds : spaceIds).has(targetId),
   );
   const userKeys = new Set([
+    ...(bookingExtras?.participants
+      .filter(({ bookingId }) => bookings.some(({ id }) => id === bookingId))
+      .flatMap(({ userKeys }) => userKeys) ?? []),
     ...(bookingExtras?.deskBookings
       .filter(({ deskId }) => spaceIds.has(deskId))
       .map(({ userKey }) => userKey) ?? []),

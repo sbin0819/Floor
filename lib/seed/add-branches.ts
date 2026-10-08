@@ -9,6 +9,7 @@ import { zonedDateTime } from "@/lib/time/zoned";
 import { loadSeedData } from "./data";
 import { loadSeedBookings2, type SeedBookings2Data } from "./bookings-2";
 import { insertSeedDeskSchedule, scopedDeskSchedule } from "./desk-schedule";
+import { insertSeedParticipants } from "./participants";
 import { SeedError } from "./errors";
 import { loadSeedPhotos } from "./photos";
 import type { SeedResult } from "./run-seed";
@@ -243,7 +244,7 @@ export async function addSeedBranches(
     userKey,
     cancelledByKey,
     ...booking
-  } of data.bookings)
+  } of data.bookings) {
     await insertSeedBooking(
       {
         ...booking,
@@ -261,6 +262,8 @@ export async function addSeedBranches(
       },
       db,
     );
+    await insertSeedParticipants(booking.id, bookingExtras, userIds, db);
+  }
   const counts = seedBranchCounts(addition);
   const deskResult = bookingExtras
     ? await insertSeedDeskSchedule({

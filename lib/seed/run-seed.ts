@@ -18,6 +18,7 @@ import {
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
+import { insertSeedParticipants } from "@/lib/seed/participants";
 import { SeedError } from "@/lib/seed/errors";
 import { loadSeedPhotos } from "@/lib/seed/photos";
 import { getOperatingDate } from "@/lib/time/open-hours";
@@ -240,6 +241,12 @@ export async function runSeed({
                 ? userId(cancelledByKey)
                 : null,
           },
+          database,
+        );
+        await insertSeedParticipants(
+          booking.id,
+          bookingExtras,
+          userIds,
           database,
         );
       }

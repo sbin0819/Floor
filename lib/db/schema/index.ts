@@ -1,6 +1,7 @@
 export * from "./access";
 export * from "./auth";
 export * from "./bookings";
+export * from "./booking-participants";
 export * from "./branches";
 export * from "./chat";
 export * from "./enums";
