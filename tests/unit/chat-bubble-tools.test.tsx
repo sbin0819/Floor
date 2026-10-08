@@ -57,6 +57,29 @@ afterEach(() => {
 });
 
 describe("bubble copy and responsive tools", () => {
+  it("keeps an inaccessible time measurement slot when the next message hides the clock", () => {
+    render(
+      <MessageList
+        messages={[message(), message({ id: "m2", seq: 2 })]}
+        userId="me"
+        channelName="일반"
+        now={now}
+        onRetry={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+    const first = screen.getAllByRole("article")[0]!;
+    expect(first).toHaveAttribute("data-show-time", "false");
+    expect(first.querySelector("[data-message-time]")).toBeNull();
+    const measure = first.querySelector("[data-message-time-measure]");
+    expect(measure).toHaveAttribute("aria-hidden", "true");
+    expect(measure).toHaveClass("invisible", "col-start-1", "row-start-1");
+    expect(measure).toHaveTextContent("오후 12:00");
+    expect(first.querySelector("[data-message-time-slot]")).toHaveClass(
+      "grid",
+      "shrink-0",
+    );
+  });
   it("opens copy-only actions by keyboard in a readonly room without action callbacks", async () => {
     const user = userEvent.setup();
     const write = vi

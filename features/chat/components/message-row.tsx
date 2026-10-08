@@ -223,32 +223,49 @@ export const MessageRow = memo(function MessageRow({
         : mine
           ? "bg-chat-mine text-chat-mine-foreground"
           : "border border-border bg-card text-foreground";
-  const metadata = !editing &&
-    (showTime ||
-      (!message.deletedAt && (message.editedAt || message.delivery))) && (
+  const metadata = !editing && (
+    <span
+      data-message-time-slot
+      className="grid shrink-0 pb-1 text-xs text-muted-foreground tabular-nums"
+    >
+      {/* 시각을 감춰도 너비를 남겨 앞 말풍선의 줄바꿈과 가상 목록 높이를 지켜요. */}
       <span
-        data-message-time
-        className={`shrink-0 pb-1 text-xs text-muted-foreground tabular-nums ${toolbarVisible ? "@min-[960px]:invisible" : ""}`}
+        aria-hidden="true"
+        data-message-time-measure
+        className="invisible col-start-1 row-start-1"
       >
-        {!message.deletedAt && message.delivery === "pending" ? (
-          <span className="inline-flex items-center gap-1">
-            <Clock className="size-3" aria-hidden="true" />
-            보내는 중
-          </span>
-        ) : !message.deletedAt && message.delivery === "failed" ? (
-          <span className="text-destructive">{messageSendError(message)}</span>
-        ) : showTime ? (
-          <>
-            {message.editedAt && !message.deletedAt && "수정됨 · "}
-            <time dateTime={message.createdAt}>
-              {formatChatTime(message.createdAt)}
-            </time>
-          </>
-        ) : message.editedAt && !message.deletedAt ? (
-          "수정됨"
-        ) : null}
+        {message.editedAt && !message.deletedAt && "수정됨 · "}
+        {formatChatTime(message.createdAt)}
       </span>
-    );
+      {(showTime ||
+        (!message.deletedAt && (message.editedAt || message.delivery))) && (
+        <span
+          data-message-time
+          className={`col-start-1 row-start-1 ${toolbarVisible ? "@min-[960px]:invisible" : ""}`}
+        >
+          {!message.deletedAt && message.delivery === "pending" ? (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="size-3" aria-hidden="true" />
+              보내는 중
+            </span>
+          ) : !message.deletedAt && message.delivery === "failed" ? (
+            <span className="text-destructive">
+              {messageSendError(message)}
+            </span>
+          ) : showTime ? (
+            <>
+              {message.editedAt && !message.deletedAt && "수정됨 · "}
+              <time dateTime={message.createdAt}>
+                {formatChatTime(message.createdAt)}
+              </time>
+            </>
+          ) : message.editedAt && !message.deletedAt ? (
+            "수정됨"
+          ) : null}
+        </span>
+      )}
+    </span>
+  );
   return (
     <>
       {dateDivider && (

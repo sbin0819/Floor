@@ -9,7 +9,7 @@ import {
 
 const me = "00000000-0000-4000-8000-000000000001";
 const peer = "00000000-0000-4000-8000-000000000002";
-const data: DirectMessageView = {
+const data: Extract<DirectMessageView, { kind: "dm" }> = {
   call: null,
   canCall: false,
   kind: "dm",
@@ -18,7 +18,7 @@ const data: DirectMessageView = {
   room: {
     id: "story-direct-message",
     archived: false,
-    lastSeq: 2,
+    lastSeq: 4,
     muted: false,
     unreadMentions: 0,
   },
@@ -56,22 +56,70 @@ const data: DirectMessageView = {
       createdAt: "2026-10-08T01:01:00Z",
       clientId: null,
     },
+    {
+      ...emptyMessageDetails(),
+      id: "direct-3",
+      seq: 3,
+      authorId: me,
+      authorName: "김하은",
+      kind: "text",
+      body: "같은 분에 이어 보낸 내용은 시각을 한 번만 보여요.",
+      createdAt: "2026-10-08T01:01:30Z",
+      clientId: null,
+    },
+    {
+      ...emptyMessageDetails(),
+      id: "direct-4",
+      seq: 4,
+      authorId: me,
+      authorName: "김하은",
+      kind: "text",
+      body: "마지막 메시지 아래에 읽음이 표시돼요.",
+      createdAt: "2026-10-08T01:02:00Z",
+      clientId: null,
+      replyTo: {
+        id: "direct-1",
+        authorName: "이서연",
+        excerpt: "다음 주 리뷰 전에 이야기 나눌까요?",
+        deleted: false,
+        attachmentSummary: null,
+      },
+    },
   ],
-  lastReadSeq: 2,
+  lastReadSeq: 4,
   firstUnreadSeq: null,
-  peerReadSeq: 2,
+  peerReadSeq: 4,
   canWrite: true,
   now: "2026-10-08T03:00:00Z",
 };
 function DirectExample({ empty = false }: { empty?: boolean }) {
-  const [client] = useState(() => new QueryClient());
+  const [client] = useState(() => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, refetchOnWindowFocus: false },
+      },
+    });
+    client.setQueryDefaults(["people"], { enabled: false });
+    for (const member of data.members)
+      client.setQueryData(["people", member.id], {
+        userId: member.id,
+        name: member.name,
+        username: null,
+        isMe: member.id === me,
+        relation: member.id === me ? null : "friend",
+        sharedSpaces: [],
+        directRoomId: null,
+        canDirectMessage: false,
+      });
+    return client;
+  });
   return (
     <QueryClientProvider client={client}>
       <DirectMessageScreen
         data={{
           ...data,
           messages: empty ? [] : data.messages,
-          room: { ...data.room, lastSeq: empty ? 0 : 2 },
+          room: { ...data.room, lastSeq: empty ? 0 : 4 },
         }}
         send={async () => ({ ok: false, code: "INTERNAL" })}
       />
