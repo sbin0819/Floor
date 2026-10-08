@@ -11,12 +11,14 @@ import {
   type TransactionDatabase,
 } from "@/lib/dal";
 import * as seedDal from "@/lib/dal/seed";
+import { syncSeedChat } from "@/lib/dal/seed-chat";
 import {
   syncSeedBranchCovers,
   syncSeedSpacePhotos,
 } from "@/lib/dal/seed-photos";
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
+import { loadSeedChat } from "@/lib/seed/chat";
 import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
 import { insertSeedParticipants } from "@/lib/seed/participants";
 import { insertSeedReminders } from "@/lib/seed/reminders";
@@ -70,6 +72,7 @@ export async function runSeed({
     const data = loadSeedData();
     const photos = loadSeedPhotos(data);
     const bookingExtras = loadSeedBookings2(data);
+    const chat = loadSeedChat(data);
     if (bookingRound2 !== undefined) {
       current = "예약 2차 추가 데이터";
       return await withTransaction(
@@ -173,6 +176,14 @@ export async function runSeed({
           { ...member, userId: userId(userKey) },
           database,
         );
+      current = "팀 채팅";
+      const chatCounts = await syncSeedChat(
+        data.teams.map(({ id }) => id),
+        chat,
+        userIds,
+        now,
+        database,
+      );
       for (const { userKey, ...staff } of data.branchStaff)
         await seedDal.upsertSeedStaff(
           { ...staff, userId: userId(userKey) },
@@ -302,6 +313,7 @@ export async function runSeed({
       skippedBookings += deskResult.skippedBookings;
       return {
         counts: {
+          ...chatCounts,
           users: data.users.length,
           branches: data.branches.length,
           floors: data.floors.length,

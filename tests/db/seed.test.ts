@@ -13,8 +13,10 @@ import {
   bookings,
   branches,
   branchStaff,
+  chatSpaces,
   floorPlans,
   floors,
+  messages,
   spaceBlocks,
   spacePhotos,
   spaces,
@@ -52,6 +54,8 @@ const expectedCounts = {
   spaceBlocks: 5,
   spacePhotos: 65,
   branchCovers: 5,
+  chatSpaces: 2,
+  chatMessages: 8,
 };
 
 describe("transactional development seed", () => {
@@ -93,6 +97,8 @@ describe("transactional development seed", () => {
         bookings,
         spaceBlocks,
         spacePhotos,
+        chatSpaces,
+        chatMessages: messages,
       }).map(async ([name, table]) => [
         name,
         (await database.db.select().from(table)).length,
