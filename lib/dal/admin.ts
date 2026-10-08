@@ -17,6 +17,7 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import type { DalDatabase } from "@/lib/dal/database";
 import { teamDisplayName } from "./team-name";
+import { ActionError } from "@/lib/actions/result";
 import { getDb } from "@/lib/db/client";
 import {
   accessGrants,
@@ -333,6 +334,15 @@ export async function replaceAccessGrants(
   database: DalDatabase = getDb(),
 ): Promise<void> {
   const ids = [...new Set(teamIds.map((id) => id.toLowerCase()))].sort();
+  if (ids.length) {
+    const active = await database
+      .select({ id: teams.id })
+      .from(teams)
+      .where(and(inArray(teams.id, ids), isNull(teams.deletedAt)))
+      .orderBy(asc(teams.id))
+      .for("key share");
+    if (active.length !== ids.length) throw new ActionError("INVALID_INPUT");
+  }
   // 대상 행 잠금과 이 두 쓰기를 호출자의 트랜잭션 안에서 묶어야 한다.
   await database
     .delete(accessGrants)

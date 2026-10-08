@@ -23,6 +23,7 @@ import {
 } from "@/lib/dal/booking-participants";
 import { withParticipantTransaction } from "./participant-transaction";
 import { cancelBookingInTransaction } from "./cancel-booking-core";
+import { lockTeam } from "@/lib/dal/teams-write";
 
 export function createCancelBookingAction(
   dependencies: BookingDependencies = {},
@@ -90,6 +91,20 @@ export function createCancelBookingAction(
               ))
             )
               throw new ActionError("NOT_FOUND");
+            if (row.booking.teamId) {
+              const team = await lockTeam(row.booking.teamId, transaction);
+              if (!team && row.booking.userId !== session.userId)
+                throw new ActionError("NOT_FOUND");
+            }
+            if (row.booking.userId !== session.userId) {
+              const current = await loadPermissionContext(
+                session,
+                row.branch.id,
+                transaction,
+              );
+              if (!canCancelBooking(current, row.booking, row.branch.id))
+                throw new ActionError("FORBIDDEN");
+            }
             const locked = await lockParticipantBooking(
               row.booking.id,
               transaction,

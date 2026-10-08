@@ -460,7 +460,7 @@ describe("operator administration DAL", () => {
           tx,
         );
       }, database.db),
-    ).rejects.toMatchObject({ cause: { code: "23503" } });
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
     expect(
       await getFloorWithAccess(fixture.restrictedFloorId, database.db),
     ).toEqual(before);

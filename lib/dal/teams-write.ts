@@ -28,6 +28,30 @@ import {
 } from "@/lib/db/schema";
 import { normalizeTeamName } from "@/lib/teams/normalize";
 import { isQueryableInviteToken } from "@/lib/teams/invite-token";
+import { can } from "@/lib/permissions/can";
+
+async function requireLockedTeamManager(
+  teamId: string,
+  userId: string,
+  database: DalDatabase,
+) {
+  // 팀 행을 잠근 뒤 다시 읽는다. 트랜잭션 밖 authorize의 역할은 바뀔 수 있다.
+  const membership = await getTeamMember(teamId, userId, database);
+  if (!membership) throw new ActionError("NOT_FOUND");
+  if (
+    !can(
+      {
+        userId,
+        teams: [{ teamId, role: membership.role }],
+        staffBranchIds: [],
+        roleSettings: {},
+      },
+      "team.manage_members",
+      { teamId },
+    )
+  )
+    throw new ActionError("FORBIDDEN");
+}
 
 // FK의 KEY SHARE도 잠금에 참여하므로 사용자 전체를 먼저 같은 순서로 잠근다.
 async function lockUsers(userIds: string[], database: DalDatabase) {
@@ -199,6 +223,11 @@ async function decideJoinRequest(
     );
     if (!(await lockTeam(metadata.teamId, transaction)))
       throw new ActionError("NOT_FOUND");
+    await requireLockedTeamManager(
+      metadata.teamId,
+      input.actorUserId,
+      transaction,
+    );
     const [request] = await transaction
       .update(teamJoinRequests)
       .set({
@@ -270,6 +299,11 @@ export async function createTeamInvite(
         );
         const team = await lockTeam(input.teamId, transaction);
         if (!team) throw new ActionError("NOT_FOUND");
+        await requireLockedTeamManager(
+          input.teamId,
+          input.actorUserId,
+          transaction,
+        );
         if (
           recipient &&
           (await getTeamMember(input.teamId, recipient.id, transaction))
@@ -340,6 +374,11 @@ export async function revokeTeamInvite(
     await lockUsers([input.actorUserId, metadata.createdBy], transaction);
     if (!(await lockTeam(metadata.teamId, transaction)))
       throw new ActionError("INVITE_INVALID");
+    await requireLockedTeamManager(
+      metadata.teamId,
+      input.actorUserId,
+      transaction,
+    );
     const [invite] = await transaction
       .update(teamInvites)
       .set({ revokedAt: sql`statement_timestamp()` })

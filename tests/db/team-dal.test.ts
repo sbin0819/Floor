@@ -40,6 +40,7 @@ describe("team data access and state transitions", () => {
       {
         id: adminId,
         name: "관리자",
+        username: null,
         email: "admin@example.test",
         emailVerified: true,
       },
@@ -497,6 +498,9 @@ describe("team data access and state transitions", () => {
   it.each(["request", "invite"] as const)(
     "reconciles both pending records when %s is processed first",
     async (first) => {
+      await database.db
+        .insert(teamMembers)
+        .values({ teamId, userId: otherId, role: "admin" });
       const request = await dal.createJoinRequest(requestInput(), database.db);
       const invite = await dal.createTeamInvite(
         { ...inviteInput(), actorUserId: otherId },
