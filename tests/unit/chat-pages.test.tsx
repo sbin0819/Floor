@@ -1,10 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { Suspense } from "react";
+import { Suspense, type ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SpacePage from "@/app/(app)/s/[spaceId]/page";
 import ChannelPage from "@/app/(app)/s/[spaceId]/[roomId]/page";
 import MessagesPage from "@/app/(app)/messages/page";
 import { ChannelScreen } from "@/features/chat/components/channel-screen";
+import { SpaceAccessBoundary } from "@/features/chat/components/space-access-boundary";
 import { resolvePageContent } from "./page-test-utils";
 
 const mocks = vi.hoisted(() => ({
@@ -14,7 +15,11 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn(),
   notFound: vi.fn(),
 }));
-vi.mock("@/lib/auth/session", () => ({ requirePageSession: mocks.guard }));
+vi.mock("@/lib/auth/session", () => ({
+  requirePageSession: mocks.guard,
+  getSession: vi.fn(),
+  requireSession: vi.fn(),
+}));
 vi.mock("@/features/chat/queries", () => ({
   getMyChatNav: mocks.nav,
   getChannelView: mocks.channel,
@@ -73,8 +78,8 @@ describe("chat route boundaries", () => {
     expect(mocks.nav).not.toHaveBeenCalled();
     expect(mocks.guard).toHaveBeenCalledWith("/s/join");
   });
-  it.each([{ nav: [] }, { nav: [{ id: spaceId, channels: [] }] }])(
-    "does not reveal an inaccessible or channel-less space",
+  it.each([{ nav: [] }])(
+    "does not reveal an inaccessible space",
     async ({ nav }) => {
       mocks.nav.mockResolvedValue({
         spaces: nav,
@@ -91,6 +96,31 @@ describe("chat route boundaries", () => {
       expect(mocks.redirect).not.toHaveBeenCalled();
     },
   );
+  it("shows an authorized channel-less space without recreating channels", async () => {
+    mocks.nav.mockResolvedValue({
+      spaces: [
+        {
+          id: spaceId,
+          kind: "team",
+          role: "member",
+          name: "가상 팀",
+          channels: [],
+        },
+      ],
+    });
+    const content = await resolvePageContent(
+      SpacePage({ params: Promise.resolve({ spaceId }) }).props.children,
+    );
+    expect(content.type).toBe(SpaceAccessBoundary);
+    render(content.props.children as ReactElement);
+    expect(screen.getByRole("heading", { name: "가상 팀" })).toBeVisible();
+    expect(screen.getByText("아직 열린 채널이 없어요")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "채널 만들기" }),
+    ).not.toBeInTheDocument();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.notFound).not.toHaveBeenCalled();
+  });
   it("checks the exact channel route and returns the same absent result", async () => {
     await expect(
       resolvePageContent(
@@ -106,9 +136,12 @@ describe("chat route boundaries", () => {
     const content = await resolvePageContent(
       ChannelPage({ params: Promise.resolve({ spaceId, roomId }) }),
     );
-    expect(content.type).toBe(ChannelScreen);
-    expect(content.props.data).toBe(view);
-    expect(content.key).toBe(roomId);
+    expect(content.type).toBe(SpaceAccessBoundary);
+    expect(content.props.spaceId).toBe(spaceId);
+    const screen = content.props.children as ReactElement<{ data: unknown }>;
+    expect(screen.type).toBe(ChannelScreen);
+    expect(screen.props.data).toBe(view);
+    expect(screen.key).toBe(roomId);
   });
   it("draws the channel skeleton before params or a session are read", () => {
     const page = ChannelPage({ params: new Promise(() => {}) });

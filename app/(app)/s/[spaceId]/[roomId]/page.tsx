@@ -4,6 +4,7 @@ import { requirePageSession } from "@/lib/auth/session";
 import { getChannelView } from "@/features/chat/queries";
 import { ChannelScreen } from "@/features/chat/components/channel-screen";
 import { ChannelSkeleton } from "@/features/chat/components/channel-skeleton";
+import { SpaceAccessBoundary } from "@/features/chat/components/space-access-boundary";
 
 type ChannelPageProps = {
   params: Promise<{ spaceId: string; roomId: string }>;
@@ -16,7 +17,11 @@ async function ChannelContent({ params }: ChannelPageProps) {
   );
   const data = await getChannelView(spaceId, roomId);
   if (!data) notFound();
-  return <ChannelScreen key={data.room.id} data={data} />;
+  return (
+    <SpaceAccessBoundary spaceId={spaceId.toLowerCase()}>
+      <ChannelScreen key={data.room.id} data={data} />
+    </SpaceAccessBoundary>
+  );
 }
 
 export default function ChannelPage(props: ChannelPageProps) {

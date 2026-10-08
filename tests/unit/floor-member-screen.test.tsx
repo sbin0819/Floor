@@ -25,6 +25,7 @@ function space(): FloorVisibleSpace {
 function branchNavigation() {
   const data = floorDayFixture();
   return {
+    lounge: { spaceId: "lounge", joined: true },
     branch: data.branch,
     floors: data.floors,
     branches: [

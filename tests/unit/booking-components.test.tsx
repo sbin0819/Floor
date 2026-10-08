@@ -553,6 +553,7 @@ describe("navigation, lists and cancellation", () => {
           {
             ...data.branch,
             isDefault: false,
+            lounge: { spaceId: "lounge", joined: true },
             todayHours: data.openHours,
             accessibleFloorCount: 1,
             freeSpaceCount: 1,

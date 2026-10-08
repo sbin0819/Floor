@@ -303,6 +303,7 @@ describe("floor date picker", () => {
           branch: data.branch,
           floors: data.floors,
           branches: [],
+          lounge: { spaceId: "lounge", joined: true },
           today: defaults.today,
           now: data.now,
           bookingDates: ["2026-10-13"],

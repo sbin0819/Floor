@@ -7,12 +7,14 @@ import { getDb } from "@/lib/db/client";
 import {
   bookings,
   branches,
+  chatSpaces,
   spaceBlocks,
   spaces,
   teamMembers,
   teams,
   users,
 } from "@/lib/db/schema";
+import { activeSpaceMembership } from "./chat-access";
 
 async function readBookingBranch(
   userId: string,
@@ -51,11 +53,21 @@ async function readBranchCards(
     .select({
       branch: branches,
       isDefault: sql<boolean>`${users.id} is not null`,
+      loungeSpaceId: chatSpaces.id,
+      loungeJoined: activeSpaceMembership(userId),
     })
     .from(branches)
     .leftJoin(
       users,
       and(eq(users.id, userId), eq(users.defaultBranchId, branches.id)),
+    )
+    .leftJoin(
+      chatSpaces,
+      and(
+        eq(chatSpaces.branchId, branches.id),
+        eq(chatSpaces.kind, "branch"),
+        isNull(chatSpaces.deletedAt),
+      ),
     )
     .orderBy(asc(branches.name), asc(branches.id));
 }

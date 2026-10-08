@@ -92,6 +92,7 @@ function page(
             { id: "floor-8", name: "8F", level: 8, sortOrder: 2 },
           ],
           branches: [],
+          lounge: { spaceId: "lounge", joined: true },
           today,
           bookingDates: [],
           now: detail.now,

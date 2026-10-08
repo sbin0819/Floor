@@ -31,6 +31,7 @@ const open = getOperatingState(
 function fixture(extra: Partial<BranchListItem> = {}): BranchListItem {
   return {
     ...detail.branch,
+    lounge: { spaceId: "lounge", joined: false },
     isDefault: false,
     todayHours: detail.openHours,
     operatingState: open,

@@ -59,6 +59,7 @@ export type FloorSummary = {
   sortOrder: number;
 };
 export type BranchListItem = BranchDetails & {
+  lounge: BranchLounge;
   isDefault: boolean;
   todayHours: DayOpenHours | null;
   accessibleFloorCount: number;
@@ -71,11 +72,13 @@ export type BranchFloorsData = {
   floors: FloorSummary[];
 };
 export type BranchNavigationData = BranchFloorsData & {
+  lounge: BranchLounge;
   branches: { id: string; name: string }[];
   bookingDates: string[];
   today: string;
   now: string;
 };
+export type BranchLounge = { spaceId: string | null; joined: boolean };
 export type BranchNavigationMeta = Omit<BranchNavigationData, "bookingDates">;
 export type BranchNavigationStream = {
   meta: BranchNavigationMeta;

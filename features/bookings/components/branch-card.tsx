@@ -1,5 +1,7 @@
 "use client";
 
+import { LoungeJoinButton } from "./lounge-join-button";
+
 import Link from "next/link";
 import {
   ArrowRight,
@@ -224,6 +226,9 @@ export function BranchCard({
               </Button>
             </span>
           )}
+          <span className="relative z-20 inline-flex">
+            <LoungeJoinButton branchId={branch.id} lounge={branch.lounge} />
+          </span>
           <span
             aria-hidden="true"
             className="ml-auto inline-flex items-center gap-2 text-sm text-muted-foreground"

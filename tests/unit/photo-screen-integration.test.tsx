@@ -138,6 +138,7 @@ describe("photos in existing member screens", () => {
             {
               ...data.branch,
               isDefault: false,
+              lounge: { spaceId: "lounge", joined: true },
               todayHours: data.openHours,
               accessibleFloorCount: 1,
               bookableSpaceCount: 2,
@@ -151,6 +152,7 @@ describe("photos in existing member screens", () => {
             branch: data.branch,
             floors: data.floors,
             branches: [],
+            lounge: { spaceId: "lounge", joined: true },
             today: data.date,
             bookingDates: [],
             now: data.now,

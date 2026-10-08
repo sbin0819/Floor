@@ -16,6 +16,7 @@ function renderNavigation() {
   return render(
     <BranchNavigation
       data={{
+        lounge: { spaceId: "lounge", joined: true },
         branch: data.branch,
         floors: data.floors,
         branches: [],

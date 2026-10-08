@@ -52,6 +52,7 @@ function fixture(): BranchNavigationData {
     branch: data.branch,
     floors: data.floors,
     branches: [],
+    lounge: { spaceId: "lounge", joined: true },
     today: date,
     bookingDates: [],
     now: "2026-10-07T01:10:00.000Z",

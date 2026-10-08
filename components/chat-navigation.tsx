@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Grid2X2, Hash } from "lucide-react";
+import { Building2, Grid2X2, Hash } from "lucide-react";
 import { cn } from "cn";
 import type {
   ChatSpaceNav,
@@ -15,6 +15,10 @@ import { DirectMessageList } from "@/features/chat/components/direct-message-lis
 import { MemberNav } from "@/components/member-nav";
 import { LinkPending } from "@/components/link-pending";
 import { ChatMuteButton } from "@/features/chat/components/chat-mute-button";
+import { SpaceAdd } from "@/features/chat/components/space-add";
+import { SpaceMenu } from "@/features/chat/components/space-menu";
+import { spaceColorClasses } from "@/features/chat/components/space-colors";
+import { ChannelDialog } from "@/features/chat/components/channel-dialog";
 import {
   shouldInterceptNavigation,
   useRouterOptimisticNavigation,
@@ -27,10 +31,10 @@ import {
 
 function chatLocation(pathname: string) {
   const [, section, spaceId, roomId] = pathname.split("/");
-  return section === "s"
+  return section === "s" && spaceId !== "join"
     ? {
         spaceId: spaceId?.toLowerCase() ?? null,
-        roomId: roomId?.toLowerCase() ?? null,
+        roomId: roomId === "settings" ? null : (roomId?.toLowerCase() ?? null),
       }
     : { spaceId: null, roomId: null };
 }
@@ -51,6 +55,8 @@ export function ChatRailNavigation({
   const entries = [
     {
       id: null,
+      kind: "home" as const,
+      iconColor: "blue" as const,
       name: "홈",
       label: `Floor 홈${homeUnreadCount({ directMessages, meetings }) > 0 ? `, 읽지 않은 메시지 ${homeUnreadCount({ directMessages, meetings })}개` : ""}`,
       href: "/",
@@ -97,14 +103,21 @@ export function ChatRailNavigation({
                     }}
                     className={cn(
                       "relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                      selected
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-foreground hover:bg-sidebar-accent",
+                      entry.kind === "community"
+                        ? `${spaceColorClasses[entry.iconColor]} text-primary-foreground`
+                        : selected
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-foreground hover:bg-sidebar-accent",
                     )}
                   >
                     <LinkPending />
                     {entry.id === null ? (
                       <Grid2X2 aria-hidden="true" className="relative size-5" />
+                    ) : entry.kind === "branch" ? (
+                      <Building2
+                        aria-hidden="true"
+                        className="relative size-5"
+                      />
                     ) : (
                       <span aria-hidden="true" className="relative">
                         {entry.initial}
@@ -132,6 +145,7 @@ export function ChatRailNavigation({
           </div>
         );
       })}
+      <SpaceAdd />
     </nav>
   );
 }
@@ -139,22 +153,15 @@ export function ChatRailNavigation({
 export function ChatSidebarTitle({ spaces }: { spaces: ChatSpaceNav[] }) {
   const { spaceId } = chatLocation(usePathname());
   const space = spaces.find(({ id }) => id === spaceId);
+  if (space) return <SpaceMenu key={space.id} space={space} />;
   return (
     <div className="flex min-w-0 items-center gap-1">
       <Link
-        href={space ? `/s/${space.id}` : "/"}
+        href="/"
         className="inline-flex min-h-11 min-w-0 items-center rounded-lg font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        <span className="truncate">{space?.name ?? "Floor"}</span>
+        <span className="truncate">Floor</span>
       </Link>
-      {space && (
-        <ChatMuteButton
-          id={space.id}
-          name={space.name}
-          muted={space.muted}
-          space
-        />
-      )}
     </div>
   );
 }
@@ -183,9 +190,12 @@ export function ChatSidebarNavigation({
     );
   return (
     <nav aria-label={`${space.name} 텍스트 채널`} className="space-y-2">
-      <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground">
-        텍스트 채널
-      </p>
+      <div className="flex items-center justify-between px-3 pt-2 text-xs font-semibold text-muted-foreground">
+        <p>텍스트 채널</p>
+        {space.role !== "member" && (
+          <ChannelDialog spaceId={space.id} compact />
+        )}
+      </div>
       <div className="flex flex-col gap-1">
         {space.channels.map((channel) => {
           const href = `/s/${space.id}/${channel.id}`;
@@ -232,6 +242,7 @@ export function ChatSidebarNavigation({
                   id={channel.id}
                   name={channel.name}
                   muted={channel.muted}
+                  manageSpaceId={space.role !== "member" ? space.id : undefined}
                 />
               </div>
             </div>

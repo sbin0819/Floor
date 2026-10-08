@@ -193,9 +193,9 @@ describe("team chat navigation", () => {
         <ChatSidebarNavigation spaces={spaces} />
       </>,
     );
-    expect(screen.getByRole("link", { name: "디자인팀" })).toHaveAttribute(
-      "href",
-      `/s/${space.id}`,
+    expect(screen.getByRole("button", { name: "디자인팀" })).toHaveAttribute(
+      "aria-haspopup",
+      "menu",
     );
     const nav = screen.getByRole("navigation", {
       name: "디자인팀 텍스트 채널",

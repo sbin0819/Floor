@@ -62,7 +62,6 @@ import type { Session } from "@/lib/auth/types";
 import type { DalDatabase } from "@/lib/dal";
 import {
   getBranch,
-  listBranches,
   listFloorsWithAccess,
   listAllFloorsWithAccess,
 } from "@/lib/dal/branches";
@@ -227,14 +226,22 @@ export function createBookingQueries(
     const current = now();
     const [data, branches] = await Promise.all([
       branchFloors(session, branchId),
-      listBranches(db),
+      listBranchCards(session.userId, db),
     ]);
+    const lounge = branches.find(({ branch }) => branch.id === data.branch.id);
     const today = localDate(current, data.branch.timezone);
     return {
       meta: {
         branch: data.branch,
         floors: data.floors,
-        branches,
+        branches: branches.map(({ branch }) => ({
+          id: branch.id,
+          name: branch.name,
+        })),
+        lounge: {
+          spaceId: lounge?.loungeSpaceId ?? null,
+          joined: lounge?.loungeJoined ?? false,
+        },
         today,
         now: current.toISOString(),
       },
@@ -309,7 +316,7 @@ export function createBookingQueries(
         .map(({ id }) => id);
       const flags = await listSpaceAvailabilityFlags(allowedIds, current, db);
       return branches
-        .map(({ branch, isDefault }) => {
+        .map(({ branch, isDefault, loungeSpaceId, loungeJoined }) => {
           const branchFloors = accessibleFloors.filter(
             ({ branchId }) => branchId === branch.id,
           );
@@ -322,6 +329,7 @@ export function createBookingQueries(
           return {
             ...branchDto(branch),
             isDefault,
+            lounge: { spaceId: loungeSpaceId, joined: loungeJoined },
             operatingState,
             todayHours: operatingState.hours,
             accessibleFloorCount: branchFloors.length,

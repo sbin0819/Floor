@@ -8,6 +8,21 @@ const readOnlyAction: (
 });
 
 export const createBooking = readOnlyAction;
+export const joinLounge = readOnlyAction;
+export const createCommunitySpace = readOnlyAction;
+export const leaveSpace = readOnlyAction;
+export const setSpaceAdmin = readOnlyAction;
+export const transferSpaceOwnership = readOnlyAction;
+export const deleteSpace = readOnlyAction;
+export const createChannel = readOnlyAction;
+export const updateChannel = readOnlyAction;
+export const archiveChannel = readOnlyAction;
+export const banSpaceMember = readOnlyAction;
+export const unbanSpaceMember = readOnlyAction;
+export const createInviteLink = readOnlyAction;
+export const revokeInvite = readOnlyAction;
+export const inviteToSpace = readOnlyAction;
+export const joinSpaceByInvite = readOnlyAction;
 export const sendMessage = readOnlyAction;
 export const editMessage = readOnlyAction;
 export const deleteMessage = readOnlyAction;

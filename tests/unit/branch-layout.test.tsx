@@ -43,6 +43,7 @@ beforeEach(() => {
   const floor = floorDayFixture();
   vi.mocked(getBranchNavigationStream).mockResolvedValue({
     meta: {
+      lounge: { spaceId: "lounge", joined: true },
       branch: floor.branch,
       floors: floor.floors,
       branches: [],

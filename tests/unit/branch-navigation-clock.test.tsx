@@ -24,6 +24,7 @@ vi.mock("next/navigation", () => ({
 }));
 function fixture(now: string): BranchNavigationData {
   return {
+    lounge: { spaceId: "lounge", joined: true },
     branch: {
       id: "branch",
       name: "성수점",

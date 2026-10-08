@@ -284,6 +284,7 @@ describe("booking query security and DTOs", () => {
   it("returns only accessible navigation floors and server-owned time in the branch timezone", async () => {
     const data = await queries().getBranchNavigation(fixture.branchId);
     expect(data).toEqual({
+      lounge: { spaceId: null, joined: false },
       branch: {
         id: fixture.branchId,
         cover: null,
@@ -649,6 +650,7 @@ describe("booking query security and DTOs", () => {
       .where(eq(users.id, fixture.person.userId));
     const list = await queries().getBranchList();
     expect(list[0]).toEqual({
+      lounge: { spaceId: null, joined: false },
       id: fixture.otherBranchId,
       cover: null,
       bookableSpaceCount: 1,

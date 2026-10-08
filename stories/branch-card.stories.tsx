@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import { PageContainer, PageHeading } from "@/components/page-container";
 import { BranchCard } from "@/features/bookings/components/branch-card";
 import type { BranchListItem } from "@/features/bookings/types";
 
 const branch: BranchListItem = {
+  lounge: { spaceId: "example-lounge", joined: true },
   id: "example-branch",
   name: "가상 강남점",
   address: "서울 가상구 가상로 12",
@@ -37,10 +40,21 @@ const branch: BranchListItem = {
     nextOpening: null,
   },
 };
+function QueryPreview({ children }: { children: React.ReactNode }) {
+  const [client] = useState(() => new QueryClient());
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
 const meta = {
   title: "예약/BranchCard",
   component: BranchCard,
   tags: ["autodocs"],
+  decorators: [
+    (Story) => (
+      <QueryPreview>
+        <Story />
+      </QueryPreview>
+    ),
+  ],
   args: { branch, onSetDefault: () => {} },
   render: (args) => (
     <div className="mx-auto w-full max-w-[478px]">
@@ -52,7 +66,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const DefaultBranch: Story = {};
 export const OtherBranch: Story = {
-  args: { branch: { ...branch, isDefault: false } },
+  args: {
+    branch: {
+      ...branch,
+      isDefault: false,
+      lounge: { spaceId: "example-lounge", joined: false },
+    },
+  },
 };
 export const BeforeOpening: Story = {
   args: {

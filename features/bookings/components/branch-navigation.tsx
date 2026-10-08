@@ -34,6 +34,7 @@ import { useBranchDisplayNow } from "./branch-display-clock";
 import { floorIdFromSegments } from "./use-branch-route-scope";
 import { BookingDateMark } from "./booking-date-mark";
 import { FloorPeopleControl } from "./floor-people-filter";
+import { LoungeJoinButton } from "./lounge-join-button";
 
 export function BranchNavigation({
   data,
@@ -97,7 +98,7 @@ export function BranchNavigation({
         {floor ? `${floor.name} 공간 예약` : `${data.branch.name} 공간 예약`}
       </h1>
       <header className="contents">
-        <div className="col-span-2 row-start-1 flex min-w-0 items-center gap-3">
+        <div className="col-span-2 row-start-1 flex min-w-0 flex-wrap items-center gap-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -141,6 +142,7 @@ export function BranchNavigation({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <LoungeJoinButton branchId={data.branch.id} lounge={data.lounge} />
           <SegmentedLinks
             label="층 선택"
             className="min-w-0 flex-nowrap overflow-x-auto"
