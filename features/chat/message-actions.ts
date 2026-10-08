@@ -18,6 +18,7 @@ import type { RealtimeItem } from "@/lib/realtime/types";
 import type { ChatActionDependencies } from "./action-factory";
 import { excerptOf, extractMentions } from "./message-text";
 import { deleteMessageSchema, editMessageSchema } from "./schema";
+import { groupDisplayName } from "./group-name";
 
 export function createMessageActions(
   dependencies: ChatActionDependencies,
@@ -88,7 +89,8 @@ export function createMessageActions(
             )
               throw new ActionError("NOT_FOUND");
             const members =
-              currentAccess.room.kind === "dm"
+              currentAccess.room.kind === "dm" ||
+              currentAccess.room.kind === "group_dm"
                 ? await listDirectMembers(target.roomId, tx, session.userId)
                 : await listChatMembers(
                     currentAccess.room.teamId!,
@@ -109,6 +111,7 @@ export function createMessageActions(
                 (currentAccess.room.directMembership?.mine === "active" &&
                   currentAccess.room.directMembership.peer === "active")) &&
               (currentAccess.room.kind === "dm" ||
+                currentAccess.room.kind === "group_dm" ||
                 currentAccess.room.role === "admin");
             const oldMentions = new Set(
               (await writes.listStoredMentions(original.id, tx)).map(
@@ -188,7 +191,14 @@ export function createMessageActions(
                 roomName:
                   result.room.kind === "dm"
                     ? session.name
-                    : (result.room.name ?? "채널"),
+                    : result.room.kind === "group_dm"
+                      ? groupDisplayName(
+                          result.room.name,
+                          [...result.names]
+                            .filter(([id]) => id !== recipient.userId)
+                            .map(([, name]) => name),
+                        )
+                      : (result.room.name ?? "채널"),
                 messageId: message.id,
                 seq: message.seq,
                 authorName: session.name ?? "알 수 없는 사용자",

@@ -63,9 +63,8 @@ export type RoomMessagesPage = {
 };
 
 export type ChatRoomKind = "text" | "voice" | "dm" | "group_dm" | "meeting";
-export type DirectMessageNav = {
+type DirectMessageNavBase = {
   roomId: string;
-  other: { userId: string; name: string; username: string | null };
   lastSeq: number;
   lastMessageAt: string;
   unread: boolean;
@@ -73,12 +72,24 @@ export type DirectMessageNav = {
   unreadMentions: number;
   muted: boolean;
 };
+export type DirectMessageNav = DirectMessageNavBase &
+  (
+    | {
+        kind: "dm";
+        other: { userId: string; name: string; username: string | null };
+      }
+    | {
+        kind: "group_dm";
+        name: string | null;
+        memberCount: number;
+        members: { userId: string; name: string }[];
+      }
+  );
 export type ChatNav = {
   spaces: ChatSpaceNav[];
   directMessages: DirectMessageNav[];
 };
-export type DirectMessageView = {
-  request: { role: "recipient" } | { role: "sender"; sentCount: number } | null;
+type DirectMessageViewBase = {
   room: {
     id: string;
     archived: boolean;
@@ -86,16 +97,41 @@ export type DirectMessageView = {
     muted: boolean;
     unreadMentions: number;
   };
-  other: { userId: string; name: string; username: string | null };
   user: { id: string; name: string };
-  members: { id: string; name: string; admin: boolean }[];
   messages: ChatMessage[];
   lastReadSeq: number | null;
   firstUnreadSeq: number | null;
-  peerReadSeq: number;
   canWrite: boolean;
   now: string;
 };
+export type DirectMessageView = DirectMessageViewBase &
+  (
+    | {
+        kind: "dm";
+        request:
+          { role: "recipient" } | { role: "sender"; sentCount: number } | null;
+        blockedByMe: boolean;
+        other: {
+          userId: string;
+          name: string;
+          username: string | null;
+          sharesSpace: boolean;
+        };
+        members: { id: string; name: string; admin: boolean }[];
+        peerReadSeq: number;
+      }
+    | {
+        kind: "group_dm";
+        name: string | null;
+        displayName: string;
+        members: {
+          userId: string;
+          name: string;
+          username: string | null;
+          sharesSpace: boolean;
+        }[];
+      }
+  );
 
 export type ChatSpaceNav = {
   id: string;

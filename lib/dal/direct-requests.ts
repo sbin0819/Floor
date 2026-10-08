@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { ActionError } from "@/lib/actions/result";
 import {
   chatRoomMembers,
@@ -55,15 +55,6 @@ export async function createEmptyDirectRoom(
   const existing = await findDirectRoom(me, other, database);
   if (!existing) throw new ActionError("INTERNAL");
   return { roomId: existing.id, created: false };
-}
-
-export function lockDirectMembers(roomId: string, database: DalDatabase) {
-  return database
-    .select()
-    .from(chatRoomMembers)
-    .where(eq(chatRoomMembers.roomId, roomId))
-    .orderBy(asc(chatRoomMembers.userId))
-    .for("update");
 }
 
 export async function countRecentRequests(

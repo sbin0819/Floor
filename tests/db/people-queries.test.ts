@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -278,6 +278,89 @@ describe("people query privacy and budgets", () => {
     expect((await queries().getPersonProfile(id(4))).canDirectMessage).toBe(
       false,
     );
+  });
+  it.each([1, 3])(
+    "allows a shared active group profile without granting DM permission, and removes visibility after user %i leaves",
+    async (leavingUser) => {
+      await database.db
+        .insert(chatRooms)
+        .values({ id: id(300), kind: "group_dm" });
+      await database.db.insert(chatRoomMembers).values(
+        [1, 2, 3].map((n) => ({
+          roomId: id(300),
+          userId: id(n),
+          status: "active" as const,
+          joinedAt: now,
+          statusChangedAt: now,
+        })),
+      );
+      const meter = createQueryMeter(database.client);
+      try {
+        meter.start();
+        const profile = await queries().getPersonProfile(id(3));
+        expect(meter.stop().perStage).toEqual([1]);
+        expect(profile).toEqual({
+          userId: id(3),
+          name: "박지훈",
+          username: "jihoon.park",
+          relation: "none",
+          isMe: false,
+          sharedSpaces: [],
+          directRoomId: null,
+          canDirectMessage: false,
+        });
+        expect(JSON.stringify(profile)).not.toContain("@example.test");
+        await database.db
+          .update(chatRoomMembers)
+          .set({ status: "left" })
+          .where(
+            and(
+              eq(chatRoomMembers.roomId, id(300)),
+              eq(chatRoomMembers.userId, id(leavingUser)),
+            ),
+          );
+        meter.start();
+        await expect(queries().getPersonProfile(id(3))).rejects.toMatchObject({
+          code: "NOT_FOUND",
+        });
+        expect(meter.stop().perStage).toEqual([1]);
+      } finally {
+        meter.restore();
+      }
+    },
+  );
+  it("does not grant group-only people contact or partial-search eligibility after many shared groups", async () => {
+    const roomIds = Array.from({ length: 20 }, (_, index) => id(300 + index));
+    await database.db
+      .insert(chatRooms)
+      .values(
+        roomIds.map((roomId) => ({ id: roomId, kind: "group_dm" as const })),
+      );
+    await database.db.insert(chatRoomMembers).values(
+      roomIds.flatMap((roomId) =>
+        [1, 2, 3].map((n) => ({
+          roomId,
+          userId: id(n),
+          status: "active" as const,
+          joinedAt: now,
+          statusChangedAt: now,
+        })),
+      ),
+    );
+    const meter = createQueryMeter(database.client);
+    try {
+      meter.start();
+      expect((await queries().getPersonProfile(id(3))).canDirectMessage).toBe(
+        false,
+      );
+      expect(meter.stop().perStage).toEqual([1]);
+      expect(await queries().searchPeople("박지훈")).toEqual([]);
+      expect(
+        (await queries().getMessageContacts()).map((row) => row.userId),
+      ).not.toContain(id(3));
+    } finally {
+      meter.restore();
+    }
   });
   it("does not expose a deleted shared space while preserving same-team profile and DM access", async () => {
     await database.db.update(chatSpaces).set({ deletedAt: now });

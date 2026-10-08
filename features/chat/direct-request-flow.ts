@@ -6,13 +6,13 @@ import {
   changeDirectMember,
   countPendingMessages,
   deleteMessageRequestNotification,
-  lockDirectMembers,
   requestCooldownMs,
   requireRequestCapacity,
   renewMessageRequestNotification,
 } from "@/lib/dal/direct-requests";
 import { roomChannel, userChannel } from "@/lib/realtime/channels";
 import type { RealtimeItem } from "@/lib/realtime/types";
+import { lockRoomMembers } from "@/lib/dal/chat-write";
 
 // 이미 사용자와 방을 잠그고 clientId 중복을 확인한 뒤에만 호출한다.
 export async function prepareDirectSend(
@@ -26,7 +26,7 @@ export async function prepareDirectSend(
   database: DalDatabase,
 ) {
   const { roomId, peerId, session, now } = input;
-  const members = await lockDirectMembers(roomId, database);
+  const members = await lockRoomMembers(roomId, database);
   const mine = members.find((row) => row.userId === session.userId);
   const peer = members.find((row) => row.userId === peerId);
   if (

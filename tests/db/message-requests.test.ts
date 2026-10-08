@@ -78,13 +78,23 @@ describe("message request lifecycle", () => {
       limiter: createMemoryRateLimiter(),
       logError: vi.fn(),
     });
-  const queries = (session = actors.member, clock = now) =>
-    createChatQueries({
+  const queries = (session = actors.member, clock = now) => {
+    const source = createChatQueries({
       database: database.db,
       requireSession: async () => session,
       now: () => clock,
       limiter: createMemoryRateLimiter(),
     });
+    return {
+      ...source,
+      async getDirectMessageView(roomId: string) {
+        const view = await source.getDirectMessageView(roomId);
+        if (view && view.kind !== "dm")
+          throw new Error("Expected a one-to-one request room");
+        return view;
+      },
+    };
+  };
   async function request(
     session = actors.member,
     recipient = actors.outsider,

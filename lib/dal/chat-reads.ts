@@ -8,7 +8,7 @@ import { readableRoomCondition } from "./chat-access";
 import { blockedBy } from "./people-blocks";
 
 export function roomJoinedAt(userId: string) {
-  return sql`case when ${chatRooms.kind} = 'dm' then (
+  return sql`case when ${chatRooms.kind} in ('dm', 'group_dm') then (
     select m.joined_at from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = ${userId}::uuid
   ) else (
     select m.created_at from team_members m inner join chat_spaces s on s.team_id = m.team_id where s.id = ${chatRooms.spaceId} and m.user_id = ${userId}::uuid
@@ -34,7 +34,7 @@ export function firstUnreadSequence(userId: string) {
       where unread_message.room_id = ${chatRooms.id}
         and unread_message.author_id is distinct from ${userId}
         and unread_message.created_at > ${roomJoinedAt(userId)}
-        and (${chatRooms.kind} <> 'dm' or unread_message.deleted_at is null)
+        and (${chatRooms.kind} not in ('dm', 'group_dm') or unread_message.deleted_at is null)
         and (${chatRoomReads.roomId} is null or unread_message.seq > ${chatRoomReads.lastReadSeq})
     ) else null end`.mapWith(Number);
 }

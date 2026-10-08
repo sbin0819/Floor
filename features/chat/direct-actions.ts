@@ -6,11 +6,10 @@ import { lockUsersForKeyShare } from "@/lib/dal/chat-write";
 import { withTransaction } from "@/lib/dal/database";
 import type { ChatActionDependencies } from "./action-factory";
 import { canReadRoom } from "@/lib/dal/chat-access";
-import { lockRoomForMessage } from "@/lib/dal/chat-write";
+import { lockRoomForMessage, lockRoomMembers } from "@/lib/dal/chat-write";
 import {
   changeDirectMember,
   deleteMessageRequestNotification,
-  lockDirectMembers,
 } from "@/lib/dal/direct-requests";
 import { roomChannel, userChannel } from "@/lib/realtime/channels";
 import { getRealtimePublisher } from "@/lib/realtime/server";
@@ -42,7 +41,7 @@ export function createDirectActions(dependencies: ChatActionDependencies = {}) {
               now,
               tx,
             );
-            const members = await lockDirectMembers(room.roomId, tx);
+            const members = await lockRoomMembers(room.roomId, tx);
             const mine = members.find(
               (member) => member.userId === session.userId,
             );
@@ -80,7 +79,7 @@ export function createDirectActions(dependencies: ChatActionDependencies = {}) {
           await withTransaction(async (tx) => {
             await lockUsersForKeyShare([session.userId, peerId], tx);
             await lockRoomForMessage(input.roomId, tx);
-            const members = await lockDirectMembers(input.roomId, tx);
+            const members = await lockRoomMembers(input.roomId, tx);
             if (
               members.find((member) => member.userId === session.userId)
                 ?.status !== "requested"

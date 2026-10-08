@@ -29,6 +29,7 @@ import type { ChatActionDependencies } from "./action-factory";
 import { prepareDirectSend } from "./direct-request-flow";
 import { excerptOf, extractMentions } from "./message-text";
 import { sendMessageSchema } from "./schema";
+import { groupDisplayName } from "./group-name";
 
 const requestSchema = sendMessageSchema
   .omit({ roomId: true })
@@ -111,7 +112,7 @@ async function sendLockedMessage(
   }
   const parsed = extractMentions(input.body);
   const members =
-    room.kind === "dm"
+    room.kind === "dm" || room.kind === "group_dm"
       ? await listDirectMembers(room.id, database, session.userId)
       : await listChatMembers(room.teamId!, database, session.userId);
   const names = new Map(members.map((member) => [member.id, member.name]));
@@ -123,7 +124,7 @@ async function sendLockedMessage(
   const mentionsEveryone =
     parsed.everyone &&
     !flow.pending &&
-    (room.kind === "dm" || room.role === "admin");
+    (room.kind === "dm" || room.kind === "group_dm" || room.role === "admin");
   const inserted = await writes.insertChatMessage(
     { ...input, mentionsEveryone, authorId: session.userId, now },
     database,
@@ -156,28 +157,36 @@ async function sendLockedMessage(
     ...(direct?.initialEvents ?? []),
   ];
   if (!flow.pending) {
-    events.push({
-      channel:
-        room.kind === "dm"
-          ? userChannel(room.peer!.userId)
-          : spaceChannel(room.spaceId!),
-      event: {
-        type: "room.activity",
-        spaceId: room.spaceId,
-        roomKind: room.kind,
-        preview:
-          room.kind === "dm"
-            ? {
-                messageId: message.id,
-                authorName: session.name,
-                excerpt: excerptOf(message.body, names),
-              }
-            : null,
-        roomId: room.id,
-        seq: message.seq,
-        authorId: message.authorId,
-      },
-    });
+    const activityChannels =
+      room.kind === "group_dm"
+        ? members
+            .filter((member) => member.id !== session.userId)
+            .map((member) => userChannel(member.id))
+        : [
+            room.kind === "dm"
+              ? userChannel(room.peer!.userId)
+              : spaceChannel(room.spaceId!),
+          ];
+    for (const channel of activityChannels)
+      events.push({
+        channel,
+        event: {
+          type: "room.activity",
+          spaceId: room.spaceId,
+          roomKind: room.kind,
+          preview:
+            room.kind === "dm" || room.kind === "group_dm"
+              ? {
+                  messageId: message.id,
+                  authorName: session.name,
+                  excerpt: excerptOf(message.body, names),
+                }
+              : null,
+          roomId: room.id,
+          seq: message.seq,
+          authorId: message.authorId,
+        },
+      });
     const recipients = mentionsEveryone
       ? members
           .filter((member) => member.id !== session.userId && member.canMention)
@@ -191,7 +200,17 @@ async function sendLockedMessage(
           spaceId: room.spaceId,
           roomKind: room.kind,
           roomId: room.id,
-          roomName: room.kind === "dm" ? session.name : (room.name ?? "채널"),
+          roomName:
+            room.kind === "dm"
+              ? session.name
+              : room.kind === "group_dm"
+                ? groupDisplayName(
+                    room.name,
+                    members
+                      .filter((member) => member.id !== recipient)
+                      .map((member) => member.name),
+                  )
+                : (room.name ?? "채널"),
           messageId: message.id,
           seq: message.seq,
           authorName: session.name,

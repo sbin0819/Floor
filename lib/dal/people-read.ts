@@ -137,6 +137,14 @@ export async function readPersonProfile(
           sql`${friendships.userLowId} is not null`,
           sharedTeamCondition(me, personId),
           sql`${directRoomId(me, personId)} is not null`,
+          sql`exists (
+            select 1 from chat_rooms group_room
+              join chat_room_members mine on mine.room_id = group_room.id
+              join chat_room_members theirs on theirs.room_id = group_room.id
+            where group_room.kind = 'group_dm'
+              and mine.user_id = ${me}::uuid and mine.status = 'active'
+              and theirs.user_id = ${personId} and theirs.status = 'active'
+          )`,
         ),
       ),
     );

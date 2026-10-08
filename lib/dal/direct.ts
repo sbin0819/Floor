@@ -95,7 +95,7 @@ export function listDirectMembers(
       and(
         eq(chatRoomMembers.roomId, roomId),
         eq(chatRoomMembers.status, "active"),
-        sql`${chatRoomMembers.userId} in (${chatRooms.dmLowUserId}, ${chatRooms.dmHighUserId})`,
+        sql`(${chatRooms.kind} = 'group_dm' or ${chatRoomMembers.userId} in (${chatRooms.dmLowUserId}, ${chatRooms.dmHighUserId}))`,
       ),
     )
     .orderBy(users.name, users.id);
@@ -109,7 +109,19 @@ export function listDirectNav(userId: string, database: DalDatabase = getDb()) {
   return database
     .select({
       roomId: chatRooms.id,
+      kind: sql<"dm" | "group_dm">`${chatRooms.kind}`,
       other: { userId: users.id, name: users.name, username: users.username },
+      name: chatRooms.name,
+      memberCount:
+        sql<number>`(select count(*)::int from chat_room_members m where m.room_id = ${chatRooms.id} and m.status = 'active')`.mapWith(
+          Number,
+        ),
+      members: sql<
+        { userId: string; name: string }[]
+      >`coalesce((select json_agg(json_build_object('userId', member.id, 'name', member.name) order by member.name, member.id) from (
+        select u.id, u.name from chat_room_members m inner join users u on u.id = m.user_id
+        where m.room_id = ${chatRooms.id} and m.status = 'active' and m.user_id <> ${userId}::uuid order by u.name, u.id limit 3
+      ) member), '[]'::json)`,
       lastSeq: chatRooms.lastSeq,
       lastMessageAt: chatRooms.lastMessageAt,
       unreadCount: unreadDirectCount(userId),
@@ -125,7 +137,7 @@ export function listDirectNav(userId: string, database: DalDatabase = getDb()) {
         eq(chatRoomMembers.status, "active"),
       ),
     )
-    .innerJoin(users, eq(users.id, directPeerId(userId)))
+    .leftJoin(users, eq(users.id, directPeerId(userId)))
     .leftJoin(
       chatRoomReads,
       and(
@@ -133,7 +145,12 @@ export function listDirectNav(userId: string, database: DalDatabase = getDb()) {
         eq(chatRoomReads.userId, userId),
       ),
     )
-    .where(and(eq(chatRooms.kind, "dm"), isNotNull(chatRooms.lastMessageAt)))
+    .where(
+      and(
+        sql`${chatRooms.kind} in ('dm', 'group_dm')`,
+        isNotNull(chatRooms.lastMessageAt),
+      ),
+    )
     .orderBy(desc(chatRooms.lastMessageAt), chatRooms.id)
     .limit(50);
 }

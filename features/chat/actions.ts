@@ -14,6 +14,22 @@ export async function respondMessageRequest(input: unknown) {
   return createChatActions().respondMessageRequest(input);
 }
 
+export async function createGroupDm(input: unknown) {
+  return createChatActions().createGroupDm(input);
+}
+
+export async function addGroupMembers(input: unknown) {
+  return createChatActions().addGroupMembers(input);
+}
+
+export async function leaveGroupDm(input: unknown) {
+  return createChatActions().leaveGroupDm(input);
+}
+
+export async function renameGroupDm(input: unknown) {
+  return createChatActions().renameGroupDm(input);
+}
+
 export async function openDirectMessage(input: unknown) {
   return createChatActions().openDirectMessage(input);
 }

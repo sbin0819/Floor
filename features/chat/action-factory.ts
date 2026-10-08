@@ -19,6 +19,7 @@ import { createReactionActions } from "./reaction-actions";
 import { createMuteActions } from "./mute-actions";
 import { createDirectActions } from "./direct-actions";
 import { createSendActions } from "./send-actions";
+import { createGroupActions } from "./group-actions";
 
 const limiter = createMemoryRateLimiter();
 export type ChatActionDependencies = Partial<ActionDependencies> & {
@@ -31,6 +32,7 @@ export type ChatActionDependencies = Partial<ActionDependencies> & {
 export function createChatActions(dependencies: ChatActionDependencies = {}) {
   return {
     ...createDirectActions(dependencies),
+    ...createGroupActions(dependencies),
     ...createSendActions(dependencies, dependencies.limiter ?? limiter),
     ...createMuteActions(dependencies),
     ...createMessageActions(dependencies, dependencies.limiter ?? limiter),

@@ -5,6 +5,7 @@ import { ActionError } from "@/lib/actions/result";
 import {
   chatRooms,
   chatRoomReads,
+  chatRoomMembers,
   chatSpaces,
   messageMentions,
   messages,
@@ -86,6 +87,15 @@ export async function lockRoomForMessage(
     .select({ id: chatRooms.id })
     .from(chatRooms)
     .where(eq(chatRooms.id, roomId))
+    .for("update");
+}
+
+export function lockRoomMembers(roomId: string, database: DalDatabase) {
+  return database
+    .select()
+    .from(chatRoomMembers)
+    .where(eq(chatRoomMembers.roomId, roomId))
+    .orderBy(asc(chatRoomMembers.userId))
     .for("update");
 }
 

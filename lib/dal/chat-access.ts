@@ -12,7 +12,8 @@ import {
 } from "@/lib/db/schema";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
-import { blockedBetween } from "./people-blocks";
+import { blockedBetween, blockedBy } from "./people-blocks";
+import { sharesChatSpace } from "./group-dm";
 
 // 같은 JOIN 조건을 조회와 액션·토큰에 사용한다. 운영자 권한은 팀 소속을 대신하지 않는다.
 export function readableTeamSpace(userId: string) {
@@ -34,6 +35,8 @@ export function readableRoomCondition(
         where s.id = readable_room.space_id and s.kind = 'team' and s.deleted_at is null and m.user_id = ${userId}::uuid
       )) or (readable_room.kind = 'dm' and exists (
         select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status in ('active', 'requested')
+      )) or (readable_room.kind = 'group_dm' and exists (
+        select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status = 'active'
       ))
     ))`;
 }
@@ -65,8 +68,9 @@ export async function canReadRoom(
         userId: string;
         name: string;
         username: string | null;
+        sharesSpace: boolean;
       } | null>`(
-        select json_build_object('userId', u.id, 'name', u.name, 'username', u.username)
+        select json_build_object('userId', u.id, 'name', u.name, 'username', u.username, 'sharesSpace', ${sharesChatSpace(userId, sql`u.id`)})
         from users u where ${chatRooms.kind} = 'dm' and u.id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end
       )`,
       peerActive: sql<boolean>`exists (select 1 from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end and m.status = 'active')`,
@@ -82,6 +86,10 @@ export async function canReadRoom(
         )) from chat_room_members mine inner join chat_room_members peer on peer.room_id = mine.room_id and peer.user_id <> mine.user_id
         where mine.room_id = ${chatRooms.id} and mine.user_id = ${userId}::uuid and ${chatRooms.kind} = 'dm')`,
       peerBlocked: blockedBetween(
+        sql`${userId}::uuid`,
+        sql`case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end`,
+      ),
+      blockedByMe: blockedBy(
         sql`${userId}::uuid`,
         sql`case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end`,
       ),
@@ -140,7 +148,7 @@ export function writableRoom(
       ? room.directMembership !== null &&
         room.directMembership.peer !== "left" &&
         !room.peerBlocked
-      : !room.adminOnly || room.role === "admin")
+      : room.kind === "group_dm" || !room.adminOnly || room.role === "admin")
   );
 }
 

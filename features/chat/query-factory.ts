@@ -26,6 +26,8 @@ import type {
 import { listDirectMembers, listDirectNav } from "@/lib/dal/direct";
 import { serializeChatMessage } from "@/lib/dal/chat-messages";
 import { requestCooldownMs } from "@/lib/dal/direct-requests";
+import { listGroupMembers } from "@/lib/dal/group-dm";
+import { groupDisplayName } from "./group-name";
 
 const pageLimiter = createMemoryRateLimiter();
 
@@ -119,7 +121,19 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
       return {
         spaces: [...spaces.values()],
         directMessages: directRows.map((row) => ({
-          ...row,
+          roomId: row.roomId,
+          lastSeq: row.lastSeq,
+          muted: row.muted,
+          unreadCount: row.unreadCount,
+          unreadMentions: row.unreadMentions,
+          ...(row.kind === "dm"
+            ? { kind: "dm" as const, other: row.other! }
+            : {
+                kind: "group_dm" as const,
+                name: row.name,
+                memberCount: row.memberCount,
+                members: row.members,
+              }),
           lastMessageAt: row.lastMessageAt!.toISOString(),
           unread: row.unreadCount > 0,
         })),
@@ -187,7 +201,39 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         roomId,
         dependencies.database,
       );
-      if (!room || room.kind !== "dm" || !room.peer) return null;
+      if (!room || (room.kind !== "dm" && room.kind !== "group_dm"))
+        return null;
+      if (room.kind === "group_dm") {
+        const [messages, members] = await Promise.all([
+          listRecentMessages(roomId, session.userId, dependencies.database),
+          listGroupMembers(roomId, session.userId, dependencies.database),
+        ]);
+        return {
+          kind: "group_dm",
+          room: {
+            id: room.id,
+            archived: room.archivedAt !== null,
+            lastSeq: room.lastSeq,
+            muted: room.roomMuted,
+            unreadMentions: room.unreadMentions,
+          },
+          name: room.name,
+          displayName: groupDisplayName(
+            room.name,
+            members
+              .filter((member) => member.userId !== session.userId)
+              .map((member) => member.name),
+          ),
+          user: { id: session.userId, name: session.name },
+          members,
+          messages: messages.map(serializeChatMessage),
+          lastReadSeq: room.lastReadSeq,
+          firstUnreadSeq: room.firstUnreadSeq,
+          canWrite: writableRoom(room),
+          now: (dependencies.now?.() ?? new Date()).toISOString(),
+        };
+      }
+      if (!room.peer) return null;
       const [messages, members] = await Promise.all([
         listRecentMessages(roomId, session.userId, dependencies.database),
         listDirectMembers(roomId, dependencies.database),
@@ -195,6 +241,8 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
       const now = dependencies.now?.() ?? new Date();
       const membership = room.directMembership;
       return {
+        kind: "dm",
+        blockedByMe: room.blockedByMe,
         request:
           membership?.mine === "requested"
             ? { role: "recipient" }
