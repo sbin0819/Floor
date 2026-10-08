@@ -173,6 +173,22 @@ describe("authenticated query execution budgets", () => {
       "teams.getTeamPageData.member",
       () => teams(actors.member).getTeamPageData(actors.teamId),
     ],
+    [
+      "teams.getTeamBookings",
+      () => teams(actors.member).getTeamBookings(actors.teamId),
+    ],
+    [
+      "teams.getTeamRemovalPreview",
+      () =>
+        teams(actors.admin).getTeamRemovalPreview(
+          actors.teamId,
+          actors.member.userId,
+        ),
+    ],
+    [
+      "teams.getTeamDeletePreview",
+      () => teams(actors.admin).getTeamDeletePreview(actors.teamId),
+    ],
     ["teams.getInvitePageData", () => teams().getInvitePageData(token)],
     [
       "admin.getAdminBranch.twoFloors",

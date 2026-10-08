@@ -15,6 +15,7 @@ import { normalizeTeamName } from "@/lib/teams/normalize";
 import { isQueryableInviteToken } from "@/lib/teams/invite-token";
 import { avatarColumns } from "./avatar";
 import { toAvatar } from "@/lib/avatar";
+import { teamDisplayName } from "./team-name";
 
 function activeTeam(
   teamId:
@@ -62,7 +63,7 @@ export async function getTeamById(
   const [team] = await database
     .select({
       id: teams.id,
-      name: teams.name,
+      name: teamDisplayName(teams),
       homeBranchId: teams.homeBranchId,
       headcount: teams.headcount,
       createdBy: teams.createdBy,
@@ -107,7 +108,11 @@ export async function getTeamMember(
 
 export function listMyTeams(userId: string, database: DalDatabase = getDb()) {
   return database
-    .select({ id: teams.id, name: teams.name, role: teamMembers.role })
+    .select({
+      id: teams.id,
+      name: teamDisplayName(teams),
+      role: teamMembers.role,
+    })
     .from(teamMembers)
     .innerJoin(teams, eq(teamMembers.teamId, teams.id))
     .where(and(eq(teamMembers.userId, userId), isNull(teams.deletedAt)))
@@ -122,6 +127,7 @@ export async function listTeamMembers(
     .select({
       userId: users.id,
       name: users.name,
+      username: users.username,
       avatar: avatarColumns(users),
       email: users.email,
       role: teamMembers.role,
@@ -130,7 +136,7 @@ export async function listTeamMembers(
     .from(teamMembers)
     .innerJoin(users, eq(teamMembers.userId, users.id))
     .where(and(eq(teamMembers.teamId, teamId), activeTeam(teamMembers.teamId)))
-    .orderBy(asc(users.name), asc(users.id));
+    .orderBy(asc(teamMembers.role), asc(users.name), asc(users.id));
   return rows.map(({ avatar, ...row }) => ({
     ...row,
     avatar: toAvatar(avatar),
@@ -140,7 +146,11 @@ export async function listTeamMembers(
 export function searchTeams(query: string, database: DalDatabase = getDb()) {
   const literal = normalizeTeamName(query).replace(/[\\%_]/g, "\\$&");
   return database
-    .select({ id: teams.id, name: teams.name, homeBranchName: branches.name })
+    .select({
+      id: teams.id,
+      name: teamDisplayName(teams),
+      homeBranchName: branches.name,
+    })
     .from(teams)
     .leftJoin(branches, eq(teams.homeBranchId, branches.id))
     .where(and(ilike(teams.name, `%${literal}%`), isNull(teams.deletedAt)))
@@ -190,7 +200,7 @@ const receivedFields = {
   id: teamInvites.id,
   token: teamInvites.token,
   teamId: teams.id,
-  teamName: teams.name,
+  teamName: teamDisplayName(teams),
   senderName: users.name,
   message: teamInvites.message,
   expiresAt: teamInvites.expiresAt,
@@ -288,7 +298,7 @@ export function listMyJoinRequests(
     .select({
       id: teamJoinRequests.id,
       teamId: teams.id,
-      teamName: teams.name,
+      teamName: teamDisplayName(teams),
       message: teamJoinRequests.message,
       createdAt: teamJoinRequests.createdAt,
     })

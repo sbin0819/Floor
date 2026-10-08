@@ -218,6 +218,7 @@ describe("team data access and state transitions", () => {
       {
         userId: adminId,
         name: "관리자",
+        username: null,
         avatar: { color: avatarColorFor(adminId, null), photoUrl: null },
         email: "admin@example.test",
         role: "admin",

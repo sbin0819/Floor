@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { cache } from "react";
 
 import type { DalDatabase } from "@/lib/dal/database";
@@ -73,4 +73,24 @@ export function getAllRoleSettings(database?: DalDatabase) {
   return database === undefined
     ? cachedAllRoleSettings()
     : readAllRoleSettings(database);
+}
+
+export async function getRoleSettingsForBranches(
+  branchIds: readonly string[],
+  database: DalDatabase = getDb(),
+) {
+  if (!branchIds.length) return {};
+  const rows = await database
+    .select({
+      branchId: roleSettings.branchId,
+      role: roleSettings.role,
+      permissions: roleSettings.permissions,
+    })
+    .from(roleSettings)
+    .where(inArray(roleSettings.branchId, [...new Set(branchIds)]));
+  const result: Record<string, Partial<Record<Role, PermissionKey[]>>> = {};
+  for (const row of rows)
+    (result[row.branchId] ??= {})[row.role] =
+      row.permissions.filter(isPermissionKey);
+  return result;
 }

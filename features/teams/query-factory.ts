@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ActionError } from "@/lib/actions/result";
 import { canManageTeam } from "@/features/teams/action-factory";
 import { teamSearchSchema } from "@/features/teams/schema";
 import type {
@@ -15,8 +16,6 @@ import type { Session } from "@/lib/auth/types";
 import {
   getInviteForRecipient,
   getOperatorBranches,
-  getTeamById,
-  getTeamContact,
   getTeamMember,
   getUserById,
   listBranches,
@@ -34,6 +33,12 @@ import {
 import { canSendEmail } from "@/lib/email";
 import { normalizeTeamName } from "@/lib/teams/normalize";
 import type { TeamStartMode } from "./start-mode";
+import { createTeamManagementQueries } from "./manage-query-factory";
+import {
+  listPublicTeamMembers,
+  readTeamPageHeader,
+  readTeamSettings,
+} from "@/lib/dal/teams-management-read";
 
 export type TeamQueryDependencies = {
   database?: DalDatabase;
@@ -66,6 +71,7 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
       : [];
   }
   return {
+    ...createTeamManagementQueries(dependencies),
     async getHomeTeams(): Promise<HomeTeamsData> {
       const session = await readSession();
       const [myTeams, invites] = await Promise.all([
@@ -173,25 +179,35 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
       ]);
       if (!membership) return null;
       // 소속과 권한을 먼저 확인해야 관리자 전용 조회가 시작될 수 있다.
-      const [team, memberRows, contact, invites, requests] = await Promise.all([
-        getTeamById(teamId, database),
-        listTeamMembers(teamId, database),
-        isManager ? getTeamContact(teamId, database) : null,
-        isManager ? listSentInvites(teamId, database) : [],
-        isManager ? listTeamJoinRequests(teamId, database) : [],
-      ]);
+      const [team, memberRows, settings, invites, requests, branches] =
+        await Promise.all([
+          readTeamPageHeader(teamId, now(), database),
+          isManager
+            ? listTeamMembers(teamId, database)
+            : listPublicTeamMembers(teamId, database),
+          isManager ? readTeamSettings(teamId, database) : null,
+          isManager ? listSentInvites(teamId, database) : [],
+          isManager ? listTeamJoinRequests(teamId, database) : [],
+          isManager ? listBranches(database) : [],
+        ]);
       if (!team) return null;
       const members = memberRows.map((member) => ({
         id: member.userId,
         name: member.name,
+        username: member.username,
         avatar: member.avatar,
-        email: member.email,
         role: member.role,
         title: member.title,
       }));
       const publicData = {
         id: team.id,
         name: team.name,
+        userId: session.userId,
+        homeBranchName: team.homeBranchName,
+        space: team.space
+          ? { ...team.space, initial: Array.from(team.name)[0] ?? "" }
+          : null,
+        upcomingBookingCount: team.upcomingBookingCount,
         memberCount: members.length,
         members,
       };
@@ -199,7 +215,17 @@ export function createTeamQueries(dependencies: TeamQueryDependencies = {}) {
       return {
         ...publicData,
         role: "admin",
-        contactPhone: contact?.contactPhone ?? null,
+        members: members.map((member, index) => {
+          const row = memberRows[index]!;
+          if (!("email" in row) || typeof row.email !== "string")
+            throw new ActionError("INTERNAL");
+          return { ...member, email: row.email };
+        }),
+        homeBranchId: settings?.homeBranchId ?? null,
+        headcount: settings?.headcount ?? null,
+        branches,
+        pendingJoinRequestCount: requests.length,
+        contactPhone: settings?.contactPhone ?? null,
         sentInvites: invites.map((invite) => ({
           id: invite.id,
           email: invite.email,

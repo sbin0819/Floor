@@ -14,6 +14,7 @@ import { avatarColorFor } from "@/lib/avatar";
 import { ActionError } from "@/lib/actions/result";
 import type { Session } from "@/lib/auth/types";
 import * as dal from "@/lib/dal";
+import * as managementDal from "@/lib/dal/teams-management-read";
 import {
   branchStaff,
   teamInvites,
@@ -176,9 +177,9 @@ describe("authenticated team queries and safe DTOs", () => {
   });
 
   it("returns identical null results for absent and inaccessible teams without reading their contents", async () => {
-    const content = vi.spyOn(dal, "getTeamById");
+    const content = vi.spyOn(managementDal, "readTeamPageHeader");
     const members = vi.spyOn(dal, "listTeamMembers");
-    const contact = vi.spyOn(dal, "getTeamContact");
+    const contact = vi.spyOn(managementDal, "readTeamSettings");
     const invites = vi.spyOn(dal, "listSentInvites");
     const requests = vi.spyOn(dal, "listTeamJoinRequests");
     for (const id of [teamId, crypto.randomUUID(), "not-a-uuid"])
@@ -189,7 +190,9 @@ describe("authenticated team queries and safe DTOs", () => {
   });
 
   it("does not even read administrator-only data for an ordinary team member", async () => {
-    const contact = vi.spyOn(dal, "getTeamContact");
+    const contact = vi.spyOn(managementDal, "readTeamSettings");
+    const privateMembers = vi.spyOn(dal, "listTeamMembers");
+    const sql = vi.spyOn(database.client, "query");
     const invites = vi.spyOn(dal, "listSentInvites");
     const requests = vi.spyOn(dal, "listTeamJoinRequests");
     const data = await queries(actors.member).getTeamPageData(teamId);
@@ -208,7 +211,7 @@ describe("authenticated team queries and safe DTOs", () => {
             color: avatarColorFor(actors.member.userId, null),
             photoUrl: null,
           },
-          email: actors.member.email,
+          username: null,
           role: "member",
           title: "개발자",
         },
@@ -218,6 +221,9 @@ describe("authenticated team queries and safe DTOs", () => {
       "contactPhone",
       "contact_phone",
       "headcount",
+      "homeBranchId",
+      "branches",
+      "pendingJoinRequestCount",
       "sentInvites",
       "joinRequests",
       "canSendEmail",
@@ -226,7 +232,12 @@ describe("authenticated team queries and safe DTOs", () => {
     expect(JSON.stringify(data)).not.toContain("01012345678");
     expect(JSON.stringify(data)).not.toContain(token);
     expect(JSON.stringify(data)).not.toContain(actors.outsider.email);
-    for (const spy of [contact, invites, requests])
+    expect(JSON.stringify(data)).not.toContain(actors.member.email);
+    expect(JSON.stringify(data)).not.toContain(actors.owner.email);
+    expect(sql.mock.calls.map(([text]) => text).join("\n")).not.toMatch(
+      /"(?:email|contact_phone|headcount)"/,
+    );
+    for (const spy of [contact, privateMembers, invites, requests])
       expect(spy).not.toHaveBeenCalled();
   });
 
@@ -249,7 +260,15 @@ describe("authenticated team queries and safe DTOs", () => {
     ]);
     expect(data.sentInvites[0]?.expiresAt).toEqual(expect.any(String));
     expect(JSON.stringify(data)).not.toContain(token);
-    expect(data).not.toHaveProperty("headcount");
+    expect(data).toMatchObject({
+      headcount: 5,
+      homeBranchId: actors.branchId,
+      branches: [{ id: actors.branchId, name: "가상 지점" }],
+      pendingJoinRequestCount: 1,
+    });
+    expect(data.members.map(({ email }) => email).sort()).toEqual(
+      [actors.owner.email, actors.member.email].sort(),
+    );
   });
 
   it.each(["owner", "member"] as const)(

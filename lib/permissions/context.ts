@@ -10,6 +10,7 @@ import {
 } from "@/lib/dal";
 import { roles } from "@/lib/permissions/keys";
 import type { PermissionContext } from "@/lib/permissions/types";
+import { getRoleSettingsForBranches } from "@/lib/dal/role-settings";
 
 export type PermissionData = {
   context: PermissionContext;
@@ -61,8 +62,29 @@ export function loadPermissionData(
 
 export async function loadPermissionContext(
   session: Session,
-  branchId?: string,
+  branchId?: string | readonly string[],
   database?: DalDatabase,
 ): Promise<PermissionContext> {
+  if (branchId !== undefined && typeof branchId !== "string") {
+    const key = [...new Set(branchId)].sort().join(",");
+    return database === undefined
+      ? cachedMultiBranchContext(session.userId, key)
+      : readMultiBranchContext(session.userId, key, database);
+  }
   return (await loadPermissionData(session, branchId, database)).context;
 }
+
+async function readMultiBranchContext(
+  userId: string,
+  key: string,
+  database?: DalDatabase,
+): Promise<PermissionContext> {
+  const [memberships, settings] = await Promise.all([
+    getMemberships(userId, database),
+    getRoleSettingsForBranches(key ? key.split(",") : [], database),
+  ]);
+  return { userId, ...memberships, roleSettings: settings };
+}
+const cachedMultiBranchContext = cache((userId: string, key: string) =>
+  readMultiBranchContext(userId, key),
+);

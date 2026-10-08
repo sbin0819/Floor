@@ -1,4 +1,5 @@
 import type { Avatar } from "@/lib/avatar";
+import type { SpaceIconColor } from "@/features/chat/space-schema";
 
 export type TeamRole = "admin" | "member";
 
@@ -54,8 +55,8 @@ export type TeamStartData = {
 export type TeamMember = {
   id: string;
   name: string;
+  username: string | null;
   avatar: Avatar;
-  email: string;
   role: TeamRole;
   title: string | null;
 };
@@ -77,14 +78,22 @@ export type PendingJoinRequest = {
 type TeamPageCommon = {
   id: string;
   name: string;
+  userId: string;
+  homeBranchName: string | null;
+  space: { id: string; iconColor: SpaceIconColor; initial: string } | null;
+  upcomingBookingCount: number;
   memberCount: number;
-  members: TeamMember[];
 };
 export type TeamPageData = TeamPageCommon &
   (
-    | { role: "member" }
+    | { role: "member"; members: TeamMember[] }
     | {
         role: "admin";
+        members: (TeamMember & { email: string })[];
+        homeBranchId: string | null;
+        headcount: number | null;
+        branches: { id: string; name: string }[];
+        pendingJoinRequestCount: number;
         contactPhone: string | null;
         sentInvites: SentInvite[];
         joinRequests: PendingJoinRequest[];
@@ -92,3 +101,59 @@ export type TeamPageData = TeamPageCommon &
       }
   );
 export type InvitePageData = ReceivedInvite;
+
+export type TeamBookingView = "upcoming" | "past" | "cancelled";
+export type TeamBooking = {
+  id: string;
+  kind: "time" | "desk";
+  startAt: string;
+  endAt: string;
+  title: string | null;
+  spaceName: string;
+  floorName: string;
+  branchName: string;
+  timezone: string;
+  restricted: boolean;
+  booker: { id: string; name: string; avatar: Avatar };
+  participantCount: number;
+  canChat: boolean;
+  canCancel: boolean;
+};
+export type TeamBookingsData = {
+  teamId: string;
+  view: TeamBookingView;
+  branchId: string | null;
+  branches: { id: string; name: string }[];
+  bookings: TeamBooking[];
+  now: string;
+};
+export type TeamRemovalPreview = {
+  teamId: string;
+  userId: string;
+  bookingCount: number;
+  firstBooking: Pick<
+    TeamBooking,
+    | "id"
+    | "startAt"
+    | "endAt"
+    | "spaceName"
+    | "floorName"
+    | "branchName"
+    | "timezone"
+  > | null;
+};
+export type TeamDeletePreview = {
+  teamId: string;
+  memberCount: number;
+  inviteCount: number;
+  requestCount: number;
+  bookingCount: number;
+  accessGrants: {
+    targetType: "floor" | "space";
+    floorId: string;
+    spaceId: string | null;
+    branchName: string;
+    floorName: string;
+    spaceName: string | null;
+  }[];
+};
