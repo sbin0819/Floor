@@ -5,6 +5,7 @@ import type { Session } from "@/lib/auth/types";
 import { canReadRoom, canWriteRoom } from "@/lib/dal/chat-access";
 import { advanceRoomRead } from "@/lib/dal/chat-reads";
 import { listChatMembers } from "@/lib/dal/chat-read";
+import { listMeetingMembers } from "@/lib/dal/chat-meeting-read";
 import { getChatMessage } from "@/lib/dal/chat-messages";
 import * as writes from "@/lib/dal/chat-write";
 import { listDirectMembers } from "@/lib/dal/direct";
@@ -39,9 +40,10 @@ type SendInput = z.infer<typeof sendMessageSchema>;
 async function requireWritable(
   userId: string,
   roomId: string,
+  now: Date,
   database?: DalDatabase,
 ) {
-  const access = await canWriteRoom(userId, roomId, database);
+  const access = await canWriteRoom(userId, roomId, database, now);
   if (!access.room) throw new ActionError("NOT_FOUND");
   if (!access.canWrite) throw new ActionError("FORBIDDEN");
   return access.room;
@@ -99,7 +101,12 @@ async function sendLockedMessage(
         database,
       )
     : { pending: false, events: [] };
-  const room = await requireWritable(session.userId, input.roomId, database);
+  const room = await requireWritable(
+    session.userId,
+    input.roomId,
+    now,
+    database,
+  );
   if (input.replyToId) {
     const reply = await getChatMessage(
       input.replyToId,
@@ -112,9 +119,11 @@ async function sendLockedMessage(
   }
   const parsed = extractMentions(input.body);
   const members =
-    room.kind === "dm" || room.kind === "group_dm"
-      ? await listDirectMembers(room.id, database, session.userId)
-      : await listChatMembers(room.teamId!, database, session.userId);
+    room.kind === "meeting"
+      ? await listMeetingMembers(room.booking!.id, session.userId, database)
+      : room.kind === "dm" || room.kind === "group_dm"
+        ? await listDirectMembers(room.id, database, session.userId)
+        : await listChatMembers(room.teamId!, database, session.userId);
   const names = new Map(members.map((member) => [member.id, member.name]));
   const mentions = parsed.userIds.filter(
     (id) =>
@@ -124,7 +133,10 @@ async function sendLockedMessage(
   const mentionsEveryone =
     parsed.everyone &&
     !flow.pending &&
-    (room.kind === "dm" || room.kind === "group_dm" || room.role === "admin");
+    (room.kind === "meeting" ||
+      room.kind === "dm" ||
+      room.kind === "group_dm" ||
+      room.role === "admin");
   const inserted = await writes.insertChatMessage(
     { ...input, mentionsEveryone, authorId: session.userId, now },
     database,
@@ -158,7 +170,7 @@ async function sendLockedMessage(
   ];
   if (!flow.pending) {
     const activityChannels =
-      room.kind === "group_dm"
+      room.kind === "group_dm" || room.kind === "meeting"
         ? members
             .filter((member) => member.id !== session.userId)
             .map((member) => userChannel(member.id))
@@ -172,11 +184,13 @@ async function sendLockedMessage(
         channel,
         event: {
           type: "room.activity",
-          bookingId: null,
+          bookingId: room.booking?.id ?? null,
           spaceId: room.spaceId,
           roomKind: room.kind,
           preview:
-            room.kind === "dm" || room.kind === "group_dm"
+            room.kind === "meeting" ||
+            room.kind === "dm" ||
+            room.kind === "group_dm"
               ? {
                   messageId: message.id,
                   authorName: session.name,
@@ -198,21 +212,23 @@ async function sendLockedMessage(
         channel: userChannel(recipient),
         event: {
           type: "mention.created",
-          bookingId: null,
+          bookingId: room.booking?.id ?? null,
           spaceId: room.spaceId,
           roomKind: room.kind,
           roomId: room.id,
           roomName:
-            room.kind === "dm"
-              ? session.name
-              : room.kind === "group_dm"
-                ? groupDisplayName(
-                    room.name,
-                    members
-                      .filter((member) => member.id !== recipient)
-                      .map((member) => member.name),
-                  )
-                : (room.name ?? "채널"),
+            room.kind === "meeting"
+              ? (room.booking!.title ?? `${room.booking!.spaceName} 회의`)
+              : room.kind === "dm"
+                ? session.name
+                : room.kind === "group_dm"
+                  ? groupDisplayName(
+                      room.name,
+                      members
+                        .filter((member) => member.id !== recipient)
+                        .map((member) => member.name),
+                    )
+                  : (room.name ?? "채널"),
           messageId: message.id,
           seq: message.seq,
           authorName: session.name,
@@ -267,12 +283,13 @@ export function createSendActions(
         authorize: "none",
         async handler({ session, input }) {
           const parsed = prepare(session.userId, input.body);
+          const now = dependencies.now?.() ?? new Date();
           const room = await requireWritable(
             session.userId,
             input.roomId,
+            now,
             dependencies.database,
           );
-          const now = dependencies.now?.() ?? new Date();
           const result = await withTransaction(async (tx) => {
             if (room.kind === "dm")
               await writes.lockMessageUsers(
@@ -286,7 +303,7 @@ export function createSendActions(
                 tx,
               );
             await writes.lockRoomForMessage(input.roomId, tx);
-            await requireWritable(session.userId, input.roomId, tx);
+            await requireWritable(session.userId, input.roomId, now, tx);
             return sendLockedMessage(
               input,
               session,

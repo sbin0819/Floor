@@ -410,7 +410,7 @@ describe("unread mentions and mute preferences", () => {
       "last_read_seq",
     );
   });
-  it("retains nav [1], channel [1,2] and message page [2] SQL budgets with many channels", async () => {
+  it("retains nav [3], channel [1,2] and message page [2] SQL budgets with many channels", async () => {
     await database.db.insert(chatRooms).values(
       Array.from({ length: 25 }, (_, index) => ({
         kind: "text" as const,
@@ -425,8 +425,8 @@ describe("unread mentions and mute preferences", () => {
       const nav = (await queries().getMyChatNav()).spaces;
       expect(meter.stop()).toMatchObject({
         stages: 1,
-        statements: 2,
-        perStage: [2],
+        statements: 3,
+        perStage: [3],
       });
       expect(nav[0]!.unreadMentions).toBe(1);
       meter.start();

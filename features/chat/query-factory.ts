@@ -3,7 +3,16 @@ import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
 import type { DalDatabase } from "@/lib/dal/database";
-import { canReadRoom, writableRoom } from "@/lib/dal/chat-access";
+import {
+  canReadRoom,
+  canReadMeeting,
+  meetingReadOnlyReason,
+  writableRoom,
+} from "@/lib/dal/chat-access";
+import {
+  listMeetingMembers,
+  listMeetingNav,
+} from "@/lib/dal/chat-meeting-read";
 import {
   listChatMembers,
   readChatNavigation,
@@ -22,6 +31,7 @@ import type {
   ChatNav,
   DirectMessageView,
   RoomMessagesPage,
+  MeetingView,
 } from "./types";
 import { listDirectMembers, listDirectNav } from "@/lib/dal/direct";
 import { serializeChatMessage } from "@/lib/dal/chat-messages";
@@ -86,9 +96,11 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
     },
     async getMyChatNav(): Promise<ChatNav> {
       const session = await readSession();
-      const [navigation, directRows] = await Promise.all([
+      const now = dependencies.now?.() ?? new Date();
+      const [navigation, directRows, meetingRows] = await Promise.all([
         readChatNavigation(session.userId, dependencies.database),
         listDirectNav(session.userId, dependencies.database),
+        listMeetingNav(session.userId, now, dependencies.database),
       ]);
       const spaces = new Map<string, ChatSpaceNav>();
       for (const row of navigation.rows) {
@@ -119,6 +131,18 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         }
       }
       return {
+        now: now.toISOString(),
+        meetings: meetingRows.map(({ during, ...row }) => ({
+          ...row,
+          start: during.start.toISOString(),
+          end: during.end.toISOString(),
+          phase:
+            now < during.start
+              ? "upcoming"
+              : now < during.end
+                ? "ongoing"
+                : "ended",
+        })),
         myStatus: navigation.myStatus,
         blockedUserIds: navigation.blockedUserIds,
         spaces: [...spaces.values()],
@@ -139,6 +163,57 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           lastMessageAt: row.lastMessageAt!.toISOString(),
           unread: row.unreadCount > 0,
         })),
+      };
+    },
+    async getMeetingView(bookingId: string): Promise<MeetingView | null> {
+      const session = await readSession();
+      if (!z.uuid().safeParse(bookingId).success) return null;
+      const now = dependencies.now?.() ?? new Date();
+      const room = await canReadMeeting(
+        session.userId,
+        bookingId,
+        dependencies.database,
+      );
+      if (!room?.booking) return null;
+      const [messages, members] = await Promise.all([
+        listRecentMessages(room.id, session.userId, dependencies.database),
+        listMeetingMembers(bookingId, session.userId, dependencies.database),
+      ]);
+      const { userId, ...booking } = room.booking;
+      const isBooker = userId === session.userId;
+      return {
+        room: {
+          id: room.id,
+          lastSeq: room.lastSeq,
+          muted: room.roomMuted,
+          unreadMentions: room.unreadMentions,
+        },
+        booking: {
+          ...booking,
+          start: new Date(booking.start).toISOString(),
+          end: new Date(booking.end).toISOString(),
+        },
+        user: { id: session.userId, name: session.name },
+        members: members.map(
+          ({ id, name, username, isBooker, sharesSpace }) => ({
+            userId: id,
+            name,
+            username,
+            isBooker,
+            sharesSpace,
+          }),
+        ),
+        messages: messages.map(serializeChatMessage),
+        lastReadSeq: room.lastReadSeq,
+        firstUnreadSeq: room.firstUnreadSeq,
+        canWrite: writableRoom(room, now),
+        readOnlyReason: meetingReadOnlyReason(booking, now),
+        isBooker,
+        canEditBooking:
+          isBooker &&
+          booking.status === "confirmed" &&
+          now.getTime() < new Date(booking.end).getTime(),
+        now: now.toISOString(),
       };
     },
     async getChannelView(

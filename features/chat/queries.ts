@@ -14,3 +14,6 @@ export async function getRoomMessagesPage(roomId: string, query: unknown) {
 export async function getDirectMessageView(roomId: string) {
   return createChatQueries().getDirectMessageView(roomId);
 }
+export async function getMeetingView(bookingId: string) {
+  return createChatQueries().getMeetingView(bookingId);
+}

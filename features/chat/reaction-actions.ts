@@ -40,10 +40,12 @@ export function createReactionActions(
             dependencies.database,
           );
           if (!target) throw new ActionError("NOT_FOUND");
+          const now = dependencies.now?.() ?? new Date();
           const access = await canReactRoom(
             session.userId,
             target.roomId,
             dependencies.database,
+            now,
           );
           if (!access.room) throw new ActionError("NOT_FOUND");
           if (!access.canReact) throw new ActionError("FORBIDDEN");
@@ -55,6 +57,7 @@ export function createReactionActions(
               session.userId,
               target.roomId,
               tx,
+              now,
             );
             if (!current.room) throw new ActionError("NOT_FOUND");
             if (!current.canReact) throw new ActionError("FORBIDDEN");
@@ -62,7 +65,7 @@ export function createReactionActions(
               {
                 ...input,
                 userId: session.userId,
-                now: dependencies.now?.() ?? new Date(),
+                now,
               },
               tx,
             );

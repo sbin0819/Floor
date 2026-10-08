@@ -566,7 +566,7 @@ describe("group direct messages", () => {
     try {
       meter.start();
       const nav = await queries().getMyChatNav();
-      expect(meter.stop().perStage).toEqual([2]);
+      expect(meter.stop().perStage).toEqual([3]);
       expect(nav.directMessages).toHaveLength(50);
       expect(nav.directMessages.some(({ kind }) => kind === "dm")).toBe(true);
       expect(

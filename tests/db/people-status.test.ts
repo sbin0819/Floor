@@ -99,23 +99,19 @@ describe("persisted self status and private navigation metadata", () => {
       log.mockRestore();
     }
   });
-  it("returns status and own blocks even without any team, in the unchanged two-statement nav budget", async () => {
+  it("returns status and own blocks even without any team, in the three-statement nav budget", async () => {
     await database.db
       .update(users)
       .set({ status: "dnd" })
       .where(eq(users.id, actors.operator.userId));
-    await database.db
-      .insert(userBlocks)
-      .values({
-        blockerId: actors.operator.userId,
-        blockedId: actors.member.userId,
-      });
-    await database.db
-      .insert(userBlocks)
-      .values({
-        blockerId: actors.admin.userId,
-        blockedId: actors.operator.userId,
-      });
+    await database.db.insert(userBlocks).values({
+      blockerId: actors.operator.userId,
+      blockedId: actors.member.userId,
+    });
+    await database.db.insert(userBlocks).values({
+      blockerId: actors.admin.userId,
+      blockedId: actors.operator.userId,
+    });
     const queries = createChatQueries({
       database: database.db,
       requireSession: async () => actors.operator,
@@ -129,10 +125,12 @@ describe("persisted self status and private navigation metadata", () => {
       expect(value).toEqual({
         spaces: [],
         directMessages: [],
+        meetings: [],
+        now: chatNow.toISOString(),
         myStatus: "dnd",
         blockedUserIds: [actors.member.userId],
       });
-      expect(measurement.perStage).toEqual([2]);
+      expect(measurement.perStage).toEqual([3]);
     } finally {
       meter.restore();
     }

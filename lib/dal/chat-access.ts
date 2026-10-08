@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   chatRoomReads,
@@ -37,6 +37,11 @@ export function readableRoomCondition(
         select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status in ('active', 'requested')
       )) or (readable_room.kind = 'group_dm' and exists (
         select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status = 'active'
+      )) or (readable_room.kind = 'meeting' and exists (
+        select 1 from bookings b where b.id = readable_room.booking_id and
+          (b.user_id = ${userId}::uuid or exists (
+            select 1 from booking_participants p where p.booking_id = b.id and p.user_id = ${userId}::uuid
+          ))
       ))
     ))`;
 }
@@ -46,6 +51,22 @@ export async function canReadRoom(
   roomId: string,
   database: DalDatabase = getDb(),
 ) {
+  return readRoom(userId, eq(chatRooms.id, roomId), database);
+}
+
+export function canReadMeeting(
+  userId: string,
+  bookingId: string,
+  database: DalDatabase = getDb(),
+) {
+  return readRoom(
+    userId,
+    and(eq(chatRooms.bookingId, bookingId), eq(chatRooms.kind, "meeting"))!,
+    database,
+  );
+}
+
+async function readRoom(userId: string, target: SQL, database: DalDatabase) {
   const [room] = await database
     .select({
       id: chatRooms.id,
@@ -64,6 +85,25 @@ export async function canReadRoom(
       roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`,
       spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`,
       role: teamMembers.role,
+      booking: sql<{
+        id: string;
+        userId: string;
+        title: string | null;
+        status: "confirmed" | "cancelled";
+        attendeeCount: number | null;
+        start: string;
+        end: string;
+        spaceName: string;
+        floorName: string;
+        branchName: string;
+        timezone: string;
+      } | null>`(select json_build_object(
+        'id', b.id, 'userId', b.user_id, 'title', b.title, 'status', b.status,
+        'attendeeCount', b.attendee_count, 'start', lower(b.during), 'end', upper(b.during),
+        'spaceName', s.name, 'floorName', f.name, 'branchName', branch.name, 'timezone', branch.timezone
+      ) from bookings b inner join spaces s on s.id = b.space_id
+        inner join floors f on f.id = s.floor_id inner join branches branch on branch.id = f.branch_id
+        where b.id = ${chatRooms.bookingId} and ${chatRooms.kind} = 'meeting')`,
       peer: sql<{
         userId: string;
         name: string;
@@ -119,7 +159,7 @@ export async function canReadRoom(
         eq(chatRoomReads.userId, userId),
       ),
     )
-    .where(and(eq(chatRooms.id, roomId), readableRoomCondition(userId)))
+    .where(and(target, readableRoomCondition(userId)))
     .limit(1);
   return room ?? null;
 }
@@ -141,7 +181,13 @@ export async function canReadSpace(
 
 export function writableRoom(
   room: NonNullable<Awaited<ReturnType<typeof canReadRoom>>>,
+  now?: Date,
 ) {
+  if (room.kind === "meeting")
+    return (
+      room.booking !== null &&
+      meetingReadOnlyReason(room.booking, now ?? new Date()) === null
+    );
   return (
     room.archivedAt === null &&
     (room.kind === "dm"
@@ -152,19 +198,38 @@ export function writableRoom(
   );
 }
 
+export function meetingReadOnlyReason(
+  booking: { status: "confirmed" | "cancelled"; end: string },
+  now: Date,
+): "cancelled" | "ended" | null {
+  if (booking.status === "cancelled") return "cancelled";
+  return now.getTime() >= new Date(booking.end).getTime() + 86_400_000
+    ? "ended"
+    : null;
+}
+
 export async function canWriteRoom(
   userId: string,
   roomId: string,
   database?: DalDatabase,
+  now?: Date,
 ) {
   const room = await canReadRoom(userId, roomId, database);
-  return { room, canWrite: room !== null && writableRoom(room) };
+  const instant = now ?? new Date();
+  return {
+    room,
+    canWrite: room !== null && writableRoom(room, instant),
+    readOnlyReason: room?.booking
+      ? meetingReadOnlyReason(room.booking, instant)
+      : null,
+  };
 }
 
 export async function canReactRoom(
   userId: string,
   roomId: string,
   database?: DalDatabase,
+  now?: Date,
 ) {
   const room = await canReadRoom(userId, roomId, database);
   return {
@@ -172,6 +237,7 @@ export async function canReactRoom(
     canReact:
       room !== null &&
       room.archivedAt === null &&
+      (room.kind !== "meeting" || writableRoom(room, now)) &&
       (room.kind !== "dm" || (room.peerActive && !room.peerBlocked)),
   };
 }

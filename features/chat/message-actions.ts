@@ -4,6 +4,7 @@ import { canReadRoom, canWriteRoom } from "@/lib/dal/chat-access";
 import * as writes from "@/lib/dal/chat-message-write";
 import { getChatMessage } from "@/lib/dal/chat-messages";
 import { listChatMembers } from "@/lib/dal/chat-read";
+import { listMeetingMembers } from "@/lib/dal/chat-meeting-read";
 import { listDirectMembers } from "@/lib/dal/direct";
 import {
   insertMessageMentions,
@@ -57,16 +58,17 @@ export function createMessageActions(
             target.deletedAt
           )
             throw new ActionError("NOT_FOUND");
+          const now = dependencies.now?.() ?? new Date();
           const access = await canWriteRoom(
             session.userId,
             target.roomId,
             dependencies.database,
+            now,
           );
           if (!access.room) throw new ActionError("NOT_FOUND");
           if (!access.canWrite) throw new ActionError("FORBIDDEN");
           const parsed = extractMentions(input.body);
           if (parsed.exceedsLimit) throw new ActionError("INVALID_INPUT");
-          const now = dependencies.now?.() ?? new Date();
           const result = await withTransaction(async (tx) => {
             await lockUsersForKeyShare(
               [...new Set([session.userId, ...parsed.userIds])].sort(),
@@ -77,6 +79,7 @@ export function createMessageActions(
               session.userId,
               target.roomId,
               tx,
+              now,
             );
             if (!currentAccess.room) throw new ActionError("NOT_FOUND");
             if (!currentAccess.canWrite) throw new ActionError("FORBIDDEN");
@@ -89,14 +92,20 @@ export function createMessageActions(
             )
               throw new ActionError("NOT_FOUND");
             const members =
-              currentAccess.room.kind === "dm" ||
-              currentAccess.room.kind === "group_dm"
-                ? await listDirectMembers(target.roomId, tx, session.userId)
-                : await listChatMembers(
-                    currentAccess.room.teamId!,
-                    tx,
+              currentAccess.room.kind === "meeting"
+                ? await listMeetingMembers(
+                    currentAccess.room.booking!.id,
                     session.userId,
-                  );
+                    tx,
+                  )
+                : currentAccess.room.kind === "dm" ||
+                    currentAccess.room.kind === "group_dm"
+                  ? await listDirectMembers(target.roomId, tx, session.userId)
+                  : await listChatMembers(
+                      currentAccess.room.teamId!,
+                      tx,
+                      session.userId,
+                    );
             const names = new Map(
               members.map((member) => [member.id, member.name]),
             );
@@ -111,6 +120,7 @@ export function createMessageActions(
                 (currentAccess.room.directMembership?.mine === "active" &&
                   currentAccess.room.directMembership.peer === "active")) &&
               (currentAccess.room.kind === "dm" ||
+                currentAccess.room.kind === "meeting" ||
                 currentAccess.room.kind === "group_dm" ||
                 currentAccess.room.role === "admin");
             const oldMentions = new Set(
@@ -148,6 +158,7 @@ export function createMessageActions(
             const recipients = await writes.unreadMentionRecipients(
               {
                 teamId: currentAccess.room.teamId,
+                bookingId: currentAccess.room.booking?.id ?? null,
                 roomId: target.roomId,
                 userIds: candidates,
                 seq: original.seq,
@@ -185,21 +196,24 @@ export function createMessageActions(
               channel: userChannel(recipient.userId),
               event: {
                 type: "mention.created",
-                bookingId: null,
+                bookingId: result.room.booking?.id ?? null,
                 spaceId: result.room.spaceId,
                 roomKind: result.room.kind,
                 roomId: target.roomId,
                 roomName:
-                  result.room.kind === "dm"
-                    ? session.name
-                    : result.room.kind === "group_dm"
-                      ? groupDisplayName(
-                          result.room.name,
-                          [...result.names]
-                            .filter(([id]) => id !== recipient.userId)
-                            .map(([, name]) => name),
-                        )
-                      : (result.room.name ?? "채널"),
+                  result.room.kind === "meeting"
+                    ? (result.room.booking!.title ??
+                      `${result.room.booking!.spaceName} 회의`)
+                    : result.room.kind === "dm"
+                      ? session.name
+                      : result.room.kind === "group_dm"
+                        ? groupDisplayName(
+                            result.room.name,
+                            [...result.names]
+                              .filter(([id]) => id !== recipient.userId)
+                              .map(([, name]) => name),
+                          )
+                        : (result.room.name ?? "채널"),
                 messageId: message.id,
                 seq: message.seq,
                 authorName: session.name ?? "알 수 없는 사용자",

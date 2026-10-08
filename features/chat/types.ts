@@ -90,6 +90,57 @@ export type ChatNav = {
   blockedUserIds: string[];
   spaces: ChatSpaceNav[];
   directMessages: DirectMessageNav[];
+  meetings: MeetingNav[];
+  now: string;
+};
+export type MeetingNav = {
+  bookingId: string;
+  roomId: string;
+  title: string | null;
+  spaceName: string;
+  start: string;
+  end: string;
+  timezone: string;
+  phase: "upcoming" | "ongoing" | "ended";
+  unread: boolean;
+  unreadMentions: number;
+  muted: boolean;
+};
+export type MeetingView = {
+  room: {
+    id: string;
+    lastSeq: number;
+    muted: boolean;
+    unreadMentions: number;
+  };
+  booking: {
+    id: string;
+    title: string | null;
+    spaceName: string;
+    floorName: string;
+    branchName: string;
+    timezone: string;
+    start: string;
+    end: string;
+    status: "confirmed" | "cancelled";
+    attendeeCount: number | null;
+  };
+  user: { id: string; name: string };
+  members: {
+    userId: string;
+    name: string;
+    username: string | null;
+    isBooker: boolean;
+    sharesSpace: boolean;
+  }[];
+  messages: ChatMessage[];
+  lastReadSeq: number | null;
+  firstUnreadSeq: number | null;
+  canWrite: boolean;
+  readOnlyReason: "cancelled" | "ended" | null;
+  isBooker: boolean;
+  canEditBooking: boolean;
+  now: string;
 };
 type DirectMessageViewBase = {
   room: {

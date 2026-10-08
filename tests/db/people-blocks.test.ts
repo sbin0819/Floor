@@ -47,13 +47,11 @@ describe("block-aware people lookup and new booking participants", () => {
   afterEach(() => vi.restoreAllMocks());
   beforeEach(async () => {
     fixture = await seedBookingActors(database);
-    await database.db
-      .insert(teamMembers)
-      .values({
-        teamId: fixture.teamId,
-        userId: fixture.person.userId,
-        role: "member",
-      });
+    await database.db.insert(teamMembers).values({
+      teamId: fixture.teamId,
+      userId: fixture.person.userId,
+      role: "member",
+    });
     await database.db
       .update(users)
       .set({ username: "shared.member" })
@@ -73,12 +71,10 @@ describe("block-aware people lookup and new booking participants", () => {
       rateLimiter: createMemoryRateLimiter(),
     });
   const block = (direction: "mine" | "theirs", other = fixture.member.userId) =>
-    database.db
-      .insert(userBlocks)
-      .values({
-        blockerId: direction === "mine" ? fixture.person.userId : other,
-        blockedId: direction === "mine" ? other : fixture.person.userId,
-      });
+    database.db.insert(userBlocks).values({
+      blockerId: direction === "mine" ? fixture.person.userId : other,
+      blockedId: direction === "mine" ? other : fixture.person.userId,
+    });
   const invalid = {
     ok: false,
     code: "INVALID_INPUT",
@@ -101,7 +97,13 @@ describe("block-aware people lookup and new booking participants", () => {
     if (existing.length)
       await database.db
         .insert(bookingParticipants)
-        .values(existing.map((userId) => ({ bookingId: row.id, userId })));
+        .values(
+          existing.map((userId) => ({
+            bookingId: row.id,
+            userId,
+            createdAt: bookingNow,
+          })),
+        );
     return {
       bookingId: row.id,
       start: row.during.start.toISOString(),
@@ -221,7 +223,11 @@ describe("block-aware people lookup and new booking participants", () => {
         data: { bookingId: draft.bookingId },
       });
       expect(await database.db.select().from(bookingParticipants)).toEqual([
-        { bookingId: draft.bookingId, userId: fixture.member.userId },
+        {
+          bookingId: draft.bookingId,
+          userId: fixture.member.userId,
+          createdAt: bookingNow,
+        },
       ]);
       await block(direction, fixture.stranger.userId);
       const before = await database.db.select().from(bookings);
@@ -250,12 +256,10 @@ describe("block-aware people lookup and new booking participants", () => {
         "lockParticipantBookingActor",
       ).mockImplementationOnce(async (input, tx) => {
         const result = await original(input, tx);
-        await tx
-          .insert(userBlocks)
-          .values({
-            blockerId: fixture.member.userId,
-            blockedId: fixture.person.userId,
-          });
+        await tx.insert(userBlocks).values({
+          blockerId: fixture.member.userId,
+          blockedId: fixture.person.userId,
+        });
         return result;
       });
       const result = draft

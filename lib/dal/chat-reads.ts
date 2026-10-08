@@ -1,15 +1,19 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { chatRoomReads, chatRooms, chatSpacePrefs } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
 import { readableRoomCondition } from "./chat-access";
 import { blockedBy } from "./people-blocks";
 
-export function roomJoinedAt(userId: string) {
+export function roomJoinedAt(userId: string | SQL) {
   return sql`case when ${chatRooms.kind} in ('dm', 'group_dm') then (
     select m.joined_at from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = ${userId}::uuid
+  ) when ${chatRooms.kind} = 'meeting' then (
+    select case when b.user_id = ${userId}::uuid then b.created_at else
+      (select p.created_at from booking_participants p where p.booking_id = b.id and p.user_id = ${userId}::uuid)
+    end from bookings b where b.id = ${chatRooms.bookingId}
   ) else (
     select m.created_at from team_members m inner join chat_spaces s on s.team_id = m.team_id where s.id = ${chatRooms.spaceId} and m.user_id = ${userId}::uuid
   ) end`;

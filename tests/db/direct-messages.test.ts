@@ -322,6 +322,7 @@ describe("direct messages", () => {
         channel: `user:${actors.admin.userId}`,
         event: {
           type: "room.activity",
+          bookingId: null,
           roomId,
           roomKind: "dm",
           spaceId: null,
@@ -338,6 +339,7 @@ describe("direct messages", () => {
         channel: `user:${actors.admin.userId}`,
         event: {
           type: "mention.created",
+          bookingId: null,
           roomId,
           roomKind: "dm",
           spaceId: null,
@@ -546,7 +548,7 @@ describe("direct messages", () => {
     const meter = createQueryMeter(database.client);
     try {
       for (const [query, expected] of [
-        [() => queries().getMyChatNav(), [2]],
+        [() => queries().getMyChatNav(), [3]],
         [() => queries().getDirectMessageView(roomId), [1, 2]],
         [() => queries().getRoomMessagesPage(roomId, { before: "100" }), [2]],
       ] as const) {

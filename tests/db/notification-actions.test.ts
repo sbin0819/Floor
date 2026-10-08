@@ -296,7 +296,9 @@ describe("atomic booking notifications and sorted recipient locks", () => {
         fixture.stranger.userId,
       ].sort(),
       booking.bookingId,
+      booking.bookingId,
     ]);
+    expect(locks.at(-1)?.query).toContain('from "chat_rooms"');
   });
   it("restarts the whole transaction if a latest participant was not locked and publishes once", async () => {
     const booking = await create();
