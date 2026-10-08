@@ -33,6 +33,7 @@ import { FloorDatePicker } from "./floor-date-picker";
 import { useBranchDisplayNow } from "./branch-display-clock";
 import { floorIdFromSegments } from "./use-branch-route-scope";
 import { BookingDateMark } from "./booking-date-mark";
+import { FloorPeopleControl } from "./floor-people-filter";
 
 export function BranchNavigation({
   data,
@@ -90,7 +91,7 @@ export function BranchNavigation({
   return (
     <PageContainer
       width="wide"
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-4 pb-6 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-4 pb-6 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
     >
       <h1 className="sr-only">
         {floor ? `${floor.name} 공간 예약` : `${data.branch.name} 공간 예약`}
@@ -176,12 +177,15 @@ export function BranchNavigation({
           {display.label}
         </StatusLine>
         {viewControl && (
-          <div className="col-start-2 row-start-3 justify-self-end lg:col-start-4 lg:row-start-1">
+          <div className="col-start-2 row-start-3 justify-self-end lg:col-start-5 lg:row-start-1">
             {viewControl}
           </div>
         )}
+        {floorId && (
+          <FloorPeopleControl className="col-span-2 row-start-4 lg:col-span-1 lg:col-start-4 lg:row-start-1" />
+        )}
       </header>
-      <div className="col-span-2 row-start-2 flex min-w-0 items-center gap-3 lg:col-span-4">
+      <div className="col-span-2 row-start-2 flex min-w-0 items-center gap-3 lg:col-span-5">
         {floorId && (
           <nav
             aria-label="날짜 선택"

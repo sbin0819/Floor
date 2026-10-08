@@ -19,6 +19,7 @@ import {
 } from "@/features/bookings/floor-view";
 import { floorHref } from "@/features/bookings/format";
 import { searchValue } from "@/features/bookings/floor-selection";
+import { parsePeopleFilter } from "@/features/bookings/people-filter";
 import { useFloorSelection } from "./branch-workspace";
 import { useWideScreen } from "./use-wide-screen";
 
@@ -27,6 +28,8 @@ const ViewPreference = createContext<{
   set: (value: FloorView) => void;
   override: FloorView | null;
   setOverride: (value: FloorView | null) => void;
+  peopleOverride: number | null | undefined;
+  setPeopleOverride: (value: number | null | undefined) => void;
 } | null>(null);
 export function FloorViewProvider({
   cookieView,
@@ -37,13 +40,36 @@ export function FloorViewProvider({
 }) {
   const [preference, setPreference] = useState(cookieView);
   const [override, setOverride] = useState<FloorView | null>(null);
+  const [peopleOverride, setPeopleOverride] = useState<number | null>();
   return (
     <ViewPreference.Provider
-      value={{ value: preference, set: setPreference, override, setOverride }}
+      value={{
+        value: preference,
+        set: setPreference,
+        override,
+        setOverride,
+        peopleOverride,
+        setPeopleOverride,
+      }}
     >
       {children}
     </ViewPreference.Provider>
   );
+}
+export function useFloorPeople() {
+  const currentSearch = useSearchParams();
+  const selection = useFloorSelection();
+  const search = selection?.search ?? currentSearch;
+  const preference = useContext(ViewPreference);
+  const current = parsePeopleFilter(searchValue(search, "people"));
+  return {
+    people:
+      preference?.peopleOverride === undefined
+        ? current
+        : preference.peopleOverride,
+    override: preference?.peopleOverride,
+    setOverride: preference?.setPeopleOverride,
+  };
 }
 export function useFloorView(initialView?: FloorView | null) {
   const currentSearch = useSearchParams();

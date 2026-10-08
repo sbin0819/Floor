@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Suspense,
   useEffect,
@@ -28,6 +29,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { floorHref, formatBookingDate } from "@/features/bookings/format";
+import { carryFloorQuery } from "@/features/bookings/people-filter";
 import {
   buildMonthGrid,
   getCalendarDayState,
@@ -138,6 +140,8 @@ function DatePickerCalendar({
   const links = useRef(new Map<string, HTMLAnchorElement>());
   const focusRequested = useRef(true);
   const navigation = useFloorSelection();
+  const currentSearch = useSearchParams();
+  const search = navigation?.search ?? currentSearch;
   const lastDate = addDays(today, 60);
   const parsed = parseCalendarMonth(month);
   const grid = buildMonthGrid(parsed.year, parsed.month);
@@ -149,7 +153,7 @@ function DatePickerCalendar({
     }
   }, [focusedDate, month]);
   const href = (value: string) =>
-    floorHref(branchId, floorId, value, spaceId, view);
+    carryFloorQuery(floorHref(branchId, floorId, value, spaceId, view), search);
   const choose = (event: MouseEvent<HTMLAnchorElement>, value: string) => {
     if (!shouldInterceptNavigation(event)) return;
     onSelect();

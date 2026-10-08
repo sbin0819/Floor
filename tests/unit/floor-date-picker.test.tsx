@@ -61,6 +61,17 @@ beforeEach(() => {
 });
 
 describe("floor date picker", () => {
+  it("preserves people on calendar date links and date changes", async () => {
+    context.query += "&people=5";
+    render(<FloorDatePicker {...defaults} />);
+    const picker = await openPicker();
+    const day = picker.getByRole("link", {
+      name: "10월 13일 화요일 내 예약 있음",
+    });
+    expect(day.getAttribute("href")).toContain("people=5");
+    fireEvent.click(day);
+    expect(context.change.mock.calls[0]?.[1]).toContain("people=5");
+  });
   it("keeps date links and focus usable while reservation marks stream in", async () => {
     let resolve!: (dates: string[]) => void;
     const bookingDates = new Promise<string[]>((done) => {

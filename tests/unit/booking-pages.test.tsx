@@ -341,6 +341,15 @@ describe("booking page guards", () => {
     });
     expect(view.list.key).toBe(first.list.key);
     expect(view.detail.key).toBe(first.detail.key);
+    const people = await floorRegions({
+      date: "2026-10-07",
+      space: selectedSpaceId,
+      people: "5",
+    });
+    expect(people.list.key).toBe(first.list.key);
+    expect(people.detail.key).toBe(first.detail.key);
+    expect(people.resolution.key).toBe(first.resolution.key);
+    expect(people.container.key).toBe(first.container.key);
     const expanded = await floorRegions({
       date: "2026-10-07",
       space: selectedSpaceId,

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { ComponentProps } from "react";
 import { shouldInterceptNavigation } from "@/components/optimistic-navigation";
 import type { FloorLocation } from "@/features/bookings/floor-selection";
+import { carryFloorQuery } from "@/features/bookings/people-filter";
 import { useFloorSelection } from "./branch-workspace";
 
 export function FloorNavigationLink({
@@ -19,11 +20,7 @@ export function FloorNavigationLink({
   const navigation = useFloorSelection();
   const currentSearch = useSearchParams();
   const search = navigation?.search ?? currentSearch;
-  const view = search.get("view");
-  const target = new URL(href, "http://floor.local");
-  if (view && !target.searchParams.has("view"))
-    target.searchParams.set("view", view);
-  const destination = `${target.pathname}${target.search}${target.hash}`;
+  const destination = carryFloorQuery(href, search);
   return (
     <Link
       {...props}

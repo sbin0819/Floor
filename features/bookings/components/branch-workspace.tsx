@@ -18,6 +18,7 @@ import {
   type NavigateAction,
 } from "@/components/optimistic-navigation";
 import { normalizeBookingDateForToday } from "@/features/bookings/date";
+import { carryFloorQuery } from "@/features/bookings/people-filter";
 import {
   selectFloorBookingSlot,
   type SelectableSlot,
@@ -252,6 +253,7 @@ export function BranchWorkspace({
   const change = useCallback<SelectionContext["change"]>(
     (next, href, options) => {
       if (!isCurrentRoute()) return;
+      href = carryFloorQuery(href, search);
       next = { ...next, detail: next.spaceId !== null && next.detail === true };
       setDismissedKey(next.spaceId === null ? locationKey : null);
       rememberPending(next, href);
@@ -277,6 +279,7 @@ export function BranchWorkspace({
       navigation.value,
       rememberPending,
       isCurrentRoute,
+      search,
     ],
   );
   const currentNavigation = useRef({ location: navigation.value, change });
@@ -309,6 +312,7 @@ export function BranchWorkspace({
   const selectSlot = useCallback<SelectionContext["selectSlot"]>(
     ({ spaceId, slots, start, href, trigger: element }) => {
       if (!isCurrentRoute()) return;
+      href = carryFloorQuery(href, search);
       if (!slots.some((slot) => slot.start === start && slot.state === "free"))
         return;
       const next = selectFloorBookingSlot(
@@ -344,6 +348,7 @@ export function BranchWorkspace({
       changeLocation,
       rememberPending,
       isCurrentRoute,
+      search,
     ],
   );
   const floorChanged = navigation.value.floorId !== base.floorId;

@@ -374,6 +374,17 @@ describe("single responsive space detail", () => {
     expect(navigation.router.push).toHaveBeenCalledWith(href(spaceId));
   });
 
+  it("keeps people and view when Escape closes the sheet", async () => {
+    navigation.query += `&space=${spaceId}&people=5&view=timeline`;
+    render(
+      frame({ matchMedia: viewport(false).matchMedia, actualSpaceId: spaceId }),
+    );
+    fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape" });
+    expect(navigation.router.replace.mock.calls[0]?.[0]).toBe(
+      `${href()}&view=timeline&people=5`,
+    );
+  });
+
   it("returns a direct-entry close to the room row instead of the earlier date link that also contains space", async () => {
     navigation.query += `&space=${spaceId}`;
     render(
