@@ -57,6 +57,16 @@ export const messageKind = pgEnum("message_kind", ["text", "system"]);
 export const attachmentKind = pgEnum("attachment_kind", ["file", "image"]);
 export const callKind = pgEnum("call_kind", ["voice", "huddle"]);
 export const userStatus = pgEnum("user_status", ["online", "away", "dnd"]);
+export const avatarColor = pgEnum("avatar_color", [
+  "blue",
+  "green",
+  "orange",
+  "purple",
+  "pink",
+  "teal",
+  "yellow",
+  "gray",
+]);
 export const reportReason = pgEnum("report_reason", [
   "spam",
   "harassment",

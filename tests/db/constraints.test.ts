@@ -1065,25 +1065,23 @@ describe("database constraints from the real migrations", () => {
       width: 1,
       height: 1,
     });
-    await database.db
-      .insert(messageAttachments)
-      .values([
-        input,
-        attachment({
-          messageId: insertedMessages[0]!.id,
-          position: 9,
-          uploadedAt: during.start,
-        }),
-        attachment({
-          messageId: insertedMessages[1]!.id,
-          position: 0,
-          uploadedAt: during.start,
-        }),
-        attachment({ messageId: null, position: null }),
-        attachment({ messageId: null, position: null }),
-        attachment({ messageId: null, position: 0 }),
-        attachment({ messageId: null, position: 0 }),
-      ]);
+    await database.db.insert(messageAttachments).values([
+      input,
+      attachment({
+        messageId: insertedMessages[0]!.id,
+        position: 9,
+        uploadedAt: during.start,
+      }),
+      attachment({
+        messageId: insertedMessages[1]!.id,
+        position: 0,
+        uploadedAt: during.start,
+      }),
+      attachment({ messageId: null, position: null }),
+      attachment({ messageId: null, position: null }),
+      attachment({ messageId: null, position: 0 }),
+      attachment({ messageId: null, position: 0 }),
+    ]);
     expect(await database.db.select().from(messageAttachments)).toHaveLength(7);
     await expect(
       database.db
@@ -1242,6 +1240,131 @@ describe("database constraints from the real migrations", () => {
     );
     expect(result.rows[0]?.indexdef).toContain("USING gist (space_id, during)");
   });
+
+  it("45. defaults new users to all reminders and enabled chat notices without an avatar choice", async () => {
+    expect(
+      await database.db
+        .select({
+          avatarColor: users.avatarColor,
+          avatarPhoto: users.avatarPhoto,
+          chatToasts: users.chatToasts,
+          tabBadge: users.tabBadge,
+          reminderMinutes: users.reminderMinutes,
+        })
+        .from(users)
+        .where(eq(users.id, userId)),
+    ).toEqual([
+      {
+        avatarColor: null,
+        avatarPhoto: false,
+        chatToasts: true,
+        tabBadge: true,
+        reminderMinutes: [30, 10, 5, 0],
+      },
+    ]);
+  });
+
+  it.each(
+    [[-1], [1], [15], [31], [30, 15, 0]].map((reminderMinutes) => ({
+      reminderMinutes,
+    })),
+  )(
+    "45. rejects reminder minutes outside the four supported values: $reminderMinutes",
+    async ({ reminderMinutes }) => {
+      await expect(
+        database.db
+          .update(users)
+          .set({ reminderMinutes })
+          .where(eq(users.id, userId)),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "users_reminder_minutes_valid" },
+      });
+    },
+  );
+
+  it.each(
+    [[], [0], [5], [10], [30], [30, 5, 0], [30, 10, 5, 0]].map(
+      (reminderMinutes) => ({ reminderMinutes }),
+    ),
+  )(
+    "45. accepts an empty reminder set or a supported subset: $reminderMinutes",
+    async ({ reminderMinutes }) => {
+      await database.db
+        .update(users)
+        .set({ reminderMinutes })
+        .where(eq(users.id, userId));
+      expect(
+        await database.db
+          .select({ reminderMinutes: users.reminderMinutes })
+          .from(users)
+          .where(eq(users.id, userId)),
+      ).toEqual([{ reminderMinutes }]);
+    },
+  );
+
+  it("45. rejects NULL reminder arrays and NULL array elements", async () => {
+    await expect(
+      database.db.execute(
+        sql`UPDATE users SET reminder_minutes = NULL WHERE id = ${userId}`,
+      ),
+    ).rejects.toMatchObject({
+      cause: { code: "23502", column: "reminder_minutes" },
+    });
+    await expect(
+      database.db.execute(
+        sql`UPDATE users SET reminder_minutes = ARRAY[30, NULL]::smallint[] WHERE id = ${userId}`,
+      ),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "users_reminder_minutes_valid" },
+    });
+  });
+
+  it.each(["avatar_photo", "chat_toasts", "tab_badge"])(
+    "keeps the profile preference %s non-null",
+    async (column) => {
+      await expect(
+        database.db.execute(
+          sql`UPDATE users SET ${sql.identifier(column)} = NULL WHERE id = ${userId}`,
+        ),
+      ).rejects.toMatchObject({ cause: { code: "23502", column } });
+    },
+  );
+
+  it("keeps the avatar enum separate from space colors and permits all eight colors or no choice", async () => {
+    const colors = [
+      "blue",
+      "green",
+      "orange",
+      "purple",
+      "pink",
+      "teal",
+      "yellow",
+      "gray",
+    ] as const;
+    const values = await database.client.query<{ enumlabel: string }>(
+      "SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'avatar_color' ORDER BY e.enumsortorder",
+    );
+    expect(values.rows.map(({ enumlabel }) => enumlabel)).toEqual(colors);
+    for (const avatarColor of [...colors, null]) {
+      const rows = await database.db
+        .update(users)
+        .set({ avatarColor })
+        .where(eq(users.id, userId))
+        .returning({ avatarColor: users.avatarColor });
+      expect(rows).toEqual([{ avatarColor }]);
+    }
+    await expect(
+      database.db.execute(
+        sql`UPDATE users SET avatar_color = 'unknown' WHERE id = ${userId}`,
+      ),
+    ).rejects.toMatchObject({ cause: { code: "22P02" } });
+    await expect(
+      database.db.execute(
+        sql`UPDATE users SET avatar_color = 'blue'::space_icon_color WHERE id = ${userId}`,
+      ),
+    ).rejects.toMatchObject({ cause: { code: "42804" } });
+  });
+
   it.each(["ab", "a".repeat(21), "Subin", "su bin", "수빈"])(
     "28. rejects invalid username %s",
     async (username) => {
@@ -2000,6 +2123,79 @@ describe("booking foundation upgrade", () => {
         code: "23514",
         constraint: "bookings_cancel_consistent",
       });
+    } finally {
+      await client.close();
+    }
+  });
+});
+
+describe("profile preferences upgrade", () => {
+  it("preserves every existing user field while backfilling only the five preference defaults", async () => {
+    const client = new PGlite({ extensions: { btree_gist } });
+    try {
+      const migrations = readMigrationFiles({ migrationsFolder: "./drizzle" });
+      const upgradeIndex = migrations.findIndex(({ sql }) =>
+        sql.some((statement) =>
+          statement.includes('ADD COLUMN "reminder_minutes"'),
+        ),
+      );
+      expect(upgradeIndex).toBeGreaterThan(0);
+      for (const migration of migrations.slice(0, upgradeIndex)) {
+        await client.transaction(async (transaction) => {
+          for (const statement of migration.sql)
+            await transaction.exec(statement);
+        });
+      }
+
+      const branchId = crypto.randomUUID();
+      const userIds = [crypto.randomUUID(), crypto.randomUUID()];
+      await client.query("INSERT INTO branches (id, name) VALUES ($1, $2)", [
+        branchId,
+        "기존 기본 지점",
+      ]);
+      await client.query(
+        `INSERT INTO users (id, name, email, email_verified, avatar_url, username,
+          username_changed_at, status, default_branch_id, created_at, updated_at)
+         VALUES ($1, $2, $3, true, $4, $5, $6, 'dnd', $7, $8, $9),
+          ($10, $11, $12, false, NULL, NULL, NULL, 'away', NULL, $8, $9)`,
+        [
+          userIds[0],
+          "기존 인증 사용자",
+          "verified-profile@example.test",
+          "https://avatars.githubusercontent.com/u/123",
+          "legacy.profile",
+          new Date("2026-09-01T03:04:05Z"),
+          branchId,
+          new Date("2026-08-01T03:04:05Z"),
+          new Date("2026-10-01T03:04:05Z"),
+          userIds[1],
+          "기존 미인증 사용자",
+          "pending-profile@example.test",
+        ],
+      );
+      const before = await client.query<{ value: Record<string, unknown> }>(
+        "SELECT to_jsonb(u) AS value FROM users u ORDER BY id",
+      );
+      const upgrade = migrations[upgradeIndex];
+      if (!upgrade) throw new Error("Missing profile migration");
+      await client.transaction(async (transaction) => {
+        for (const statement of upgrade.sql) await transaction.exec(statement);
+      });
+      const after = await client.query<{ value: Record<string, unknown> }>(
+        "SELECT to_jsonb(u) AS value FROM users u ORDER BY id",
+      );
+      expect(after.rows).toEqual(
+        before.rows.map(({ value }) => ({
+          value: {
+            ...value,
+            avatar_color: null,
+            avatar_photo: false,
+            chat_toasts: true,
+            tab_badge: true,
+            reminder_minutes: [30, 10, 5, 0],
+          },
+        })),
+      );
     } finally {
       await client.close();
     }
