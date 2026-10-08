@@ -13,7 +13,104 @@ import {
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { blockedBetween, blockedBy } from "./people-blocks";
-import { sharesChatSpace } from "./group-dm";
+import {
+  loungeAccessFrom,
+  type LoungeRoleSettings,
+} from "@/lib/permissions/lounge";
+export { loungeAccessFrom } from "@/lib/permissions/lounge";
+
+export type SpaceRole = "member" | "admin" | "owner";
+export type SpaceAccessFacts = {
+  spaceKind: "team" | "branch" | "community" | null;
+  teamRole: "member" | "admin" | null;
+  memberRole: SpaceRole | null;
+  isStaff: boolean;
+  roleSettings: LoungeRoleSettings;
+};
+
+export function activeSpaceMembership(
+  userId: string | SQL,
+  spaceId: SQL = sql`${chatSpaces.id}`,
+) {
+  return sql<boolean>`exists (select 1 from chat_space_members active_member
+    join chat_spaces active_space on active_space.id = active_member.space_id
+    where active_member.space_id = ${spaceId} and active_member.user_id = ${userId}::uuid
+      and active_member.status = 'active' and active_space.deleted_at is null)`;
+}
+
+export function readableSpaceCondition(
+  userId: string | SQL,
+  spaceId: SQL = sql`${chatSpaces.id}`,
+) {
+  return sql<boolean>`exists (select 1 from chat_spaces readable_space
+    where readable_space.id = ${spaceId} and readable_space.deleted_at is null and (
+      (readable_space.kind = 'team' and exists (select 1 from team_members team_member
+        where team_member.team_id = readable_space.team_id and team_member.user_id = ${userId}::uuid))
+      or (readable_space.kind in ('branch', 'community') and ${activeSpaceMembership(userId, sql`readable_space.id`)})
+    ))`;
+}
+
+export function sharedMembershipSpace(
+  me: string | SQL,
+  other: SQL,
+  kinds: readonly ("branch" | "community")[] = ["community"],
+) {
+  const allowed = kinds.length
+    ? sql.join(
+        kinds.map((kind) => sql`${kind}`),
+        sql`, `,
+      )
+    : sql`null`;
+  return sql<boolean>`exists (select 1 from chat_spaces shared_space
+    where shared_space.kind in (${allowed})
+      and ${activeSpaceMembership(me, sql`shared_space.id`)}
+      and ${activeSpaceMembership(other, sql`shared_space.id`)})`;
+}
+
+export function sharesChatSpace(me: string, other: SQL) {
+  return sql<boolean>`(exists (select 1 from chat_spaces s
+    inner join team_members mine on mine.team_id = s.team_id and mine.user_id = ${me}::uuid
+    inner join team_members peer on peer.team_id = s.team_id and peer.user_id = ${other}
+    where s.kind = 'team' and s.deleted_at is null)
+    or ${sharedMembershipSpace(me, other)})`;
+}
+
+// 같은 SQL로 가져온 역할 원재료를 목록·방·관리 조회가 함께 해석한다.
+export function spaceAccessFields(userId: string | SQL) {
+  return {
+    spaceKind: chatSpaces.kind,
+    teamRole: sql<
+      "member" | "admin" | null
+    >`(select m.role from team_members m where m.team_id = ${chatSpaces.teamId} and m.user_id = ${userId}::uuid)`,
+    memberRole: sql<SpaceRole | null>`(select m.role from chat_space_members m where m.space_id = ${chatSpaces.id} and m.user_id = ${userId}::uuid and ${activeSpaceMembership(userId)})`,
+    isStaff: sql<boolean>`exists (select 1 from branch_staff staff where staff.branch_id = ${chatSpaces.branchId} and staff.user_id = ${userId}::uuid)`,
+    roleSettings: sql<LoungeRoleSettings>`coalesce((select jsonb_object_agg(setting.role, setting.permissions) from role_settings setting where setting.branch_id = ${chatSpaces.branchId}), '{}'::jsonb)`,
+  };
+}
+
+export function spaceRoleFrom(facts: SpaceAccessFacts): SpaceRole | null {
+  if (facts.spaceKind === "team") return facts.teamRole;
+  if (!facts.memberRole) return null;
+  if (facts.spaceKind === "community") return facts.memberRole;
+  return loungeAccessFrom(facts).isAdmin ? "admin" : "member";
+}
+
+export function isSpaceAdmin(role: SpaceRole | null) {
+  return role === "admin" || role === "owner";
+}
+
+export async function lockMessageSpace(
+  spaceId: string | null,
+  database: DalDatabase,
+) {
+  if (spaceId === null) return;
+  // 내보내기·나가기·스페이스 삭제의 FOR UPDATE와 직렬화한다. 사용자 잠금 다음, 방 잠금 이전이다.
+  await database
+    .select({ id: chatSpaces.id })
+    .from(chatSpaces)
+    .where(eq(chatSpaces.id, spaceId))
+    .for("key share");
+}
 
 // 같은 JOIN 조건을 조회와 액션·토큰에 사용한다. 운영자 권한은 팀 소속을 대신하지 않는다.
 export function readableTeamSpace(userId: string) {
@@ -25,15 +122,12 @@ export function readableTeamSpace(userId: string) {
 }
 
 export function readableRoomCondition(
-  userId: string,
+  userId: string | SQL,
   roomId = sql`${chatRooms.id}`,
 ) {
   return sql<boolean>`exists (select 1 from chat_rooms readable_room
     where readable_room.id = ${roomId} and (
-      (readable_room.kind = 'text' and exists (
-        select 1 from chat_spaces s inner join team_members m on m.team_id = s.team_id
-        where s.id = readable_room.space_id and s.kind = 'team' and s.deleted_at is null and m.user_id = ${userId}::uuid
-      )) or (readable_room.kind = 'dm' and exists (
+      (readable_room.kind = 'text' and ${readableSpaceCondition(userId, sql`readable_room.space_id`)}) or (readable_room.kind = 'dm' and exists (
         select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status in ('active', 'requested')
       )) or (readable_room.kind = 'group_dm' and exists (
         select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status = 'active'
@@ -72,7 +166,12 @@ async function readRoom(userId: string, target: SQL, database: DalDatabase) {
       id: chatRooms.id,
       kind: chatRooms.kind,
       spaceId: chatSpaces.id,
-      spaceName: teams.name,
+      spaceName: sql<
+        string | null
+      >`case when ${chatSpaces.kind} = 'team' then ${teams.name}
+        when ${chatSpaces.kind} = 'branch' then (select b.name from branches b where b.id = ${chatSpaces.branchId})
+        else ${chatSpaces.name} end`,
+      branchId: chatSpaces.branchId,
       teamId: teams.id,
       name: chatRooms.name,
       topic: chatRooms.topic,
@@ -84,7 +183,7 @@ async function readRoom(userId: string, target: SQL, database: DalDatabase) {
       unreadMentions: unreadMentionCount(userId),
       roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`,
       spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`,
-      role: teamMembers.role,
+      ...spaceAccessFields(userId),
       booking: sql<{
         id: string;
         userId: string;
@@ -161,7 +260,7 @@ async function readRoom(userId: string, target: SQL, database: DalDatabase) {
     )
     .where(and(target, readableRoomCondition(userId)))
     .limit(1);
-  return room ?? null;
+  return room ? { ...room, role: spaceRoleFrom(room) } : null;
 }
 
 export async function canReadSpace(
@@ -170,13 +269,24 @@ export async function canReadSpace(
   database: DalDatabase = getDb(),
 ) {
   const [space] = await database
-    .select({ id: chatSpaces.id, teamId: teams.id })
+    .select({
+      id: chatSpaces.id,
+      teamId: chatSpaces.teamId,
+      branchId: chatSpaces.branchId,
+      ...spaceAccessFields(userId),
+    })
     .from(chatSpaces)
-    .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
-    .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
-    .where(and(eq(chatSpaces.id, spaceId), readableTeamSpace(userId)))
+    .where(and(eq(chatSpaces.id, spaceId), readableSpaceCondition(userId)))
     .limit(1);
-  return space ?? null;
+  return space ? { ...space, role: spaceRoleFrom(space) } : null;
+}
+
+export async function spaceRoleOf(
+  userId: string,
+  spaceId: string,
+  database?: DalDatabase,
+) {
+  return (await canReadSpace(userId, spaceId, database))?.role ?? null;
 }
 
 export function writableRoom(
@@ -190,11 +300,12 @@ export function writableRoom(
     );
   return (
     room.archivedAt === null &&
+    (room.spaceKind !== "branch" || loungeAccessFrom(room).canWrite) &&
     (room.kind === "dm"
       ? room.directMembership !== null &&
         room.directMembership.peer !== "left" &&
         !room.peerBlocked
-      : room.kind === "group_dm" || !room.adminOnly || room.role === "admin")
+      : room.kind === "group_dm" || !room.adminOnly || isSpaceAdmin(room.role))
   );
 }
 
@@ -237,6 +348,7 @@ export async function canReactRoom(
     canReact:
       room !== null &&
       room.archivedAt === null &&
+      (room.spaceKind !== "branch" || loungeAccessFrom(room).canWrite) &&
       (room.kind !== "meeting" || writableRoom(room, now)) &&
       (room.kind !== "dm" || (room.peerActive && !room.peerBlocked)),
   };

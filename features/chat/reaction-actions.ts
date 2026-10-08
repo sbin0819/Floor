@@ -1,6 +1,6 @@
 import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
-import { canReactRoom } from "@/lib/dal/chat-access";
+import { canReactRoom, lockMessageSpace } from "@/lib/dal/chat-access";
 import { findMessageTarget } from "@/lib/dal/chat-message-write";
 import { setMessageReaction } from "@/lib/dal/chat-reactions";
 import { lockRoomForMessage, lockUsersForKeyShare } from "@/lib/dal/chat-write";
@@ -49,9 +49,11 @@ export function createReactionActions(
           );
           if (!access.room) throw new ActionError("NOT_FOUND");
           if (!access.canReact) throw new ActionError("FORBIDDEN");
+          const spaceId = access.room.spaceId;
           if (target.kind === "system") throw new ActionError("INVALID_INPUT");
           const result = await withTransaction(async (tx) => {
             await lockUsersForKeyShare([session.userId], tx);
+            await lockMessageSpace(spaceId, tx);
             await lockRoomForMessage(target.roomId, tx);
             const current = await canReactRoom(
               session.userId,

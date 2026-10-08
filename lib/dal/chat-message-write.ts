@@ -6,14 +6,13 @@ import {
   chatRoomReads,
   chatRooms,
   users,
-  chatRoomMembers,
   messageMentions,
   messageReactions,
   messages,
-  teamMembers,
 } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
 import { roomJoinedAt } from "./chat-reads";
+import { readableRoomCondition } from "./chat-access";
 
 export async function findMessageTarget(
   messageId: string,
@@ -56,8 +55,6 @@ export async function listStoredMentions(
 
 export async function unreadMentionRecipients(
   input: {
-    teamId: string | null;
-    bookingId?: string | null;
     roomId: string;
     userIds: string[];
     seq: number;
@@ -66,82 +63,26 @@ export async function unreadMentionRecipients(
   database: DalDatabase,
 ) {
   if (!input.userIds.length) return [];
-  if (input.bookingId) {
-    return database
-      .select({ userId: users.id })
-      .from(users)
-      .innerJoin(
-        chatRooms,
-        and(
-          eq(chatRooms.id, input.roomId),
-          eq(chatRooms.bookingId, input.bookingId),
-        ),
-      )
-      .leftJoin(
-        chatRoomReads,
-        and(
-          eq(chatRoomReads.roomId, input.roomId),
-          eq(chatRoomReads.userId, users.id),
-        ),
-      )
-      .where(
-        and(
-          inArray(users.id, input.userIds),
-          gt(
-            sql`${input.createdAt.toISOString()}::timestamptz`,
-            roomJoinedAt(sql`${users.id}`),
-          ),
-          or(
-            isNull(chatRoomReads.lastReadSeq),
-            gt(sql`${input.seq}::int`, chatRoomReads.lastReadSeq),
-          ),
-        ),
-      );
-  }
-  if (input.teamId === null) {
-    return database
-      .select({ userId: chatRoomMembers.userId })
-      .from(chatRoomMembers)
-      .leftJoin(
-        chatRoomReads,
-        and(
-          eq(chatRoomReads.roomId, input.roomId),
-          eq(chatRoomReads.userId, chatRoomMembers.userId),
-        ),
-      )
-      .where(
-        and(
-          eq(chatRoomMembers.roomId, input.roomId),
-          eq(chatRoomMembers.status, "active"),
-          inArray(chatRoomMembers.userId, input.userIds),
-          gt(
-            sql`${input.createdAt.toISOString()}::timestamptz`,
-            chatRoomMembers.joinedAt,
-          ),
-          or(
-            isNull(chatRoomReads.lastReadSeq),
-            gt(sql`${input.seq}::int`, chatRoomReads.lastReadSeq),
-          ),
-        ),
-      );
-  }
   return database
-    .select({ userId: teamMembers.userId })
-    .from(teamMembers)
+    .select({ userId: users.id })
+    .from(users)
+    .innerJoin(chatRooms, eq(chatRooms.id, input.roomId))
     .leftJoin(
       chatRoomReads,
       and(
         eq(chatRoomReads.roomId, input.roomId),
-        eq(chatRoomReads.userId, teamMembers.userId),
+        eq(chatRoomReads.userId, users.id),
       ),
     )
     .where(
       and(
-        eq(teamMembers.teamId, input.teamId),
-        inArray(teamMembers.userId, input.userIds),
+        inArray(users.id, input.userIds),
+        readableRoomCondition(sql`${users.id}`),
+        sql`(${chatRooms.kind} <> 'dm' or exists (select 1 from chat_room_members direct_member
+          where direct_member.room_id = ${chatRooms.id} and direct_member.user_id = ${users.id} and direct_member.status = 'active'))`,
         gt(
           sql`${input.createdAt.toISOString()}::timestamptz`,
-          teamMembers.createdAt,
+          roomJoinedAt(sql`${users.id}`),
         ),
         or(
           isNull(chatRoomReads.lastReadSeq),

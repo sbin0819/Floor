@@ -2,9 +2,14 @@ import { z } from "zod";
 import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
 import type { Session } from "@/lib/auth/types";
-import { canReadRoom, canWriteRoom } from "@/lib/dal/chat-access";
+import {
+  canReadRoom,
+  canWriteRoom,
+  isSpaceAdmin,
+  lockMessageSpace,
+} from "@/lib/dal/chat-access";
 import { advanceRoomRead } from "@/lib/dal/chat-reads";
-import { listChatMembers } from "@/lib/dal/chat-read";
+import { listChannelMembers } from "@/lib/dal/chat-read";
 import { listMeetingMembers } from "@/lib/dal/chat-meeting-read";
 import { getChatMessage } from "@/lib/dal/chat-messages";
 import * as writes from "@/lib/dal/chat-write";
@@ -123,7 +128,9 @@ async function sendLockedMessage(
       ? await listMeetingMembers(room.booking!.id, session.userId, database)
       : room.kind === "dm" || room.kind === "group_dm"
         ? await listDirectMembers(room.id, database, session.userId)
-        : await listChatMembers(room.teamId!, database, session.userId);
+        : await listChannelMembers(room, session.userId, database, {
+            mentionAuthorId: session.userId,
+          });
   const names = new Map(members.map((member) => [member.id, member.name]));
   const mentions = parsed.userIds.filter(
     (id) =>
@@ -136,7 +143,7 @@ async function sendLockedMessage(
     (room.kind === "meeting" ||
       room.kind === "dm" ||
       room.kind === "group_dm" ||
-      room.role === "admin");
+      isSpaceAdmin(room.role));
   const inserted = await writes.insertChatMessage(
     { ...input, mentionsEveryone, authorId: session.userId, now },
     database,
@@ -302,6 +309,7 @@ export function createSendActions(
                 [session.userId, ...parsed.userIds],
                 tx,
               );
+            await lockMessageSpace(room.spaceId, tx);
             await writes.lockRoomForMessage(input.roomId, tx);
             await requireWritable(session.userId, input.roomId, now, tx);
             return sendLockedMessage(

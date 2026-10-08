@@ -14,7 +14,7 @@ import {
   listMeetingNav,
 } from "@/lib/dal/chat-meeting-read";
 import {
-  listChatMembers,
+  listChannelMembers,
   readChatNavigation,
   listRecentMessages,
   listMessagesPage,
@@ -235,13 +235,14 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         !room ||
         room.kind !== "text" ||
         room.spaceId !== spaceId.toLowerCase() ||
-        !room.teamId ||
         !room.spaceName
       )
         return null;
       const [messages, members] = await Promise.all([
         listRecentMessages(roomId, session.userId, dependencies.database),
-        listChatMembers(room.teamId, dependencies.database),
+        listChannelMembers(room, session.userId, dependencies.database, {
+          roomId,
+        }),
       ]);
       return {
         space: {

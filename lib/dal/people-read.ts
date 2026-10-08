@@ -12,6 +12,7 @@ import { canOpenDirectMessageCondition } from "./direct-permission";
 import type { DalDatabase } from "./database";
 import { blockedBetween, blockedBy } from "./people-blocks";
 import { messageRequestCount } from "./message-requests-read";
+import { activeSpaceMembership, sharedMembershipSpace } from "./chat-access";
 export { blockBetween } from "./people-blocks";
 
 export function sharedTeamCondition(me: string, other: SQL) {
@@ -66,7 +67,10 @@ export function searchPeopleRows(
     sql`lower(${users.email}) = ${input.query.toLowerCase()}`,
   )!;
   const pattern = `%${input.query.replace(/[\\%_]/g, "\\$&")}%`;
-  const shared = sharedTeamCondition(me, personId);
+  const shared = or(
+    sharedTeamCondition(me, personId),
+    sharedMembershipSpace(me, personId),
+  )!;
   return database
     .select({
       userId: users.id,
@@ -120,11 +124,18 @@ export async function readPersonProfile(
         personId,
       ),
       sharedSpaces: sql<{ id: string; name: string }[]>`coalesce((
-      select jsonb_agg(jsonb_build_object('id', s.id, 'name', t.name) order by t.name, s.id)
-      from chat_spaces s join teams t on s.team_id = t.id
-      join team_members mine on mine.team_id = t.id join team_members theirs on theirs.team_id = t.id
-      where s.kind = 'team' and s.deleted_at is null
-        and mine.user_id = ${me}::uuid and theirs.user_id = ${personId}
+      select jsonb_agg(jsonb_build_object('id', s.id, 'name', s.name) order by s.name, s.id)
+      from (
+        select s.id, t.name from chat_spaces s join teams t on s.team_id = t.id
+        join team_members mine on mine.team_id = t.id join team_members theirs on theirs.team_id = t.id
+        where s.kind = 'team' and s.deleted_at is null
+          and mine.user_id = ${me}::uuid and theirs.user_id = ${personId}
+        union all
+        select community.id, community.name from chat_spaces community
+        where community.kind = 'community'
+          and ${activeSpaceMembership(me, sql`community.id`)}
+          and ${activeSpaceMembership(personId, sql`community.id`)}
+      ) s
     ), '[]'::jsonb)`,
     })
     .from(users)
@@ -136,6 +147,7 @@ export async function readPersonProfile(
           eq(users.id, me),
           sql`${friendships.userLowId} is not null`,
           sharedTeamCondition(me, personId),
+          sharedMembershipSpace(me, personId, ["branch", "community"]),
           sql`${directRoomId(me, personId)} is not null`,
           sql`exists (
             select 1 from chat_rooms group_room

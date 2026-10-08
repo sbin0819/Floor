@@ -216,7 +216,12 @@ export type ChannelView = {
     unreadMentions: number;
   };
   user: { id: string; name: string };
-  members: { id: string; name: string; admin: boolean }[];
+  members: {
+    id: string;
+    name: string;
+    admin: boolean;
+    sharesSpace?: boolean;
+  }[];
   messages: ChatMessage[];
   lastReadSeq: number | null;
   firstUnreadSeq: number | null;

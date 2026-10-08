@@ -1,9 +1,14 @@
 import { createAction } from "@/lib/actions/create-action";
 import { ActionError } from "@/lib/actions/result";
-import { canReadRoom, canWriteRoom } from "@/lib/dal/chat-access";
+import {
+  canReadRoom,
+  canWriteRoom,
+  isSpaceAdmin,
+  lockMessageSpace,
+} from "@/lib/dal/chat-access";
 import * as writes from "@/lib/dal/chat-message-write";
 import { getChatMessage } from "@/lib/dal/chat-messages";
-import { listChatMembers } from "@/lib/dal/chat-read";
+import { listChannelMembers } from "@/lib/dal/chat-read";
 import { listMeetingMembers } from "@/lib/dal/chat-meeting-read";
 import { listDirectMembers } from "@/lib/dal/direct";
 import {
@@ -67,6 +72,7 @@ export function createMessageActions(
           );
           if (!access.room) throw new ActionError("NOT_FOUND");
           if (!access.canWrite) throw new ActionError("FORBIDDEN");
+          const spaceId = access.room.spaceId;
           const parsed = extractMentions(input.body);
           if (parsed.exceedsLimit) throw new ActionError("INVALID_INPUT");
           const result = await withTransaction(async (tx) => {
@@ -74,6 +80,7 @@ export function createMessageActions(
               [...new Set([session.userId, ...parsed.userIds])].sort(),
               tx,
             );
+            await lockMessageSpace(spaceId, tx);
             await lockRoomForMessage(target.roomId, tx);
             const currentAccess = await canWriteRoom(
               session.userId,
@@ -101,10 +108,11 @@ export function createMessageActions(
                 : currentAccess.room.kind === "dm" ||
                     currentAccess.room.kind === "group_dm"
                   ? await listDirectMembers(target.roomId, tx, session.userId)
-                  : await listChatMembers(
-                      currentAccess.room.teamId!,
-                      tx,
+                  : await listChannelMembers(
+                      currentAccess.room,
                       session.userId,
+                      tx,
+                      { mentionAuthorId: session.userId },
                     );
             const names = new Map(
               members.map((member) => [member.id, member.name]),
@@ -122,7 +130,7 @@ export function createMessageActions(
               (currentAccess.room.kind === "dm" ||
                 currentAccess.room.kind === "meeting" ||
                 currentAccess.room.kind === "group_dm" ||
-                currentAccess.room.role === "admin");
+                isSpaceAdmin(currentAccess.room.role));
             const oldMentions = new Set(
               (await writes.listStoredMentions(original.id, tx)).map(
                 (row) => row.userId,
@@ -157,8 +165,6 @@ export function createMessageActions(
             );
             const recipients = await writes.unreadMentionRecipients(
               {
-                teamId: currentAccess.room.teamId,
-                bookingId: currentAccess.room.booking?.id ?? null,
                 roomId: target.roomId,
                 userIds: candidates,
                 seq: original.seq,
@@ -235,18 +241,17 @@ export function createMessageActions(
             input.messageId,
             dependencies.database,
           );
-          if (
-            !target ||
-            !(await canReadRoom(
-              session.userId,
-              target.roomId,
-              dependencies.database,
-            ))
-          )
-            throw new ActionError("NOT_FOUND");
+          if (!target) throw new ActionError("NOT_FOUND");
+          const access = await canReadRoom(
+            session.userId,
+            target.roomId,
+            dependencies.database,
+          );
+          if (!access) throw new ActionError("NOT_FOUND");
           const now = dependencies.now?.() ?? new Date();
           const result = await withTransaction(async (tx) => {
             await lockUsersForKeyShare([session.userId], tx);
+            await lockMessageSpace(access.spaceId, tx);
             await lockRoomForMessage(target.roomId, tx);
             const room = await canReadRoom(session.userId, target.roomId, tx);
             if (!room) throw new ActionError("NOT_FOUND");
@@ -254,14 +259,14 @@ export function createMessageActions(
             if (
               !original ||
               original.kind !== "text" ||
-              (original.authorId !== session.userId && room.role !== "admin")
+              (original.authorId !== session.userId && !isSpaceAdmin(room.role))
             )
               throw new ActionError("NOT_FOUND");
             const changed = await writes.deleteChatMessage(
               {
                 id: original.id,
                 userId: session.userId,
-                admin: room.role === "admin",
+                admin: isSpaceAdmin(room.role),
                 now,
               },
               tx,

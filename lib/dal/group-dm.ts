@@ -1,19 +1,14 @@
 import "server-only";
 
-import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { ActionError } from "@/lib/actions/result";
 import { getDb } from "@/lib/db/client";
 import { chatRoomMembers, chatRooms, users } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
 import { directRelationshipCondition } from "./direct-permission";
 import { blockedBetween } from "./people-blocks";
-
-export function sharesChatSpace(me: string, other: SQL) {
-  return sql<boolean>`exists (select 1 from chat_spaces s
-    inner join team_members mine on mine.team_id = s.team_id and mine.user_id = ${me}::uuid
-    inner join team_members peer on peer.team_id = s.team_id and peer.user_id = ${other}
-    where s.kind = 'team' and s.deleted_at is null)`;
-}
+import { sharesChatSpace } from "./chat-access";
+export { sharesChatSpace } from "./chat-access";
 
 export function groupCandidates(
   adder: string,

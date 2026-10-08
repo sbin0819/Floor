@@ -12,7 +12,14 @@ import {
   teams,
   users,
 } from "@/lib/db/schema";
-import { readableRoomCondition, readableTeamSpace } from "./chat-access";
+import {
+  activeSpaceMembership,
+  loungeAccessFrom,
+  readableRoomCondition,
+  readableTeamSpace,
+  sharesChatSpace,
+  type SpaceAccessFacts,
+} from "./chat-access";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { selectChatMessages } from "./chat-messages";
@@ -26,10 +33,16 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
       spaceName: sql<string>`${teams.name}`.as("space_name"),
       roomId: sql<string | null>`${chatRooms.id}`.as("room_id"),
       roomName: sql<string | null>`${chatRooms.name}`.as("room_name"),
-      unread: sql<boolean>`${firstUnreadSequence(userId)} is not null`.as("unread"),
+      unread: sql<boolean>`${firstUnreadSequence(userId)} is not null`.as(
+        "unread",
+      ),
       unreadMentions: unreadMentionCount(userId).as("unread_mentions"),
-      roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`.as("room_muted"),
-      spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`.as("space_muted"),
+      roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`.as(
+        "room_muted",
+      ),
+      spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`.as(
+        "space_muted",
+      ),
     })
     .from(chatSpaces)
     .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
@@ -66,20 +79,30 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
 }
 
 // 공간이 하나도 없는 사람도 자기 상태와 차단 목록을 받는다. SQL 문장은 늘리지 않는다.
-export async function readChatNavigation(userId: string, database: DalDatabase = getDb()) {
+export async function readChatNavigation(
+  userId: string,
+  database: DalDatabase = getDb(),
+) {
   type Row = Awaited<ReturnType<typeof listChatNav>>[number];
   const navigation = listChatNav(userId, database).as("nav_rows");
-  const [result] = await database.select({
-    myStatus: sql<UserStatus>`${users.status}`,
-    blockedUserIds: sql<string[]>`array(select b.blocked_id from user_blocks b where b.blocker_id = ${userId}::uuid order by b.blocked_id)`,
-    rows: sql<Row[]>`coalesce((select jsonb_agg(jsonb_build_object(
+  const [result] = await database
+    .select({
+      myStatus: sql<UserStatus>`${users.status}`,
+      blockedUserIds: sql<
+        string[]
+      >`array(select b.blocked_id from user_blocks b where b.blocker_id = ${userId}::uuid order by b.blocked_id)`,
+      rows: sql<Row[]>`coalesce((select jsonb_agg(jsonb_build_object(
       'spaceId', nav_rows.space_id, 'spaceName', nav_rows.space_name,
       'roomId', nav_rows.room_id, 'roomName', nav_rows.room_name,
       'unread', nav_rows.unread, 'unreadMentions', nav_rows.unread_mentions,
       'roomMuted', nav_rows.room_muted, 'spaceMuted', nav_rows.space_muted
     )) from ${navigation}), '[]'::jsonb)`,
-  }).from(users).where(eq(users.id,userId));
-  return result ?? { myStatus: "online" as const, blockedUserIds: [], rows: [] };
+    })
+    .from(users)
+    .where(eq(users.id, userId));
+  return (
+    result ?? { myStatus: "online" as const, blockedUserIds: [], rows: [] }
+  );
 }
 
 export async function listRecentMessages(
@@ -113,6 +136,65 @@ export function listChatMembers(
     .from(teamMembers)
     .innerJoin(users, eq(teamMembers.userId, users.id))
     .where(eq(teamMembers.teamId, teamId))
+    .orderBy(asc(users.name), asc(users.id));
+}
+
+export async function listChannelMembers(
+  space: SpaceAccessFacts & {
+    spaceId: string | null;
+    teamId: string | null;
+    branchId: string | null;
+  },
+  viewerId: string,
+  database: DalDatabase = getDb(),
+  options: { roomId?: string; mentionAuthorId?: string } = {},
+) {
+  if (space.spaceKind === "team" && space.teamId)
+    return listChatMembers(space.teamId, database, options.mentionAuthorId);
+  if (!space.spaceId) return [];
+  const staff = sql<boolean>`exists (select 1 from branch_staff member_staff
+    where member_staff.branch_id = ${space.branchId}::uuid and member_staff.user_id = ${users.id})`;
+  const regularAdmin = loungeAccessFrom({
+    isStaff: false,
+    roleSettings: space.roleSettings,
+  }).isAdmin;
+  const staffAdmin = loungeAccessFrom({
+    isStaff: true,
+    roleSettings: space.roleSettings,
+  }).isAdmin;
+  const admin =
+    space.spaceKind === "branch"
+      ? sql<boolean>`(${regularAdmin} or (${staffAdmin} and ${staff}))`
+      : sql<boolean>`member.role in ('owner', 'admin')`;
+  return database
+    .select({
+      id: users.id,
+      name: users.name,
+      admin,
+      sharesSpace: sharesChatSpace(viewerId, sql`${users.id}`),
+      ...(options.mentionAuthorId
+        ? {
+            canMention: sql<boolean>`not ${blockedBy(sql`${users.id}`, sql`${options.mentionAuthorId}::uuid`)}`,
+          }
+        : {}),
+    })
+    .from(users)
+    .innerJoin(
+      sql`chat_space_members member`,
+      sql`member.user_id = ${users.id} and member.space_id = ${space.spaceId}::uuid`,
+    )
+    .where(
+      and(
+        activeSpaceMembership(sql`${users.id}`, sql`${space.spaceId}::uuid`),
+        space.spaceKind === "branch" && options.roomId
+          ? sql`(${admin} or ${users.id} in (
+            select recent.author_id from (
+              select author_id from messages where room_id = ${options.roomId}::uuid order by seq desc limit 50
+            ) recent
+          ))`
+          : undefined,
+      ),
+    )
     .orderBy(asc(users.name), asc(users.id));
 }
 

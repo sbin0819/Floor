@@ -4,7 +4,11 @@ import { and, eq, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { chatRoomReads, chatRooms, chatSpacePrefs } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
-import { readableRoomCondition } from "./chat-access";
+import {
+  activeSpaceMembership,
+  readableRoomCondition,
+  readableSpaceCondition,
+} from "./chat-access";
 import { blockedBy } from "./people-blocks";
 
 export function roomJoinedAt(userId: string | SQL) {
@@ -15,7 +19,12 @@ export function roomJoinedAt(userId: string | SQL) {
       (select p.created_at from booking_participants p where p.booking_id = b.id and p.user_id = ${userId}::uuid)
     end from bookings b where b.id = ${chatRooms.bookingId}
   ) else (
-    select m.created_at from team_members m inner join chat_spaces s on s.team_id = m.team_id where s.id = ${chatRooms.spaceId} and m.user_id = ${userId}::uuid
+    select case when s.kind = 'team' then (
+      select m.created_at from team_members m where m.team_id = s.team_id and m.user_id = ${userId}::uuid
+    ) else (
+      select m.joined_at from chat_space_members m where m.space_id = s.id and m.user_id = ${userId}::uuid
+        and ${activeSpaceMembership(userId, sql`s.id`)}
+    ) end from chat_spaces s where s.id = ${chatRooms.spaceId} and s.deleted_at is null
   ) end`;
 }
 
@@ -99,9 +108,8 @@ export async function saveSpaceMuted(
       select id from users where id = ${input.userId}::uuid for key share
     ), locked_space as materialized (
       select s.id from chat_spaces s cross join locked_user u
-      inner join team_members m on m.team_id = s.team_id and m.user_id = u.id
-      where s.id = ${input.spaceId}::uuid and s.kind = 'team'
-        and s.deleted_at is null for key share of s
+      where s.id = ${input.spaceId}::uuid and ${readableSpaceCondition(input.userId, sql`s.id`)}
+        for key share of s
     ) select id, ${input.userId}::uuid, ${input.muted},
       ${input.now.toISOString()}::timestamptz, ${input.now.toISOString()}::timestamptz
       from locked_space
