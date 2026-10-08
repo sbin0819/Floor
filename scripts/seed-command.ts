@@ -184,6 +184,10 @@ export async function runSeedCommand(
     for (const [table, count] of Object.entries(result.counts))
       dependencies.stdout(`${table}: ${count}개`);
     dependencies.stdout(`건너뛴 예약: ${result.skippedBookings}개`);
+    if (result.skippedMeetingMessages !== undefined)
+      dependencies.stdout(
+        `건너뛴 회의 메시지: ${result.skippedMeetingMessages}개`,
+      );
     dependencies.stdout(
       `${result.branchScope || bookingRound2 ? "참조한 기존 계정 (변경 없음)" : "계정"}: ${result.accounts.join(", ")}`,
     );

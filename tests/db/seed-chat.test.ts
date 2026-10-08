@@ -82,7 +82,7 @@ describe("transactional team chat seed", () => {
   it("writes two general channels and eight sequenced messages, keeping channels and timestamps on rerun", async () => {
     expect((await seed()).counts).toMatchObject({
       chatSpaces: 2,
-      chatMessages: 18,
+      chatMessages: 44,
     });
     const first = await state();
     expect(first.spaces).toHaveLength(2);
@@ -263,7 +263,7 @@ describe("transactional team chat seed", () => {
     vi.spyOn(chatLoader, "loadSeedChat").mockReturnValue({ messages: [] });
     expect((await seed()).counts).toMatchObject({
       chatSpaces: 2,
-      chatMessages: 10,
+      chatMessages: 36,
     });
     const after = await state();
     expect(after.messages).toEqual([]);

@@ -56,6 +56,18 @@ function expectNoDatabaseUse(deps: ReturnType<typeof dependencies>) {
 }
 
 describe("seed command safety and output", () => {
+  it("reports skipped meeting messages separately from skipped bookings", async () => {
+    const deps = dependencies();
+    deps.runSeed.mockResolvedValue({
+      counts: { meetingRooms: 20, chatMessages: 40 },
+      skippedBookings: 1,
+      skippedMeetingMessages: 3,
+      accounts: [],
+    });
+    expect(await runSeedCommand([], deps)).toBe(0);
+    expect(deps.stdout).toHaveBeenCalledWith("건너뛴 예약: 1개");
+    expect(deps.stdout).toHaveBeenCalledWith("건너뛴 회의 메시지: 3개");
+  });
   const branchIds = loadSeedData()
     .branches.slice(0, 2)
     .map(({ id }) => id);

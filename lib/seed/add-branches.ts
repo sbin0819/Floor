@@ -1,5 +1,6 @@
 import type { DalDatabase } from "@/lib/dal";
 import { insertSeedBlock, insertSeedBooking } from "@/lib/dal/seed";
+import { insertSeedMeeting } from "@/lib/dal/seed-meeting";
 import {
   insertSeedBranchStructure,
   readSeedScopeRows,
@@ -13,6 +14,11 @@ import { insertSeedParticipants } from "./participants";
 import { insertSeedReminders } from "./reminders";
 import { SeedError } from "./errors";
 import { loadSeedPhotos } from "./photos";
+import {
+  loadSeedMeeting,
+  seedMeetingCreatedAt,
+  type SeedMeetingData,
+} from "./meeting";
 import type { SeedResult } from "./run-seed";
 import {
   seedBranchCounts,
@@ -170,6 +176,7 @@ export async function preflightSeedBranches({
   const data = loadSeedData();
   const photos = loadSeedPhotos(data);
   const extras = loadSeedBookings2(data);
+  const meeting = loadSeedMeeting(data, extras);
   const ids = validateSeedBranchIds(branchIds, data);
   const plan = await prepareAddition(
     selectSeedBranches(data, photos, ids, extras),
@@ -178,6 +185,7 @@ export async function preflightSeedBranches({
   );
   const selected = scopedDeskSchedule(plan.addition.data, extras);
   const counts = seedBranchCounts(plan.addition);
+  const bookingIds = new Set(plan.addition.data.bookings.map(({ id }) => id));
   return {
     addedBranchIds: plan.addedBranchIds,
     skippedBranchIds: plan.skippedBranchIds,
@@ -185,6 +193,11 @@ export async function preflightSeedBranches({
       ...counts,
       bookings: counts.bookings + selected.bookings.length,
       spaceBlocks: counts.spaceBlocks + selected.blocks.length,
+      meetingRooms: counts.bookings,
+      chatMessages:
+        counts.bookings +
+        meeting.messages.filter(({ bookingId }) => bookingIds.has(bookingId))
+          .length,
     },
   };
 }
@@ -194,6 +207,7 @@ export async function addSeedBranches(
   db: DalDatabase,
   now: Date,
   bookingExtras?: SeedBookings2Data,
+  meeting: SeedMeetingData = { messages: [] },
 ): Promise<SeedResult> {
   const { addition, userIds, addedBranchIds, skippedBranchIds } =
     await prepareAddition(scope, db, bookingExtras);
@@ -246,6 +260,10 @@ export async function addSeedBranches(
     cancelledByKey,
     ...booking
   } of data.bookings) {
+    const meetingMessages = meeting.messages.filter(
+      ({ bookingId }) => bookingId === booking.id,
+    );
+    const createdAt = seedMeetingCreatedAt(meetingMessages, now);
     const during = {
       start: instant(booking.spaceId, dayOffset, start),
       end: instant(booking.spaceId, dayOffset, end),
@@ -253,7 +271,7 @@ export async function addSeedBranches(
     await insertSeedBooking(
       {
         ...booking,
-        createdAt: now,
+        createdAt,
         attendeeCount: attendeeCounts.get(booking.id) ?? null,
         userId: userIds.get(userKey)!,
         during,
@@ -265,7 +283,24 @@ export async function addSeedBranches(
       },
       db,
     );
-    await insertSeedParticipants(booking.id, bookingExtras, userIds, now, db);
+    await insertSeedParticipants(
+      booking.id,
+      bookingExtras,
+      userIds,
+      createdAt,
+      db,
+    );
+    await insertSeedMeeting(
+      {
+        bookingId: booking.id,
+        bookerId: userIds.get(userKey)!,
+        messages: meetingMessages,
+        userIds,
+        createdAt,
+        now,
+      },
+      db,
+    );
     await insertSeedReminders({
       booking: { ...booking, during, userId: userIds.get(userKey)! },
       data,
@@ -276,6 +311,7 @@ export async function addSeedBranches(
     });
   }
   const counts = seedBranchCounts(addition);
+  const bookingIds = new Set(data.bookings.map(({ id }) => id));
   const deskResult = bookingExtras
     ? await insertSeedDeskSchedule({
         data,
@@ -290,8 +326,14 @@ export async function addSeedBranches(
       ...counts,
       bookings: counts.bookings + deskResult.bookings,
       spaceBlocks: counts.spaceBlocks + deskResult.spaceBlocks,
+      meetingRooms: counts.bookings,
+      chatMessages:
+        counts.bookings +
+        meeting.messages.filter(({ bookingId }) => bookingIds.has(bookingId))
+          .length,
     },
     skippedBookings: deskResult.skippedBookings,
+    skippedMeetingMessages: 0,
     accounts: data.users.map(({ email }) => email),
     branchScope: { addedBranchIds, skippedBranchIds },
   };

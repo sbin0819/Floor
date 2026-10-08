@@ -66,6 +66,8 @@ const protectedTables = [
   "chat_rooms",
   "messages",
   "chat_spaces",
+  "chat_room_reads",
+  "chat_room_members",
 ];
 
 describe("receipt-backed booking round 2 additions", () => {
@@ -196,18 +198,17 @@ describe("receipt-backed booking round 2 additions", () => {
 
   it("changes only the six counts and adds five participants, nine desks, one block and future reminders", async () => {
     for (let index = 1; index <= 20; index++)
-      await database.db
-        .insert(users)
-        .values({
-          email: `test${index}@ai.com`,
-          name: `테스트 회원 ${index}`,
-          emailVerified: true,
-        });
+      await database.db.insert(users).values({
+        email: `test${index}@ai.com`,
+        name: `테스트 회원 ${index}`,
+        emailVerified: true,
+      });
     const before = await preserved();
     const authRead = vi.spyOn(authModule, "getAuth").mockImplementation(() => {
       throw new Error("must not initialize auth");
     });
     const provision = vi.spyOn(authModule, "createProvisioningAuth");
+    const beforeSeed = statements.length;
     const result = await seed();
     expect(result.counts).toMatchObject({
       attendeeCounts: 6,
@@ -227,6 +228,13 @@ describe("receipt-backed booking round 2 additions", () => {
     });
     expect(authRead).not.toHaveBeenCalled();
     expect(provision).not.toHaveBeenCalled();
+    expect(
+      statements
+        .slice(beforeSeed)
+        .filter(({ sql: query }) =>
+          /\b(?:from|into|update|join)\s+"(?:chat_|messages)/iu.test(query),
+        ),
+    ).toEqual([]);
     expect(await preserved()).toEqual(before);
     const current = await snapshot();
     expect(current.bookings).toHaveLength(30);
@@ -507,13 +515,11 @@ describe("receipt-backed booking round 2 additions", () => {
     const desk = data.spaces.find(({ id }) => id === first.deskId)!;
     const during = firstRange();
     if (kind === "desk block" || kind === "area block") {
-      await database.db
-        .insert(spaceBlocks)
-        .values({
-          spaceId: kind === "area block" ? desk.parentId! : desk.id,
-          during,
-          createdBy: (await user("admin")).id,
-        });
+      await database.db.insert(spaceBlocks).values({
+        spaceId: kind === "area block" ? desk.parentId! : desk.id,
+        during,
+        createdBy: (await user("admin")).id,
+      });
     } else {
       await database.db.insert(bookings).values({
         spaceId: kind === "same seat" ? desk.id : extras.deskBlocks[0]!.spaceId,

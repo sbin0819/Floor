@@ -20,6 +20,7 @@ import {
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { loadSeedData } from "@/lib/seed/data";
+import meetingFile from "@/docs/spec/examples/seed-meeting.json";
 import { loadSeedPhotos } from "@/lib/seed/photos";
 import { runSeed } from "@/lib/seed/run-seed";
 import { selectSeedBranches } from "@/lib/seed/scope";
@@ -61,16 +62,22 @@ describe("participant seed additions", () => {
   it("inserts the five declared participants and preserves their exact mapping on rerun", async () => {
     await seed();
     const accounts = await database.db.select().from(users);
-    const expected = extras.participants.flatMap(({ bookingId, userKeys }) =>
-      userKeys.map((key) => ({
+    const expected = extras.participants.flatMap(({ bookingId, userKeys }) => {
+      const first = meetingFile.messages.find(
+        (message) => message.bookingId === bookingId,
+      );
+      const createdAt = first
+        ? new Date(now.getTime() - (first.minutesAgo + 2) * 60_000)
+        : now;
+      return userKeys.map((key) => ({
         bookingId,
-        createdAt: now,
+        createdAt,
         userId: accounts.find(
           ({ email }) =>
             email === data.users.find((user) => user.key === key)!.email,
         )!.id,
-      })),
-    );
+      }));
+    });
     expect(await read()).toEqual(expect.arrayContaining(expected));
     expect(await read()).toHaveLength(5);
     const before = await read();

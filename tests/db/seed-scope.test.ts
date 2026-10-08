@@ -42,6 +42,9 @@ const {
   floorPlans,
   bookings,
   spaceBlocks,
+  chatRooms,
+  messages,
+  chatRoomReads,
 } = schema;
 const now = new Date("2026-10-07T03:00:00Z");
 const base = dataLoader.loadSeedData();
@@ -160,6 +163,7 @@ describe("transactional additive-only branch seed", () => {
   let database: TestDatabase;
   let auth: authModule.AuthInstance;
   const statements: string[] = [];
+  const statementParameters: unknown[][] = [];
   const expected = {
     users: 0,
     branches: 1,
@@ -174,6 +178,8 @@ describe("transactional additive-only branch seed", () => {
     spaceBlocks: 1,
     spacePhotos: 2,
     branchCovers: 1,
+    meetingRooms: 2,
+    chatMessages: 2,
   };
   beforeAll(async () => {
     database = await createTestDatabase();
@@ -207,14 +213,16 @@ describe("transactional additive-only branch seed", () => {
       new Error("Scoped seed must not provision users"),
     );
     statements.length = 0;
+    statementParameters.length = 0;
   });
   const loggingDb = () =>
     drizzle({
       client: database.client,
       schema,
       logger: {
-        logQuery(query) {
+        logQuery(query, params) {
           statements.push(query);
+          statementParameters.push(params);
         },
       },
     });
@@ -227,6 +235,9 @@ describe("transactional additive-only branch seed", () => {
       authAccounts,
       authSessions,
       authVerifications,
+      chatRooms,
+      messages,
+      chatRoomReads,
       branches,
       floors,
       spaces,
@@ -282,6 +293,7 @@ describe("transactional additive-only branch seed", () => {
     );
     expect(await snapshot()).toEqual(before);
     statements.length = 0;
+    statementParameters.length = 0;
     const result = await append();
     expect(result).toMatchObject({
       counts: expected,
@@ -306,9 +318,23 @@ describe("transactional additive-only branch seed", () => {
       "floorPlans",
     ])
       expect(after[table]).toEqual(before[table]);
-    expect(
-      statements.filter((statement) => /^(update|delete)\b/i.test(statement)),
-    ).toEqual([]);
+    const newRooms = await database.db
+      .select()
+      .from(chatRooms)
+      .where(sql`${chatRooms.bookingId} in (${ids.booking}, ${ids.cancelled})`);
+    expect(newRooms).toHaveLength(2);
+    const newRoomIds = new Set(newRooms.map(({ id }) => id));
+    const updates = statements.flatMap((statement, index) =>
+      /^(update|delete)\b/i.test(statement)
+        ? [{ statement, params: statementParameters[index]! }]
+        : [],
+    );
+    expect(updates).toHaveLength(2);
+    for (const { statement, params } of updates) {
+      expect(statement).toMatch(/^update "chat_rooms" set "last_seq"/i);
+      expect(statement).toContain('where "chat_rooms"."id" =');
+      expect(newRoomIds.has(String(params.at(-1)))).toBe(true);
+    }
     expect(
       statements.filter((statement) =>
         /insert into "(users|auth_|teams|team_members)/i.test(statement),
@@ -376,6 +402,7 @@ describe("transactional additive-only branch seed", () => {
       .where(eq(users.email, "member@floor.com"));
     const before = await snapshot();
     statements.length = 0;
+    statementParameters.length = 0;
     const result = await append([ids.branch], new Date("2026-11-21T03:00:00Z"));
     expect(result.branchScope).toEqual({
       addedBranchIds: [],

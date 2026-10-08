@@ -57,7 +57,8 @@ const expectedCounts = {
   spacePhotos: 65,
   branchCovers: 5,
   chatSpaces: 2,
-  chatMessages: 18,
+  chatMessages: 44,
+  meetingRooms: 21,
   friendships: 3,
   directRooms: 3,
   groupRooms: 1,
@@ -112,6 +113,12 @@ describe("transactional development seed", () => {
     );
     return {
       ...Object.fromEntries(entries),
+      meetingRooms: (
+        await database.db
+          .select()
+          .from(chatRooms)
+          .where(eq(chatRooms.kind, "meeting"))
+      ).length,
       directRooms: (
         await database.db
           .select()

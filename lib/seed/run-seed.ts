@@ -14,6 +14,7 @@ import * as seedDal from "@/lib/dal/seed";
 import { syncSeedChat } from "@/lib/dal/seed-chat";
 import { syncSeedPeople } from "@/lib/dal/seed-people";
 import { syncSeedPeople2 } from "@/lib/dal/seed-people-2";
+import { insertSeedMeeting } from "@/lib/dal/seed-meeting";
 import {
   syncSeedBranchCovers,
   syncSeedSpacePhotos,
@@ -23,6 +24,7 @@ import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { loadSeedChat } from "@/lib/seed/chat";
 import { loadSeedPeople } from "@/lib/seed/people";
 import { loadSeedPeople2 } from "@/lib/seed/people-2";
+import { loadSeedMeeting, seedMeetingCreatedAt } from "@/lib/seed/meeting";
 import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
 import { insertSeedParticipants } from "@/lib/seed/participants";
 import { insertSeedReminders } from "@/lib/seed/reminders";
@@ -42,6 +44,7 @@ import type { BookingRound2Receipt } from "@/lib/seed/booking-round2-receipt";
 export type SeedResult = {
   counts: Record<string, number>;
   skippedBookings: number;
+  skippedMeetingMessages?: number;
   accounts: string[];
   branchScope?: { addedBranchIds: string[]; skippedBranchIds: string[] };
   bookingRound2?: { applied: boolean; receipt: BookingRound2Receipt };
@@ -79,6 +82,18 @@ export async function runSeed({
     const chat = loadSeedChat(data);
     const people = loadSeedPeople(data);
     const people2 = loadSeedPeople2(data, people);
+    const meeting = loadSeedMeeting(data, bookingExtras);
+    const meetingPlans = new Map(
+      data.bookings.map(({ id }) => {
+        const messages = meeting.messages.filter(
+          ({ bookingId }) => bookingId === id,
+        );
+        return [
+          id,
+          { messages, createdAt: seedMeetingCreatedAt(messages, now) },
+        ];
+      }),
+    );
     if (bookingRound2 !== undefined) {
       current = "예약 2차 추가 데이터";
       return await withTransaction(
@@ -105,7 +120,8 @@ export async function runSeed({
       const ids = validateSeedBranchIds(branchIds, data, resetPasswords);
       const scope = selectSeedBranches(data, photos, ids, bookingExtras);
       return await withTransaction(
-        (database) => addSeedBranches(scope, database, now, bookingExtras),
+        (database) =>
+          addSeedBranches(scope, database, now, bookingExtras, meeting),
         db,
       );
     }
@@ -264,6 +280,8 @@ export async function runSeed({
         );
       }
       let skippedBookings = 0;
+      let skippedMeetingMessages = 0;
+      let meetingMessages = 0;
       for (const {
         dayOffset,
         start,
@@ -273,6 +291,7 @@ export async function runSeed({
         ...booking
       } of data.bookings) {
         current = `예약 ${booking.id}`;
+        const meetingPlan = meetingPlans.get(booking.id)!;
         const during = {
           start: instant(booking.spaceId, dayOffset, start),
           end: instant(booking.spaceId, dayOffset, end),
@@ -286,12 +305,13 @@ export async function runSeed({
           ))
         ) {
           skippedBookings++;
+          skippedMeetingMessages += meetingPlan.messages.length;
           continue;
         }
         await seedDal.insertSeedBooking(
           {
             ...booking,
-            createdAt: now,
+            createdAt: meetingPlan.createdAt,
             attendeeCount: attendeeCounts.get(booking.id) ?? null,
             userId: userId(userKey),
             during,
@@ -307,9 +327,20 @@ export async function runSeed({
           booking.id,
           bookingExtras,
           userIds,
-          now,
+          meetingPlan.createdAt,
           database,
         );
+        const meetingResult = await insertSeedMeeting(
+          {
+            bookingId: booking.id,
+            bookerId: userId(userKey),
+            ...meetingPlan,
+            userIds,
+            now,
+          },
+          database,
+        );
+        meetingMessages += meetingResult.chatMessages;
         await insertSeedReminders({
           booking: { ...booking, during, userId: userId(userKey) },
           data,
@@ -337,7 +368,9 @@ export async function runSeed({
           chatMessages:
             chatCounts.chatMessages +
             peopleCounts.chatMessages +
-            people2Counts.chatMessages,
+            people2Counts.chatMessages +
+            meetingMessages,
+          meetingRooms: timeBookings,
           users: data.users.length,
           branches: data.branches.length,
           floors: data.floors.length,
@@ -353,6 +386,7 @@ export async function runSeed({
           branchCovers: photos.branchCovers.length,
         },
         skippedBookings,
+        skippedMeetingMessages,
         accounts: data.users.map(({ email }) => email),
       };
     }, db);

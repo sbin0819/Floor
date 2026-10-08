@@ -102,7 +102,7 @@ describe("transactional group and request seed", () => {
     const keys = new Map(
       snapshot.rooms.map((room) => [
         room.id,
-        `${room.kind}:${room.spaceId}:${room.name}:${room.dmLowUserId}:${room.dmHighUserId}`,
+        `${room.kind}:${room.spaceId}:${room.name}:${room.dmLowUserId}:${room.dmHighUserId}:${room.bookingId}`,
       ]),
     );
     const sorted = <T>(rows: T[]) =>
@@ -138,7 +138,7 @@ describe("transactional group and request seed", () => {
     expect((await seed()).counts).toMatchObject({
       directRooms: 3,
       groupRooms: 1,
-      chatMessages: 18,
+      chatMessages: 44,
     });
     const snapshot = await state();
     const userIds = await ids();
@@ -204,7 +204,17 @@ describe("transactional group and request seed", () => {
       readAt: null,
       expiresAt: null,
     });
-    expect(snapshot.reads).toHaveLength(8);
+    const meetingRoomIds = new Set(
+      snapshot.rooms
+        .filter(({ kind }) => kind === "meeting")
+        .map(({ id }) => id),
+    );
+    expect(
+      snapshot.reads.filter(({ roomId }) => !meetingRoomIds.has(roomId)),
+    ).toHaveLength(8);
+    expect(
+      snapshot.reads.filter(({ roomId }) => meetingRoomIds.has(roomId)),
+    ).toHaveLength(24);
     expect(
       snapshot.reads.some(
         (read) =>
