@@ -97,27 +97,41 @@ describe("member navigation", () => {
     render(<MemberNav />);
     for (const link of screen.getAllByRole("link")) {
       expect(link.tagName).toBe("A");
-      expect(link).toHaveClass("min-h-11", "focus-visible:outline-2");
+      expect(link).toHaveClass(
+        "h-11",
+        "min-h-11",
+        "rounded-lg",
+        "px-3",
+        "focus-visible:outline-2",
+      );
     }
-    expect(screen.getByRole("navigation")).toHaveClass("hidden", "md:flex");
+    expect(screen.getByRole("navigation", { name: "회원 메뉴" })).toHaveClass(
+      "flex",
+      "flex-col",
+    );
   });
 
-  it("shows icons and a 2px underline on the current desktop menu", () => {
+  it("shows icons and a tinted background on the current sidebar menu", () => {
     render(<MemberNav />);
-    for (const link of screen.getAllByRole("link"))
+    for (const link of screen.getAllByRole("link")) {
       expect(link.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+      expect(link.querySelector("svg")).toHaveClass("size-5");
+    }
     const current = screen.getByRole("link", { current: "page" });
     expect(current).toHaveClass(
-      "border-b-2",
-      "border-foreground",
+      "bg-sidebar-accent",
+      "text-sidebar-accent-foreground",
       "font-semibold",
     );
-    expect(current).not.toHaveClass("bg-muted");
+    expect(current).not.toHaveClass("border-b-2");
     for (const link of screen
       .getAllByRole("link")
       .filter((link) => link !== current)) {
-      expect(link).toHaveClass("border-transparent", "text-muted-foreground");
-      expect(link).not.toHaveClass("border-transparenttext-muted-foreground");
+      expect(link).toHaveClass(
+        "text-muted-foreground",
+        "hover:bg-sidebar-accent/60",
+      );
+      expect(link).not.toHaveClass("bg-sidebar-accent", "font-semibold");
     }
   });
 

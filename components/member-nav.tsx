@@ -44,11 +44,7 @@ export function MemberNav({
   return (
     <nav
       aria-label={mobile ? "하단 회원 메뉴" : "회원 메뉴"}
-      className={
-        mobile
-          ? "grid h-16 grid-cols-4"
-          : "hidden h-full items-center gap-1 md:flex"
-      }
+      className={mobile ? "grid h-16 grid-cols-4" : "flex flex-col gap-1"}
     >
       {memberNavItems.map(({ key, href, label }) => {
         const Icon = icons[key];
@@ -67,13 +63,14 @@ export function MemberNav({
               "relative inline-flex min-h-11 items-center justify-center px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
               mobile
                 ? "flex-col gap-1 rounded-lg text-xs"
-                : "h-full gap-2 border-b-2 text-sm",
+                : "h-11 justify-start gap-2 rounded-lg text-sm",
               selected
                 ? mobile
                   ? "font-semibold text-primary"
-                  : "border-foreground font-semibold text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-              !selected && !mobile && "border-transparent",
+                  : "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                : mobile
+                  ? "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent/60",
             )}
           >
             <LinkPending />
