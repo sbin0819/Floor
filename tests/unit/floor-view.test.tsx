@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Activity, useEffect } from "react";
 import {
   act,
   fireEvent,
@@ -342,6 +342,50 @@ describe("floor view preference", () => {
     );
     expect(screen.getByTestId("view")).toHaveTextContent("timeline");
   });
+  it.each(["inactive", "hidden"] as const)(
+    "discards a pending view override on %s route leave and follows the URL on back",
+    async (mode) => {
+      const original = floorHref("branch", "floor", today, first, "timeline");
+      window.history.replaceState(null, "", original);
+      const navigation = Promise.withResolvers<void>();
+      const navigate = vi.fn<NavigateAction>(() => navigation.promise);
+      const frame = (hidden = false) => (
+        <Activity mode={hidden ? "hidden" : "visible"}>
+          <WorkspaceView navigateAction={navigate} />
+        </Activity>
+      );
+      const view = render(frame());
+      fireEvent.click(screen.getByText("다른 공간 고르기"));
+      expect(workspaceState().pending).toBe(true);
+      const push = vi.spyOn(window.history, "pushState");
+      fireEvent.click(screen.getByRole("link", { name: "목록 보기" }));
+      expect(screen.getByTestId("view")).toHaveTextContent("list");
+      expect(push).not.toHaveBeenCalled();
+      window.history.replaceState(null, "", "/bookings?view=calendar");
+      await act(async () => view.rerender(frame(mode === "hidden")));
+      await act(async () => {
+        navigation.resolve();
+        await navigation.promise;
+      });
+      expect(window.location.pathname).toBe("/bookings");
+      expect(window.location.search).toBe("?view=calendar");
+      expect(push).not.toHaveBeenCalled();
+      window.history.replaceState(null, "", original);
+      view.rerender(frame());
+      await waitFor(() =>
+        expect(screen.getByTestId("view")).toHaveTextContent("timeline"),
+      );
+      expect(screen.getByRole("link", { name: "시간표 보기" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(
+        screen.getByRole("link", { name: "목록 보기" }),
+      ).not.toHaveAttribute("aria-current");
+      expect(document.cookie).toContain("floor_view=list");
+      expect(push).not.toHaveBeenCalled();
+    },
+  );
   it("also defers during closing navigation without putting the removed space back into the URL", async () => {
     window.history.replaceState(
       null,

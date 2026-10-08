@@ -21,6 +21,7 @@ import type { MyBooking } from "@/features/bookings/types";
 import { floorDayFixture, spaceDayFixture } from "./booking-ui-fixtures";
 
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   useSearchParams: () => new URLSearchParams("date=2026-10-07"),

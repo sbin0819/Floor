@@ -9,6 +9,7 @@ import { floorDayFixture } from "./booking-ui-fixtures";
 
 const navigation = vi.hoisted(() => ({ date: "2026-10-07" }));
 vi.mock("next/navigation", () => ({
+  useSelectedLayoutSegments: () => ["floors", "floor"],
   useParams: () => ({ branchId: "branch", floorId: "floor" }),
   useSearchParams: () => new URLSearchParams({ date: navigation.date }),
 }));

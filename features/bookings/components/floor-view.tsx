@@ -84,9 +84,11 @@ export function FloorViewControl({ className }: { className?: string }) {
   const pending = selection?.navigationPending ?? false;
   const currentView = searchValue(search, "view");
   const isCurrentRoute = selection?.isCurrentRoute;
+  const routeActive = selection?.routeActive ?? false;
   useEffect(() => {
-    if (!isCurrentRoute?.()) {
+    if (!routeActive || !isCurrentRoute?.()) {
       queuedView.current = null;
+      setOverride?.(null);
       return;
     }
     if (pending || queuedView.current === null) return;
@@ -95,12 +97,13 @@ export function FloorViewControl({ className }: { className?: string }) {
     const view = queuedView.current;
     queuedView.current = null;
     pushViewHistory(view);
-  }, [pending, override, isCurrentRoute]);
+  }, [pending, override, isCurrentRoute, routeActive, setOverride]);
   useEffect(
     () => () => {
       queuedView.current = null;
+      setOverride?.(null);
     },
-    [],
+    [setOverride],
   );
   useEffect(() => {
     if (
