@@ -9,6 +9,7 @@ import { config, proxy } from "@/proxy";
 import { TeamsHub } from "@/features/teams/components/teams-hub";
 import { TeamStart } from "@/features/teams/components/team-start";
 import { TeamDetail } from "@/features/teams/components/team-detail";
+import { TeamHeader } from "@/features/teams/components/team-header";
 import { InviteDetail } from "@/features/teams/components/invite-detail";
 import { normalizeTeamStartMode } from "@/features/teams/start-mode";
 import type { TeamsData, TeamStartData } from "@/features/teams/types";
@@ -32,6 +33,14 @@ vi.mock("@/features/teams/queries", () => ({
   getTeamStartData: vi.fn(),
 }));
 vi.mock("@/features/teams/create-team-action", () => ({ createTeam: vi.fn() }));
+vi.mock("@/features/teams/manage-actions", () => ({
+  setMemberRole: vi.fn(),
+  setMemberTitle: vi.fn(),
+}));
+vi.mock("@/features/chat/actions", () => ({ openDirectMessage: vi.fn() }));
+vi.mock("@/features/people/components/person-card", () => ({
+  PersonCard: ({ children }: { children: ReactNode }) => children,
+}));
 vi.mock("@/features/teams/invite-management-actions", () => ({
   sendTeamInvite: mocks.send,
   revokeTeamInvite: vi.fn(),
@@ -389,40 +398,63 @@ describe("three-mode team start", () => {
 });
 
 describe("team detail and invitation layout", () => {
-  it("opens the admin invitation as an accessible dialog and places requests above members", async () => {
+  it("keeps the admin invitation in the header and moves the original request content into its tab", async () => {
     renderUi(
-      <TeamDetail
-        data={{
-          id: teamId,
-          name: "가상 팀",
-          memberCount: 0,
-          members: [],
-          role: "admin",
-          canSendEmail: true,
-          contactPhone: "01012345678",
-          sentInvites: [],
-          joinRequests: [
-            {
-              id: "request",
-              name: "가상 요청자",
-              avatar: { color: "blue" as const, photoUrl: null },
-              email: "request@example.test",
-              message: null,
-              createdAt: "2030-01-01T00:00:00Z",
-            },
-          ],
-        }}
-      />,
+      <>
+        <TeamHeader
+          data={{
+            id: teamId,
+            name: "가상 팀",
+            role: "admin",
+            memberCount: 0,
+            homeBranchName: null,
+            space: null,
+            canSendEmail: true,
+          }}
+        />
+        <TeamDetail
+          tab="requests"
+          data={{
+            id: teamId,
+            name: "가상 팀",
+            userId: "self",
+            homeBranchName: null,
+            space: null,
+            upcomingBookingCount: 0,
+            homeBranchId: null,
+            headcount: null,
+            branches: [],
+            pendingJoinRequestCount: 1,
+            memberCount: 0,
+            members: [],
+            role: "admin",
+            canSendEmail: true,
+            contactPhone: "01012345678",
+            sentInvites: [],
+            joinRequests: [
+              {
+                id: "request",
+                name: "가상 요청자",
+                avatar: { color: "blue" as const, photoUrl: null },
+                email: "request@example.test",
+                message: null,
+                createdAt: "2030-01-01T00:00:00Z",
+              },
+            ],
+          }}
+        />
+        ,
+      </>,
     );
     expect(
       screen.queryByRole("form", { name: "초대 보내기" }),
     ).not.toBeInTheDocument();
-    const headings = screen
-      .getAllByRole("heading")
-      .map((node) => node.textContent);
-    expect(headings.indexOf("받은 가입 요청 1건")).toBeLessThan(
-      headings.indexOf("팀원 목록"),
-    );
+    expect(
+      screen.getByRole("heading", { name: "받은 가입 요청 1건" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "팀원 목록" }),
+    ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "팀원 초대" }));
     expect(screen.getByRole("dialog", { name: "팀원 초대" })).toBeVisible();
     expect(screen.getByRole("form", { name: "초대 보내기" })).toBeVisible();

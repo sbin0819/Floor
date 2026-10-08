@@ -56,6 +56,14 @@ vi.mock("@/features/teams/invite-response-actions", () => ({
   acceptTeamInvite: mocks.accept,
   declineTeamInvite: mocks.decline,
 }));
+vi.mock("@/features/teams/manage-actions", () => ({
+  setMemberRole: vi.fn(),
+  setMemberTitle: vi.fn(),
+}));
+vi.mock("@/features/chat/actions", () => ({ openDirectMessage: vi.fn() }));
+vi.mock("@/features/people/components/person-card", () => ({
+  PersonCard: ({ children }: { children: ReactNode }) => children,
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
 }));
@@ -319,9 +327,18 @@ describe("invites and requests", () => {
     mocks.revoke.mockResolvedValue({ ok: true, data: { teamId } });
     renderUi(
       <TeamDetail
+        tab="requests"
         data={{
           id: teamId,
           name: "가상 팀",
+          userId: "self",
+          homeBranchName: null,
+          space: null,
+          upcomingBookingCount: 0,
+          homeBranchId: null,
+          headcount: null,
+          branches: [],
+          pendingJoinRequestCount: 1,
           role: "admin",
           memberCount: 0,
           members: [],
@@ -426,6 +443,10 @@ describe("read-only views and search", () => {
     const data: TeamPageData = {
       id: teamId,
       name: "가상 팀",
+      userId: "self",
+      homeBranchName: null,
+      space: null,
+      upcomingBookingCount: 0,
       role: "member",
       memberCount: 1,
       members: [
@@ -433,7 +454,7 @@ describe("read-only views and search", () => {
           id: crypto.randomUUID(),
           name: "가상 회원",
           avatar: { color: "blue" as const, photoUrl: null },
-          email: "member@example.com",
+          username: "member",
           role: "member",
           title: "디자이너",
         },
@@ -453,7 +474,13 @@ describe("read-only views and search", () => {
     expect(
       screen.queryByRole("heading", { name: "받은 가입 요청" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: "이메일" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("member@example.com")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "팀원 초대" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 });

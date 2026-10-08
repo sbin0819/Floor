@@ -38,6 +38,9 @@ vi.mock("@/features/teams/components/team-home", () => ({
 vi.mock("@/features/teams/components/team-detail", () => ({
   TeamDetail: () => null,
 }));
+vi.mock("@/features/teams/components/team-removal", () => ({
+  TeamRemoval: () => null,
+}));
 vi.mock("@/features/teams/components/team-start", () => ({
   TeamStart: () => null,
 }));

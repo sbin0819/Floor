@@ -50,10 +50,12 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  closeLabel = "공간 상세 시트 닫기",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left";
   showCloseButton?: boolean;
+  closeLabel?: string;
 }) {
   return (
     <SheetPortal>
@@ -76,7 +78,7 @@ function SheetContent({
               size="icon"
             >
               <XIcon aria-hidden="true" />
-              <span className="sr-only">공간 상세 시트 닫기</span>
+              <span className="sr-only">{closeLabel}</span>
             </Button>
           </SheetPrimitive.Close>
         )}

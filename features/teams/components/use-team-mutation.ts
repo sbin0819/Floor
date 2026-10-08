@@ -17,6 +17,8 @@ const fallbackMessage = "처리하지 못했어요. 새로고침한 뒤 다시 �
 
 export function teamErrorMessage(code: ActionErrorCode, limitMessage?: string) {
   switch (code) {
+    case "LAST_ADMIN":
+      return "팀 관리자가 한 명뿐이에요. 다른 팀원을 팀 관리자로 지정한 뒤에 해 주세요";
     case "TEAM_NAME_TAKEN":
       return "같은 이름의 팀이 이미 있어요";
     case "ALREADY_MEMBER":
