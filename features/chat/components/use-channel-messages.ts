@@ -124,6 +124,7 @@ export function useChannelMessages(
       authorId: event.authorId,
       authorName: event.authorName,
       kind: event.kind,
+      systemData: event.systemData,
       body: event.body,
       createdAt: event.createdAt,
       clientId: event.authorId === userId ? event.clientId : null,

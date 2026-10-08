@@ -35,6 +35,13 @@ export const chatRoomKind = pgEnum("chat_room_kind", [
   "meeting",
 ]);
 export const messageKind = pgEnum("message_kind", ["text", "system"]);
+export const userStatus = pgEnum("user_status", ["online", "away", "dnd"]);
+export const reportReason = pgEnum("report_reason", [
+  "spam",
+  "harassment",
+  "inappropriate",
+  "other",
+]);
 export const friendshipStatus = pgEnum("friendship_status", [
   "pending",
   "accepted",
@@ -80,4 +87,5 @@ export const notificationType = pgEnum("notification_type", [
   "booking_reminder",
   "friend_request",
   "friend_accepted",
+  "message_request",
 ]);

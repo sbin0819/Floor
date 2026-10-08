@@ -167,16 +167,16 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                 names: new Map<string, string>(),
               };
             }
-            if (
-              input.replyToId &&
-              !(await getChatMessage(
+            if (input.replyToId) {
+              const reply = await getChatMessage(
                 input.replyToId,
                 input.roomId,
                 session.userId,
                 transaction,
-              ))
-            )
-              throw new ActionError("INVALID_INPUT");
+              );
+              if (!reply || reply.kind === "system")
+                throw new ActionError("INVALID_INPUT");
+            }
             const members =
               room.kind === "dm"
                 ? await listDirectMembers(room.id, transaction)

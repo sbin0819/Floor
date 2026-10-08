@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RoomMessagesPage } from "./types";
 import { reactionEmojis } from "./types";
+import { parseSystemMessageData } from "./system-messages";
 
 export type { RoomMessagesPage } from "./types";
 export type MessagePageQuery =
@@ -15,6 +16,7 @@ const pageSchema = z.object({
       authorId: z.string().nullable(),
       authorName: z.string().nullable(),
       kind: z.enum(["text", "system"]),
+      systemData: z.unknown().transform(parseSystemMessageData),
       body: z.string(),
       createdAt: z.string(),
       clientId: z.string().nullable(),

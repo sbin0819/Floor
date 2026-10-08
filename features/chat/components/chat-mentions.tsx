@@ -136,10 +136,11 @@ export function ChatMentions({
     const room = data?.directMessages.find(
       (room) => room.roomId === event.roomId,
     );
-    if (!room || room.muted || !event.preview || event.authorId === userId)
+    if (!room || room.muted || !event.preview || event.preview.authorName === null || event.authorId === userId)
       return;
     enqueue({
       ...event.preview,
+      authorName: event.preview.authorName,
       seq: event.seq,
       roomId: event.roomId,
       href: `/dm/${event.roomId}`,

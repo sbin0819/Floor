@@ -30,7 +30,9 @@ export function NotificationRow({
 }) {
   const presentation = notificationPresentation(item);
   const booking =
-    item.type !== "friend_request" && item.type !== "friend_accepted"
+    item.type !== "friend_request" &&
+    item.type !== "friend_accepted" &&
+    item.type !== "message_request"
       ? item
       : null;
   const age = notificationAge(

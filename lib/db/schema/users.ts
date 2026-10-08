@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { branches } from "./branches";
 import { createdAt, id } from "./common";
+import { userStatus } from "./enums";
 
 export const users = pgTable(
   "users",
@@ -20,6 +21,7 @@ export const users = pgTable(
     avatarUrl: text("avatar_url"),
     username: text("username").unique("users_username_unique"),
     usernameChangedAt: timestamp("username_changed_at", { withTimezone: true }),
+    status: userStatus("status").notNull().default("online"),
     defaultBranchId: uuid("default_branch_id").references(() => branches.id, {
       onDelete: "set null",
     }),

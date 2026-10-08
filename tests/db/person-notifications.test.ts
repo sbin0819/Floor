@@ -37,7 +37,7 @@ describe("person notification persistence", () => {
       );
   });
   const create = (
-    type: "friend_request" | "friend_accepted",
+    type: "friend_request" | "friend_accepted" | "message_request",
     userId = me.userId,
     actorId = other.userId,
   ) =>
@@ -105,6 +105,30 @@ describe("person notification persistence", () => {
     ).toEqual([]);
   });
 
+  it("returns a message request as a person notification with no booking fields", async () => {
+    const request = await create("message_request");
+    expect((await queries().getNotifications()).items).toEqual([
+      {
+        id: request.id,
+        type: "message_request",
+        data: { actorName: "박지훈" },
+        read: false,
+        scheduledFor: now.toISOString(),
+        bookingId: null,
+        href: "/friends?tab=requests",
+      },
+    ]);
+    const actions = createNotificationActions({
+      database: database.db,
+      getSession: async () => me,
+      now: () => now,
+    });
+    expect(
+      await actions.markNotificationRead({ notificationId: request.id }),
+    ).toEqual({ ok: true, data: {} });
+    expect((await queries().getNotificationSummary()).unreadCount).toBe(0);
+  });
+
   it("rolls back person notifications with the surrounding transaction", async () => {
     await expect(
       database.db.transaction(async (tx) => {
@@ -125,15 +149,13 @@ describe("person notification persistence", () => {
   });
 
   it("filters malformed person data at the query boundary", async () => {
-    await database.db
-      .insert(notifications)
-      .values({
-        userId: me.userId,
-        type: "friend_request",
-        actorId: other.userId,
-        scheduledFor: now,
-        data: {} as typeof notifications.$inferInsert.data,
-      });
+    await database.db.insert(notifications).values({
+      userId: me.userId,
+      type: "friend_request",
+      actorId: other.userId,
+      scheduledFor: now,
+      data: {} as typeof notifications.$inferInsert.data,
+    });
     expect((await queries().getNotifications()).items).toEqual([]);
   });
 });

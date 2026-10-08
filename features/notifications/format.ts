@@ -23,6 +23,7 @@ function notificationDate(start: string, timezone: string) {
 export function notificationHref({ type, data }: NotificationContent) {
   if (type === "friend_request") return "/friends?tab=received";
   if (type === "friend_accepted") return "/friends";
+  if (type === "message_request") return "/friends?tab=requests";
   if (type === "booking_removed") return null;
   if (type === "booking_cancelled") return "/bookings?tab=past";
   const date = localDate(new Date(data.start), data.timezone);
@@ -30,14 +31,20 @@ export function notificationHref({ type, data }: NotificationContent) {
 }
 
 export function notificationPresentation({ type, data }: NotificationContent) {
-  if (type === "friend_request" || type === "friend_accepted") {
+  if (
+    type === "friend_request" ||
+    type === "friend_accepted" ||
+    type === "message_request"
+  ) {
     const parts = [
       { text: data.actorName, strong: true },
       {
         text:
           type === "friend_request"
             ? " 님이 친구 요청을 보냈어요"
-            : " 님이 친구 요청을 수락했어요",
+            : type === "message_request"
+              ? " 님이 메시지를 보내고 싶어 해요"
+              : " 님이 친구 요청을 수락했어요",
         strong: false,
       },
     ];

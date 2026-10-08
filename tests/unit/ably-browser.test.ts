@@ -23,6 +23,7 @@ const event: RealtimeEvent = {
   authorName: "김서연",
   clientId: "client-a",
   kind: "text",
+  systemData: null,
   body: "안녕하세요",
   createdAt: "2026-10-08T00:00:00Z",
   replyTo: null,

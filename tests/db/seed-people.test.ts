@@ -77,7 +77,12 @@ describe("transactional people and direct-message seed", () => {
     const rooms = await database.db
       .select()
       .from(chatRooms)
-      .where(eq(chatRooms.kind, "dm"))
+      .where(
+        and(
+          eq(chatRooms.kind, "dm"),
+          sql`not exists (select 1 from chat_room_members m where m.room_id = ${chatRooms.id} and m.status <> 'active')`,
+        ),
+      )
       .orderBy(chatRooms.dmLowUserId, chatRooms.dmHighUserId);
     const roomIds = rooms.map(({ id }) => id);
     return {
@@ -163,9 +168,10 @@ describe("transactional people and direct-message seed", () => {
   it("writes exact names, friendships, notification snapshots, direct sequences and authored read cursors", async () => {
     expect((await seed()).counts).toMatchObject({
       chatSpaces: 2,
-      chatMessages: 13,
+      chatMessages: 18,
       friendships: 3,
-      directRooms: 2,
+      directRooms: 3,
+      groupRooms: 1,
     });
     const snapshot = await state();
     const ids = await userIds();

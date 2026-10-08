@@ -19,6 +19,7 @@ import {
   messages,
   messageMentions,
   messageReactions,
+  reports,
   roleSettings,
   spaces,
   teamInvites,
@@ -26,6 +27,7 @@ import {
   teamMembers,
   teams,
   users,
+  userBlocks,
 } from "@/lib/db/schema";
 import { createTestDatabase, type TestDatabase } from "./helper";
 
@@ -377,6 +379,10 @@ describe("database constraints from the real migrations", () => {
           kind,
           authorId: kind === "system" ? userId : null,
           body: "작성자 검사",
+          systemData:
+            kind === "system"
+              ? { type: "group_created", actorName: "테스트 사용자" }
+              : null,
         }),
       ).rejects.toMatchObject({
         cause: { code: "23514", constraint: "messages_author_kind" },
@@ -399,7 +405,13 @@ describe("database constraints from the real migrations", () => {
 
   it("9. accepts a system message without an author and 4000 Unicode code points", async () => {
     await database.db.insert(messages).values([
-      { roomId, seq: 1, kind: "system", body: "시스템 메시지" },
+      {
+        roomId,
+        seq: 1,
+        kind: "system",
+        body: "테스트 사용자 님이 그룹을 만들었어요",
+        systemData: { type: "group_created", actorName: "테스트 사용자" },
+      },
       { roomId, seq: 2, authorId: userId, body: "😀".repeat(4000) },
     ]);
     expect(await database.db.select().from(messages)).toHaveLength(2);
@@ -1121,6 +1133,160 @@ describe("database constraints from the real migrations", () => {
     expect(await database.db.select().from(chatRoomMembers)).toEqual([]);
   });
 
+  it("32. rejects self and duplicate blocks but permits the reverse direction", async () => {
+    const { low, high } = await peoplePair();
+    await expect(
+      database.db.insert(userBlocks).values({ blockerId: low, blockedId: low }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "user_blocks_not_self" },
+    });
+    await database.db
+      .insert(userBlocks)
+      .values({ blockerId: low, blockedId: high });
+    await expect(
+      database.db
+        .insert(userBlocks)
+        .values({ blockerId: low, blockedId: high }),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+    await database.db
+      .insert(userBlocks)
+      .values({ blockerId: high, blockedId: low });
+    expect(await database.db.select().from(userBlocks)).toHaveLength(2);
+  });
+
+  it("33. enforces message report uniqueness and Unicode detail length while retaining reports after message deletion", async () => {
+    const { low, high } = await peoplePair();
+    const [message] = await database.db
+      .insert(messages)
+      .values({ roomId, seq: 1, authorId: high, body: "검사 메시지" })
+      .returning();
+    const report = {
+      reporterId: low,
+      targetUserId: high,
+      messageId: message!.id,
+      reason: "spam" as const,
+      detail: "😀".repeat(500),
+    };
+    await database.db.insert(reports).values(report);
+    await expect(
+      database.db.insert(reports).values(report),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "reports_message_unique" },
+    });
+    await database.db.insert(reports).values([
+      { ...report, messageId: null },
+      { ...report, messageId: null },
+    ]);
+    await expect(
+      database.db
+        .insert(reports)
+        .values({ ...report, messageId: null, detail: "😀".repeat(501) }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "reports_detail_length" },
+    });
+    await database.db.delete(messages).where(eq(messages.id, message!.id));
+    expect(
+      (await database.db.select().from(reports)).map((row) => row.messageId),
+    ).toEqual([null, null, null]);
+  });
+
+  it("34. accepts unnamed group rooms but rejects space and private pair references", async () => {
+    const [room] = await database.db
+      .insert(chatRooms)
+      .values({ kind: "group_dm" })
+      .returning();
+    expect(room?.name).toBeNull();
+    for (const ref of [
+      { spaceId: chatSpaceId },
+      { dmLowUserId: userId },
+      { dmHighUserId: userId },
+    ]) {
+      await expect(
+        database.db.insert(chatRooms).values({ kind: "group_dm", ...ref }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "chat_rooms_kind_ref" },
+      });
+    }
+  });
+
+  it.each(["requested", "declined"] as const)(
+    "34. requires a request timestamp for %s memberships",
+    async (status) => {
+      const member = {
+        roomId,
+        userId,
+        status,
+        joinedAt: during.start,
+        statusChangedAt: during.start,
+      };
+      await expect(
+        database.db.insert(chatRoomMembers).values(member),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "chat_room_members_requested" },
+      });
+      await database.db
+        .insert(chatRoomMembers)
+        .values({ ...member, requestedAt: during.start });
+      expect(
+        (await database.db.select().from(chatRoomMembers))[0]?.requestedAt,
+      ).toEqual(during.start);
+    },
+  );
+
+  it.each(["active", "left"] as const)(
+    "34. allows %s memberships without a request timestamp",
+    async (status) => {
+      await database.db
+        .insert(chatRoomMembers)
+        .values({
+          roomId,
+          userId,
+          status,
+          joinedAt: during.start,
+          statusChangedAt: during.start,
+        });
+      expect(
+        (await database.db.select().from(chatRoomMembers))[0]?.requestedAt,
+      ).toBeNull();
+    },
+  );
+
+  it.each(["system", "text"] as const)(
+    "35. requires system data exactly for system messages, not %s with mismatched data",
+    async (kind) => {
+      await expect(
+        database.db
+          .insert(messages)
+          .values({
+            roomId,
+            seq: 1,
+            kind,
+            authorId: kind === "system" ? null : userId,
+            body: "검사",
+            systemData:
+              kind === "system"
+                ? null
+                : { type: "group_created", actorName: "테스트" },
+          }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "messages_system_data" },
+      });
+      await database.db
+        .insert(messages)
+        .values({
+          roomId,
+          seq: 1,
+          kind,
+          authorId: kind === "system" ? null : userId,
+          body: "검사",
+          systemData:
+            kind === "system"
+              ? { type: "group_created", actorName: "테스트" }
+              : null,
+        });
+      expect(await database.db.select().from(messages)).toHaveLength(1);
+    },
+  );
 });
 
 describe("booking foundation upgrade", () => {
@@ -1185,11 +1351,13 @@ describe("booking foundation upgrade", () => {
       expect(
         (
           await client.query(
-            "SELECT username, username_changed_at FROM users WHERE id = $1",
+            "SELECT username, username_changed_at, status FROM users WHERE id = $1",
             [userId],
           )
         ).rows,
-      ).toEqual([{ username: null, username_changed_at: null }]);
+      ).toEqual([
+        { username: null, username_changed_at: null, status: "online" },
+      ]);
       expect(result.rows).toEqual([
         { status: "confirmed", cancelled_at: null, cancelled_by: null },
         { status: "cancelled", cancelled_at: createdAt, cancelled_by: null },

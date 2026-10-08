@@ -57,9 +57,10 @@ const expectedCounts = {
   spacePhotos: 65,
   branchCovers: 5,
   chatSpaces: 2,
-  chatMessages: 13,
+  chatMessages: 18,
   friendships: 3,
-  directRooms: 2,
+  directRooms: 3,
+  groupRooms: 1,
 };
 
 describe("transactional development seed", () => {
@@ -116,6 +117,12 @@ describe("transactional development seed", () => {
           .select()
           .from(chatRooms)
           .where(eq(chatRooms.kind, "dm"))
+      ).length,
+      groupRooms: (
+        await database.db
+          .select()
+          .from(chatRooms)
+          .where(eq(chatRooms.kind, "group_dm"))
       ).length,
       branchCovers: (await database.db.select().from(branches)).filter(
         ({ coverPhotoPath }) => coverPhotoPath !== null,

@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe("person notification snapshots and presentation", () => {
-  it.each(["friend_request", "friend_accepted"] as const)(
+  it.each(["friend_request", "friend_accepted", "message_request"] as const)(
     "parses only the strict actor snapshot for %s",
     (type) => {
       expect(parseNotificationData(type, base.data)).toEqual(base.data);
@@ -66,6 +66,11 @@ describe("person notification snapshots and presentation", () => {
       "/friends?tab=received",
     ],
     ["friend_accepted", "김하은 님이 친구 요청을 수락했어요", "/friends"],
+    [
+      "message_request",
+      "김하은 님이 메시지를 보내고 싶어 해요",
+      "/friends?tab=requests",
+    ],
   ] as const)(
     "renders %s without a booking date or separator",
     (type, text, href) => {

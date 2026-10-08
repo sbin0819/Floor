@@ -13,6 +13,7 @@ import {
 import * as seedDal from "@/lib/dal/seed";
 import { syncSeedChat } from "@/lib/dal/seed-chat";
 import { syncSeedPeople } from "@/lib/dal/seed-people";
+import { syncSeedPeople2 } from "@/lib/dal/seed-people-2";
 import {
   syncSeedBranchCovers,
   syncSeedSpacePhotos,
@@ -21,6 +22,7 @@ import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { loadSeedChat } from "@/lib/seed/chat";
 import { loadSeedPeople } from "@/lib/seed/people";
+import { loadSeedPeople2 } from "@/lib/seed/people-2";
 import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
 import { insertSeedParticipants } from "@/lib/seed/participants";
 import { insertSeedReminders } from "@/lib/seed/reminders";
@@ -76,6 +78,7 @@ export async function runSeed({
     const bookingExtras = loadSeedBookings2(data);
     const chat = loadSeedChat(data);
     const people = loadSeedPeople(data);
+    const people2 = loadSeedPeople2(data, people);
     if (bookingRound2 !== undefined) {
       current = "예약 2차 추가 데이터";
       return await withTransaction(
@@ -189,6 +192,13 @@ export async function runSeed({
       );
       current = "사람과 DM";
       const peopleCounts = await syncSeedPeople(people, userIds, now, database);
+      current = "그룹과 메시지 요청";
+      const people2Counts = await syncSeedPeople2(
+        people2,
+        userIds,
+        now,
+        database,
+      );
       for (const { userKey, ...staff } of data.branchStaff)
         await seedDal.upsertSeedStaff(
           { ...staff, userId: userId(userKey) },
@@ -320,7 +330,12 @@ export async function runSeed({
         counts: {
           ...chatCounts,
           ...peopleCounts,
-          chatMessages: chatCounts.chatMessages + peopleCounts.chatMessages,
+          groupRooms: people2Counts.groupRooms,
+          directRooms: peopleCounts.directRooms + people2Counts.directRooms,
+          chatMessages:
+            chatCounts.chatMessages +
+            peopleCounts.chatMessages +
+            people2Counts.chatMessages,
           users: data.users.length,
           branches: data.branches.length,
           floors: data.floors.length,

@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   index,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -24,6 +25,7 @@ import {
 } from "./enums";
 import { teams } from "./teams";
 import { users } from "./users";
+import type { SystemMessageData } from "@/features/chat/system-messages";
 
 export const chatSpaces = pgTable(
   "chat_spaces",
@@ -76,7 +78,7 @@ export const chatRooms = pgTable(
   (table) => [
     check(
       "chat_rooms_kind_ref",
-      sql`(${table.kind} IN ('text', 'voice') AND ${table.spaceId} IS NOT NULL AND ${table.name} IS NOT NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL) OR (${table.kind} = 'dm' AND ${table.dmLowUserId} IS NOT NULL AND ${table.dmHighUserId} IS NOT NULL AND ${table.dmLowUserId} < ${table.dmHighUserId} AND ${table.spaceId} IS NULL AND ${table.name} IS NULL) OR ${table.kind} IN ('group_dm', 'meeting')`,
+      sql`(${table.kind} IN ('text', 'voice') AND ${table.spaceId} IS NOT NULL AND ${table.name} IS NOT NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL) OR (${table.kind} = 'dm' AND ${table.dmLowUserId} IS NOT NULL AND ${table.dmHighUserId} IS NOT NULL AND ${table.dmLowUserId} < ${table.dmHighUserId} AND ${table.spaceId} IS NULL AND ${table.name} IS NULL) OR (${table.kind} = 'group_dm' AND ${table.spaceId} IS NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL) OR ${table.kind} = 'meeting'`,
     ),
     check(
       "chat_rooms_name_length",
@@ -103,6 +105,7 @@ export const chatRoomMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     status: chatMemberStatus("status").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull(),
     statusChangedAt: timestamp("status_changed_at", {
       withTimezone: true,
@@ -112,6 +115,10 @@ export const chatRoomMembers = pgTable(
   (table) => [
     primaryKey({ columns: [table.roomId, table.userId] }),
     index("chat_room_members_user_id_idx").on(table.userId),
+    check(
+      "chat_room_members_requested",
+      sql`${table.status} NOT IN ('requested', 'declined') OR ${table.requestedAt} IS NOT NULL`,
+    ),
   ],
 );
 
@@ -128,6 +135,7 @@ export const messages = pgTable(
     }),
     kind: messageKind("kind").notNull().default("text"),
     body: text("body").notNull(),
+    systemData: jsonb("system_data").$type<SystemMessageData>(),
     clientId: text("client_id"),
     replyToId: uuid("reply_to_id").references((): AnyPgColumn => messages.id, {
       onDelete: "set null",
@@ -152,6 +160,10 @@ export const messages = pgTable(
     check(
       "messages_body_length",
       sql`(${table.deletedAt} IS NULL AND char_length(${table.body}) BETWEEN 1 AND 4000) OR (${table.deletedAt} IS NOT NULL AND ${table.body} = '')`,
+    ),
+    check(
+      "messages_system_data",
+      sql`(${table.kind} = 'system' AND ${table.systemData} IS NOT NULL) OR (${table.kind} = 'text' AND ${table.systemData} IS NULL)`,
     ),
     index("messages_everyone_idx")
       .on(table.roomId, table.seq)

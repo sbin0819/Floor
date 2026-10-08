@@ -12,6 +12,7 @@ export const bookingNotificationTypes = [
 export const personNotificationTypes = [
   "friend_request",
   "friend_accepted",
+  "message_request",
 ] as const;
 export const notificationTypes = [
   ...bookingNotificationTypes,
@@ -72,7 +73,11 @@ export type NotificationContent =
 export function isPersonNotificationType(
   type: NotificationType,
 ): type is PersonNotificationType {
-  return type === "friend_request" || type === "friend_accepted";
+  return (
+    type === "friend_request" ||
+    type === "friend_accepted" ||
+    type === "message_request"
+  );
 }
 
 export function parseNotificationData(

@@ -5,7 +5,7 @@ export type RealtimeEvent =
       roomKind: ChatRoomKind;
       preview: {
         messageId: string;
-        authorName: string;
+        authorName: string | null;
         excerpt: string;
       } | null;
       roomId: string;
@@ -15,6 +15,9 @@ export type RealtimeEvent =
   | { type: "room.read"; roomId: string; userId: string; seq: number }
   | { type: "friend.changed" }
   | { type: "notifications.changed" }
+  | { type: "room.changed"; roomId: string }
+  | { type: "realtime.reauth" }
+  | { type: "status.changed"; status: "online" | "away" | "dnd" }
   | { type: "booking.changed"; spaceId: string }
   | { type: "space.status_changed"; spaceId: string }
   | { type: "plan.published"; floorId: string; version: number }
@@ -27,6 +30,7 @@ export type RealtimeEvent =
       authorName: string | null;
       clientId: string | null;
       kind: "text" | "system";
+      systemData: SystemMessageData | null;
       body: string;
       createdAt: string;
       replyTo: ChatReply | null;
@@ -87,3 +91,4 @@ import type {
   ChatReply,
   ReactionEmoji,
 } from "@/features/chat/types";
+import type { SystemMessageData } from "@/features/chat/system-messages";

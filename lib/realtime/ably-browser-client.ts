@@ -2,6 +2,7 @@ import type { ConnectionState, TokenRequest } from "ably";
 import { z } from "zod";
 
 import { reactionEmojis } from "@/features/chat/types";
+import { parseSystemMessageData } from "@/features/chat/system-messages";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
 export interface RealtimeTokenInput {
@@ -52,6 +53,12 @@ const replySchema = z.object({
 const eventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("friend.changed") }),
   z.object({ type: z.literal("notifications.changed") }),
+  z.object({ type: z.literal("room.changed"), roomId: z.string() }),
+  z.object({ type: z.literal("realtime.reauth") }),
+  z.object({
+    type: z.literal("status.changed"),
+    status: z.enum(["online", "away", "dnd"]),
+  }),
   z.object({
     type: z.literal("room.read"),
     roomId: z.string(),
@@ -65,7 +72,7 @@ const eventSchema = z.discriminatedUnion("type", [
     preview: z
       .object({
         messageId: z.string(),
-        authorName: z.string(),
+        authorName: z.string().nullable(),
         excerpt: z.string(),
       })
       .nullable(),
@@ -89,6 +96,7 @@ const eventSchema = z.discriminatedUnion("type", [
     authorName: z.string().nullable(),
     clientId: z.string().nullable(),
     kind: z.enum(["text", "system"]),
+    systemData: z.unknown().transform(parseSystemMessageData),
     body: z.string(),
     createdAt: z.string(),
     replyTo: replySchema.nullable(),

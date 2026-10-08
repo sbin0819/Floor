@@ -47,6 +47,7 @@ export function createReactionActions(
           );
           if (!access.room) throw new ActionError("NOT_FOUND");
           if (!access.canReact) throw new ActionError("FORBIDDEN");
+          if (target.kind === "system") throw new ActionError("INVALID_INPUT");
           const result = await withTransaction(async (tx) => {
             await lockUsersForKeyShare([session.userId], tx);
             await lockRoomForMessage(target.roomId, tx);

@@ -93,6 +93,7 @@ describe("future reminders for actual seeded time reservations", () => {
     ).toEqual([
       expect.objectContaining({ type: "friend_request" }),
       expect.objectContaining({ type: "friend_request" }),
+      expect.objectContaining({ type: "message_request" }),
     ]);
     expect(rows).toHaveLength(expected.length);
     expect(rows.length).toBeGreaterThan(0);

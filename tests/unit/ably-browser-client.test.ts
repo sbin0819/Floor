@@ -44,6 +44,7 @@ const created: Extract<RealtimeEvent, { type: "message.created" }> = {
   authorName: "김서연",
   clientId: "client-a",
   kind: "text",
+  systemData: null,
   body: "답장해요",
   createdAt: "2026-10-08T00:00:00Z",
   replyTo: {
@@ -232,6 +233,32 @@ describe("Ably SDK bridge", () => {
     });
     expect(listener).toHaveBeenCalledExactlyOnceWith(created);
   });
+  it("forwards validated system snapshots and falls back to body for malformed data", async () => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const listener = vi.fn();
+    await client.channel("room:a").subscribe(listener);
+    const event = {
+      ...created,
+      kind: "system" as const,
+      authorId: null,
+      authorName: null,
+      clientId: null,
+      body: "김서연 님이 그룹을 만들었어요",
+      systemData: { type: "group_created" as const, actorName: "김서연" },
+    };
+    sdk.subscribe.mock.calls[0]?.[0]({ data: event });
+    expect(listener).toHaveBeenLastCalledWith(event);
+    sdk.subscribe.mock.calls[0]?.[0]({
+      data: {
+        ...event,
+        systemData: { ...event.systemData, email: "private@floor.test" },
+      },
+    });
+    expect(listener).toHaveBeenLastCalledWith({ ...event, systemData: null });
+    expect(JSON.stringify(listener.mock.calls)).not.toContain(
+      "private@floor.test",
+    );
+  });
   it.each<RealtimeEvent>([
     {
       type: "message.updated",
@@ -247,6 +274,11 @@ describe("Ably SDK bridge", () => {
     { type: "room.read", roomId: "a", userId: "u", seq: 1 },
     { type: "friend.changed" },
     { type: "notifications.changed" },
+    { type: "room.changed", roomId: "a" },
+    { type: "realtime.reauth" },
+    { type: "status.changed", status: "online" },
+    { type: "status.changed", status: "away" },
+    { type: "status.changed", status: "dnd" },
     {
       type: "room.activity",
       roomId: "a",

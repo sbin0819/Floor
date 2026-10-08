@@ -23,6 +23,7 @@ export type ChatReaction = {
   names: string[];
 };
 export type ChatMessageDetails = {
+  systemData: SystemMessageData | null;
   replyTo: ChatReply | null;
   mentions: ChatMention[];
   mentionsEveryone: boolean;
@@ -32,6 +33,7 @@ export type ChatMessageDetails = {
 };
 
 export const emptyMessageDetails = (): ChatMessageDetails => ({
+  systemData: null,
   replyTo: null,
   mentions: [],
   mentionsEveryone: false,
@@ -131,3 +133,4 @@ export type ChannelView = {
   canWrite: boolean;
   now: string;
 };
+import type { SystemMessageData } from "./system-messages";

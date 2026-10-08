@@ -4,12 +4,19 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ActionError } from "@/lib/actions/result";
 import {
   chatRooms,
+  chatRoomReads,
   chatSpaces,
   messageMentions,
   messages,
   users,
 } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
+import {
+  systemMessageDataSchema,
+  systemMessageText,
+  type SystemMessageData,
+} from "@/features/chat/system-messages";
+import { emptyMessageDetails, type ChatMessage } from "@/features/chat/types";
 
 export async function createTeamSpace(teamId: string, database: DalDatabase) {
   await database
@@ -123,4 +130,67 @@ export async function insertMessageMentions(
     .insert(messageMentions)
     .values(userIds.map((userId) => ({ messageId, userId, createdAt: now })))
     .onConflictDoNothing();
+}
+
+// 호출자가 사용자 → 방 순서로 잠근 트랜잭션 안에서만 쓴다.
+export async function insertSystemMessage(
+  input: {
+    roomId: string;
+    data: SystemMessageData;
+    actorId?: string | null;
+    now: Date;
+  },
+  database: DalDatabase,
+): Promise<ChatMessage> {
+  const data = systemMessageDataSchema.parse(input.data);
+  const [room] = await database
+    .update(chatRooms)
+    .set({ lastSeq: sql`${chatRooms.lastSeq} + 1`, lastMessageAt: input.now })
+    .where(eq(chatRooms.id, input.roomId))
+    .returning({ seq: chatRooms.lastSeq });
+  if (!room) throw new ActionError("NOT_FOUND");
+  const [message] = await database
+    .insert(messages)
+    .values({
+      roomId: input.roomId,
+      seq: room.seq,
+      kind: "system",
+      authorId: null,
+      body: systemMessageText(data),
+      systemData: data,
+      createdAt: input.now,
+    })
+    .returning({ id: messages.id });
+  if (!message) throw new ActionError("INTERNAL");
+  if (input.actorId) {
+    // 공개 읽음 액션과 달리 작업자·방의 자격은 호출자가 이미 잠금 아래 확인했다.
+    await database
+      .insert(chatRoomReads)
+      .values({
+        roomId: input.roomId,
+        userId: input.actorId,
+        lastReadSeq: room.seq,
+        updatedAt: input.now,
+        createdAt: input.now,
+      })
+      .onConflictDoUpdate({
+        target: [chatRoomReads.roomId, chatRoomReads.userId],
+        set: {
+          lastReadSeq: sql`greatest(${chatRoomReads.lastReadSeq}, excluded.last_read_seq)`,
+          updatedAt: input.now,
+        },
+      });
+  }
+  return {
+    ...emptyMessageDetails(),
+    id: message.id,
+    seq: room.seq,
+    authorId: null,
+    authorName: null,
+    clientId: null,
+    kind: "system",
+    body: systemMessageText(data),
+    systemData: data,
+    createdAt: input.now.toISOString(),
+  };
 }

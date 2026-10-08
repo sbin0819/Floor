@@ -279,7 +279,7 @@ describe("read-only booking round2 preservation audit", () => {
     if (!room) throw new Error("Expected test room.");
     const id = crypto.randomUUID();
     await database.db.execute(
-      sql`insert into messages (id, room_id, seq, body, kind) values (${id}, ${room.id}, 9007199254740992, 'precision fixture', 'system')`,
+      sql`insert into messages (id, room_id, seq, body, kind, system_data) values (${id}, ${room.id}, 9007199254740992, 'precision fixture', 'system', '{"type":"group_created","actorName":"테스트"}'::jsonb)`,
     );
     const before = await capture();
     await database.db.execute(
@@ -455,14 +455,12 @@ describe("read-only booking round2 preservation audit", () => {
     await database.db
       .insert(spaces)
       .values(data.spaces.filter(({ parentId }) => parentId !== null));
-    await database.db
-      .insert(teams)
-      .values(
-        data.teams.map(({ createdByKey, ...team }) => ({
-          ...team,
-          createdBy: userId(createdByKey),
-        })),
-      );
+    await database.db.insert(teams).values(
+      data.teams.map(({ createdByKey, ...team }) => ({
+        ...team,
+        createdBy: userId(createdByKey),
+      })),
+    );
     await database.db.insert(bookings).values(
       data.bookings.map((booking, index) => ({
         id: booking.id,
@@ -575,43 +573,37 @@ describe("read-only booking round2 preservation audit", () => {
       .update(bookings)
       .set({ attendeeCount: target.attendeeCount })
       .where(eq(bookings.id, target.bookingId));
-    await database.db
-      .insert(bookings)
-      .values({
-        id: bookingRound2.deskBlocks[0]!.id,
-        spaceId: source.spaceId,
-        userId: userId(source.userKey),
-        during: bookingRange("12:00", "13:00", "2027-02-01"),
-      });
-    await database.db
-      .insert(spaceBlocks)
-      .values({
-        id: bookingRound2.deskBookings[0]!.id,
-        spaceId: source.spaceId,
-        createdBy: userId("admin"),
-        during: bookingRange("12:00", "13:00", "2027-02-02"),
-      });
+    await database.db.insert(bookings).values({
+      id: bookingRound2.deskBlocks[0]!.id,
+      spaceId: source.spaceId,
+      userId: userId(source.userKey),
+      during: bookingRange("12:00", "13:00", "2027-02-01"),
+    });
+    await database.db.insert(spaceBlocks).values({
+      id: bookingRound2.deskBookings[0]!.id,
+      spaceId: source.spaceId,
+      createdBy: userId("admin"),
+      during: bookingRange("12:00", "13:00", "2027-02-02"),
+    });
     await database.db
       .insert(bookingParticipants)
       .values({ bookingId: target.bookingId, userId: userId("designMember") });
-    await database.db
-      .insert(notifications)
-      .values({
-        userId: userId(source.userKey),
-        bookingId: target.bookingId,
-        type: "booking_reminder",
-        scheduledFor: bookingNow,
-        expiresAt: new Date("2027-01-01T04:00:00Z"),
-        data: {
-          branchName: "지점",
-          floorName: "층",
-          spaceName: "공간",
-          timezone: "Asia/Seoul",
-          start: "2027-01-01T03:00:00Z",
-          end: "2027-01-01T04:00:00Z",
-          minutesBefore: 0,
-        },
-      });
+    await database.db.insert(notifications).values({
+      userId: userId(source.userKey),
+      bookingId: target.bookingId,
+      type: "booking_reminder",
+      scheduledFor: bookingNow,
+      expiresAt: new Date("2027-01-01T04:00:00Z"),
+      data: {
+        branchName: "지점",
+        floorName: "층",
+        spaceName: "공간",
+        timezone: "Asia/Seoul",
+        start: "2027-01-01T03:00:00Z",
+        end: "2027-01-01T04:00:00Z",
+        minutesBefore: 0,
+      },
+    });
     const result = await validateSeedRound2Prerequisites(database.db);
     expect(result).toMatchObject({
       ok: false,

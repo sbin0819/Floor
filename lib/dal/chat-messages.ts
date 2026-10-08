@@ -8,6 +8,7 @@ import type {
   ChatReaction,
 } from "@/features/chat/types";
 import { excerptOf } from "@/features/chat/message-text";
+import { parseSystemMessageData } from "@/features/chat/system-messages";
 import type { DalDatabase } from "./database";
 
 type ReplyRow = {
@@ -27,6 +28,7 @@ export function selectChatMessages(userId: string, database: DalDatabase) {
       authorId: messages.authorId,
       authorName: users.name,
       kind: messages.kind,
+      systemData: messages.systemData,
       body: messages.body,
       createdAt: messages.createdAt,
       clientId: sql<
@@ -71,6 +73,8 @@ type MessageRow = Awaited<ReturnType<typeof selectChatMessages>>[number];
 export function serializeChatMessage(row: MessageRow): ChatMessage {
   return {
     ...row,
+    systemData:
+      row.kind === "system" ? parseSystemMessageData(row.systemData) : null,
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt?.toISOString() ?? null,
     deletedAt: row.deletedAt?.toISOString() ?? null,
