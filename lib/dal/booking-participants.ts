@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
 import {
@@ -116,7 +116,7 @@ export async function lockParticipantBookingActor(
   const [team] = await database
     .select({ id: teams.id })
     .from(teams)
-    .where(eq(teams.id, input.teamId))
+    .where(and(eq(teams.id, input.teamId), isNull(teams.deletedAt)))
     .for("update");
   return Boolean(team);
 }

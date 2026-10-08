@@ -6,6 +6,8 @@ import {
   personNotificationDataSchema,
   personNotificationTypes,
   spaceInviteNotificationDataSchema,
+  teamNotificationDataSchema,
+  teamRoleNotificationDataSchema,
   parseNotificationData,
   type NotificationSummary,
 } from "./types";
@@ -43,6 +45,16 @@ const itemSchema = z
       ...itemFields,
       type: z.literal("space_invite"),
       data: spaceInviteNotificationDataSchema,
+    }),
+    z.strictObject({
+      ...itemFields,
+      type: z.enum(["team_removed", "team_deleted"]),
+      data: teamNotificationDataSchema,
+    }),
+    z.strictObject({
+      ...itemFields,
+      type: z.literal("team_role_changed"),
+      data: teamRoleNotificationDataSchema,
     }),
   ])
   .refine((item) => parseNotificationData(item.type, item.data) !== null);

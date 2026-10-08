@@ -15,15 +15,22 @@ export const personNotificationTypes = [
   "friend_accepted",
   "message_request",
 ] as const;
+export const teamNotificationTypes = [
+  "team_removed",
+  "team_role_changed",
+  "team_deleted",
+] as const;
 export const notificationTypes = [
   ...bookingNotificationTypes,
   ...personNotificationTypes,
+  ...teamNotificationTypes,
   "space_invite",
 ] as const;
 
 export type NotificationType = (typeof notificationTypes)[number];
 export type BookingNotificationType = (typeof bookingNotificationTypes)[number];
 export type PersonNotificationType = (typeof personNotificationTypes)[number];
+export type TeamNotificationType = (typeof teamNotificationTypes)[number];
 const instant = z.iso.datetime({ offset: true });
 
 export const bookingNotificationDataSchema = z
@@ -52,10 +59,22 @@ export const spaceInviteNotificationDataSchema = z.strictObject({
   spaceName: z.string().min(1),
   inviteCode: z.string().regex(/^[A-Za-z0-9_-]{22}$/),
 });
+export const teamNotificationDataSchema = z.strictObject({
+  actorName: z.string().min(1),
+  teamName: z.string().min(1),
+});
+export const teamRoleNotificationDataSchema = teamNotificationDataSchema.extend(
+  {
+    teamId: z.uuid(),
+    role: z.enum(["admin", "member"]),
+  },
+);
 export const notificationDataSchema = z.union([
   bookingNotificationDataSchema,
   personNotificationDataSchema,
   spaceInviteNotificationDataSchema,
+  teamNotificationDataSchema,
+  teamRoleNotificationDataSchema,
 ]);
 export type BookingNotificationData = z.infer<
   typeof bookingNotificationDataSchema
@@ -66,10 +85,16 @@ export type PersonNotificationData = z.infer<
 export type SpaceInviteNotificationData = z.infer<
   typeof spaceInviteNotificationDataSchema
 >;
+export type TeamNotificationData = z.infer<typeof teamNotificationDataSchema>;
+export type TeamRoleNotificationData = z.infer<
+  typeof teamRoleNotificationDataSchema
+>;
 export type NotificationData =
   | BookingNotificationData
   | PersonNotificationData
-  | SpaceInviteNotificationData;
+  | SpaceInviteNotificationData
+  | TeamNotificationData
+  | TeamRoleNotificationData;
 export type NotificationSnapshot =
   | {
       [Type in BookingNotificationType]: {
@@ -83,7 +108,10 @@ export type NotificationSnapshot =
         data: PersonNotificationData;
       };
     }[PersonNotificationType]
-  | { type: "space_invite"; data: SpaceInviteNotificationData };
+  | { type: "space_invite"; data: SpaceInviteNotificationData }
+  | { type: "team_removed"; data: TeamNotificationData }
+  | { type: "team_deleted"; data: TeamNotificationData }
+  | { type: "team_role_changed"; data: TeamRoleNotificationData };
 export type NotificationContent = NotificationSnapshot & {
   bookingId: string | null;
 };
@@ -111,6 +139,14 @@ export function parseNotificationData(
   input: unknown,
 ): SpaceInviteNotificationData | null;
 export function parseNotificationData(
+  type: "team_removed" | "team_deleted",
+  input: unknown,
+): TeamNotificationData | null;
+export function parseNotificationData(
+  type: "team_role_changed",
+  input: unknown,
+): TeamRoleNotificationData | null;
+export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null;
@@ -118,6 +154,14 @@ export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null {
+  if (type === "team_removed" || type === "team_deleted") {
+    const result = teamNotificationDataSchema.safeParse(input);
+    return result.success ? result.data : null;
+  }
+  if (type === "team_role_changed") {
+    const result = teamRoleNotificationDataSchema.safeParse(input);
+    return result.success ? result.data : null;
+  }
   if (type === "space_invite") {
     const result = spaceInviteNotificationDataSchema.safeParse(input);
     return result.success ? result.data : null;
@@ -154,6 +198,14 @@ export function parseNotificationContent(
   input: unknown,
   bookingId: string | null,
 ): NotificationContent | null {
+  if (type === "team_removed" || type === "team_deleted") {
+    const data = parseNotificationData(type, input);
+    return data ? { type, data, bookingId: null } : null;
+  }
+  if (type === "team_role_changed") {
+    const data = parseNotificationData(type, input);
+    return data ? { type, data, bookingId: null } : null;
+  }
   if (type === "space_invite") {
     const data = parseNotificationData(type, input);
     return data ? { type, data, bookingId: null } : null;

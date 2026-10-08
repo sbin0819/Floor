@@ -29,6 +29,8 @@ export function notificationHref({
   if (type === "friend_accepted") return "/friends";
   if (type === "message_request") return "/friends?tab=requests";
   if (type === "space_invite") return `/s/join/${data.inviteCode}`;
+  if (type === "team_removed" || type === "team_deleted") return "/teams";
+  if (type === "team_role_changed") return `/teams/${data.teamId}`;
   if (type === "booking_removed") return null;
   if (type === "booking_cancelled") return "/bookings?tab=past";
   if (type === "booking_reminder") return bookingId ? `/m/${bookingId}` : null;
@@ -37,6 +39,36 @@ export function notificationHref({
 }
 
 export function notificationPresentation({ type, data }: NotificationSnapshot) {
+  if (
+    type === "team_removed" ||
+    type === "team_role_changed" ||
+    type === "team_deleted"
+  ) {
+    const parts = [
+      { text: data.actorName, strong: true },
+      {
+        text: type === "team_deleted" ? " 님이 ‘" : " 님이 나를 ",
+        strong: false,
+      },
+      { text: data.teamName, strong: true },
+      {
+        text:
+          type === "team_removed"
+            ? "에서 내보냈어요"
+            : type === "team_deleted"
+              ? "’을(를) 지웠어요"
+              : data.role === "admin"
+                ? "의 팀 관리자로 지정했어요"
+                : "의 팀원으로 바꿨어요",
+        strong: false,
+      },
+    ];
+    return {
+      parts,
+      text: parts.map((part) => part.text).join(""),
+      dateTime: undefined,
+    };
+  }
   if (type === "space_invite") {
     const parts = [
       { text: data.actorName, strong: true },

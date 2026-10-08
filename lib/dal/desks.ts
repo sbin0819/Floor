@@ -246,7 +246,7 @@ export async function lockDeskBookingActor(
   const [team] = await transaction
     .select({ id: teams.id })
     .from(teams)
-    .where(eq(teams.id, teamId))
+    .where(and(eq(teams.id, teamId), isNull(teams.deletedAt)))
     .for("update");
   return Boolean(team);
 }

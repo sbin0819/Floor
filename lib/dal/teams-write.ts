@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 import { createTeamSpace } from "@/lib/dal/chat-write";
-import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getPostgresError } from "@/lib/actions/errors";
 import { ActionError } from "@/lib/actions/result";
 import {
@@ -44,11 +44,11 @@ async function lockUsers(userIds: string[], database: DalDatabase) {
     .for("update");
 }
 
-async function lockTeam(teamId: string, database: DalDatabase) {
+export async function lockTeam(teamId: string, database: DalDatabase) {
   const [team] = await database
     .select({ id: teams.id, name: teams.name })
     .from(teams)
-    .where(eq(teams.id, teamId))
+    .where(and(eq(teams.id, teamId), isNull(teams.deletedAt)))
     .for("update");
   return team ?? null;
 }
@@ -112,10 +112,12 @@ export async function createTeam(
     const [total] = await transaction
       .select({ value: count() })
       .from(teamMembers)
+      .innerJoin(teams, eq(teams.id, teamMembers.teamId))
       .where(
         and(
           eq(teamMembers.userId, input.userId),
           eq(teamMembers.role, "admin"),
+          isNull(teams.deletedAt),
         ),
       );
     if (total!.value > 5) throw new ActionError("LIMIT_EXCEEDED");
@@ -161,7 +163,8 @@ export async function cancelJoinRequest(
     const metadata = await getJoinRequestById(input.requestId, transaction);
     if (!metadata) throw new ActionError("NOT_FOUND");
     await lockUsers([input.userId], transaction);
-    await lockTeam(metadata.teamId, transaction);
+    if (!(await lockTeam(metadata.teamId, transaction)))
+      throw new ActionError("NOT_FOUND");
     const [request] = await transaction
       .update(teamJoinRequests)
       .set({
@@ -194,7 +197,8 @@ async function decideJoinRequest(
       [input.actorUserId, metadata.userId],
       transaction,
     );
-    await lockTeam(metadata.teamId, transaction);
+    if (!(await lockTeam(metadata.teamId, transaction)))
+      throw new ActionError("NOT_FOUND");
     const [request] = await transaction
       .update(teamJoinRequests)
       .set({
@@ -334,7 +338,8 @@ export async function revokeTeamInvite(
     const metadata = await getTeamInviteById(input.inviteId, transaction);
     if (!metadata) throw new ActionError("INVITE_INVALID");
     await lockUsers([input.actorUserId, metadata.createdBy], transaction);
-    await lockTeam(metadata.teamId, transaction);
+    if (!(await lockTeam(metadata.teamId, transaction)))
+      throw new ActionError("INVITE_INVALID");
     const [invite] = await transaction
       .update(teamInvites)
       .set({ revokedAt: sql`statement_timestamp()` })
@@ -369,7 +374,8 @@ async function respondToInvite(
     );
     const recipient = lockedUsers.find(({ id }) => id === input.userId);
     if (!recipient?.emailVerified) throw new ActionError("INVITE_INVALID");
-    await lockTeam(metadata.teamId, transaction);
+    if (!(await lockTeam(metadata.teamId, transaction)))
+      throw new ActionError("INVITE_INVALID");
     const [invite] = await transaction
       .update(teamInvites)
       .set(

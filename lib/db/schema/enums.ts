@@ -120,4 +120,7 @@ export const notificationType = pgEnum("notification_type", [
   "friend_accepted",
   "message_request",
   "space_invite",
+  "team_removed",
+  "team_role_changed",
+  "team_deleted",
 ]);

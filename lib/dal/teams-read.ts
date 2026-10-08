@@ -16,6 +16,16 @@ import { isQueryableInviteToken } from "@/lib/teams/invite-token";
 import { avatarColumns } from "./avatar";
 import { toAvatar } from "@/lib/avatar";
 
+function activeTeam(
+  teamId:
+    | typeof teams.id
+    | typeof teamInvites.teamId
+    | typeof teamJoinRequests.teamId
+    | typeof teamMembers.teamId,
+) {
+  return sql`exists (select 1 from teams active_team where active_team.id = ${teamId} and active_team.deleted_at is null)`;
+}
+
 export function pendingInvite() {
   return and(
     isNull(teamInvites.acceptedAt),
@@ -29,6 +39,7 @@ export function usableInvite(email: string, now?: Date) {
     pendingInvite(),
     eq(teamInvites.email, email.toLowerCase()),
     gt(teamInvites.expiresAt, now ?? sql`statement_timestamp()`),
+    activeTeam(teamInvites.teamId),
   );
 }
 
@@ -39,7 +50,7 @@ export async function getTeamIdentity(
   const [team] = await database
     .select({ id: teams.id })
     .from(teams)
-    .where(eq(teams.id, teamId))
+    .where(and(eq(teams.id, teamId), isNull(teams.deletedAt)))
     .limit(1);
   return team ?? null;
 }
@@ -58,7 +69,7 @@ export async function getTeamById(
       createdAt: teams.createdAt,
     })
     .from(teams)
-    .where(eq(teams.id, teamId))
+    .where(and(eq(teams.id, teamId), isNull(teams.deletedAt)))
     .limit(1);
   return team ?? null;
 }
@@ -70,7 +81,7 @@ export async function getTeamContact(
   const [team] = await database
     .select({ contactPhone: teams.contactPhone })
     .from(teams)
-    .where(eq(teams.id, teamId))
+    .where(and(eq(teams.id, teamId), isNull(teams.deletedAt)))
     .limit(1);
   return team ?? null;
 }
@@ -83,7 +94,13 @@ export async function getTeamMember(
   const [member] = await database
     .select({ role: teamMembers.role, title: teamMembers.title })
     .from(teamMembers)
-    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+    .where(
+      and(
+        eq(teamMembers.teamId, teamId),
+        eq(teamMembers.userId, userId),
+        activeTeam(teamMembers.teamId),
+      ),
+    )
     .limit(1);
   return member ?? null;
 }
@@ -93,7 +110,7 @@ export function listMyTeams(userId: string, database: DalDatabase = getDb()) {
     .select({ id: teams.id, name: teams.name, role: teamMembers.role })
     .from(teamMembers)
     .innerJoin(teams, eq(teamMembers.teamId, teams.id))
-    .where(eq(teamMembers.userId, userId))
+    .where(and(eq(teamMembers.userId, userId), isNull(teams.deletedAt)))
     .orderBy(asc(teams.name), asc(teams.id));
 }
 
@@ -112,7 +129,7 @@ export async function listTeamMembers(
     })
     .from(teamMembers)
     .innerJoin(users, eq(teamMembers.userId, users.id))
-    .where(eq(teamMembers.teamId, teamId))
+    .where(and(eq(teamMembers.teamId, teamId), activeTeam(teamMembers.teamId)))
     .orderBy(asc(users.name), asc(users.id));
   return rows.map(({ avatar, ...row }) => ({
     ...row,
@@ -126,7 +143,7 @@ export function searchTeams(query: string, database: DalDatabase = getDb()) {
     .select({ id: teams.id, name: teams.name, homeBranchName: branches.name })
     .from(teams)
     .leftJoin(branches, eq(teams.homeBranchId, branches.id))
-    .where(ilike(teams.name, `%${literal}%`))
+    .where(and(ilike(teams.name, `%${literal}%`), isNull(teams.deletedAt)))
     .orderBy(asc(teams.name), asc(teams.id))
     .limit(10);
 }
@@ -138,7 +155,12 @@ export async function getJoinRequestById(
   const [request] = await database
     .select()
     .from(teamJoinRequests)
-    .where(eq(teamJoinRequests.id, requestId))
+    .where(
+      and(
+        eq(teamJoinRequests.id, requestId),
+        activeTeam(teamJoinRequests.teamId),
+      ),
+    )
     .limit(1);
   return request ?? null;
 }
@@ -159,7 +181,7 @@ export async function getTeamInviteById(
       expiresAt: teamInvites.expiresAt,
     })
     .from(teamInvites)
-    .where(eq(teamInvites.id, inviteId))
+    .where(and(eq(teamInvites.id, inviteId), activeTeam(teamInvites.teamId)))
     .limit(1);
   return invite ?? null;
 }
@@ -218,7 +240,13 @@ export function listSentInvites(
       createdAt: teamInvites.createdAt,
     })
     .from(teamInvites)
-    .where(and(eq(teamInvites.teamId, teamId), pendingInvite()))
+    .where(
+      and(
+        eq(teamInvites.teamId, teamId),
+        pendingInvite(),
+        activeTeam(teamInvites.teamId),
+      ),
+    )
     .orderBy(desc(teamInvites.createdAt), asc(teamInvites.id));
 }
 
@@ -242,6 +270,7 @@ export async function listTeamJoinRequests(
       and(
         eq(teamJoinRequests.teamId, teamId),
         eq(teamJoinRequests.status, "pending"),
+        activeTeam(teamJoinRequests.teamId),
       ),
     )
     .orderBy(asc(teamJoinRequests.createdAt), asc(teamJoinRequests.id));
@@ -269,6 +298,7 @@ export function listMyJoinRequests(
       and(
         eq(teamJoinRequests.userId, userId),
         eq(teamJoinRequests.status, "pending"),
+        isNull(teams.deletedAt),
       ),
     )
     .orderBy(desc(teamJoinRequests.createdAt), asc(teamJoinRequests.id));

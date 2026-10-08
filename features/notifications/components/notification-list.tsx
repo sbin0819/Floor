@@ -34,6 +34,9 @@ export function NotificationRow({
     item.type !== "friend_request" &&
     item.type !== "friend_accepted" &&
     item.type !== "space_invite" &&
+    item.type !== "team_removed" &&
+    item.type !== "team_role_changed" &&
+    item.type !== "team_deleted" &&
     item.type !== "message_request"
       ? item
       : null;

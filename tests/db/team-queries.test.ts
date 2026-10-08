@@ -90,6 +90,25 @@ describe("authenticated team queries and safe DTOs", () => {
       canSendEmail: () => false,
     });
 
+  it("excludes deleted teams from membership, search, invitations and requests even before physical membership cleanup", async () => {
+    await database.db
+      .update(teams)
+      .set({ deletedAt: new Date(), deletedBy: actors.owner.userId })
+      .where(eq(teams.id, teamId));
+    expect(await queries(actors.owner).getTeamPageData(teamId)).toBeNull();
+    expect((await queries(actors.owner).getHomeTeams()).teams).toEqual([]);
+    expect((await queries().getTeamStartData("회사")).search.results).toEqual(
+      [],
+    );
+    expect(await queries().getInvitePageData(token)).toBeNull();
+    expect(
+      await dal.listMyJoinRequests(actors.outsider.userId, database.db),
+    ).toEqual([]);
+    expect(await dal.listSentInvites(teamId, database.db)).toEqual([]);
+    expect(await dal.listTeamJoinRequests(teamId, database.db)).toEqual([]);
+    expect(await dal.getTeamIdentity(teamId, database.db)).toBeNull();
+  });
+
   it("uses the same safe avatar for member and administrator-only request rows", async () => {
     await database.db
       .update(users)

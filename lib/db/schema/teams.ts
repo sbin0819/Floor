@@ -28,10 +28,20 @@ export const teams = pgTable(
     }),
     headcount: integer("headcount"),
     contactPhone: text("contact_phone"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex("teams_name_unique").on(sql`lower(${table.name})`),
+    uniqueIndex("teams_name_unique")
+      .on(sql`lower(${table.name})`)
+      .where(sql`${table.deletedAt} is null`),
+    check(
+      "teams_deleted_consistent",
+      sql`(${table.deletedAt} is null) = (${table.deletedBy} is null)`,
+    ),
     check(
       "teams_headcount_valid",
       sql`${table.headcount} is null or ${table.headcount} between 1 and 1000`,

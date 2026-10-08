@@ -1,5 +1,6 @@
 import {
   parseNotificationData,
+  parseNotificationContent,
   type BookingNotificationData,
   type BookingNotificationType,
   type NotificationContent,
@@ -31,6 +32,37 @@ type BookingNotificationWrite = NotificationWrite & {
   data: BookingNotificationData;
   bookingId: string;
 };
+
+export function buildTeamNotifications(
+  input: {
+    teamName: string;
+    actor: { id: string; name: string };
+    userIds: readonly string[];
+    now: Date;
+  } & (
+    | { type: "team_removed" | "team_deleted" }
+    | { type: "team_role_changed"; teamId: string; role: "admin" | "member" }
+  ),
+): NotificationWrite[] {
+  const data = {
+    actorName: input.actor.name,
+    teamName: input.teamName,
+    ...(input.type === "team_role_changed"
+      ? { teamId: input.teamId, role: input.role }
+      : {}),
+  };
+  const content = parseNotificationContent(input.type, data, null);
+  if (!content) throw new Error("Invalid team notification snapshot.");
+  return [...new Set(input.userIds)]
+    .filter((userId) => userId !== input.actor.id)
+    .map((userId) => ({
+      ...content,
+      userId,
+      actorId: input.actor.id,
+      scheduledFor: input.now,
+      expiresAt: null,
+    }));
+}
 
 export function createReminderSchedule(during: During, now: Date) {
   return REMINDER_MINUTES.map((minutesBefore) => ({

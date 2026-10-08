@@ -22,6 +22,7 @@ const systemIcons: Record<SystemMessageData["type"], typeof Users> = {
   members_added: UserPlus,
   member_left: LogOut,
   room_renamed: Pencil,
+  team_renamed: Pencil,
   booking_created: CalendarDays,
   booking_time_changed: Clock,
   booking_cancelled: CalendarX,

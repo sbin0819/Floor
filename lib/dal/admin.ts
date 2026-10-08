@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { DalDatabase } from "@/lib/dal/database";
+import { teamDisplayName } from "./team-name";
 import { getDb } from "@/lib/db/client";
 import {
   accessGrants,
@@ -261,7 +262,7 @@ export async function listAdminSpaceDetails(
         access: spaces.access,
         archivedAt: spaces.archivedAt,
       },
-      team: { id: teams.id, name: teams.name },
+      team: { id: teams.id, name: teamDisplayName(teams) },
       deskCount: sql<number>`(${deskCount})`.mapWith(Number),
     })
     .from(spaces)
@@ -361,9 +362,9 @@ export async function getTeamsByIds(
 ): Promise<{ id: string; name: string }[]> {
   if (ids.length === 0) return [];
   return database
-    .select({ id: teams.id, name: teams.name })
+    .select({ id: teams.id, name: teamDisplayName(teams) })
     .from(teams)
-    .where(inArray(teams.id, ids))
+    .where(and(inArray(teams.id, ids), isNull(teams.deletedAt)))
     .orderBy(asc(teams.name), asc(teams.id));
 }
 

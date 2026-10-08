@@ -29,6 +29,7 @@ async function readBookingBranch(
       select ${teams.homeBranchId} from ${teamMembers}
       inner join ${teams} on ${teams.id} = ${teamMembers.teamId}
       where ${teamMembers.userId} = ${userId} and ${teams.homeBranchId} is not null
+        and ${teams.deletedAt} is null
       order by ${teams.name}, ${teams.id} limit 1
     ))`,
     )

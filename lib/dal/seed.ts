@@ -1,9 +1,10 @@
 import "server-only";
 
 // 고정된 가상 데이터만 다루는 시드 전용 쓰기다. 기능 액션에서 사용하지 않는다.
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { DalDatabase } from "@/lib/dal/database";
 import { createBranchLounge } from "./chat-write";
+import { SeedError } from "@/lib/seed/errors";
 import { serializeTimeRange, type TimeRange } from "@/lib/db/range";
 import {
   accessGrants,
@@ -52,10 +53,19 @@ export async function upsertSeedTeam(
   input: typeof teams.$inferInsert,
   db: DalDatabase,
 ) {
-  await db
+  const [saved] = await db
     .insert(teams)
     .values(input)
-    .onConflictDoUpdate({ target: teams.id, set: input });
+    .onConflictDoUpdate({
+      target: teams.id,
+      set: input,
+      setWhere: isNull(teams.deletedAt),
+    })
+    .returning({ id: teams.id });
+  if (!saved)
+    throw new SeedError(
+      "지운 시드 팀이 있어요. 자동 복구하지 않으니 먼저 데이터를 확인해 주세요.",
+    );
 }
 export async function upsertSeedMember(
   input: typeof teamMembers.$inferInsert,

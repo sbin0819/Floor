@@ -12,6 +12,11 @@ export const systemMessageDataSchema = z.discriminatedUnion("type", [
   }),
   z.strictObject({ type: z.literal("member_left"), name: personName }),
   z.strictObject({
+    type: z.literal("team_renamed"),
+    actorName: personName,
+    name: z.string().min(1),
+  }),
+  z.strictObject({
     type: z.literal("room_renamed"),
     actorName: personName,
     name: z
@@ -78,6 +83,8 @@ export function systemMessageText(data: SystemMessageData): string {
     }
     case "member_left":
       return `${data.name} 님이 나갔어요`;
+    case "team_renamed":
+      return `${data.actorName} 님이 팀 이름을 ‘${data.name}’(으)로 바꿨어요`;
     case "room_renamed":
       return data.name === null
         ? `${data.actorName} 님이 그룹 이름을 지웠어요`

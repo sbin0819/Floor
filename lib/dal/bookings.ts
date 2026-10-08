@@ -29,6 +29,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { addDays, localDate, zonedDateTime } from "@/lib/time/zoned";
+import { teamDisplayName } from "./team-name";
 import {
   bookingParticipantNames,
   ownedOrInvitedBooking,
@@ -91,7 +92,7 @@ export async function listSpaceBookings(
     .select({
       ...getTableColumns(bookings),
       userName: users.name,
-      teamName: teams.name,
+      teamName: teamDisplayName(teams),
     })
     .from(bookings)
     .innerJoin(users, eq(users.id, bookings.userId))
@@ -241,7 +242,7 @@ function locatedBookings(database: DalDatabase, userId: string) {
       floor: floors,
       branch: branches,
       userName: users.name,
-      teamName: teams.name,
+      teamName: teamDisplayName(teams),
       photo: { path: spacePhotos.path, alt: spacePhotos.alt },
       isOwner: sql<boolean>`${bookings.userId} = ${userId}`,
       participantNames: bookingParticipantNames,
@@ -350,7 +351,7 @@ export async function getBookingWithLocation(
       floor: floors,
       branch: branches,
       userName: users.name,
-      teamName: teams.name,
+      teamName: teamDisplayName(teams),
     })
     .from(bookings)
     .innerJoin(spaces, eq(spaces.id, bookings.spaceId))
@@ -445,12 +446,12 @@ export function listUserTeamHomeBranches(
   return database
     .select({
       id: teams.id,
-      name: teams.name,
+      name: teamDisplayName(teams),
       homeBranchId: teams.homeBranchId,
     })
     .from(teamMembers)
     .innerJoin(teams, eq(teams.id, teamMembers.teamId))
-    .where(eq(teamMembers.userId, userId))
+    .where(and(eq(teamMembers.userId, userId), isNull(teams.deletedAt)))
     .orderBy(asc(teams.name), asc(teams.id));
 }
 
@@ -493,7 +494,7 @@ export async function lockBookingActor(
   const [team] = await transaction
     .select({ id: teams.id })
     .from(teams)
-    .where(eq(teams.id, teamId))
+    .where(and(eq(teams.id, teamId), isNull(teams.deletedAt)))
     .for("update");
   return Boolean(team);
 }

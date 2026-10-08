@@ -531,6 +531,75 @@ describe("database constraints from the real migrations", () => {
     });
   });
 
+  it("46. permits reusing a deleted team name but keeps active names unique", async () => {
+    await database.db
+      .update(teams)
+      .set({
+        name: "Example",
+        deletedAt: new Date("2026-10-09T00:00:00Z"),
+        deletedBy: userId,
+      })
+      .where(eq(teams.id, teamId));
+    await database.db
+      .insert(teams)
+      .values({ name: "EXAMPLE", createdBy: userId });
+    await expect(
+      database.db.insert(teams).values({ name: "example", createdBy: userId }),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "teams_name_unique" },
+    });
+    await expect(
+      database.db
+        .update(teams)
+        .set({ deletedAt: null, deletedBy: null })
+        .where(eq(teams.id, teamId)),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "teams_name_unique" },
+    });
+  });
+
+  it.each(["deletedAt", "deletedBy"] as const)(
+    "47. rejects a deletion audit with only %s",
+    async (field) => {
+      await expect(
+        database.db
+          .update(teams)
+          .set(
+            field === "deletedAt"
+              ? { deletedAt: new Date("2026-10-09T00:00:00Z") }
+              : { deletedBy: userId },
+          )
+          .where(eq(teams.id, teamId)),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "teams_deleted_consistent" },
+      });
+    },
+  );
+
+  it("47. records a deletion pair with a real user FK", async () => {
+    await expect(
+      database.db
+        .update(teams)
+        .set({
+          deletedAt: new Date("2026-10-09T00:00:00Z"),
+          deletedBy: crypto.randomUUID(),
+        })
+        .where(eq(teams.id, teamId)),
+    ).rejects.toMatchObject({ cause: { code: "23503" } });
+    await database.db
+      .update(teams)
+      .set({ deletedAt: new Date("2026-10-09T00:00:00Z"), deletedBy: userId })
+      .where(eq(teams.id, teamId));
+    const [row] = await database.db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId));
+    expect(row).toMatchObject({
+      deletedBy: userId,
+      deletedAt: new Date("2026-10-09T00:00:00Z"),
+    });
+  });
+
   it.each([null, 1, 1000])(
     "12. permits nullable and boundary headcount %s",
     async (headcount) => {

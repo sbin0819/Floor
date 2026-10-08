@@ -3,6 +3,7 @@ export type ActionErrorCode =
   | "FORBIDDEN"
   | "INVALID_INPUT"
   | "PASSWORD_INCORRECT"
+  | "LAST_ADMIN"
   | "NOT_FOUND"
   | "BOOKING_CONFLICT"
   | "SPACE_BLOCKED"
@@ -49,6 +50,7 @@ export type ActionErrorDetails = {
     | "call_full"
     | "storage_quota"
     | "password_attempts"
+    | "admin_teams"
     | "desk_per_person"
     | "attendee_count"
     | "participants";

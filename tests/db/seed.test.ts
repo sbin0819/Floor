@@ -407,6 +407,38 @@ describe("transactional development seed", () => {
     expect(await database.db.select().from(teams)).toHaveLength(1);
   });
 
+  it("does not resurrect a soft-deleted seed team and rolls back other seed updates", async () => {
+    await seed();
+    const [creator] = await database.db.select().from(users);
+    const teamId = fixtures.teams[0]!.id;
+    await database.db
+      .update(teams)
+      .set({
+        deletedAt: new Date("2026-10-09T00:00:00Z"),
+        deletedBy: creator!.id,
+      })
+      .where(eq(teams.id, teamId));
+    await database.db
+      .update(branches)
+      .set({ name: "보존할 지점 이름" })
+      .where(eq(branches.id, fixtures.branches[0]!.id));
+    const before = await database.db
+      .select()
+      .from(teams)
+      .where(eq(teams.id, teamId));
+    await expect(seed()).rejects.toThrow(
+      "지운 시드 팀이 있어요. 자동 복구하지 않으니 먼저 데이터를 확인해 주세요.",
+    );
+    expect(
+      await database.db.select().from(teams).where(eq(teams.id, teamId)),
+    ).toEqual(before);
+    const [branch] = await database.db
+      .select()
+      .from(branches)
+      .where(eq(branches.id, fixtures.branches[0]!.id));
+    expect(branch!.name).toBe("보존할 지점 이름");
+  });
+
   it("rolls back a branch upsert when an unrelated floor owns its level", async () => {
     const branch = fixtures.branches[0]!;
     const floor = fixtures.floors.find((row) => row.branchId === branch.id)!;

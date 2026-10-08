@@ -7,6 +7,7 @@ import {
   desc,
   eq,
   gte,
+  isNull,
   notExists,
   or,
   sql,
@@ -20,6 +21,7 @@ import {
   teams,
 } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
+import { teamDisplayName } from "./team-name";
 
 export function listMyTeamSummaries(
   userId: string,
@@ -33,7 +35,7 @@ export function listMyTeamSummaries(
   return database
     .select({
       id: teams.id,
-      name: teams.name,
+      name: teamDisplayName(teams),
       role: teamMembers.role,
       homeBranchName: branches.name,
       memberCount: sql<number>`(${memberCount})`.mapWith(Number),
@@ -41,7 +43,7 @@ export function listMyTeamSummaries(
     .from(teamMembers)
     .innerJoin(teams, eq(teamMembers.teamId, teams.id))
     .leftJoin(branches, eq(teams.homeBranchId, branches.id))
-    .where(eq(teamMembers.userId, userId))
+    .where(and(eq(teamMembers.userId, userId), isNull(teams.deletedAt)))
     .orderBy(asc(teams.name), asc(teams.id));
 }
 
@@ -81,7 +83,7 @@ export function listTeamHubRequests(
     .select({
       id: teamJoinRequests.id,
       teamId: teams.id,
-      teamName: teams.name,
+      teamName: teamDisplayName(teams),
       message: teamJoinRequests.message,
       createdAt: teamJoinRequests.createdAt,
       status: teamJoinRequests.status,
@@ -92,6 +94,7 @@ export function listTeamHubRequests(
     .where(
       and(
         eq(teamJoinRequests.userId, userId),
+        isNull(teams.deletedAt),
         notExists(newerRequest),
         or(
           eq(teamJoinRequests.status, "pending"),

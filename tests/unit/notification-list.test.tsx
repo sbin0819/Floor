@@ -45,6 +45,27 @@ function notification(
 }
 
 describe("shared notification rows", () => {
+  it("renders a team snapshot without booking details and retains its actor avatar", () => {
+    const item: NotificationItem = {
+      id: "team-notification",
+      type: "team_deleted",
+      data: { actorName: "박지훈", teamName: "디자인팀" },
+      actorAvatar: { color: "pink", photoUrl: null },
+      read: false,
+      bookingId: null,
+      scheduledFor: "2026-10-08T05:50:00Z",
+      href: "/teams",
+    };
+    const { container } = render(
+      <NotificationRow item={item} now={now} onActivate={vi.fn()} />,
+    );
+    expect(screen.getByRole("link")).toHaveAccessibleName(
+      "읽지 않음 · 박지훈 님이 ‘디자인팀’을(를) 지웠어요 · 5분 전",
+    );
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/teams");
+    expect(container.querySelector("[data-user-avatar]")).toBeInTheDocument();
+    expect(container.querySelector("time")).toHaveTextContent("5분 전");
+  });
   it("uses the actor avatar for person events and keeps reminders as a clock", () => {
     const { container, rerender } = render(
       <NotificationRow
