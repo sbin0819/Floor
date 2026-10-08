@@ -50,6 +50,8 @@ const replySchema = z.object({
 });
 
 const eventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("friend.changed") }),
+  z.object({ type: z.literal("notifications.changed") }),
   z.object({
     type: z.literal("room.activity"),
     spaceId: z.string(),

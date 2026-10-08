@@ -6,6 +6,8 @@ export type RealtimeEvent =
       seq: number;
       authorId: string | null;
     }
+  | { type: "friend.changed" }
+  | { type: "notifications.changed" }
   | { type: "booking.changed"; spaceId: string }
   | { type: "space.status_changed"; spaceId: string }
   | { type: "plan.published"; floorId: string; version: number }
