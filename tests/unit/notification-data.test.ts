@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   parseNotificationData,
-  type NotificationData,
+  type BookingNotificationData,
 } from "@/features/notifications/types";
 
-const data: NotificationData = {
+const data: BookingNotificationData = {
   spaceName: "회의실 A",
   floorName: "7F",
   branchName: "강남점",

@@ -1,7 +1,8 @@
 import {
   parseNotificationData,
-  type NotificationData,
-  type NotificationType,
+  type BookingNotificationData,
+  type BookingNotificationType,
+  type NotificationContent,
 } from "./types";
 
 export const REMINDER_MINUTES = [30, 10, 5, 0] as const;
@@ -18,14 +19,17 @@ export type NotificationBooking = {
   timezone: string;
 };
 
-export type NotificationWrite = {
+export type NotificationWrite = NotificationContent & {
   userId: string;
-  type: NotificationType;
-  bookingId: string;
+  bookingId: string | null;
   actorId: string | null;
-  data: NotificationData;
   scheduledFor: Date;
   expiresAt: Date | null;
+};
+type BookingNotificationWrite = NotificationWrite & {
+  type: BookingNotificationType;
+  data: BookingNotificationData;
+  bookingId: string;
 };
 
 export function createReminderSchedule(during: During, now: Date) {
@@ -43,7 +47,7 @@ export function buildNotificationData(
     previousDuring?: During;
     minutesBefore?: ReminderMinutes;
   } = {},
-): NotificationData {
+): BookingNotificationData {
   const data = {
     spaceName: booking.spaceName,
     floorName: booking.floorName,
@@ -72,7 +76,7 @@ export function buildReminderNotifications(
   booking: NotificationBooking,
   userIds: readonly string[],
   now: Date,
-): NotificationWrite[] {
+): BookingNotificationWrite[] {
   const schedule = createReminderSchedule(booking.during, now);
   return [...new Set(userIds)].flatMap((userId) =>
     schedule.map(({ minutesBefore, scheduledFor, expiresAt }) => ({
@@ -95,13 +99,13 @@ export function buildBookingNotifications({
   now,
   previousDuring,
 }: {
-  type: Exclude<NotificationType, "booking_reminder">;
+  type: Exclude<BookingNotificationType, "booking_reminder">;
   booking: NotificationBooking;
   actor: { id: string; name: string };
   userIds: readonly string[];
   now: Date;
   previousDuring?: During;
-}): NotificationWrite[] {
+}): BookingNotificationWrite[] {
   const data = buildNotificationData(booking, {
     actorName: actor.name,
     previousDuring,

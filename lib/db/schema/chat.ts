@@ -17,6 +17,7 @@ import { branches } from "./branches";
 import { createdAt, id } from "./common";
 import {
   chatRoomKind,
+  chatMemberStatus,
   chatSpaceKind,
   messageKind,
   reactionEmoji,
@@ -64,12 +65,18 @@ export const chatRooms = pgTable(
     lastSeq: bigint("last_seq", { mode: "number" }).notNull().default(0),
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    dmLowUserId: uuid("dm_low_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    dmHighUserId: uuid("dm_high_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
     createdAt: createdAt(),
   },
   (table) => [
     check(
       "chat_rooms_kind_ref",
-      sql`${table.kind} NOT IN ('text', 'voice') OR (${table.spaceId} IS NOT NULL AND ${table.name} IS NOT NULL)`,
+      sql`(${table.kind} IN ('text', 'voice') AND ${table.spaceId} IS NOT NULL AND ${table.name} IS NOT NULL AND ${table.dmLowUserId} IS NULL AND ${table.dmHighUserId} IS NULL) OR (${table.kind} = 'dm' AND ${table.dmLowUserId} IS NOT NULL AND ${table.dmHighUserId} IS NOT NULL AND ${table.dmLowUserId} < ${table.dmHighUserId} AND ${table.spaceId} IS NULL AND ${table.name} IS NULL) OR ${table.kind} IN ('group_dm', 'meeting')`,
     ),
     check(
       "chat_rooms_name_length",
@@ -79,6 +86,32 @@ export const chatRooms = pgTable(
       .on(table.spaceId, sql`lower(${table.name})`)
       .where(sql`${table.archivedAt} IS NULL`),
     index("chat_rooms_space_id_idx").on(table.spaceId),
+    uniqueIndex("chat_rooms_dm_pair_unique")
+      .on(table.dmLowUserId, table.dmHighUserId)
+      .where(sql`${table.kind} = 'dm'`),
+    index("chat_rooms_dm_high_user_id_idx").on(table.dmHighUserId),
+  ],
+);
+
+export const chatRoomMembers = pgTable(
+  "chat_room_members",
+  {
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: chatMemberStatus("status").notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull(),
+    statusChangedAt: timestamp("status_changed_at", {
+      withTimezone: true,
+    }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.roomId, table.userId] }),
+    index("chat_room_members_user_id_idx").on(table.userId),
   ],
 );
 

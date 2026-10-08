@@ -4,9 +4,7 @@ import {
   formatBookingTime,
 } from "@/features/bookings/format";
 import { addDays, localDate } from "@/lib/time/zoned";
-import type { NotificationItem } from "./types";
-
-type NotificationContent = Pick<NotificationItem, "type" | "data">;
+import type { NotificationContent } from "./types";
 export type NotificationTextPart = { text: string; strong: boolean };
 
 const actionText = {
@@ -23,6 +21,8 @@ function notificationDate(start: string, timezone: string) {
 }
 
 export function notificationHref({ type, data }: NotificationContent) {
+  if (type === "friend_request") return "/friends?tab=received";
+  if (type === "friend_accepted") return "/friends";
   if (type === "booking_removed") return null;
   if (type === "booking_cancelled") return "/bookings?tab=past";
   const date = localDate(new Date(data.start), data.timezone);
@@ -30,6 +30,23 @@ export function notificationHref({ type, data }: NotificationContent) {
 }
 
 export function notificationPresentation({ type, data }: NotificationContent) {
+  if (type === "friend_request" || type === "friend_accepted") {
+    const parts = [
+      { text: data.actorName, strong: true },
+      {
+        text:
+          type === "friend_request"
+            ? " 님이 친구 요청을 보냈어요"
+            : " 님이 친구 요청을 수락했어요",
+        strong: false,
+      },
+    ];
+    return {
+      parts,
+      text: parts.map((part) => part.text).join(""),
+      dateTime: undefined,
+    };
+  }
   const parts: NotificationTextPart[] =
     type === "booking_reminder"
       ? [

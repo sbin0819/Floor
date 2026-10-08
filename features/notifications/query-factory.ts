@@ -9,7 +9,7 @@ import {
 } from "@/lib/dal/notifications-read";
 import { notificationHref } from "./format";
 import {
-  parseNotificationData,
+  parseNotificationContent,
   type NotificationItem,
   type NotificationListData,
   type NotificationSummary,
@@ -25,17 +25,16 @@ function items(
   rows: Awaited<ReturnType<typeof listVisibleNotifications>>,
 ): NotificationItem[] {
   return rows.flatMap((row) => {
-    const data = parseNotificationData(row.type, row.data);
-    return data
+    const content = parseNotificationContent(row.type, row.data);
+    return content
       ? [
           {
             id: row.id,
-            type: row.type,
+            ...content,
             bookingId: row.bookingId,
-            data,
             read: row.readAt !== null,
             scheduledFor: row.scheduledFor.toISOString(),
-            href: notificationHref({ type: row.type, data }),
+            href: notificationHref(content),
           },
         ]
       : [];

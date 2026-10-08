@@ -28,7 +28,9 @@ export function useNotificationToasts(
       const presentation = notificationPresentation(item);
       toast(presentation.text, {
         id: notificationToastId(item),
-        description: presentation.dateTime,
+        ...(presentation.dateTime
+          ? { description: presentation.dateTime }
+          : {}),
         ...(item.href
           ? {
               action: {

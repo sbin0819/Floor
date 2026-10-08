@@ -1,30 +1,42 @@
 import { z } from "zod";
 import {
-  notificationDataSchema,
-  notificationTypes,
+  bookingNotificationDataSchema,
+  bookingNotificationTypes,
+  personNotificationDataSchema,
+  personNotificationTypes,
   parseNotificationData,
   type NotificationSummary,
 } from "./types";
 
 const instant = z.iso.datetime({ offset: true });
+const itemFields = {
+  id: z.string().min(1),
+  read: z.boolean(),
+  scheduledFor: instant,
+  bookingId: z.string().min(1).nullable(),
+  href: z
+    .string()
+    .refine(
+      (value) =>
+        value.startsWith("/") &&
+        !value.startsWith("//") &&
+        !/[\\\s]/u.test(value),
+    )
+    .nullable(),
+};
 const itemSchema = z
-  .strictObject({
-    id: z.string().min(1),
-    type: z.enum(notificationTypes),
-    read: z.boolean(),
-    scheduledFor: instant,
-    bookingId: z.string().min(1).nullable(),
-    data: notificationDataSchema,
-    href: z
-      .string()
-      .refine(
-        (value) =>
-          value.startsWith("/") &&
-          !value.startsWith("//") &&
-          !/[\\\s]/u.test(value),
-      )
-      .nullable(),
-  })
+  .discriminatedUnion("type", [
+    z.strictObject({
+      ...itemFields,
+      type: z.enum(bookingNotificationTypes),
+      data: bookingNotificationDataSchema,
+    }),
+    z.strictObject({
+      ...itemFields,
+      type: z.enum(personNotificationTypes),
+      data: personNotificationDataSchema,
+    }),
+  ])
   .refine((item) => parseNotificationData(item.type, item.data) !== null);
 const summarySchema = z.strictObject({
   items: z.array(itemSchema).max(20),

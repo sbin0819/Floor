@@ -10,9 +10,11 @@ import {
   branches,
   branchStaff,
   chatRooms,
+  chatRoomMembers,
   chatSpaces,
   chatSpacePrefs,
   floorPlans,
+  friendships,
   floors,
   messages,
   messageMentions,
@@ -981,6 +983,144 @@ describe("database constraints from the real migrations", () => {
     );
     expect(result.rows[0]?.indexdef).toContain("USING gist (space_id, during)");
   });
+  it.each(["ab", "a".repeat(21), "Subin", "su bin", "수빈"])(
+    "28. rejects invalid username %s",
+    async (username) => {
+      await expect(
+        database.db.update(users).set({ username }).where(eq(users.id, userId)),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "users_username_format" },
+      });
+    },
+  );
+
+  it("28. permits null names and enforces valid username uniqueness", async () => {
+    const otherId = crypto.randomUUID();
+    await database.db
+      .insert(users)
+      .values({ id: otherId, name: "다른 회원", email: "other@floor.test" });
+    expect(
+      (
+        await database.db.select({ username: users.username }).from(users)
+      ).every((row) => row.username === null),
+    ).toBe(true);
+    await database.db
+      .update(users)
+      .set({ username: "sub.in_1" })
+      .where(eq(users.id, userId));
+    await expect(
+      database.db
+        .update(users)
+        .set({ username: "sub.in_1" })
+        .where(eq(users.id, otherId)),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "users_username_unique" },
+    });
+  });
+
+  async function peoplePair() {
+    const otherId = crypto.randomUUID();
+    await database.db
+      .insert(users)
+      .values({ id: otherId, name: "상대", email: `${otherId}@floor.test` });
+    const [low, high] = [userId, otherId].sort() as [string, string];
+    return { low, high };
+  }
+
+  it("29. enforces friendship order, requester and pair uniqueness", async () => {
+    const { low, high } = await peoplePair();
+    const relation = {
+      userLowId: low,
+      userHighId: high,
+      requestedBy: low,
+      status: "pending" as const,
+      requestedAt: during.start,
+      statusChangedAt: during.start,
+    };
+    for (const ids of [
+      { userLowId: high, userHighId: low },
+      { userLowId: low, userHighId: low },
+    ]) {
+      await expect(
+        database.db.insert(friendships).values({ ...relation, ...ids }),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "friendships_order" },
+      });
+    }
+    await expect(
+      database.db
+        .insert(friendships)
+        .values({ ...relation, requestedBy: crypto.randomUUID() }),
+    ).rejects.toMatchObject({
+      cause: { code: "23514", constraint: "friendships_requester" },
+    });
+    await database.db.insert(friendships).values(relation);
+    await expect(
+      database.db.insert(friendships).values(relation),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+  });
+
+  it("30. requires ordered DM peers without a space or name and keeps one room per pair", async () => {
+    const { low, high } = await peoplePair();
+    const room = { kind: "dm" as const, dmLowUserId: low, dmHighUserId: high };
+    for (const invalid of [
+      { kind: "dm" as const },
+      { ...room, dmLowUserId: null },
+      { ...room, dmHighUserId: null },
+      { ...room, dmLowUserId: high, dmHighUserId: low },
+      { ...room, dmHighUserId: low },
+      { ...room, spaceId: chatSpaceId },
+      { ...room, name: "금지 이름" },
+      {
+        ...room,
+        kind: "text" as const,
+        spaceId: chatSpaceId,
+        name: "금지 채널",
+      },
+      {
+        ...room,
+        kind: "voice" as const,
+        spaceId: chatSpaceId,
+        name: "금지 음성",
+      },
+    ])
+      await expect(
+        database.db.insert(chatRooms).values(invalid),
+      ).rejects.toMatchObject({
+        cause: { code: "23514", constraint: "chat_rooms_kind_ref" },
+      });
+    await database.db.insert(chatRooms).values(room);
+    await expect(
+      database.db.insert(chatRooms).values(room),
+    ).rejects.toMatchObject({
+      cause: { code: "23505", constraint: "chat_rooms_dm_pair_unique" },
+    });
+    await database.db
+      .insert(chatRooms)
+      .values([{ kind: "group_dm" }, { kind: "meeting" }]);
+  });
+
+  it("31. makes room memberships unique and cascades room deletion", async () => {
+    const { low, high } = await peoplePair();
+    const [room] = await database.db
+      .insert(chatRooms)
+      .values({ kind: "dm", dmLowUserId: low, dmHighUserId: high })
+      .returning();
+    const member = {
+      roomId: room!.id,
+      userId: low,
+      status: "active" as const,
+      joinedAt: during.start,
+      statusChangedAt: during.start,
+    };
+    await database.db.insert(chatRoomMembers).values(member);
+    await expect(
+      database.db.insert(chatRoomMembers).values(member),
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
+    await database.db.delete(chatRooms).where(eq(chatRooms.id, room!.id));
+    expect(await database.db.select().from(chatRoomMembers)).toEqual([]);
+  });
+
 });
 
 describe("booking foundation upgrade", () => {
@@ -1042,6 +1182,14 @@ describe("booking foundation upgrade", () => {
       }>(
         "SELECT status, cancelled_at, cancelled_by FROM bookings ORDER BY status",
       );
+      expect(
+        (
+          await client.query(
+            "SELECT username, username_changed_at FROM users WHERE id = $1",
+            [userId],
+          )
+        ).rows,
+      ).toEqual([{ username: null, username_changed_at: null }]);
       expect(result.rows).toEqual([
         { status: "confirmed", cancelled_at: null, cancelled_by: null },
         { status: "cancelled", cancelled_at: createdAt, cancelled_by: null },

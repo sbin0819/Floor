@@ -29,8 +29,19 @@ export function NotificationRow({
   pending?: boolean;
 }) {
   const presentation = notificationPresentation(item);
-  const age = notificationAge(item.scheduledFor, now, item.data.timezone);
-  const title = item.type !== "booking_reminder" ? item.data.title : undefined;
+  const booking =
+    item.type !== "friend_request" && item.type !== "friend_accepted"
+      ? item
+      : null;
+  const age = notificationAge(
+    item.scheduledFor,
+    now,
+    booking?.data.timezone ?? "Asia/Seoul",
+  );
+  const title =
+    booking && booking.type !== "booking_reminder"
+      ? booking.data.title
+      : undefined;
   const label = [
     !item.read ? "읽지 않음" : null,
     presentation.text,
@@ -77,9 +88,11 @@ export function NotificationRow({
           )}
         </span>
         <span className="block text-xs leading-5 break-words text-muted-foreground">
-          <span className="tabular-nums">{presentation.dateTime}</span>
+          {presentation.dateTime && (
+            <span className="tabular-nums">{presentation.dateTime}</span>
+          )}
           {title && <span> · {title}</span>}
-          <span> · </span>
+          {(presentation.dateTime || title) && <span> · </span>}
           <time dateTime={item.scheduledFor} className="tabular-nums">
             {age}
           </time>

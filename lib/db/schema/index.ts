@@ -8,6 +8,7 @@ export * from "./enums";
 export * from "./floor-plans";
 export * from "./photos";
 export * from "./notifications";
+export * from "./people";
 export * from "./spaces";
 export * from "./teams";
 export * from "./users";

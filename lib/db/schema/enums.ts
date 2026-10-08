@@ -35,6 +35,18 @@ export const chatRoomKind = pgEnum("chat_room_kind", [
   "meeting",
 ]);
 export const messageKind = pgEnum("message_kind", ["text", "system"]);
+export const friendshipStatus = pgEnum("friendship_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "cancelled",
+]);
+export const chatMemberStatus = pgEnum("chat_member_status", [
+  "active",
+  "requested",
+  "declined",
+  "left",
+]);
 export const reactionEmoji = pgEnum("reaction_emoji", [
   "thumbs_up",
   "heart",
@@ -66,4 +78,6 @@ export const notificationType = pgEnum("notification_type", [
   "booking_removed",
   "participant_left",
   "booking_reminder",
+  "friend_request",
+  "friend_accepted",
 ]);

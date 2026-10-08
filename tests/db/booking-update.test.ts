@@ -717,8 +717,10 @@ describe("atomic owner-only booking updates", () => {
     ).toBe(true);
     const rows = await notices(booking.id);
     expect(
-      rows.find(({ type }) => type === "participant_left")?.data.start,
-    ).toBe(bookingRange("14:00", "15:00").start.toISOString());
+      rows.find(({ type }) => type === "participant_left")?.data,
+    ).toMatchObject({
+      start: bookingRange("14:00", "15:00").start.toISOString(),
+    });
     expect(
       rows.filter(
         ({ type, userId }) =>
@@ -840,9 +842,9 @@ describe("atomic owner-only booking updates", () => {
     for (const row of (await notices(booking.id)).filter(
       ({ type }) => type === "booking_changed",
     ))
-      expect(row.data.previousStart).toBe(
-        bookingRange("13:00", "14:00").start.toISOString(),
-      );
+      expect(row.data).toMatchObject({
+        previousStart: bookingRange("13:00", "14:00").start.toISOString(),
+      });
   });
 
   it.each([false, true])(

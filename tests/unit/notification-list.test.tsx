@@ -9,13 +9,13 @@ import { NotificationListSkeleton } from "@/features/notifications/components/no
 import { notificationHref } from "@/features/notifications/format";
 import type {
   NotificationItem,
-  NotificationType,
+  BookingNotificationType,
 } from "@/features/notifications/types";
 
 const now = "2026-10-08T05:55:00Z";
 function notification(
-  type: NotificationType = "booking_invited",
-): NotificationItem {
+  type: BookingNotificationType = "booking_invited",
+): Extract<NotificationItem, { type: BookingNotificationType }> {
   const item = {
     id: type,
     type,

@@ -2,11 +2,11 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NotificationList } from "@/features/notifications/components/notification-list";
 import { notificationHref } from "@/features/notifications/format";
 import {
-  notificationTypes,
+  bookingNotificationTypes,
   type NotificationItem,
 } from "@/features/notifications/types";
 
-const items: NotificationItem[] = notificationTypes.map((type, index) => {
+const items: NotificationItem[] = bookingNotificationTypes.map((type, index) => {
   const content = {
     type,
     data: {
