@@ -46,6 +46,12 @@ import {
 } from "@/lib/dal/bookings";
 import { loadPermissionContext } from "@/lib/permissions/context";
 import { localDate } from "@/lib/time/zoned";
+import {
+  buildBookingNotifications,
+  buildReminderNotifications,
+  notificationBookingSnapshot,
+} from "@/features/notifications/builders";
+import { insertNotifications } from "@/lib/dal/notifications";
 
 function assertBookable(space: { bookable: boolean; type: string }) {
   if (!space.bookable || space.type === "desk")
@@ -229,6 +235,29 @@ export function createBookingActions(dependencies: BookingDependencies = {}) {
                 participants.map(({ userId }) => userId),
                 transaction,
               );
+            const snapshot = notificationBookingSnapshot({
+              booking: created,
+              space: current,
+              floor: current.floor,
+              branch,
+            });
+            await insertNotifications(
+              [
+                ...buildBookingNotifications({
+                  type: "booking_invited",
+                  booking: snapshot,
+                  actor: { id: session.userId, name: session.name },
+                  userIds: participants.map(({ userId }) => userId),
+                  now,
+                }),
+                ...buildReminderNotifications(
+                  snapshot,
+                  [session.userId, ...participants.map(({ userId }) => userId)],
+                  now,
+                ),
+              ],
+              transaction,
+            );
             await fillBookingDefaultBranch(
               session.userId,
               branch.id,

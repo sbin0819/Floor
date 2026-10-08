@@ -10,6 +10,7 @@ import { loadSeedData } from "./data";
 import { loadSeedBookings2, type SeedBookings2Data } from "./bookings-2";
 import { insertSeedDeskSchedule, scopedDeskSchedule } from "./desk-schedule";
 import { insertSeedParticipants } from "./participants";
+import { insertSeedReminders } from "./reminders";
 import { SeedError } from "./errors";
 import { loadSeedPhotos } from "./photos";
 import type { SeedResult } from "./run-seed";
@@ -245,15 +246,16 @@ export async function addSeedBranches(
     cancelledByKey,
     ...booking
   } of data.bookings) {
+    const during = {
+      start: instant(booking.spaceId, dayOffset, start),
+      end: instant(booking.spaceId, dayOffset, end),
+    };
     await insertSeedBooking(
       {
         ...booking,
         attendeeCount: attendeeCounts.get(booking.id) ?? null,
         userId: userIds.get(userKey)!,
-        during: {
-          start: instant(booking.spaceId, dayOffset, start),
-          end: instant(booking.spaceId, dayOffset, end),
-        },
+        during,
         cancelledAt: booking.status === "cancelled" ? now : null,
         cancelledBy:
           booking.status === "cancelled" && cancelledByKey
@@ -263,6 +265,14 @@ export async function addSeedBranches(
       db,
     );
     await insertSeedParticipants(booking.id, bookingExtras, userIds, db);
+    await insertSeedReminders({
+      booking: { ...booking, during, userId: userIds.get(userKey)! },
+      data,
+      extras: bookingExtras,
+      userIds,
+      now,
+      database: db,
+    });
   }
   const counts = seedBranchCounts(addition);
   const deskResult = bookingExtras

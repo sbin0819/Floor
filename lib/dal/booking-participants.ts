@@ -3,7 +3,37 @@ import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
-import { bookingParticipants, bookings, teams, users } from "@/lib/db/schema";
+import {
+  bookingParticipants,
+  bookings,
+  spaces,
+  teams,
+  users,
+} from "@/lib/db/schema";
+
+export async function listBookingParticipantIds(
+  bookingId: string,
+  database: DalDatabase,
+) {
+  const rows = await database
+    .select({ userId: bookingParticipants.userId })
+    .from(bookingParticipants)
+    .where(eq(bookingParticipants.bookingId, bookingId));
+  return rows.map(({ userId }) => userId);
+}
+
+export async function getDeskNotificationAreaName(
+  parentId: string | null,
+  database: DalDatabase,
+) {
+  if (!parentId) return undefined;
+  const [area] = await database
+    .select({ name: spaces.name })
+    .from(spaces)
+    .where(eq(spaces.id, parentId))
+    .limit(1);
+  return area?.name;
+}
 
 export function getParticipantEligibility(
   ownerId: string,

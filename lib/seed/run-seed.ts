@@ -19,6 +19,7 @@ import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
 import { insertSeedParticipants } from "@/lib/seed/participants";
+import { insertSeedReminders } from "@/lib/seed/reminders";
 import { SeedError } from "@/lib/seed/errors";
 import { loadSeedPhotos } from "@/lib/seed/photos";
 import { getOperatingDate } from "@/lib/time/open-hours";
@@ -249,6 +250,14 @@ export async function runSeed({
           userIds,
           database,
         );
+        await insertSeedReminders({
+          booking: { ...booking, during, userId: userId(userKey) },
+          data,
+          extras: bookingExtras,
+          userIds,
+          now,
+          database,
+        });
       }
       const deskResult = await insertSeedDeskSchedule({
         data,

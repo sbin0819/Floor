@@ -13,6 +13,14 @@ import {
   lockBookingUsers,
   lockParticipantBooking,
 } from "@/lib/dal/booking-participants";
+import {
+  buildBookingNotifications,
+  notificationBookingSnapshot,
+} from "@/features/notifications/builders";
+import {
+  deleteBookingReminders,
+  insertNotifications,
+} from "@/lib/dal/notifications";
 
 export function createLeaveBookingAction(
   dependencies: BookingDependencies = {},
@@ -50,6 +58,20 @@ export function createLeaveBookingAction(
             transaction,
           );
           if (!removed) throw new ActionError("NOT_FOUND");
+          await deleteBookingReminders(
+            { bookingId: locked.id, userIds: [session.userId] },
+            transaction,
+          );
+          await insertNotifications(
+            buildBookingNotifications({
+              type: "participant_left",
+              booking: notificationBookingSnapshot({ ...row, booking: locked }),
+              actor: { id: session.userId, name: session.name },
+              userIds: [locked.userId],
+              now,
+            }),
+            transaction,
+          );
           return {
             bookingId: removed.bookingId,
             floorId: row.floor.id,
