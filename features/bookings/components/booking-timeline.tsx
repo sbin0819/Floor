@@ -7,12 +7,14 @@ import { dayGridLayout } from "@/features/bookings/day-grid";
 import { formatBookingTime } from "@/features/bookings/format";
 import type { SelectableSlot } from "@/features/bookings/selection";
 import type { DayBooking, SpaceDayData } from "@/features/bookings/types";
-import { localTime } from "@/lib/time/zoned";
+import { localDate, localTime } from "@/lib/time/zoned";
+import { useBranchDisplayNow } from "./branch-display-clock";
 import { cn } from "@/lib/utils";
 
 const offset = (rows: number) => `calc(var(--booking-slot-height) * ${rows})`;
 
 export function BookingTimeline({
+  branchId = "standalone",
   slots,
   bookings,
   blocks,
@@ -25,6 +27,7 @@ export function BookingTimeline({
   onSelect,
   renderCancel,
 }: {
+  branchId?: string;
   slots: SelectableSlot[];
   bookings: DayBooking[];
   blocks: SpaceDayData["blocks"];
@@ -38,6 +41,7 @@ export function BookingTimeline({
   renderCancel: (bookingId: string) => ReactNode;
 }) {
   const id = useId();
+  const displayNow = useBranchDisplayNow({ branchId, now });
   const [showPast, setShowPast] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -60,6 +64,13 @@ export function BookingTimeline({
     Date.parse(slot.end) <= Date.parse(end);
   const hiddenFirst = grid.hiddenSlots[0];
   const hiddenLast = grid.hiddenSlots.at(-1);
+  const displayPosition = grid.position(displayNow);
+  const currentPosition =
+    localDate(new Date(displayNow), timeZone) === date &&
+    displayPosition >= 0 &&
+    displayPosition < grid.slots.length
+      ? displayPosition
+      : null;
   return (
     <div className="space-y-3 [--booking-slot-height:44px] lg:[--booking-slot-height:28px]">
       {hiddenFirst && hiddenLast && (
@@ -246,11 +257,11 @@ export function BookingTimeline({
               </span>
             </div>
           )}
-          {grid.currentPosition !== null && (
+          {currentPosition !== null && (
             <div
-              aria-label={`지금 ${localTime(new Date(now), timeZone)}`}
+              aria-label={`지금 ${localTime(new Date(displayNow), timeZone)}`}
               className="absolute inset-x-0 z-10 border-t-2 border-status-busy-strong before:absolute before:-top-1 before:-left-1 before:size-1.5 before:rounded-full before:bg-status-busy-strong"
-              style={{ top: offset(grid.currentPosition) }}
+              style={{ top: offset(currentPosition) }}
             />
           )}
         </div>

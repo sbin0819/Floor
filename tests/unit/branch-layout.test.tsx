@@ -13,6 +13,8 @@ import { getBranchNavigation } from "@/features/bookings/queries";
 import { ActionError } from "@/lib/actions/result";
 import { floorDayFixture } from "./booking-ui-fixtures";
 import { resolvePageContent } from "./page-test-utils";
+import { BranchDisplayClockProvider } from "@/features/bookings/components/branch-display-clock";
+import { FloorViewProvider } from "@/features/bookings/components/floor-view";
 
 vi.mock("@/lib/auth/session", () => ({ getSession: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
@@ -54,7 +56,13 @@ async function navigationBoundary() {
     params: Promise.resolve({ branchId: "branch" }),
     children: <p>페이지</p>,
   });
-  const provider = await resolvePageContent(shell);
+  const clock = await resolvePageContent(shell);
+  expect(clock.type).toBe(BranchDisplayClockProvider);
+  expect(clock.props.branchId).toBe("branch");
+  const provider = clock.props.children;
+  if (!isValidElement<{ children: ReactNode }>(provider))
+    throw new Error("Missing floor view provider");
+  expect(provider.type).toBe(FloorViewProvider);
   const workspace = provider.props.children;
   if (!isValidElement<{ children: ReactNode }>(workspace))
     throw new Error("Missing workspace");

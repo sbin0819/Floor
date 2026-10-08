@@ -181,6 +181,10 @@ describe("floor timetable", () => {
       interactive().filter((element) => element.tabIndex === 0),
     ).toHaveLength(1);
     await userEvent.tab();
+    expect(
+      screen.getByRole("button", { name: "현재 시간으로 이동" }),
+    ).toHaveFocus();
+    await userEvent.tab();
     expect(screen.getByRole("link", { name: /회의실 A/ })).toHaveFocus();
     await userEvent.keyboard("{ArrowRight}{ArrowRight}{ArrowRight}");
     expect(
@@ -245,7 +249,7 @@ describe("floor timetable", () => {
     space.intervals.push({ start: at(9), end: at(9, 30), kind: "other" });
     const view = render(<Interactive data={data} />);
     expect(
-      view.container.querySelector("[data-timetable-clock]"),
+      view.container.querySelector("[data-timetable-clock-label]"),
     ).toHaveTextContent("10:10");
     expect(
       view.container.querySelector("[data-timetable-past]"),

@@ -6,6 +6,7 @@ import { ActionError } from "@/lib/actions/result";
 import { getBranchNavigation } from "@/features/bookings/queries";
 import { BranchNavigation } from "@/features/bookings/components/branch-navigation";
 import { BranchWorkspace } from "@/features/bookings/components/branch-workspace";
+import { BranchDisplayClockProvider } from "@/features/bookings/components/branch-display-clock";
 import {
   FloorNavigationSkeleton,
   FloorPageSkeleton,
@@ -48,19 +49,22 @@ async function BranchRequestLayout({
   params: Promise<{ branchId: string }>;
   children: ReactNode;
 }) {
+  const { branchId } = await params;
   const cookieView = resolveFloorView(
     undefined,
     (await cookies()).get("floor_view")?.value,
   );
   return (
-    <FloorViewProvider cookieView={cookieView}>
-      <BranchWorkspace>
-        <Suspense fallback={<NavigationFallback />}>
-          <NavigationContent params={params} />
-        </Suspense>
-        {children}
-      </BranchWorkspace>
-    </FloorViewProvider>
+    <BranchDisplayClockProvider branchId={branchId.toLowerCase()}>
+      <FloorViewProvider cookieView={cookieView}>
+        <BranchWorkspace>
+          <Suspense fallback={<NavigationFallback />}>
+            <NavigationContent params={params} />
+          </Suspense>
+          {children}
+        </BranchWorkspace>
+      </FloorViewProvider>
+    </BranchDisplayClockProvider>
   );
 }
 export default function BranchLayout({

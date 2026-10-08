@@ -11,7 +11,7 @@ import type {
   RestrictedSpace,
   SpaceType,
 } from "@/features/bookings/types";
-import { SLOT_MINUTES } from "@/lib/time/zoned";
+import { localDate, SLOT_MINUTES } from "@/lib/time/zoned";
 
 const step = SLOT_MINUTES * 60_000;
 const spaceOrder: SpaceType[] = [
@@ -107,7 +107,10 @@ function placeBlocks(
   return blocks;
 }
 
-export function floorTimetableLayout(data: FloorDayData) {
+export function floorTimetableLayout(
+  data: FloorDayData,
+  displayNow = data.now,
+) {
   const slots = createBookingSlots({
     date: data.date,
     timeZone: data.branch.timezone,
@@ -183,8 +186,12 @@ export function floorTimetableLayout(data: FloorDayData) {
   const start = slots[0] ? Date.parse(slots[0].start) : null;
   const end = slots.at(-1) ? Date.parse(slots.at(-1)!.end) : null;
   const nowPosition =
-    data.isToday && start !== null && end !== null && now >= start && now < end
-      ? (now - start) / step
+    localDate(new Date(displayNow), data.branch.timezone) === data.date &&
+    start !== null &&
+    end !== null &&
+    Date.parse(displayNow) >= start &&
+    Date.parse(displayNow) < end
+      ? (Date.parse(displayNow) - start) / step
       : null;
   const pastColumns =
     data.isToday && start !== null

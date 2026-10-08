@@ -19,7 +19,7 @@ import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
 import { StatusLine } from "@/components/status-line";
 import { getBookingDateWindow } from "@/features/bookings/date";
 import { floorHref, formatBookingDate } from "@/features/bookings/format";
-import { getOperatingState } from "@/features/bookings/operating-state";
+import { getDisplayOperatingState } from "@/features/bookings/display-operating-state";
 import { searchValue } from "@/features/bookings/floor-selection";
 import type { BranchNavigationData } from "@/features/bookings/types";
 import { getOpenHours } from "@/lib/time/open-hours";
@@ -27,6 +27,7 @@ import { zonedDateTime } from "@/lib/time/zoned";
 import { useFloorSelection } from "./branch-workspace";
 import { FloorNavigationLink } from "./floor-navigation-link";
 import { FloorDatePicker } from "./floor-date-picker";
+import { useBranchDisplayNow } from "./branch-display-clock";
 
 export function BranchNavigation({
   data,
@@ -38,6 +39,10 @@ export function BranchNavigation({
   const params = useParams<{ floorId?: string }>();
   const search = useSearchParams();
   const navigation = useFloorSelection();
+  const displayNow = useBranchDisplayNow({
+    branchId: data.branch.id,
+    now: data.now,
+  });
   const registerNavigation = navigation?.registerNavigation;
   useEffect(
     () => registerNavigation?.(data.branch.id, data.today, data.now),
@@ -58,21 +63,12 @@ export function BranchNavigation({
       : undefined;
   const view = typeof requestedView === "string" ? requestedView : undefined;
   const floor = data.floors.find(({ id }) => id === floorId);
-  const hours = getOpenHours(data.branch.openHours, date);
-  const operating = getOperatingState(
-    new Date(data.now),
-    data.branch.timezone,
-    data.branch.openHours,
-  );
-  const todayStatus =
-    operating.status === "open"
-      ? "영업 중"
-      : operating.status === "before_open"
-        ? "영업 전"
-        : "영업 종료";
-  const hoursLabel = !hours
-    ? "쉬는 날"
-    : `${date === data.today ? `${todayStatus} · ` : ""}${hours.open}–${hours.close}`;
+  const display = getDisplayOperatingState({
+    date,
+    now: displayNow,
+    timeZone: data.branch.timezone,
+    openHours: data.branch.openHours,
+  });
   const link = (value: string) =>
     floorHref(data.branch.id, floorId ?? "", value, selectedSpaceId, view);
   const location = (value: string) => ({
@@ -162,15 +158,11 @@ export function BranchNavigation({
           </SegmentedLinks>
         </div>
         <StatusLine
-          kind={
-            date === data.today && operating.status === "open" && hours
-              ? "free"
-              : "none"
-          }
+          kind={display.kind}
           aria-label="선택한 날짜 운영 시간"
           className="col-start-1 row-start-3 min-w-0 lg:col-start-3 lg:row-start-1"
         >
-          {hoursLabel}
+          {display.label}
         </StatusLine>
         {viewControl && (
           <div className="col-start-2 row-start-3 justify-self-end lg:col-start-4 lg:row-start-1">
@@ -306,7 +298,7 @@ export function BranchNavigation({
           aria-label="공간 상태 범례"
           className="ml-auto hidden shrink-0 items-center gap-4 lg:flex"
         >
-          {(date !== data.today || operating.status === "open") && (
+          {(!display.isToday || display.operating.status === "open") && (
             <StatusLine kind="free">비어 있음</StatusLine>
           )}
           <StatusLine kind="busy">예약됨</StatusLine>
