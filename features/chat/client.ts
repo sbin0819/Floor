@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RoomMessagesPage } from "./types";
+import { reactionEmojis } from "./types";
 
 export type { RoomMessagesPage } from "./types";
 export type MessagePageQuery =
@@ -17,6 +18,26 @@ const pageSchema = z.object({
       body: z.string(),
       createdAt: z.string(),
       clientId: z.string().nullable(),
+      replyTo: z
+        .object({
+          id: z.string(),
+          authorName: z.string().nullable(),
+          excerpt: z.string(),
+          deleted: z.boolean(),
+        })
+        .nullable(),
+      mentions: z.array(z.object({ userId: z.string(), name: z.string() })),
+      mentionsEveryone: z.boolean(),
+      editedAt: z.string().nullable(),
+      deletedAt: z.string().nullable(),
+      reactions: z.array(
+        z.object({
+          emoji: z.enum(reactionEmojis),
+          count: sequence,
+          mine: z.boolean(),
+          names: z.array(z.string()),
+        }),
+      ),
     }),
   ),
   hasMore: z.boolean(),

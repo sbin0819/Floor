@@ -6,6 +6,7 @@ import {
   loadAblyBrowserClient,
   RealtimeTokenError,
 } from "@/lib/realtime/ably-browser-client";
+import type { RealtimeEvent } from "@/lib/realtime/types";
 
 import { fakeTokenRequest } from "./ably-test-client";
 
@@ -25,6 +26,30 @@ const sdk = vi.hoisted(() => ({
   onChannel: vi.fn(),
   offChannel: vi.fn(),
 }));
+
+const created: Extract<RealtimeEvent, { type: "message.created" }> = {
+  type: "message.created",
+  roomId: "a",
+  id: "m",
+  seq: 1,
+  authorId: "u",
+  authorName: "김서연",
+  clientId: "client-a",
+  kind: "text",
+  body: "답장해요",
+  createdAt: "2026-10-08T00:00:00Z",
+  replyTo: {
+    id: "original",
+    authorName: null,
+    excerpt: "원문",
+    deleted: false,
+  },
+  mentions: [{ userId: "other", name: "이도윤" }],
+  mentionsEveryone: false,
+  editedAt: null,
+  deletedAt: null,
+  reactions: [],
+};
 
 vi.mock("ably", () => ({
   Realtime: class {
@@ -176,6 +201,117 @@ describe("Ably SDK bridge", () => {
       seq: 3,
       authorId: "other",
     });
+  });
+  it("accepts new message details while stripping nested private fields", async () => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const listener = vi.fn();
+    await client.channel("room:a").subscribe(listener);
+    sdk.subscribe.mock.calls[0]?.[0]({
+      data: {
+        ...created,
+        email: "private@example.test",
+        replyTo: { ...created.replyTo, email: "private@example.test" },
+        mentions: created.mentions.map((mention) => ({
+          ...mention,
+          email: "private@example.test",
+        })),
+      },
+    });
+    expect(listener).toHaveBeenCalledExactlyOnceWith(created);
+  });
+  it.each<RealtimeEvent>([
+    {
+      type: "message.updated",
+      roomId: "a",
+      id: "m",
+      seq: 1,
+      body: "고친 본문",
+      mentions: [{ userId: "u", name: "김서연" }],
+      mentionsEveryone: true,
+      editedAt: "2026-10-08T01:00:00Z",
+    },
+    { type: "message.deleted", roomId: "a", id: "m", seq: 1 },
+    {
+      type: "reaction.changed",
+      roomId: "a",
+      messageId: "m",
+      emoji: "thumbs_up",
+      userId: "u",
+      added: true,
+      count: 1,
+    },
+    {
+      type: "reaction.changed",
+      roomId: "a",
+      messageId: "m",
+      emoji: "check",
+      userId: "u",
+      added: false,
+      count: 0,
+    },
+    {
+      type: "mention.created",
+      spaceId: "s",
+      roomId: "a",
+      roomName: "일반",
+      messageId: "m",
+      seq: 1,
+      authorName: "김서연",
+      excerpt: "알려드려요",
+    },
+  ])("validates $type without forwarding unknown fields", async (event) => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const listener = vi.fn();
+    await client.channel("room:a").subscribe(listener);
+    sdk.subscribe.mock.calls[0]?.[0]({
+      data: {
+        ...event,
+        email: "private@example.test",
+        deletedBy: "private-user",
+      },
+    });
+    expect(listener).toHaveBeenCalledExactlyOnceWith(event);
+  });
+  it.each([
+    { ...created, reactions: [{ emoji: "heart", count: 1 }] },
+    { ...created, editedAt: "2026-10-08T01:00:00Z" },
+    { ...created, deletedAt: "2026-10-08T01:00:00Z" },
+    { ...created, mentions: [{ userId: "u" }] },
+    { ...created, replyTo: { id: "original" } },
+    { type: "message.deleted", roomId: "a", id: "m", seq: 0 },
+    {
+      type: "reaction.changed",
+      roomId: "a",
+      messageId: "m",
+      emoji: "unsupported",
+      userId: "u",
+      added: true,
+      count: 1,
+    },
+    {
+      type: "reaction.changed",
+      roomId: "a",
+      messageId: "m",
+      emoji: "heart",
+      userId: "u",
+      added: true,
+      count: -1,
+    },
+    {
+      type: "reaction.changed",
+      roomId: "a",
+      messageId: "m",
+      emoji: "heart",
+      userId: "u",
+      added: true,
+      count: 1.5,
+    },
+  ])("ignores malformed or non-new message events %#", async (event) => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const listener = vi.fn();
+    await client.channel("room:a").subscribe(listener);
+    sdk.subscribe.mock.calls[0]?.[0]({ data: event });
+    expect(listener).not.toHaveBeenCalled();
   });
   it("observes attached and attached-update continuity flags and unsubscribes", async () => {
     const client = await loadAblyBrowserClient(vi.fn());

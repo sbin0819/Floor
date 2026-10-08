@@ -15,6 +15,7 @@ import {
 import * as writeDal from "@/lib/dal/chat-write";
 import { chatRooms, messages, teamMembers } from "@/lib/db/schema";
 import { createMemoryRateLimiter } from "@/lib/rate-limit/memory";
+import type { RealtimeEvent } from "@/lib/realtime/types";
 import { createTestDatabase, type TestDatabase } from "./helper";
 import { chatNow, seedChatActors, type ChatActors } from "./chat-helper";
 
@@ -22,6 +23,15 @@ describe("sendMessage transaction", () => {
   let database: TestDatabase;
   let actors: ChatActors;
   const publish = vi.fn();
+  const publishMany = async (
+    items: { channel: string; event: RealtimeEvent }[],
+  ) => {
+    const results = await Promise.allSettled(
+      items.map(({ channel, event }) => publish(channel, event)),
+    );
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
+  };
   beforeAll(async () => {
     database = await createTestDatabase();
   });
@@ -43,7 +53,7 @@ describe("sendMessage transaction", () => {
       getSession: async () => session,
       now: () => chatNow,
       limiter: createMemoryRateLimiter(() => chatNow.getTime()),
-      publisher: { publish },
+      publisher: { publish, publishMany },
       ...overrides,
     });
   const input = (body = " 안녕하세요\n반가워요 ") => ({
@@ -174,11 +184,12 @@ describe("sendMessage transaction", () => {
   });
   it("locks the user before the room, and allocates after an intervening send", async () => {
     const order: string[] = [];
-    const lockAuthor = writeDal.lockMessageAuthor;
+    const lockAuthor = writeDal.lockUsersForKeyShare;
     const lockRoom = writeDal.lockRoomForMessage;
-    vi.spyOn(writeDal, "lockMessageAuthor").mockImplementation(
+    vi.spyOn(writeDal, "lockUsersForKeyShare").mockImplementation(
       async (...args) => {
         order.push("user");
+        expect(args[0]).toEqual([actors.member.userId]);
         return lockAuthor(...args);
       },
     );
@@ -238,7 +249,6 @@ describe("sendMessage transaction", () => {
     ).toBe(true);
     expect(await database.db.select().from(messages)).toHaveLength(1);
     expect(logError.mock.calls).toEqual([
-      ["Chat realtime publication failed."],
       ["Chat realtime publication failed."],
     ]);
   });

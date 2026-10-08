@@ -14,6 +14,7 @@ import {
 import { readableTeamSpace } from "./chat-access";
 import { firstUnreadSequence } from "./chat-reads";
 import type { DalDatabase } from "./database";
+import { selectChatMessages } from "./chat-messages";
 
 export function listChatNav(userId: string, database: DalDatabase = getDb()) {
   return database
@@ -51,30 +52,12 @@ export function listChatNav(userId: string, database: DalDatabase = getDb()) {
     );
 }
 
-export function chatMessageFields(userId: string) {
-  return {
-    id: messages.id,
-    seq: messages.seq,
-    authorId: messages.authorId,
-    authorName: users.name,
-    kind: messages.kind,
-    body: messages.body,
-    createdAt: messages.createdAt,
-    clientId: sql<
-      string | null
-    >`case when ${messages.authorId} = ${userId} then ${messages.clientId} else null end`,
-  };
-}
-
 export async function listRecentMessages(
   roomId: string,
   userId: string,
   database: DalDatabase = getDb(),
 ) {
-  const rows = await database
-    .select(chatMessageFields(userId))
-    .from(messages)
-    .leftJoin(users, eq(messages.authorId, users.id))
+  const rows = await selectChatMessages(userId, database)
     .where(eq(messages.roomId, roomId))
     .orderBy(desc(messages.seq))
     .limit(50);
@@ -106,14 +89,11 @@ export async function listMessagesPage(
   const before = "before" in cursor;
   const limit = before ? 50 : 200;
   // 방 메타데이터와 병렬로 실행되므로 이 SQL도 직접 소속을 확인한 행만 읽는다.
-  const rows = await database
-    .select(chatMessageFields(userId))
-    .from(messages)
+  const rows = await selectChatMessages(userId, database)
     .innerJoin(chatRooms, eq(messages.roomId, chatRooms.id))
     .innerJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
     .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
     .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
-    .leftJoin(users, eq(messages.authorId, users.id))
     .where(
       and(
         eq(chatRooms.id, roomId),

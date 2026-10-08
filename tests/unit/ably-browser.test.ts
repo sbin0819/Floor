@@ -25,6 +25,12 @@ const event: RealtimeEvent = {
   kind: "text",
   body: "안녕하세요",
   createdAt: "2026-10-08T00:00:00Z",
+  replyTo: null,
+  mentions: [],
+  mentionsEveryone: false,
+  editedAt: null,
+  deletedAt: null,
+  reactions: [],
 };
 const cleanup: BrowserRealtime[] = [];
 

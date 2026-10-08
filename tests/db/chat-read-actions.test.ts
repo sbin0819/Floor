@@ -47,7 +47,14 @@ describe("chat read actions", () => {
       getSession: async () => session,
       now: () => chatNow,
       limiter: createMemoryRateLimiter(() => chatNow.getTime()),
-      publisher: { publish },
+      publisher: {
+        publish,
+        async publishMany(items) {
+          await Promise.all(
+            items.map(({ channel, event }) => publish(channel, event)),
+          );
+        },
+      },
       ...overrides,
     });
   const input = (seq: unknown) => ({ roomId: actors.roomId, seq });

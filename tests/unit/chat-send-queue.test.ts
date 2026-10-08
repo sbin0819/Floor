@@ -5,6 +5,7 @@ import {
 } from "@/features/chat/send-queue";
 import type { ActionResult } from "@/lib/actions/result";
 import type { ChatMessage } from "@/features/chat/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 
 function deferred() {
   let resolve!: (result: ActionResult<ChatMessage>) => void;
@@ -24,6 +25,7 @@ function entry(
     roomId,
     send,
     message: {
+      ...emptyMessageDetails(),
       id: body,
       clientId: body,
       seq: 0,

@@ -20,10 +20,49 @@ export type RealtimeEvent =
       kind: "text" | "system";
       body: string;
       createdAt: string;
+      replyTo: ChatReply | null;
+      mentions: ChatMention[];
+      mentionsEveryone: boolean;
+      editedAt: null;
+      deletedAt: null;
+      reactions: [];
+    }
+  | {
+      type: "message.updated";
+      roomId: string;
+      id: string;
+      seq: number;
+      body: string;
+      mentions: ChatMention[];
+      mentionsEveryone: boolean;
+      editedAt: string;
+    }
+  | { type: "message.deleted"; roomId: string; id: string; seq: number }
+  | {
+      type: "reaction.changed";
+      roomId: string;
+      messageId: string;
+      emoji: ReactionEmoji;
+      userId: string;
+      added: boolean;
+      count: number;
+    }
+  | {
+      type: "mention.created";
+      spaceId: string;
+      roomId: string;
+      roomName: string;
+      messageId: string;
+      seq: number;
+      authorName: string;
+      excerpt: string;
     };
+
+export type RealtimeItem = { channel: string; event: RealtimeEvent };
 
 export interface RealtimePublisher {
   publish(channel: string, event: RealtimeEvent): Promise<void>;
+  publishMany(items: readonly RealtimeItem[]): Promise<void>;
 }
 
 export interface RealtimeSubscriber {
@@ -32,3 +71,8 @@ export interface RealtimeSubscriber {
     onEvent: (event: RealtimeEvent) => void,
   ): () => void;
 }
+import type {
+  ChatMention,
+  ChatReply,
+  ReactionEmoji,
+} from "@/features/chat/types";

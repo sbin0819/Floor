@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ChannelScreen } from "@/features/chat/components/channel-screen";
 import { ChannelSkeleton } from "@/features/chat/components/channel-skeleton";
 import type { ChannelView } from "@/features/chat/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 
 const data: ChannelView = {
   space: { id: "story-space", name: "디자인팀" },
@@ -22,6 +23,7 @@ const data: ChannelView = {
   ],
   messages: [
     {
+      ...emptyMessageDetails(),
       id: "first",
       seq: 1,
       authorId: "park",
@@ -32,6 +34,7 @@ const data: ChannelView = {
       clientId: null,
     },
     {
+      ...emptyMessageDetails(),
       id: "second",
       seq: 2,
       authorId: "lee",
@@ -42,6 +45,7 @@ const data: ChannelView = {
       clientId: null,
     },
     {
+      ...emptyMessageDetails(),
       id: "third",
       seq: 3,
       authorId: "lee",

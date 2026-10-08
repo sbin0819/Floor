@@ -12,6 +12,7 @@ import type {
   RoomMessagesPage,
 } from "@/features/chat/types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 import type { RealtimeLifecycleEvent } from "@/lib/realtime/ably-browser";
 
 const realtime = vi.hoisted(() => ({
@@ -36,6 +37,7 @@ vi.mock("@/components/realtime-provider", () => ({
 
 function message(seq: number, extra: Partial<ChatMessage> = {}): ChatMessage {
   return {
+    ...emptyMessageDetails(),
     id: `message-${seq}`,
     seq,
     authorId: "other",
@@ -45,6 +47,19 @@ function message(seq: number, extra: Partial<ChatMessage> = {}): ChatMessage {
     createdAt: "2026-10-08T00:00:00Z",
     clientId: null,
     ...extra,
+  };
+}
+function created(
+  message: ChatMessage,
+  roomId = "room-a",
+): Extract<RealtimeEvent, { type: "message.created" }> {
+  return {
+    ...message,
+    type: "message.created",
+    roomId,
+    editedAt: null,
+    deletedAt: null,
+    reactions: [],
   };
 }
 function view(id = "room-a"): ChannelView {
@@ -205,21 +220,9 @@ describe("channel reconnect integration", () => {
     vi.stubGlobal("fetch", fetcher);
     setup();
     await act(async () => {
-      realtime.event({
-        type: "message.created",
-        roomId: "room-a",
-        ...message(3),
-      });
-      realtime.event({
-        type: "message.created",
-        roomId: "room-a",
-        ...message(4),
-      });
-      realtime.event({
-        type: "message.created",
-        roomId: "room-a",
-        ...message(4),
-      });
+      realtime.event(created(message(3)));
+      realtime.event(created(message(4)));
+      realtime.event(created(message(4)));
     });
     await waitFor(() =>
       expect(screen.getByLabelText("목록")).toHaveTextContent(
@@ -238,16 +241,8 @@ describe("channel reconnect integration", () => {
   it("does not announce my own confirmations or another room's messages", async () => {
     setup();
     await act(async () => {
-      realtime.event({
-        type: "message.created",
-        roomId: "other-room",
-        ...message(2),
-      });
-      realtime.event({
-        type: "message.created",
-        roomId: "room-a",
-        ...message(2, { authorId: "me" }),
-      });
+      realtime.event(created(message(2), "other-room"));
+      realtime.event(created(message(2, { authorId: "me" })));
     });
     expect(screen.getByLabelText("알림")).toBeEmptyDOMElement();
   });

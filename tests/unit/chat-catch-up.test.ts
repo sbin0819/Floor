@@ -4,8 +4,10 @@ import {
   type LoadMessagePage,
 } from "@/features/chat/catch-up";
 import type { ChatMessage, RoomMessagesPage } from "@/features/chat/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 
 const message = (seq: number): ChatMessage => ({
+  ...emptyMessageDetails(),
   id: `message-${seq}`,
   seq,
   authorId: "other",

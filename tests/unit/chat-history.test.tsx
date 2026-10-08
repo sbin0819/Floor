@@ -12,10 +12,12 @@ import { useMessageHistory } from "@/features/chat/components/use-message-histor
 import { fetchRoomMessagesPage } from "@/features/chat/client";
 import { roomMessagesKey } from "@/features/chat/components/message-state";
 import type { ChatMessage, RoomMessagesPage } from "@/features/chat/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 
 vi.mock("@/features/chat/client", () => ({ fetchRoomMessagesPage: vi.fn() }));
 function message(seq: number): ChatMessage {
   return {
+    ...emptyMessageDetails(),
     id: `m-${seq}`,
     seq,
     kind: "text",

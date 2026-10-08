@@ -11,6 +11,7 @@ export const sendMessageSchema = z.strictObject({
   roomId: z.uuid(),
   clientId: z.uuid(),
   body: messageBodySchema,
+  replyToId: z.uuid().optional(),
 });
 
 export const markRoomReadSchema = z.strictObject({

@@ -1,8 +1,14 @@
 import "server-only";
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ActionError } from "@/lib/actions/result";
-import { chatRooms, chatSpaces, messages, users } from "@/lib/db/schema";
+import {
+  chatRooms,
+  chatSpaces,
+  messageMentions,
+  messages,
+  users,
+} from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
 
 export async function createTeamSpace(teamId: string, database: DalDatabase) {
@@ -34,11 +40,17 @@ export async function createTeamSpace(teamId: string, database: DalDatabase) {
   return { spaceId: space.id, roomId: room.id };
 }
 
-export async function lockMessageAuthor(userId: string, database: DalDatabase) {
+export async function lockUsersForKeyShare(
+  ids: readonly string[],
+  database: DalDatabase,
+) {
+  const sorted = [...new Set(ids)].sort();
+  if (!sorted.length) return [];
   return database
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.id, userId))
+    .where(inArray(users.id, sorted))
+    .orderBy(asc(users.id))
     .for("key share");
 }
 
@@ -71,6 +83,8 @@ export async function insertChatMessage(
     authorId: string;
     clientId: string;
     body: string;
+    replyToId?: string;
+    mentionsEveryone?: boolean;
     now: Date;
   },
   database: DalDatabase,
@@ -89,9 +103,24 @@ export async function insertChatMessage(
       authorId: input.authorId,
       clientId: input.clientId,
       body: input.body,
+      replyToId: input.replyToId,
+      mentionsEveryone: input.mentionsEveryone,
       createdAt: input.now,
     })
     .returning();
   if (!message) throw new ActionError("INTERNAL");
   return message;
+}
+
+export async function insertMessageMentions(
+  messageId: string,
+  userIds: readonly string[],
+  now: Date,
+  database: DalDatabase,
+) {
+  if (!userIds.length) return;
+  await database
+    .insert(messageMentions)
+    .values(userIds.map((userId) => ({ messageId, userId, createdAt: now })))
+    .onConflictDoNothing();
 }

@@ -10,6 +10,7 @@ import { MessageList } from "@/features/chat/components/message-list";
 import { MessageComposer } from "@/features/chat/components/message-composer";
 import { Profiler } from "react";
 import type { ChatMessage } from "@/features/chat/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 import { installChatViewport } from "../helpers/chat-viewport";
 
 function message(
@@ -17,6 +18,7 @@ function message(
   overrides: Partial<ChatMessage> = {},
 ): ChatMessage {
   return {
+    ...emptyMessageDetails(),
     id: `m-${seq}`,
     seq,
     kind: "text",

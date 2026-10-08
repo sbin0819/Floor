@@ -1,6 +1,7 @@
 import type { ConnectionState, TokenRequest } from "ably";
 import { z } from "zod";
 
+import { reactionEmojis } from "@/features/chat/types";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
 export interface RealtimeTokenInput {
@@ -40,6 +41,14 @@ export async function fetchRealtimeToken(
   return parsed.data;
 }
 
+const mentionSchema = z.object({ userId: z.string(), name: z.string() });
+const replySchema = z.object({
+  id: z.string(),
+  authorName: z.string().nullable(),
+  excerpt: z.string(),
+  deleted: z.boolean(),
+});
+
 const eventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("room.activity"),
@@ -66,6 +75,47 @@ const eventSchema = z.discriminatedUnion("type", [
     kind: z.enum(["text", "system"]),
     body: z.string(),
     createdAt: z.string(),
+    replyTo: replySchema.nullable(),
+    mentions: z.array(mentionSchema),
+    mentionsEveryone: z.boolean(),
+    editedAt: z.null(),
+    deletedAt: z.null(),
+    reactions: z.tuple([]),
+  }),
+  z.object({
+    type: z.literal("message.updated"),
+    roomId: z.string(),
+    id: z.string(),
+    seq: z.number().int().positive(),
+    body: z.string(),
+    mentions: z.array(mentionSchema),
+    mentionsEveryone: z.boolean(),
+    editedAt: z.string(),
+  }),
+  z.object({
+    type: z.literal("message.deleted"),
+    roomId: z.string(),
+    id: z.string(),
+    seq: z.number().int().positive(),
+  }),
+  z.object({
+    type: z.literal("reaction.changed"),
+    roomId: z.string(),
+    messageId: z.string(),
+    emoji: z.enum(reactionEmojis),
+    userId: z.string(),
+    added: z.boolean(),
+    count: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal("mention.created"),
+    spaceId: z.string(),
+    roomId: z.string(),
+    roomName: z.string(),
+    messageId: z.string(),
+    seq: z.number().int().positive(),
+    authorName: z.string(),
+    excerpt: z.string(),
   }),
 ]);
 

@@ -12,6 +12,7 @@ import {
   createChatQueries,
   type ChatQueryDependencies,
 } from "@/features/chat/query-factory";
+import { emptyMessageDetails } from "@/features/chat/types";
 import { ActionError } from "@/lib/actions/result";
 import * as accessDal from "@/lib/dal/chat-access";
 import * as readDal from "@/lib/dal/chat-read";
@@ -91,6 +92,17 @@ describe("authenticated chat message pages", () => {
       Array.from({ length: 10 }, (_, i) => i + 1),
     );
     expect(first.hasMore).toBe(false);
+    expect(first.messages[0]).toEqual({
+      ...emptyMessageDetails(),
+      id: expect.any(String),
+      seq: 1,
+      authorId: actors.member.userId,
+      authorName: actors.member.name,
+      kind: "text",
+      body: "가상 메시지 1",
+      createdAt: chatNow.toISOString(),
+      clientId: "client-1",
+    });
     expect(first.messages[0]!.clientId).toBe("client-1");
     expect(
       first.messages.slice(1).every(({ clientId }) => clientId === null),
@@ -131,14 +143,12 @@ describe("authenticated chat message pages", () => {
   });
   it("shares the joined-at and read-cursor start with the initial channel view", async () => {
     await fill(3);
-    await database.db
-      .insert(chatRoomReads)
-      .values({
-        roomId: actors.roomId,
-        userId: actors.member.userId,
-        lastReadSeq: 2,
-        updatedAt: chatNow,
-      });
+    await database.db.insert(chatRoomReads).values({
+      roomId: actors.roomId,
+      userId: actors.member.userId,
+      lastReadSeq: 2,
+      updatedAt: chatNow,
+    });
     expect(
       await queries().getRoomMessagesPage(actors.roomId, { after: "0" }),
     ).toMatchObject({ lastReadSeq: 2, firstUnreadSeq: 3 });

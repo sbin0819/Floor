@@ -5,6 +5,7 @@ import type {
 
 export const noopRealtime: RealtimePublisher & RealtimeSubscriber = {
   async publish() {},
+  async publishMany() {},
   subscribe() {
     return () => {};
   },

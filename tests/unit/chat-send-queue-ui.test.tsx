@@ -23,6 +23,7 @@ import {
 } from "@/features/chat/components/message-state";
 import type { SendChatMessage } from "@/features/chat/send-queue";
 import type { ChannelView } from "@/features/chat/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 
 const mocks = vi.hoisted(() => ({
   connection: "disabled",
@@ -86,6 +87,7 @@ function createSend() {
   return vi.fn<SendChatMessage>().mockImplementation(async (input) => ({
     ok: true,
     data: {
+      ...emptyMessageDetails(),
       id: input.clientId,
       seq: 1,
       clientId: input.clientId,

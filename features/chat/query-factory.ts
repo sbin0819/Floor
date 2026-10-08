@@ -17,6 +17,7 @@ import {
 } from "@/lib/rate-limit/memory";
 import { messagePageQuerySchema } from "./schema";
 import type { ChannelView, ChatSpaceNav, RoomMessagesPage } from "./types";
+import { serializeChatMessage } from "@/lib/dal/chat-messages";
 
 const pageLimiter = createMemoryRateLimiter();
 
@@ -65,10 +66,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
       ]);
       if (!room) throw new ActionError("NOT_FOUND");
       return {
-        messages: page.messages.map((message) => ({
-          ...message,
-          createdAt: message.createdAt.toISOString(),
-        })),
+        messages: page.messages.map(serializeChatMessage),
         hasMore: page.hasMore,
         lastSeq: room.lastSeq,
         lastReadSeq: room.lastReadSeq,
@@ -134,10 +132,7 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           lastSeq: room.lastSeq,
         },
         user: { id: session.userId, name: session.name },
-        messages: messages.map((message) => ({
-          ...message,
-          createdAt: message.createdAt.toISOString(),
-        })),
+        messages: messages.map(serializeChatMessage),
         members,
         lastReadSeq: room.lastReadSeq,
         firstUnreadSeq: room.firstUnreadSeq,

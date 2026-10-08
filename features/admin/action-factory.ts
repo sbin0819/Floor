@@ -14,7 +14,7 @@ import type { RealtimePublisher } from "@/lib/realtime/types";
 export type AdminDependencies = Partial<ActionDependencies> & {
   database?: DalDatabase & TransactionDatabase;
   now?: () => Date;
-  publisher?: RealtimePublisher;
+  publisher?: Pick<RealtimePublisher, "publish">;
 };
 export function adminActionDependencies(dependencies: AdminDependencies) {
   return {

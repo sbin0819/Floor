@@ -6,10 +6,14 @@ import type {
 
 export function createMemoryRealtime(): RealtimePublisher & RealtimeSubscriber {
   const channels = new Map<string, Set<(event: RealtimeEvent) => void>>();
+  const publish = async (channel: string, event: RealtimeEvent) => {
+    for (const notify of [...(channels.get(channel) ?? [])]) notify(event);
+  };
 
   return {
-    async publish(channel, event) {
-      for (const notify of [...(channels.get(channel) ?? [])]) notify(event);
+    publish,
+    async publishMany(items) {
+      for (const { channel, event } of items) await publish(channel, event);
     },
     subscribe(channel, onEvent) {
       const listeners = channels.get(channel) ?? new Set();

@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 import type { ActionResult } from "@/lib/actions/result";
 import type { ChannelView, ChatMessage } from "@/features/chat/types";
+import { emptyMessageDetails } from "@/features/chat/types";
 import { ChannelScreen } from "@/features/chat/components/channel-screen";
 import { ChannelSkeleton } from "@/features/chat/components/channel-skeleton";
 import { MessageComposer } from "@/features/chat/components/message-composer";
@@ -52,6 +53,7 @@ vi.mock("@/components/realtime-provider", () => ({
 const now = "2026-10-08T03:00:00Z";
 function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
+    ...emptyMessageDetails(),
     id: "message",
     seq: 1,
     authorId: "me",
@@ -61,6 +63,18 @@ function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
     createdAt: "2026-10-08T00:12:00Z",
     clientId: null,
     ...overrides,
+  };
+}
+function created(
+  message: ChatMessage,
+): Extract<RealtimeEvent, { type: "message.created" }> {
+  return {
+    ...message,
+    type: "message.created",
+    roomId: "room",
+    editedAt: null,
+    deletedAt: null,
+    reactions: [],
   };
 }
 function view(overrides: Partial<ChannelView> = {}): ChannelView {
@@ -342,9 +356,7 @@ describe("optimistic sending and streamed updates", () => {
       body: submitted.body,
       clientId: submitted.clientId,
     });
-    act(() =>
-      realtime.event({ type: "message.created", roomId: "room", ...saved }),
-    );
+    act(() => realtime.event(created(saved)));
     await act(async () => {
       pending.resolve({ ok: true, data: saved });
     });
@@ -470,9 +482,7 @@ describe("optimistic sending and streamed updates", () => {
       lastReadSeq: null,
       firstUnreadSeq: 2,
     });
-    act(() =>
-      realtime.event({ type: "message.created", roomId: "room", ...third }),
-    );
+    act(() => realtime.event(created(third)));
     await waitFor(() =>
       expect(fetchRoomMessagesPage).toHaveBeenCalledWith(
         "room",
@@ -481,9 +491,7 @@ describe("optimistic sending and streamed updates", () => {
       ),
     );
     expect(realtime.refresh).not.toHaveBeenCalled();
-    act(() =>
-      realtime.event({ type: "message.created", roomId: "room", ...third }),
-    );
+    act(() => realtime.event(created(third)));
     result.update(view({ messages: [second, third] }));
     await waitFor(() => expect(screen.getByText("두 번째")).toBeVisible());
     expect(screen.getAllByText("세 번째")).toHaveLength(1);

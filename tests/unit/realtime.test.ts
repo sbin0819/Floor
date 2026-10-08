@@ -78,6 +78,12 @@ describe("memory realtime", () => {
       kind: "system",
       body: "예약이 변경되었어요.",
       createdAt: "2026-10-07T00:00:00Z",
+      replyTo: null,
+      mentions: [],
+      mentionsEveryone: false,
+      editedAt: null,
+      deletedAt: null,
+      reactions: [],
     },
   ])("preserves the payload of $type", async (event) => {
     const bus = createMemoryRealtime();
@@ -85,6 +91,31 @@ describe("memory realtime", () => {
     bus.subscribe(userChannel("a"), listener);
     await bus.publish(userChannel("a"), event);
     expect(listener).toHaveBeenCalledExactlyOnceWith(event);
+  });
+
+  it("publishes many in input order only to their intended subscribers", async () => {
+    const bus = createMemoryRealtime();
+    const delivered: string[] = [];
+    bus.subscribe("room:a", (event) => delivered.push(`a:${event.type}`));
+    bus.subscribe("user:b", (event) => delivered.push(`b:${event.type}`));
+    await bus.publishMany([
+      { channel: "room:a", event: booking },
+      {
+        channel: "user:b",
+        event: { type: "message.deleted", roomId: "a", id: "m", seq: 1 },
+      },
+      { channel: "missing", event: booking },
+      {
+        channel: "room:a",
+        event: { type: "space.status_changed", spaceId: "a" },
+      },
+    ]);
+    await bus.publishMany([]);
+    expect(delivered).toEqual([
+      "a:booking.changed",
+      "b:message.deleted",
+      "a:space.status_changed",
+    ]);
   });
 });
 
@@ -95,6 +126,12 @@ describe("noop realtime", () => {
     await expect(
       noopRealtime.publish(floorChannel("a"), booking),
     ).resolves.toBeUndefined();
+    await expect(
+      noopRealtime.publishMany([
+        { channel: floorChannel("a"), event: booking },
+      ]),
+    ).resolves.toBeUndefined();
+    await expect(noopRealtime.publishMany([])).resolves.toBeUndefined();
     expect(listener).not.toHaveBeenCalled();
     expect(() => {
       unsubscribe();

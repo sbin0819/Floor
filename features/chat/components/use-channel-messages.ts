@@ -82,6 +82,12 @@ export function useChannelMessages(
       body: event.body,
       createdAt: event.createdAt,
       clientId: event.authorId === userId ? event.clientId : null,
+      replyTo: event.replyTo,
+      mentions: event.mentions,
+      mentionsEveryone: event.mentionsEveryone,
+      editedAt: event.editedAt,
+      deletedAt: event.deletedAt,
+      reactions: event.reactions,
     };
     merge([message]);
     catchUp.receive(event.seq);

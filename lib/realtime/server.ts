@@ -16,10 +16,15 @@ export function createServerRealtimePublisher({
 }): RealtimePublisher {
   if (!key) return noopRealtime;
   let publisher: Promise<RealtimePublisher> | undefined;
+  const load = () =>
+    (publisher ??= createClient(key).then(createAblyPublisher));
   return {
     async publish(channel, event) {
-      publisher ??= createClient(key).then(createAblyPublisher);
-      await (await publisher).publish(channel, event);
+      await (await load()).publish(channel, event);
+    },
+    async publishMany(items) {
+      if (!items.length) return;
+      await (await load()).publishMany(items);
     },
   };
 }

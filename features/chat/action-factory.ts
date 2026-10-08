@@ -5,6 +5,8 @@ import {
 import { ActionError } from "@/lib/actions/result";
 import { canReadRoom, canWriteRoom } from "@/lib/dal/chat-access";
 import { advanceRoomRead } from "@/lib/dal/chat-reads";
+import { listChatMembers } from "@/lib/dal/chat-read";
+import { getChatMessage } from "@/lib/dal/chat-messages";
 import * as chatWrite from "@/lib/dal/chat-write";
 import {
   withTransaction,
@@ -15,11 +17,16 @@ import {
   createMemoryRateLimiter,
   type RateLimiter,
 } from "@/lib/rate-limit/memory";
-import { roomChannel, spaceChannel } from "@/lib/realtime/channels";
+import {
+  roomChannel,
+  spaceChannel,
+  userChannel,
+} from "@/lib/realtime/channels";
 import type { RealtimeEvent, RealtimePublisher } from "@/lib/realtime/types";
 import { getRealtimePublisher } from "@/lib/realtime/server";
 import { markRoomReadSchema, sendMessageSchema } from "./schema";
 import type { ChatMessage } from "./types";
+import { excerptOf, extractMentions } from "./message-text";
 
 const limiter = createMemoryRateLimiter();
 export type ChatActionDependencies = Partial<ActionDependencies> & {
@@ -87,9 +94,14 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
             input.roomId,
             dependencies.database,
           );
+          const parsed = extractMentions(input.body);
+          if (parsed.exceedsLimit) throw new ActionError("INVALID_INPUT");
           const now = dependencies.now?.() ?? new Date();
           const result = await withTransaction(async (transaction) => {
-            await chatWrite.lockMessageAuthor(session.userId, transaction);
+            await chatWrite.lockUsersForKeyShare(
+              [...new Set([session.userId, ...parsed.userIds])].sort(),
+              transaction,
+            );
             await chatWrite.lockRoomForMessage(input.roomId, transaction);
             const room = await requireWritable(
               session.userId,
@@ -113,14 +125,48 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                 },
                 transaction,
               );
+              const message = await getChatMessage(
+                existing.id,
+                input.roomId,
+                session.userId,
+                transaction,
+              );
+              if (!message) throw new ActionError("INTERNAL");
               return {
-                message: existing,
+                message,
                 inserted: false,
                 spaceId: room.spaceId,
+                roomName: room.name,
+                recipients: [] as string[],
+                names: new Map<string, string>(),
               };
             }
+            if (
+              input.replyToId &&
+              !(await getChatMessage(
+                input.replyToId,
+                input.roomId,
+                session.userId,
+                transaction,
+              ))
+            )
+              throw new ActionError("INVALID_INPUT");
+            const members = await listChatMembers(room.teamId, transaction);
+            const names = new Map(
+              members.map((member) => [member.id, member.name]),
+            );
+            const mentions = parsed.userIds.filter(
+              (id) => id !== session.userId && names.has(id),
+            );
+            const mentionsEveryone = parsed.everyone && room.role === "admin";
             const message = await chatWrite.insertChatMessage(
-              { ...input, authorId: session.userId, now },
+              { ...input, mentionsEveryone, authorId: session.userId, now },
+              transaction,
+            );
+            await chatWrite.insertMessageMentions(
+              message.id,
+              mentions,
+              now,
               transaction,
             );
             await advanceRoomRead(
@@ -132,18 +178,27 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
               },
               transaction,
             );
-            return { message, inserted: true, spaceId: room.spaceId };
+            const saved = await getChatMessage(
+              message.id,
+              input.roomId,
+              session.userId,
+              transaction,
+            );
+            if (!saved) throw new ActionError("INTERNAL");
+            return {
+              message: saved,
+              inserted: true,
+              spaceId: room.spaceId,
+              roomName: room.name,
+              names,
+              recipients: mentionsEveryone
+                ? members
+                    .filter((member) => member.id !== session.userId)
+                    .map((member) => member.id)
+                : mentions,
+            };
           }, dependencies.database);
-          const message: ChatMessage = {
-            id: result.message.id,
-            seq: result.message.seq,
-            authorId: result.message.authorId,
-            authorName: session.name,
-            kind: result.message.kind,
-            body: result.message.body,
-            clientId: result.message.clientId,
-            createdAt: result.message.createdAt.toISOString(),
-          };
+          const message = result.message;
           if (result.inserted) {
             const events: { channel: string; event: RealtimeEvent }[] = [
               {
@@ -152,6 +207,9 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                   type: "message.created",
                   roomId: input.roomId,
                   ...message,
+                  editedAt: null,
+                  deletedAt: null,
+                  reactions: [],
                 },
               },
               {
@@ -165,19 +223,29 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                 },
               },
             ];
-            await Promise.all(
-              events.map(async ({ channel, event }) => {
-                try {
-                  await (
-                    dependencies.publisher ?? getRealtimePublisher()
-                  ).publish(channel, event);
-                } catch {
-                  (dependencies.logError ?? console.error)(
-                    "Chat realtime publication failed.",
-                  );
-                }
-              }),
-            );
+            for (const recipient of result.recipients)
+              events.push({
+                channel: userChannel(recipient),
+                event: {
+                  type: "mention.created",
+                  spaceId: result.spaceId,
+                  roomId: input.roomId,
+                  roomName: result.roomName ?? "채널",
+                  messageId: message.id,
+                  seq: message.seq,
+                  authorName: session.name ?? "알 수 없는 사용자",
+                  excerpt: excerptOf(message.body, result.names),
+                },
+              });
+            try {
+              await (
+                dependencies.publisher ?? getRealtimePublisher()
+              ).publishMany(events);
+            } catch {
+              (dependencies.logError ?? console.error)(
+                "Chat realtime publication failed.",
+              );
+            }
           }
           return message;
         },

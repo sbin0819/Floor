@@ -1,4 +1,46 @@
-export type ChatMessage = {
+export const reactionEmojis = [
+  "thumbs_up",
+  "heart",
+  "joy",
+  "tada",
+  "open_mouth",
+  "cry",
+  "pray",
+  "check",
+] as const;
+export type ReactionEmoji = (typeof reactionEmojis)[number];
+export type ChatMention = { userId: string; name: string };
+export type ChatReply = {
+  id: string;
+  authorName: string | null;
+  excerpt: string;
+  deleted: boolean;
+};
+export type ChatReaction = {
+  emoji: ReactionEmoji;
+  count: number;
+  mine: boolean;
+  names: string[];
+};
+export type ChatMessageDetails = {
+  replyTo: ChatReply | null;
+  mentions: ChatMention[];
+  mentionsEveryone: boolean;
+  editedAt: string | null;
+  deletedAt: string | null;
+  reactions: ChatReaction[];
+};
+
+export const emptyMessageDetails = (): ChatMessageDetails => ({
+  replyTo: null,
+  mentions: [],
+  mentionsEveryone: false,
+  editedAt: null,
+  deletedAt: null,
+  reactions: [],
+});
+
+export type ChatMessage = ChatMessageDetails & {
   id: string;
   seq: number;
   authorId: string | null;

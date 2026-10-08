@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { emptyMessageDetails } from "@/features/chat/types";
 import {
   chatDate,
   formatChatDate,
@@ -14,6 +15,7 @@ import {
 const now = "2026-10-08T03:00:00Z";
 function message(overrides: Partial<DisplayMessage> = {}): DisplayMessage {
   return {
+    ...emptyMessageDetails(),
     id: "message",
     seq: 1,
     authorId: "me",
