@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -31,6 +31,10 @@ import { ChatMentions } from "./chat-mentions";
 import { DirectMessageList } from "./direct-message-list";
 import { MeetingList } from "./meeting-list";
 import { QuickSwitcher } from "./quick-switcher";
+import { CallSession } from "@/features/calls/components/call-provider";
+import { callNavigationTargets } from "@/features/calls/nav-targets";
+import { CallRinging } from "@/features/calls/components/call-ringing";
+import { CallingStatus } from "@/features/calls/components/calling-status";
 
 const spaceSchema = z.array(
   z.object({
@@ -175,6 +179,8 @@ export function LiveChatSidebar({ data }: { data: ChatNav }) {
   const nav = useNavSnapshot(data);
   return (
     <ChatSidebarNavigation
+      callsEnabled={nav.callsEnabled}
+      calls={nav.calls}
       spaces={nav.spaces}
       directMessages={nav.directMessages}
       meetings={nav.meetings}
@@ -186,11 +192,12 @@ export function LiveChatSidebarTitle({ data }: { data: ChatNav }) {
   return <ChatSidebarTitle spaces={useNavSnapshot(data).spaces} />;
 }
 export function LiveDirectMessages({ data }: { data: ChatNav }) {
-  return <DirectMessageList rows={useNavSnapshot(data).directMessages} />;
+  const nav = useNavSnapshot(data);
+  return <DirectMessageList rows={nav.directMessages} calls={nav.calls} />;
 }
 export function LiveMeetings({ data }: { data: ChatNav }) {
   const nav = useNavSnapshot(data);
-  return <MeetingList rows={nav.meetings} now={nav.now} />;
+  return <MeetingList rows={nav.meetings} now={nav.now} calls={nav.calls} />;
 }
 
 export function ChatNavSync({
@@ -226,6 +233,10 @@ export function ChatNavSync({
     refetchInterval: activity.active ? 60_000 : false,
     refetchIntervalInBackground: false,
   });
+  const callTargets = useMemo(
+    () => callNavigationTargets(query.data),
+    [query.data],
+  );
   const reauthorize = useRealtimeReauthorize();
   const scopeKey = query.data.spaces.map((space) => space.id).join(",");
   const previousScope = useRef(scopeKey);
@@ -284,6 +295,23 @@ export function ChatNavSync({
   }, [activity, refetch]);
   return (
     <>
+      <CallSession
+        userId={userId}
+        callsEnabled={query.data.callsEnabled}
+        myCall={query.data.myCall}
+        targets={callTargets}
+      />
+      {query.data.callsEnabled && (
+        <>
+          <CallRinging
+            userId={userId}
+            enabled
+            myStatus={query.data.myStatus}
+            blockedUserIds={query.data.blockedUserIds}
+          />
+          <CallingStatus userId={userId} />
+        </>
+      )}
       <QuickSwitcher userId={userId} />
       <StatusSync status={query.data.myStatus} />
       <ChatMentions

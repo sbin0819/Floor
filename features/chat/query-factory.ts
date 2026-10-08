@@ -217,6 +217,8 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
       const { userId, ...booking } = room.booking;
       const isBooker = userId === session.userId;
       return {
+        canCallAtStart:
+          enabled() && joinableCall(room, new Date(booking.start)),
         call: room.call
           ? {
               ...room.call,

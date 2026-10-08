@@ -142,6 +142,7 @@ describe("meeting channel views and navigation", () => {
     expect(data).toEqual({
       call: null,
       canCall: false,
+      canCallAtStart: false,
       room: {
         id: room.id,
         lastSeq: 1,

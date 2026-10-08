@@ -10,6 +10,7 @@ export function meetingView(overrides: Partial<MeetingView> = {}): MeetingView {
   return {
     call: null,
     canCall: false,
+    canCallAtStart: false,
     room: {
       id: "a1111111-1111-4111-8111-111111111111",
       lastSeq: 1,

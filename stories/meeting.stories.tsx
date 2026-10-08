@@ -14,6 +14,7 @@ import { systemMessageText } from "@/features/chat/system-messages";
 const data: MeetingView = {
   call: null,
   canCall: false,
+  canCallAtStart: false,
   room: { id: "story-meeting", lastSeq: 2, muted: false, unreadMentions: 0 },
   booking: {
     id: "story-booking",

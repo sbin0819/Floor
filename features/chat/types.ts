@@ -110,6 +110,7 @@ export type MeetingNav = {
   muted: boolean;
 };
 export type MeetingView = {
+  canCallAtStart: boolean;
   call: import("@/features/calls/types").CallView | null;
   canCall: boolean;
   room: {

@@ -1,6 +1,12 @@
 "use client";
 
-import { useId, useState, type ReactNode, type RefObject } from "react";
+import {
+  useId,
+  useMemo,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import Link from "next/link";
 import { CalendarDays, ChevronDown, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +22,8 @@ import {
   meetingTime,
 } from "../meeting-format";
 import { ChatMuteButton } from "./chat-mute-button";
+import { MeetingCallButton } from "@/features/calls/components/meeting-call-button";
+import type { CallTarget } from "@/features/calls/client/types";
 
 export function MeetingHeader({
   data,
@@ -83,6 +91,16 @@ export function MeetingBookingCard({
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const { booking, members } = data;
+  const target = useMemo<CallTarget>(
+    () => ({
+      roomId: data.room.id,
+      roomKind: "meeting",
+      name: meetingName(booking),
+      href: `/m/${booking.id}`,
+      participants: data.call?.participants ?? [],
+    }),
+    [data.room.id, booking, data.call],
+  );
   return (
     <section
       aria-label="예약 정보"
@@ -146,6 +164,17 @@ export function MeetingBookingCard({
             )}
           </div>
         </div>
+        {data.canCallAtStart && (
+          <MeetingCallButton
+            target={target}
+            start={booking.start}
+            end={booking.end}
+            status={booking.status}
+            now={data.now}
+            enabled={data.canCallAtStart}
+            eligible={data.canCallAtStart}
+          />
+        )}
         {data.canEditBooking && (
           <Button asChild variant="outline">
             <Link href={`/bookings/${booking.id}/edit`}>예약 바꾸기</Link>

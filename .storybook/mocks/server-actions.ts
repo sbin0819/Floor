@@ -77,3 +77,6 @@ export const sendTeamInvite = readOnlyAction;
 export const revokeTeamInvite = readOnlyAction;
 export const acceptTeamInvite = readOnlyAction;
 export const declineTeamInvite = readOnlyAction;
+
+export const joinCall = readOnlyAction;
+export const declineCall = readOnlyAction;
