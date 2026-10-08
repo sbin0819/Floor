@@ -23,6 +23,8 @@ export default defineConfig({
       LIVEKIT_URL: "",
       LIVEKIT_API_KEY: "",
       LIVEKIT_API_SECRET: "",
+      FILE_STORAGE: "disabled",
+      FILE_STORAGE_DIR: "",
     },
   },
 });

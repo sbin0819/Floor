@@ -158,6 +158,9 @@ export function useMessageMutations({
       try {
         const result = await deletions.mutateAsync({ messageId });
         if (result.ok) {
+          void client.invalidateQueries({
+            queryKey: ["chat", "room", roomId, "files"],
+          });
           update((rows) =>
             applyMessageEvent(
               rows,

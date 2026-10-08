@@ -13,7 +13,7 @@ import {
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   defaultModerationActions,
@@ -40,6 +40,7 @@ import type { RoomMessageSource } from "../room-message-source";
 import { excerptOf, summarizeAttachments } from "../message-text";
 import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
 import { RoomMembersPanel } from "./room-members-panel";
+import { RoomFilesPanel } from "./room-files-panel";
 import { MessageComposer } from "./message-composer";
 import { useRoomUploads, useUploadOnline } from "./use-room-uploads";
 import { UploadDropArea } from "./upload-drop-area";
@@ -465,6 +466,34 @@ function ChatRoomScreen({
   const wide = useWideMembers();
   const membersId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
+  const [filesState, setFilesState] = useState({
+    roomId: data.room.id,
+    open: false,
+  });
+  const filesOpen = filesState.roomId === data.room.id && filesState.open;
+  const filesId = useId();
+  const filesTrigger = useRef<HTMLButtonElement>(null);
+  const setFilesOpen = (open: boolean) => {
+    setFilesState({ roomId: data.room.id, open });
+    if (open) setMembersOpen(false);
+  };
+  const toggleMembers = () => {
+    setFilesOpen(false);
+    setMembersOpen((open) => !open);
+  };
+  const fileAction = (
+    <Button
+      ref={filesTrigger}
+      variant="ghost"
+      aria-label="파일"
+      aria-expanded={filesOpen}
+      aria-controls={filesId}
+      onClick={() => setFilesOpen(!filesOpen)}
+    >
+      <Paperclip aria-hidden="true" />
+      <span className="hidden sm:inline">파일</span>
+    </Button>
+  );
   const memberPanel = meeting ? (
     <MeetingMembers members={meeting.data.members} />
   ) : (
@@ -523,7 +552,8 @@ function ChatRoomScreen({
             trigger={trigger}
             membersOpen={membersOpen}
             membersId={membersId}
-            onToggleMembers={() => setMembersOpen((open) => !open)}
+            onToggleMembers={toggleMembers}
+            fileAction={fileAction}
           />
         ) : (
           <ChatRoomHeader
@@ -533,7 +563,8 @@ function ChatRoomScreen({
             trigger={trigger}
             membersOpen={membersOpen}
             membersId={membersId}
-            onToggleMembers={() => setMembersOpen((open) => !open)}
+            onToggleMembers={toggleMembers}
+            fileAction={fileAction}
             groupMenu={groupMenu}
             groupDialogOpen={groupDialog !== null}
             onRename={() => {
@@ -727,6 +758,25 @@ function ChatRoomScreen({
               {memberPanel}
             </aside>
           )}
+          <RoomFilesPanel
+            roomId={data.room.id}
+            filesEnabled={metadata.filesEnabled}
+            wide={wide && !compact}
+            open={filesOpen}
+            id={filesId}
+            trigger={filesTrigger}
+            onOpenChange={setFilesOpen}
+            onJump={(_seq, messageId) => {
+              const url = new URL(window.location.href);
+              url.searchParams.set("message", messageId);
+              window.history.pushState(
+                null,
+                "",
+                `${url.pathname}${url.search}${url.hash}`,
+              );
+              requestAnimationFrame(() => returnMessageFocus(messageId));
+            }}
+          />
         </div>
         <MessageDeleteDialog
           key={`${data.room.id}:${deleting?.id ?? "none"}`}

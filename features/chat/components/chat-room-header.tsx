@@ -1,5 +1,5 @@
 "use client";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Hash, MoreHorizontal, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +49,7 @@ export function ChatRoomHeader({
   groupMenu,
   groupDialogOpen,
   onRename,
+  fileAction,
 }: {
   data: RoomMessageSource;
   presentation: ChatRoomPresentation;
@@ -60,6 +61,7 @@ export function ChatRoomHeader({
   groupMenu: RefObject<HTMLButtonElement | null>;
   groupDialogOpen: boolean;
   onRename: () => void;
+  fileAction?: ReactNode;
 }) {
   const direct = presentation.kind === "dm" ? presentation : null;
   const group = presentation.kind === "group_dm" ? presentation : null;
@@ -117,6 +119,7 @@ export function ChatRoomHeader({
         </>
       )}
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {fileAction}
         <ChatMuteButton
           id={data.room.id}
           name={roomName}

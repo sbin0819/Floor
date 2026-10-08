@@ -160,6 +160,69 @@ afterEach(() => {
 });
 
 describe("channel message reconciliation integration", () => {
+  it("refreshes cached file filters on attachment creation, deletion and reconnect without adding message GETs", async () => {
+    const { client } = setup();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    emit({
+      ...message(2),
+      type: "message.created",
+      roomId: "room-a",
+      editedAt: null,
+      deletedAt: null,
+      reactions: [],
+    });
+    expect(invalidate).not.toHaveBeenCalledWith({
+      queryKey: ["chat", "room", "room-a", "files"],
+    });
+    emit({
+      ...message(3, {
+        attachments: [
+          {
+            id: "file-a",
+            name: "설명.txt",
+            size: 100,
+            kind: "file",
+            width: null,
+            height: null,
+          },
+        ],
+      }),
+      type: "message.created",
+      roomId: "room-a",
+      editedAt: null,
+      deletedAt: null,
+      reactions: [],
+    });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["chat", "room", "room-a", "files"],
+    });
+    invalidate.mockClear();
+    emit({
+      type: "message.deleted",
+      roomId: "room-a",
+      id: "message-3",
+      seq: 3,
+    });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["chat", "room", "room-a", "files"],
+    });
+    expect(requestMessagePage).not.toHaveBeenCalled();
+    invalidate.mockClear();
+    lifecycle({
+      type: "connection",
+      previous: "connected",
+      current: "disconnected",
+    });
+    lifecycle({
+      type: "connection",
+      previous: "disconnected",
+      current: "connected",
+    });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["chat", "room", "room-a", "files"],
+    });
+    await tick(250);
+  });
   it("uses a reaction event as a page signal, not an authoritative count or identity list", async () => {
     const { read, result } = setup();
     const reaction: RealtimeEvent = {

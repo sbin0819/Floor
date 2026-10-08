@@ -33,6 +33,7 @@ export function MeetingHeader({
   membersOpen,
   membersId,
   onToggleMembers,
+  fileAction,
 }: {
   data: MeetingView;
   compact: boolean;
@@ -41,6 +42,7 @@ export function MeetingHeader({
   membersOpen: boolean;
   membersId: string;
   onToggleMembers: () => void;
+  fileAction?: ReactNode;
 }) {
   const name = meetingName(data.booking);
   const Heading = compact ? "h2" : "h1";
@@ -57,6 +59,7 @@ export function MeetingHeader({
         {meetingPhaseLabels[meetingPhase(data.booking, data.now)]}
       </Badge>
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {fileAction}
         {compact ? (
           <span className="text-xs text-muted-foreground tabular-nums">
             멤버 {data.members.length}명

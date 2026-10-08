@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+test("로그인하지 않은 파일 내려받기는 401이에요", async ({ request }) => {
+  const response = await request.get(
+    "/api/files/48db9ea0-4f45-4168-a2b1-e44a26c59791",
+  );
+  expect(response.status()).toBe(401);
+  expect(response.headers()["cache-control"]).toBe("private, no-cache");
+});
+
 test("서명 없는 통화 웹훅과 비로그인 아직 있음 요청을 거절해요", async ({
   request,
 }) => {

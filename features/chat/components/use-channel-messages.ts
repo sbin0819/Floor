@@ -50,9 +50,16 @@ export function useChannelMessages(
       else if (event.current === "connected" && wasDisconnected.current) {
         wasDisconnected.current = false;
         sync.revalidate();
+        void client.invalidateQueries({
+          queryKey: ["chat", "room", roomId, "files"],
+        });
       }
-    } else if (event.channel === roomChannel(roomId) && !event.resumed)
+    } else if (event.channel === roomChannel(roomId) && !event.resumed) {
       sync.revalidate();
+      void client.invalidateQueries({
+        queryKey: ["chat", "room", roomId, "files"],
+      });
+    }
   });
   const catchUp = useChannelCatchUp(data, onPageRead);
   const sending = useChatSendQueue(data, send, directKind);
@@ -151,6 +158,10 @@ export function useChannelMessages(
   useRealtimeChannel(roomChannel(roomId), (event) => {
     if (event.type === "message.updated" || event.type === "message.deleted") {
       if (event.roomId !== roomId) return;
+      if (event.type === "message.deleted")
+        void client.invalidateQueries({
+          queryKey: ["chat", "room", roomId, "files"],
+        });
       sync.receiveChange(
         event,
         new Map(data.members.map((member) => [member.id, member.name])),
@@ -166,6 +177,10 @@ export function useChannelMessages(
       return;
     }
     if (event.type !== "message.created" || event.roomId !== roomId) return;
+    if (event.attachments.length)
+      void client.invalidateQueries({
+        queryKey: ["chat", "room", roomId, "files"],
+      });
     const current =
       client.getQueryData<DisplayMessage[]>(roomMessagesKey(roomId)) ?? [];
     // 다른 사람의 전송 ID는 내 임시 메시지와 합치는 데 사용하지 않는다.
