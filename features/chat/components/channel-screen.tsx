@@ -71,6 +71,15 @@ import {
   useChannelMessages,
   type SendChatMessage,
 } from "./use-channel-messages";
+import { RoomCallBoundary } from "@/features/calls/components/room-call-area";
+import type { CallTarget } from "@/features/calls/client/types";
+import type { CallView } from "@/features/calls/types";
+
+type RoomCallContext = {
+  target: CallTarget;
+  initialCall: CallView | null;
+  canCall: boolean;
+};
 
 const wideServerSnapshot = () => true;
 function useWideMembers() {
@@ -99,9 +108,20 @@ export function ChannelScreen({
   data: ChannelView;
   send?: SendChatMessage;
 }) {
+  const target = useMemo<CallTarget>(
+    () => ({
+      roomId: data.room.id,
+      roomKind: data.room.kind,
+      name: data.room.name,
+      href: `/s/${data.space.id}/${data.room.id}`,
+      participants: data.call?.participants ?? [],
+    }),
+    [data.room.id, data.room.kind, data.room.name, data.space.id, data.call],
+  );
   return (
     <ChatRoomScreen
       data={data}
+      callContext={{ target, initialCall: data.call, canCall: data.canCall }}
       send={send}
       presentation={{
         kind: "channel",
@@ -122,6 +142,23 @@ export function DirectMessageScreen({
   send?: SendChatMessage;
   contacts?: Promise<MessageContact[]>;
 }) {
+  const target = useMemo<CallTarget>(
+    () => ({
+      roomId: data.room.id,
+      roomKind: data.kind,
+      name: data.kind === "dm" ? data.other.name : data.displayName,
+      href: `/dm/${data.room.id}`,
+      participants:
+        data.call?.participants ??
+        (data.kind === "dm"
+          ? [
+              { userId: data.user.id, name: data.user.name },
+              { userId: data.other.userId, name: data.other.name },
+            ]
+          : []),
+    }),
+    [data],
+  );
   const source = useMemo(
     () =>
       data.kind === "group_dm"
@@ -140,6 +177,7 @@ export function DirectMessageScreen({
   return (
     <ChatRoomScreen
       data={source}
+      callContext={{ target, initialCall: data.call, canCall: data.canCall }}
       send={send}
       presentation={
         data.kind === "group_dm"
@@ -173,6 +211,16 @@ export function MeetingScreen({
   variant?: "page" | "sheet";
   actions?: ReactNode;
 }) {
+  const target = useMemo<CallTarget>(
+    () => ({
+      roomId: data.room.id,
+      roomKind: "meeting",
+      name: meetingName(data.booking),
+      href: `/m/${data.booking.id}`,
+      participants: data.call?.participants ?? [],
+    }),
+    [data.room.id, data.booking, data.call],
+  );
   const source = useMemo(
     () => ({
       ...data,
@@ -188,6 +236,7 @@ export function MeetingScreen({
   return (
     <ChatRoomScreen
       data={source}
+      callContext={{ target, initialCall: data.call, canCall: data.canCall }}
       send={send}
       presentation={{ kind: "meeting", data, variant, actions }}
     />
@@ -198,9 +247,11 @@ function ChatRoomScreen({
   data,
   send,
   presentation,
+  callContext,
 }: {
   data: RoomMessageSource;
   send?: SendChatMessage;
+  callContext?: RoomCallContext;
   presentation:
     | ChatRoomPresentation
     | {
@@ -435,12 +486,12 @@ function ChatRoomScreen({
         </Button>
       </section>
     );
-  return (
+  const content = (
     <section
       ref={channelRef}
       data-chat-screen={compact ? undefined : ""}
       className={
-        compact
+        compact || callContext
           ? "flex h-full min-h-0 flex-col bg-background"
           : "flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col bg-background"
       }
@@ -721,6 +772,17 @@ function ChatRoomScreen({
         </Sheet>
       )}
     </section>
+  );
+  return callContext ? (
+    <RoomCallBoundary
+      key={callContext.target.roomId}
+      {...callContext}
+      compact={compact}
+    >
+      {content}
+    </RoomCallBoundary>
+  ) : (
+    content
   );
 }
 

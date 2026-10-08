@@ -176,7 +176,11 @@ export function AppShellFrame({
             </div>
             <div className="shrink-0">{notifications}</div>
           </header>
-          <div id="content" tabIndex={-1} className="scroll-mt-14">
+          <div
+            id="content"
+            tabIndex={-1}
+            className="scroll-mt-14 [&:has([data-chat-screen])]:max-md:pb-0 [body:has([data-mobile-call-panel])_&]:max-md:pb-[calc(8rem+env(safe-area-inset-bottom))]"
+          >
             {children}
           </div>
         </div>

@@ -356,7 +356,8 @@ describe("chat channel presentation", () => {
   it("shows only real channel fields and a team member panel without online status", () => {
     const { container } = setup();
     expect(screen.getByRole("heading", { name: "일반" })).toBeVisible();
-    expect(container.querySelector("[data-chat-screen]")).toHaveClass(
+    expect(container.querySelector("[data-chat-screen]")).toHaveClass("h-full");
+    expect(container.querySelector("[data-call-room]")).toHaveClass(
       "h-[calc(100dvh-3.5rem)]",
     );
     expect(screen.getByRole("region", { name: "일반 메시지" })).toHaveAttribute(

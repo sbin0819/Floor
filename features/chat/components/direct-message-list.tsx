@@ -7,13 +7,16 @@ import { cn } from "cn";
 import type { DirectMessageNav } from "../types";
 import { LinkPending } from "@/components/link-pending";
 import { groupDisplayName } from "../group-name";
+import { CallIndicator } from "@/features/calls/components/call-indicator";
 
 export function DirectMessageList({
   rows,
   limit = 50,
+  calls = [],
 }: {
   rows: DirectMessageNav[];
   limit?: number;
+  calls?: { roomId: string; participantCount: number }[];
 }) {
   const pathname = usePathname();
   return (
@@ -42,12 +45,16 @@ export function DirectMessageList({
                 : room.other.name;
             const count = room.muted ? room.unreadMentions : room.unreadCount;
             const selected = pathname === `/dm/${room.roomId}`;
+            const call = calls.find(
+              (call) =>
+                call.roomId === room.roomId && call.participantCount > 0,
+            );
             return (
               <li key={room.roomId}>
                 <Link
                   href={`/dm/${room.roomId}`}
                   aria-current={selected ? "page" : undefined}
-                  aria-label={`${name}${group ? `, ${group.memberCount}명` : ""}${count > 0 ? `, 읽지 않은 메시지 ${count}개` : ""}`}
+                  aria-label={`${name}${group ? `, ${group.memberCount}명` : ""}${count > 0 ? `, 읽지 않은 메시지 ${count}개` : ""}${call ? `, 통화 중, ${call.participantCount}명` : ""}`}
                   className={cn(
                     "relative flex min-h-11 items-center gap-2 rounded-sm px-3 text-sm hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring",
                     selected && "bg-sidebar-accent",
@@ -86,6 +93,7 @@ export function DirectMessageList({
                       </span>
                     )}
                   </span>
+                  <CallIndicator count={call?.participantCount} />
                   {count > 0 && (
                     <span
                       aria-hidden="true"

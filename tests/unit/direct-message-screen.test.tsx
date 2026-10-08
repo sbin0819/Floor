@@ -263,7 +263,8 @@ describe("shared direct message screen", () => {
     expect(
       screen.queryByRole("complementary", { name: "채널 멤버" }),
     ).not.toBeInTheDocument();
-    expect(container.querySelector("[data-chat-screen]")).toHaveClass(
+    expect(container.querySelector("[data-chat-screen]")).toHaveClass("h-full");
+    expect(container.querySelector("[data-call-room]")).toHaveClass(
       "h-[calc(100dvh-3.5rem)]",
     );
     expect(

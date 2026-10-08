@@ -31,6 +31,14 @@ export function quickSwitchItems(
         href: `/s/${space.id}/${room.id}`,
         unread: room.unread && !room.muted && !space.muted,
       })),
+      ...space.voiceChannels.map((room) => ({
+        id: room.id,
+        kind: "room" as const,
+        label: `🔊 ${room.name} · ${space.name}`,
+        search: normalizeQuickSearch(`${room.name} ${space.name}`),
+        href: `/s/${space.id}/${room.id}`,
+        unread: false,
+      })),
       {
         id: space.id,
         kind: "space" as const,

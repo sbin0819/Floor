@@ -19,6 +19,8 @@ import {
 } from "@/components/chat-shell-navigation";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { CallProvider } from "@/features/calls/components/call-provider";
+import { CallConnectionPanel } from "@/features/calls/components/call-connection-panel";
 
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
@@ -52,12 +54,23 @@ describe("member shell streaming", () => {
   function frame() {
     const shell = AppShell({ children: <main>페이지 내용</main> });
     expect(shell.type).toBe(RealtimeProvider);
-    const [session, body] = shell.props.children;
+    const calls = shell.props.children;
+    expect(calls.type).toBe(CallProvider);
+    const [session, body, mobilePanel] = calls.props.children;
     expect(session.type).toBe(Suspense);
     expect(session.props.fallback).toBeNull();
     expect(session.props.children.type).toBe(ShellRealtimeSession);
     expect(body.type).toBe(AppShellFrame);
+    expect(mobilePanel.type).toBe(CallConnectionPanel);
+    expect(mobilePanel.props.mobile).toBe(true);
     return body;
+  }
+
+  function boundaryFor(shell: ReturnType<typeof frame>, slot: string) {
+    if (slot !== "accountCard") return shell.props[slot];
+    const [panel, boundary] = shell.props.accountCard.props.children;
+    expect(panel.type).toBe(CallConnectionPanel);
+    return boundary;
   }
 
   it.each([
@@ -71,7 +84,7 @@ describe("member shell streaming", () => {
     "renders the %s fallback synchronously without reading session or data",
     (slot) => {
       const shell = frame();
-      const boundary = shell.props[slot];
+      const boundary = boundaryFor(shell, slot);
       if (!isValidElement<SuspenseProps>(boundary))
         throw new Error("Missing boundary");
       expect(boundary.type).toBe(Suspense);
@@ -176,7 +189,7 @@ describe("member shell streaming", () => {
       ["accountAvatar", "size-11"],
       ["notifications", "size-11"],
     ] as const) {
-      const { container } = render(shell.props[slot].props.fallback);
+      const { container } = render(boundaryFor(shell, slot).props.fallback);
       expect(container.firstElementChild).toHaveClass(expectedClass);
       cleanup();
     }

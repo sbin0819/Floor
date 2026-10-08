@@ -21,6 +21,8 @@ import { getSession } from "@/lib/auth/session";
 import { getNotificationSummary } from "@/features/notifications/queries";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { ChatQueueConnection } from "@/features/chat/components/use-chat-send-queue";
+import { CallProvider } from "@/features/calls/components/call-provider";
+import { CallConnectionPanel } from "@/features/calls/components/call-connection-panel";
 
 export async function HeaderNotifications() {
   if (!(await getSession())) return null;
@@ -58,50 +60,56 @@ export function MemberNavPlaceholder() {
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <RealtimeProvider>
-      <Suspense fallback={null}>
-        <ShellRealtimeSession />
-      </Suspense>
-      <AppShellFrame
-        rail={
-          <Suspense fallback={<ChatRailPlaceholder />}>
-            <ChatRailSlot />
-          </Suspense>
-        }
-        sidebarTitle={
-          <Suspense fallback={<ChatSidebarTitlePlaceholder />}>
-            <ChatSidebarTitleSlot />
-          </Suspense>
-        }
-        menu={
-          <Suspense fallback={<MemberNavPlaceholder />}>
-            <ChatSidebarSlot />
-          </Suspense>
-        }
-        accountCard={
-          <Suspense fallback={<AccountMenuPlaceholder variant="card" />}>
-            <HeaderAccount variant="card" />
-          </Suspense>
-        }
-        accountAvatar={
-          <Suspense fallback={<AccountMenuPlaceholder variant="avatar" />}>
-            <HeaderAccount variant="avatar" />
-          </Suspense>
-        }
-        notifications={
-          <Suspense fallback={<NotificationBellPlaceholder />}>
-            <HeaderNotifications />
-          </Suspense>
-        }
-      >
-        {children}
-      </AppShellFrame>
-      <Suspense fallback={null}>
-        <ChatNavSyncSlot />
-      </Suspense>
-      <ChatQueueConnection />
-      <Suspense fallback={null}>
-        <ShellPeopleSync />
-      </Suspense>
+      <CallProvider>
+        <Suspense fallback={null}>
+          <ShellRealtimeSession />
+        </Suspense>
+        <AppShellFrame
+          rail={
+            <Suspense fallback={<ChatRailPlaceholder />}>
+              <ChatRailSlot />
+            </Suspense>
+          }
+          sidebarTitle={
+            <Suspense fallback={<ChatSidebarTitlePlaceholder />}>
+              <ChatSidebarTitleSlot />
+            </Suspense>
+          }
+          menu={
+            <Suspense fallback={<MemberNavPlaceholder />}>
+              <ChatSidebarSlot />
+            </Suspense>
+          }
+          accountCard={
+            <>
+              <CallConnectionPanel />
+              <Suspense fallback={<AccountMenuPlaceholder variant="card" />}>
+                <HeaderAccount variant="card" />
+              </Suspense>
+            </>
+          }
+          accountAvatar={
+            <Suspense fallback={<AccountMenuPlaceholder variant="avatar" />}>
+              <HeaderAccount variant="avatar" />
+            </Suspense>
+          }
+          notifications={
+            <Suspense fallback={<NotificationBellPlaceholder />}>
+              <HeaderNotifications />
+            </Suspense>
+          }
+        >
+          {children}
+        </AppShellFrame>
+        <CallConnectionPanel mobile />
+        <Suspense fallback={null}>
+          <ChatNavSyncSlot />
+        </Suspense>
+        <ChatQueueConnection />
+        <Suspense fallback={null}>
+          <ShellPeopleSync />
+        </Suspense>
+      </CallProvider>
     </RealtimeProvider>
   );
 }

@@ -20,6 +20,8 @@ import { SpaceMenu } from "@/features/chat/components/space-menu";
 import { spaceColorClasses } from "@/features/chat/components/space-colors";
 import { ChannelDialog } from "@/features/chat/components/channel-dialog";
 import { QuickSwitchButton } from "@/features/chat/components/quick-switcher";
+import { VoiceChannelList } from "@/features/calls/components/voice-channel-list";
+import { CallIndicator } from "@/features/calls/components/call-indicator";
 import {
   shouldInterceptNavigation,
   useRouterOptimisticNavigation,
@@ -172,11 +174,15 @@ export function ChatSidebarNavigation({
   directMessages = [],
   meetings = [],
   now,
+  callsEnabled = false,
+  calls = [],
 }: {
   spaces: ChatSpaceNav[];
   directMessages?: DirectMessageNav[];
   meetings?: MeetingNav[];
   now?: string;
+  callsEnabled?: boolean;
+  calls?: { roomId: string; participantCount: number }[];
 }) {
   const { spaceId, roomId } = chatLocation(usePathname());
   const navigation = useRouterOptimisticNavigation(roomId);
@@ -186,8 +192,8 @@ export function ChatSidebarNavigation({
       <div className="space-y-6">
         <QuickSwitchButton className="hidden xl:flex" />
         <MemberNav />
-        {now && <MeetingList rows={meetings} now={now} />}
-        <DirectMessageList rows={directMessages} limit={10} />
+        {now && <MeetingList rows={meetings} now={now} calls={calls} />}
+        <DirectMessageList rows={directMessages} limit={10} calls={calls} />
       </div>
     );
   return (
@@ -202,12 +208,15 @@ export function ChatSidebarNavigation({
         {space.channels.map((channel) => {
           const href = `/s/${space.id}/${channel.id}`;
           const selected = navigation.value === channel.id;
+          const call = calls.find(
+            (call) => call.roomId === channel.id && call.participantCount > 0,
+          );
           return (
             <div key={channel.id} className="group flex items-center">
               <Link
                 href={href}
                 aria-current={selected ? "page" : undefined}
-                aria-label={`${channel.name}${channel.unread && !channel.muted && !space.muted ? ", 안 읽은 메시지 있음" : ""}${channel.unreadMentions > 0 ? `, 멘션 ${channel.unreadMentions}개` : ""}`}
+                aria-label={`${channel.name}${channel.unread && !channel.muted && !space.muted ? ", 안 읽은 메시지 있음" : ""}${channel.unreadMentions > 0 ? `, 멘션 ${channel.unreadMentions}개` : ""}${call ? `, 통화 중, ${call.participantCount}명` : ""}`}
                 onClick={(event) => {
                   if (!shouldInterceptNavigation(event)) return;
                   event.preventDefault();
@@ -228,6 +237,7 @@ export function ChatSidebarNavigation({
                 <LinkPending />
                 <Hash aria-hidden="true" className="relative size-5 shrink-0" />
                 <span className="relative truncate">{channel.name}</span>
+                <CallIndicator count={call?.participantCount} />
                 {channel.unreadMentions > 0 && (
                   <span
                     aria-hidden="true"
@@ -255,6 +265,13 @@ export function ChatSidebarNavigation({
         <p className="px-3 text-sm text-muted-foreground">
           아직 열린 채널이 없어요
         </p>
+      )}
+      {space.voiceChannels.length > 0 && (
+        <VoiceChannelList
+          space={space}
+          enabled={callsEnabled}
+          selected={roomId}
+        />
       )}
     </nav>
   );

@@ -9,13 +9,16 @@ import { Button } from "@/components/ui/button";
 import { LinkPending } from "@/components/link-pending";
 import type { MeetingNav } from "../types";
 import { meetingName, meetingStartLabel } from "../meeting-format";
+import { CallIndicator } from "@/features/calls/components/call-indicator";
 
 export function MeetingList({
   rows,
   now,
+  calls = [],
 }: {
   rows: MeetingNav[];
   now: string;
+  calls?: { roomId: string; participantCount: number }[];
 }) {
   const pathname = usePathname();
   const [pastOpen, setPastOpen] = useState(false);
@@ -26,6 +29,9 @@ export function MeetingList({
       <ul className="space-y-1">
         {items.map((row) => {
           const name = meetingName(row);
+          const call = calls.find(
+            (call) => call.roomId === row.roomId && call.participantCount > 0,
+          );
           return (
             <li key={row.roomId}>
               <Link
@@ -33,7 +39,7 @@ export function MeetingList({
                 aria-current={
                   pathname === `/m/${row.bookingId}` ? "page" : undefined
                 }
-                aria-label={`${name}, ${meetingStartLabel(row.start, row.timezone, now)}${row.phase === "ongoing" ? ", 진행 중" : ""}${row.unread && !row.muted ? ", 안 읽은 메시지 있음" : ""}${row.unreadMentions ? `, 멘션 ${row.unreadMentions}개` : ""}`}
+                aria-label={`${name}, ${meetingStartLabel(row.start, row.timezone, now)}${row.phase === "ongoing" ? ", 진행 중" : ""}${row.unread && !row.muted ? ", 안 읽은 메시지 있음" : ""}${row.unreadMentions ? `, 멘션 ${row.unreadMentions}개` : ""}${call ? `, 통화 중, ${call.participantCount}명` : ""}`}
                 className={cn(
                   "relative flex min-h-11 items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring",
                   pathname === `/m/${row.bookingId}` && "bg-sidebar-accent",
@@ -53,6 +59,7 @@ export function MeetingList({
                     {row.phase === "ongoing" && " · 진행 중"}
                   </span>
                 </span>
+                <CallIndicator count={call?.participantCount} />
                 {row.unreadMentions > 0 && (
                   <span
                     aria-hidden="true"
