@@ -18,6 +18,7 @@ import type { Session } from "@/lib/auth/types";
 import type { LiveKitServer } from "@/lib/calls/types";
 import { canStayInCall } from "@/lib/dal/call-access";
 import * as callWrites from "@/lib/dal/call-write";
+import * as chatAccess from "@/lib/dal/chat-access";
 import * as chatWrites from "@/lib/dal/chat-write";
 import * as schema from "@/lib/db/schema";
 import {
@@ -551,6 +552,33 @@ describe("call actions and participant lifecycle", () => {
     expect(livekit.issueToken).not.toHaveBeenCalled();
     expect(events).toEqual([]);
   });
+  it.each(["text", "voice"] as const)(
+    "rechecks a deleted space after acquiring its admission lock for %s",
+    async (kind) => {
+      const roomId = kind === "voice" ? await voice() : actors.roomId;
+      const original = chatAccess.lockMessageSpace;
+      const locked = vi
+        .spyOn(chatAccess, "lockMessageSpace")
+        .mockImplementation(async (spaceId, tx) => {
+          // 첫 권한 조회 뒤, 입장 잠금을 얻기 전에 삭제가 커밋된 상태를 재현한다.
+          await tx
+            .update(schema.chatSpaces)
+            .set({ deletedAt: now })
+            .where(eq(schema.chatSpaces.id, actors.spaceId));
+          await original(spaceId, tx);
+        });
+      expect(await actions().joinCall({ roomId })).toEqual({
+        ok: false,
+        code: "NOT_FOUND",
+      });
+      expect(locked).toHaveBeenCalledOnce();
+      expect(locked.mock.calls[0]![0]).toBe(actors.spaceId);
+      expect(await database.db.select().from(callSessions)).toEqual([]);
+      expect(await database.db.select().from(callParticipants)).toEqual([]);
+      expect(livekit.issueToken).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    },
+  );
   it.each([false, true])(
     "replaces only its old participant and preserves the solo huddle even when stale=%s",
     async (stale) => {
@@ -979,6 +1007,20 @@ describe("call actions and participant lifecycle", () => {
     expect(
       locks.map(({ text }) => /from "([^"]+)"/.exec(text)?.[1]).slice(0, 3),
     ).toEqual(["users", "chat_rooms", "call_sessions"]);
+    const admissionLocks = queries.filter(({ text }) =>
+      /for (update|key share)/i.test(text),
+    );
+    expect(
+      admissionLocks.slice(0, 4).map(({ text }) => ({
+        table: /from "([^"]+)"/.exec(text)?.[1],
+        strength: /for (update|key share)/i.exec(text)?.[1],
+      })),
+    ).toEqual([
+      { table: "users", strength: "update" },
+      { table: "chat_spaces", strength: "key share" },
+      { table: "chat_rooms", strength: "update" },
+      { table: "call_sessions", strength: "update" },
+    ]);
     expect(listener).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "call.changed",

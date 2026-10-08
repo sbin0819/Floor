@@ -25,6 +25,26 @@ function setup() {
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 describe("one client call lifetime", () => {
+  it("keeps the current room active while a new device enumeration waits, and leave cancels that pending join", async () => {
+    const { controller, dependencies, room } = setup();
+    await controller.join(callTarget);
+    const devices = deferred<MediaDeviceInfo[]>();
+    dependencies.enumerateDevices.mockReturnValueOnce(devices.promise);
+    const moving = controller.join({ ...callTarget, roomId: "room-b" });
+    room.emit({ type: "reconnecting" });
+    expect(controller.getSnapshot().phase).toBe("reconnecting");
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(dependencies.post).toHaveBeenCalledWith(
+      "heartbeat",
+      "participant-a",
+    );
+    expect(room.disconnect).not.toHaveBeenCalled();
+    await controller.leave();
+    devices.resolve([]);
+    await moving;
+    expect(dependencies.join).toHaveBeenCalledTimes(1);
+    expect(controller.getSnapshot().phase).toBe("idle");
+  });
   it("loads the SDK only after joining, defaults mic on/camera off, and keeps the connection across target metadata updates", async () => {
     const { controller, dependencies, createRoom, room } = setup();
     expect(dependencies.loadLiveKit).not.toHaveBeenCalled();

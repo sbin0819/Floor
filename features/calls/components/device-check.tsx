@@ -52,6 +52,7 @@ export function DeviceCheck({
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const video = useRef<HTMLVideoElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
   useEffect(
     () => devices.subscribe(() => setRevision((value) => value + 1)),
     [devices],
@@ -152,7 +153,20 @@ export function DeviceCheck({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onOpenAutoFocus={() => {
+          returnFocus.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!returnFocus.current?.isConnected) return;
+          event.preventDefault();
+          returnFocus.current.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>장치 점검</DialogTitle>
           <DialogDescription>

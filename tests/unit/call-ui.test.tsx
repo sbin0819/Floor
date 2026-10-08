@@ -335,6 +335,52 @@ describe("call tiles", () => {
     unmount();
     expect(second.detach).toHaveBeenCalledExactlyOnceWith(video);
   });
+  it("places a fixed-width vertical participant strip beside desktop screen sharing while preserving mobile swipes and overflow names", () => {
+    const shared = track("screen", "screen_share");
+    const participants = Array.from({ length: 12 }, (_, index) =>
+      person(
+        index + 1,
+        index === 0 ? { screenShareEnabled: true, tracks: [shared] } : {},
+      ),
+    );
+    render(<CallTiles participants={participants} />);
+    const sharing = screen.getByRole("region", {
+      name: "가상 1 님의 화면 공유",
+    });
+    const layout = sharing.parentElement!;
+    const tile = screen.getByRole("region", { name: "가상 1" });
+    const strip = tile.parentElement!;
+    const sidebar = strip.parentElement!;
+    expect(layout).toHaveClass("flex-col", "md:flex-row", "md:overflow-hidden");
+    expect(sharing).toHaveClass("flex-1", "min-w-0", "md:min-h-0");
+    expect(sidebar).toHaveClass(
+      "contents",
+      "md:flex",
+      "md:w-52",
+      "xl:w-60",
+      "md:shrink-0",
+      "md:overflow-y-auto",
+    );
+    expect(strip).toHaveClass(
+      "snap-x",
+      "snap-mandatory",
+      "overflow-x-auto",
+      "md:flex",
+      "md:flex-col",
+    );
+    expect(strip).not.toHaveClass(
+      "md:grid",
+      "md:grid-cols-3",
+      "lg:grid-cols-4",
+    );
+    expect(tile).toHaveClass("basis-full", "snap-center", "md:basis-auto");
+    expect(within(sidebar).getAllByRole("region")).toHaveLength(9);
+    expect(
+      within(sidebar).getByRole("list", { name: "다른 참가자" }),
+    ).toContainElement(screen.getByText("가상 12"));
+    expect(layout.children[0]).toBe(sharing);
+    expect(layout.children[1]).toBe(sidebar);
+  });
   it("gives even an overflow participant's screen share its own large labeled region", () => {
     const shared = track("screen", "screen_share");
     const participants = Array.from({ length: 10 }, (_, index) =>

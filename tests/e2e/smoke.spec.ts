@@ -1,5 +1,28 @@
 import { expect, test } from "@playwright/test";
 
+test("서명 없는 통화 웹훅과 비로그인 아직 있음 요청을 거절해요", async ({
+  request,
+}) => {
+  const webhook = await request.post("/api/livekit/webhook", {
+    data: {
+      event: "room_finished",
+      room: { name: "call:11111111-1111-4111-8111-111111111111" },
+    },
+    maxRedirects: 0,
+  });
+  expect([401, 404]).toContain(webhook.status());
+  expect(await webhook.text()).toBe("");
+  expect(webhook.headers()["cache-control"]).toBe("no-store");
+  const heartbeat = await request.post("/api/calls/heartbeat", {
+    data: { participantId: "11111111-1111-4111-8111-111111111111" },
+    maxRedirects: 0,
+  });
+  expect(heartbeat.status()).toBe(401);
+  expect(heartbeat.headers()["cache-control"]).toBe("no-store");
+  expect(await heartbeat.text()).toBe("");
+  expect(heartbeat.headers().location).toBeUndefined();
+});
+
 test("비로그인 스페이스 초대는 로그인 후 돌아올 주소를 보존해요", async ({
   page,
 }) => {

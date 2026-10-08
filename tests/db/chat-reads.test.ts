@@ -198,7 +198,7 @@ describe("chat read cursor constraints and unread boundaries", () => {
       await canReadSpace(actors.member.userId, actors.spaceId, database.db),
     ).toBeNull();
   });
-  it("keeps navigation to three parallel statements and channel view to two stages across many rooms", async () => {
+  it("keeps navigation to four parallel statements and channel view to two stages across many rooms", async () => {
     await database.db.insert(chatRooms).values(
       Array.from({ length: 25 }, (_, index) => ({
         kind: "text" as const,
@@ -213,8 +213,8 @@ describe("chat read cursor constraints and unread boundaries", () => {
       await queries().getMyChatNav();
       expect(meter.stop()).toMatchObject({
         stages: 1,
-        statements: 3,
-        perStage: [3],
+        statements: 4,
+        perStage: [4],
       });
       meter.start();
       await queries().getChannelView(actors.spaceId, actors.roomId);

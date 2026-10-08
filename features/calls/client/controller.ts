@@ -42,6 +42,7 @@ export function createCallController(deps: CallDependencies) {
   let state = initialCallSnapshot;
   const listeners = new Set<() => void>();
   let generation = 0;
+  let joinRequest = 0;
   let active: Connection | null = null;
   let userId: string | null = null;
   let enabled = false;
@@ -266,6 +267,7 @@ export function createCallController(deps: CallDependencies) {
     }
   }
   async function connect(target: CallTarget, devices: CallDevices) {
+    joinRequest++;
     const ownGeneration = ++generation;
     update({
       phase: "connecting",
@@ -404,6 +406,7 @@ export function createCallController(deps: CallDependencies) {
     if (current(connection)) readPeople(connection);
   }
   async function join(target: CallTarget) {
+    const request = ++joinRequest;
     if (!enabled) {
       update({ notice: "통화를 쓸 수 없어요" });
       return;
@@ -421,15 +424,15 @@ export function createCallController(deps: CallDependencies) {
       });
       return;
     }
-    const request = ++generation;
     let devices = saved;
     try {
       devices = availableCallDevices(saved, await deps.enumerateDevices());
     } catch {}
-    if (request !== generation) return;
+    if (request !== joinRequest) return;
     await connect(target, devices);
   }
   async function leave() {
+    joinRequest++;
     generation++;
     if (state.call) dismissedRestore = state.call.participantId;
     update({ ...initialCallSnapshot });
@@ -588,6 +591,7 @@ export function createCallController(deps: CallDependencies) {
       await postLeave(participantId);
     },
     pagehide() {
+      joinRequest++;
       if (active) deps.beacon(active.participantId);
       generation++;
       void detach(false);
@@ -609,6 +613,7 @@ export function createCallController(deps: CallDependencies) {
       } catch {}
     },
     dispose() {
+      joinRequest++;
       generation++;
       void detach(true);
       state = initialCallSnapshot;

@@ -82,6 +82,14 @@ export function adaptRoom(sdk: typeof LiveKit, room: LiveKit.Room): CallRoom {
     if (reduced) lower(publication);
     media();
   };
+  const unsubscribed = (
+    track: LiveKit.RemoteTrack,
+    publication: LiveKit.RemoteTrackPublication,
+  ) => {
+    tracks.delete(track);
+    previousQuality.delete(publication);
+    media();
+  };
   const localPublished = (publication: LiveKit.LocalTrackPublication) => {
     const track = publication.track;
     if (track && !ended.has(track)) {
@@ -126,7 +134,7 @@ export function adaptRoom(sdk: typeof LiveKit, room: LiveKit.Room): CallRoom {
     room[method](sdk.RoomEvent.ParticipantConnected, media);
     room[method](sdk.RoomEvent.ParticipantDisconnected, media);
     room[method](sdk.RoomEvent.TrackSubscribed, subscribed);
-    room[method](sdk.RoomEvent.TrackUnsubscribed, media);
+    room[method](sdk.RoomEvent.TrackUnsubscribed, unsubscribed);
     room[method](sdk.RoomEvent.TrackMuted, media);
     room[method](sdk.RoomEvent.TrackUnmuted, media);
     room[method](sdk.RoomEvent.LocalTrackPublished, localPublished);
@@ -187,23 +195,37 @@ export function adaptRoom(sdk: typeof LiveKit, room: LiveKit.Room): CallRoom {
       };
     },
     people(): readonly RoomPerson[] {
-      return [room.localParticipant, ...room.remoteParticipants.values()].map(
-        (person) => ({
-          identity: person.identity,
-          attributes: person.attributes,
-          local: person === room.localParticipant,
-          speaking: person.isSpeaking,
-          microphoneEnabled: person.isMicrophoneEnabled,
-          cameraEnabled: person.isCameraEnabled,
-          screenShareEnabled: person.isScreenShareEnabled,
-          tracks: [...person.trackPublications.values()].flatMap(
-            (publication) => {
-              const track = publication.track && trackView(publication.track);
-              return track ? [track] : [];
-            },
-          ),
-        }),
+      const currentTracks = new Set<LiveKit.Track>();
+      const currentPublications = new Set(
+        [...room.remoteParticipants.values()].flatMap((person) => [
+          ...person.videoTrackPublications.values(),
+        ]),
       );
+      const people = [
+        room.localParticipant,
+        ...room.remoteParticipants.values(),
+      ].map((person) => ({
+        identity: person.identity,
+        attributes: person.attributes,
+        local: person === room.localParticipant,
+        speaking: person.isSpeaking,
+        microphoneEnabled: person.isMicrophoneEnabled,
+        cameraEnabled: person.isCameraEnabled,
+        screenShareEnabled: person.isScreenShareEnabled,
+        tracks: [...person.trackPublications.values()].flatMap(
+          (publication) => {
+            if (publication.track) currentTracks.add(publication.track);
+            const track = publication.track && trackView(publication.track);
+            return track ? [track] : [];
+          },
+        ),
+      }));
+      for (const track of tracks.keys())
+        if (!currentTracks.has(track)) tracks.delete(track);
+      for (const publication of previousQuality.keys())
+        if (!currentPublications.has(publication))
+          previousQuality.delete(publication);
+      return people;
     },
     async microphone(enabled, deviceId) {
       await room.localParticipant.setMicrophoneEnabled(enabled, { deviceId });

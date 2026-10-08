@@ -99,7 +99,7 @@ describe("persisted self status and private navigation metadata", () => {
       log.mockRestore();
     }
   });
-  it("returns status and own blocks even without any team, in the three-statement nav budget", async () => {
+  it("returns status and own blocks even without any team, in the four-statement nav budget", async () => {
     await database.db
       .update(users)
       .set({ status: "dnd" })
@@ -123,6 +123,9 @@ describe("persisted self status and private navigation metadata", () => {
       const value = await queries.getMyChatNav();
       const measurement = meter.stop();
       expect(value).toEqual({
+        callsEnabled: false,
+        calls: [],
+        myCall: null,
         spaces: [],
         directMessages: [],
         meetings: [],
@@ -130,7 +133,7 @@ describe("persisted self status and private navigation metadata", () => {
         myStatus: "dnd",
         blockedUserIds: [actors.member.userId],
       });
-      expect(measurement.perStage).toEqual([3]);
+      expect(measurement.perStage).toEqual([4]);
     } finally {
       meter.restore();
     }

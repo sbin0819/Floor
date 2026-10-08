@@ -26,7 +26,8 @@ import {
   joinedCall,
 } from "../helpers/call-client";
 
-const mocks = vi.hoisted(() => ({ join: vi.fn() }));
+const mocks = vi.hoisted(() => ({ join: vi.fn(), notice: vi.fn() }));
+vi.mock("sonner", () => ({ toast: { info: mocks.notice } }));
 vi.mock("@/features/calls/actions", () => ({ joinCall: mocks.join }));
 vi.mock("@/components/realtime-provider", () => ({
   useRealtimeChannel: () => {},
@@ -87,6 +88,7 @@ function show() {
   return { ...fake, ...view, client, devices };
 }
 beforeEach(() => {
+  mocks.notice.mockReset();
   mocks.join.mockReset();
   mocks.join.mockResolvedValue({ ok: true, data: joinedCall() });
   saveCallDevices(defaultCallDevices());
@@ -96,6 +98,64 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("app-shell call provider", () => {
+  it.each(["removed", "replaced"] as const)(
+    "announces %s once even when the user is on another page",
+    async (reason) => {
+      const { room, unmount } = show();
+      fireEvent.click(screen.getByRole("button", { name: "통화 시작" }));
+      await screen.findByText("connected");
+      fireEvent.click(screen.getByRole("button", { name: "친구 화면" }));
+      expect(screen.getByText("친구")).toBeInTheDocument();
+      act(() => room.emit({ type: "disconnected", reason }));
+      await waitFor(() =>
+        expect(mocks.notice).toHaveBeenCalledExactlyOnceWith(
+          reason === "removed"
+            ? "통화가 끝났어요"
+            : "다른 탭에서 통화에 들어갔어요",
+        ),
+      );
+      act(() => room.emit({ type: "disconnected", reason }));
+      fireEvent.click(screen.getByRole("button", { name: "친구 화면" }));
+      expect(mocks.notice).toHaveBeenCalledTimes(1);
+      unmount();
+    },
+  );
+  it("isolated previews inject action and preferences without server actions or browser storage", async () => {
+    const fake = callDependencies();
+    const join = vi.fn(async (input: { roomId: string }) => ({
+      ok: true as const,
+      data: { ...joinedCall(), room: `call:${input.roomId}` },
+    }));
+    const read = vi.fn(() => defaultCallDevices());
+    const storage = vi.spyOn(Storage.prototype, "getItem");
+    const devices = {
+      enumerateDevices: fake.dependencies.enumerateDevices,
+      getUserMedia: vi.fn(),
+      supportsSpeaker: () => false,
+      subscribe: () => () => {},
+    } satisfies DeviceAdapter;
+    const client = new QueryClient();
+    const view = render(
+      <QueryClientProvider client={client}>
+        <CallProvider
+          loadLiveKit={fake.dependencies.loadLiveKit}
+          devices={devices}
+          transport={fake.dependencies}
+          preferences={{ read, save: vi.fn() }}
+          joinAction={join}
+        >
+          <Harness />
+        </CallProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "통화 시작" }));
+    await screen.findByText("connected");
+    expect(join).toHaveBeenCalledExactlyOnceWith({ roomId: "room-a" });
+    expect(read).toHaveBeenCalledOnce();
+    expect(storage).not.toHaveBeenCalled();
+    expect(mocks.join).not.toHaveBeenCalled();
+    view.unmount();
+  });
   it("survives StrictMode setup/cleanup and page rerenders without duplicate connections or metadata feedback", async () => {
     const { room, dependencies, unmount, devices } = show();
     expect(dependencies.loadLiveKit).not.toHaveBeenCalled();

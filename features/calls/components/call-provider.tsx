@@ -4,11 +4,13 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +23,8 @@ import {
 import { useRealtimeChannel } from "@/components/realtime-provider";
 import { userChannel } from "@/lib/realtime/channels";
 import { joinCall } from "@/features/calls/actions";
-import type { MyCall } from "../types";
+import type { JoinedCall, MyCall } from "../types";
+import type { ActionResult } from "@/lib/actions/result";
 import {
   createCallController,
   type CallController,
@@ -75,18 +78,25 @@ export function CallProvider({
   devices = browserDevices,
   audioMeter = browserAudioMeter,
   transport,
+  joinAction = joinCall,
+  preferences,
 }: {
   children: ReactNode;
   loadLiveKit?: LoadLiveKit;
   devices?: DeviceAdapter;
   audioMeter?: AudioMeter;
   transport?: Pick<CallDependencies, "post" | "beacon">;
+  joinAction?: (input: { roomId: string }) => Promise<ActionResult<JoinedCall>>;
+  preferences?: {
+    read: CallDependencies["readDevices"];
+    save: CallDependencies["saveDevices"];
+  };
 }) {
   const joining = useMutation({
     mutationKey: ["calls", "join"],
     retry: false,
     networkMode: "always",
-    mutationFn: (input: { roomId: string }) => joinCall(input),
+    mutationFn: (input: { roomId: string }) => joinAction(input),
   });
   const [controller] = useState(() =>
     createCallController({
@@ -94,8 +104,8 @@ export function CallProvider({
       join: (roomId) => joining.mutateAsync({ roomId }),
       post: transport?.post ?? postCall,
       beacon: transport?.beacon ?? beaconLeave,
-      readDevices: readCallDevices,
-      saveDevices: saveCallDevices,
+      readDevices: preferences?.read ?? readCallDevices,
+      saveDevices: preferences?.save ?? saveCallDevices,
       enumerateDevices: () => devices.enumerateDevices(),
       now: () => Date.now(),
     }),
@@ -189,11 +199,23 @@ function CallOverlays({
     controller.getSnapshot,
     controller.getServerSnapshot,
   );
+  const notified = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.phase !== "disconnected") {
+      notified.current = null;
+      return;
+    }
+    if (!state.notice) return;
+    const key = `${state.call?.participantId ?? "join"}:${state.notice}`;
+    if (notified.current === key) return;
+    notified.current = key;
+    toast.info(state.notice);
+  }, [state.phase, state.notice, state.call?.participantId]);
   return (
     <>
       {state.restore && (
         <div
-          className="flex flex-wrap items-center justify-center gap-2 border-b bg-muted px-4 py-2"
+          className="fixed inset-x-0 top-14 z-[46] flex flex-wrap items-center justify-center gap-2 border-b bg-muted px-4 py-2 md:left-[72px] xl:left-[320px]"
           role="status"
         >
           <span>통화에 다시 들어갈까요?</span>

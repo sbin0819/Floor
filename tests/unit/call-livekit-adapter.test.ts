@@ -91,6 +91,41 @@ function fixture() {
   return { room, local, remote, adapter, events, listeners, emit, unsubscribe };
 }
 describe("lazy LiveKit room adapter", () => {
+  it("drops unsubscribed tracks and departed publications from the quality restoration cache", async () => {
+    const f = fixture();
+    const track = {
+      sid: "video-a",
+      kind: "video",
+      source: "camera",
+      mediaStreamTrack: { id: "native-video" },
+      attach: vi.fn(),
+      detach: vi.fn(),
+    };
+    const publication = {
+      kind: "video",
+      track,
+      videoQuality: 2,
+      setVideoQuality: vi.fn(),
+    };
+    f.remote.trackPublications.set("pub", publication);
+    f.remote.videoTrackPublications.set("pub", publication);
+    const oldView = f.adapter.people()[1]!.tracks[0];
+    f.adapter.reduceVideoQuality(true);
+    f.remote.trackPublications.delete("pub");
+    f.remote.videoTrackPublications.delete("pub");
+    f.emit("trackUnsubscribed", track, publication, f.remote);
+    f.adapter.reduceVideoQuality(false);
+    expect(publication.setVideoQuality).toHaveBeenCalledExactlyOnceWith(0);
+    f.remote.trackPublications.set("pub", publication);
+    expect(f.adapter.people()[1]!.tracks[0]).not.toBe(oldView);
+    f.remote.videoTrackPublications.set("pub", publication);
+    f.adapter.reduceVideoQuality(true);
+    f.room.remoteParticipants.clear();
+    f.adapter.people();
+    f.adapter.reduceVideoQuality(false);
+    expect(publication.setVideoQuality).toHaveBeenCalledTimes(2);
+    await f.adapter.disconnect();
+  });
   it("maps only local quality and restores each publication's preceding quality", async () => {
     const f = fixture();
     const first = { kind: "video", videoQuality: 1, setVideoQuality: vi.fn() };

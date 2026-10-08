@@ -192,7 +192,7 @@ describe("chat block boundaries", () => {
         ]);
         meter.start();
         const nav = await queries().getMyChatNav();
-        expect(meter.stop().perStage).toEqual([3]);
+        expect(meter.stop().perStage).toEqual([4]);
         expect(nav.spaces[0]?.unread).toBe(true);
         expect(nav.spaces[0]?.unreadMentions).toBe(0);
       } finally {

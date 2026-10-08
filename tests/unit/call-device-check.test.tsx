@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { DeviceCheck } from "@/features/calls/components/device-check";
 import {
   CALL_DEVICES_KEY,
@@ -52,6 +53,44 @@ afterEach(() => {
   localStorage.clear();
 });
 describe("device check without real media", () => {
+  it.each(["Escape", "적용"])(
+    "returns actual keyboard focus to the opening button after %s",
+    async (method) => {
+      const { adapter, meter } = setup();
+      function ControlledCheck() {
+        const [open, setOpen] = useState(false);
+        return (
+          <>
+            <button onClick={() => setOpen(true)}>통화 장치 설정</button>
+            {open && (
+              <DeviceCheck
+                settings
+                initial={defaultCallDevices()}
+                devices={adapter}
+                audioMeter={meter}
+                onClose={() => setOpen(false)}
+                onConfirm={() => setOpen(false)}
+              />
+            )}
+          </>
+        );
+      }
+      render(<ControlledCheck />);
+      const user = userEvent.setup();
+      const trigger = screen.getByRole("button", { name: "통화 장치 설정" });
+      await user.click(trigger);
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "적용" })).toBeEnabled(),
+      );
+      expect(screen.getByRole("dialog")).toContainElement(
+        document.activeElement as HTMLElement,
+      );
+      if (method === "Escape") await user.keyboard("{Escape}");
+      else await user.click(screen.getByRole("button", { name: "적용" }));
+      await waitFor(() => expect(trigger).toHaveFocus());
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    },
+  );
   it("requests permission, then reloads labels, mounts an isolated meter, and stops every track on close", async () => {
     const { adapter, meter, stopMeter, track } = setup();
     const confirm = vi.fn();

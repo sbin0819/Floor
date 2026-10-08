@@ -3,6 +3,7 @@ import type { Session } from "@/lib/auth/types";
 import { getLiveKitServer } from "@/lib/calls/livekit-server";
 import type { LiveKitServer } from "@/lib/calls/types";
 import { canJoinCall } from "@/lib/dal/call-access";
+import { lockMessageSpace } from "@/lib/dal/chat-access";
 import { callEvents } from "@/lib/dal/call-events";
 import {
   readCallParticipant,
@@ -107,6 +108,7 @@ export function createCallService(dependencies: CallDependencies = {}) {
     );
     if (!initial.room) throw new ActionError("NOT_FOUND");
     if (!initial.canJoin) throw new ActionError("FORBIDDEN");
+    const spaceId = initial.room.spaceId;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const prior = await readMyCallParticipant(
         session.userId,
@@ -121,6 +123,7 @@ export function createCallService(dependencies: CallDependencies = {}) {
           const current = await readMyCallParticipant(session.userId, tx);
           // 이동 사이 다른 탭이 들어갔으면 두 번째 방을 잠그지 않고 새 트랜잭션으로 돌아간다.
           if (current && current.roomId !== roomId) throw new CallMoveRetry();
+          await lockMessageSpace(spaceId, tx);
           await lockRoomForMessage(roomId, tx);
           const access = await canJoinCall(session.userId, roomId, now, tx);
           if (!access.room) throw new ActionError("NOT_FOUND");
