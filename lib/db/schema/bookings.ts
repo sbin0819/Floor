@@ -31,6 +31,7 @@ export const bookings = pgTable(
     during: tstzrange("during").notNull(),
     title: text("title"),
     attendeeCount: integer("attendee_count"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
     status: bookingStatus("status").notNull().default("confirmed"),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     cancelledBy: uuid("cancelled_by").references(() => users.id, {
