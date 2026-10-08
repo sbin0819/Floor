@@ -84,7 +84,16 @@ describe("future reminders for actual seeded time reservations", () => {
             expiresAt: booking.during.end,
           });
     }
-    const rows = await read();
+    const allNotifications = await read();
+    const rows = allNotifications.filter(
+      ({ type }) => type === "booking_reminder",
+    );
+    expect(
+      allNotifications.filter(({ type }) => type !== "booking_reminder"),
+    ).toEqual([
+      expect.objectContaining({ type: "friend_request" }),
+      expect.objectContaining({ type: "friend_request" }),
+    ]);
     expect(rows).toHaveLength(expected.length);
     expect(rows.length).toBeGreaterThan(0);
     expect(rows).toEqual(

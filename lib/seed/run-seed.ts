@@ -12,6 +12,7 @@ import {
 } from "@/lib/dal";
 import * as seedDal from "@/lib/dal/seed";
 import { syncSeedChat } from "@/lib/dal/seed-chat";
+import { syncSeedPeople } from "@/lib/dal/seed-people";
 import {
   syncSeedBranchCovers,
   syncSeedSpacePhotos,
@@ -19,6 +20,7 @@ import {
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { loadSeedChat } from "@/lib/seed/chat";
+import { loadSeedPeople } from "@/lib/seed/people";
 import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
 import { insertSeedParticipants } from "@/lib/seed/participants";
 import { insertSeedReminders } from "@/lib/seed/reminders";
@@ -73,6 +75,7 @@ export async function runSeed({
     const photos = loadSeedPhotos(data);
     const bookingExtras = loadSeedBookings2(data);
     const chat = loadSeedChat(data);
+    const people = loadSeedPeople(data);
     if (bookingRound2 !== undefined) {
       current = "예약 2차 추가 데이터";
       return await withTransaction(
@@ -184,6 +187,8 @@ export async function runSeed({
         now,
         database,
       );
+      current = "사람과 DM";
+      const peopleCounts = await syncSeedPeople(people, userIds, now, database);
       for (const { userKey, ...staff } of data.branchStaff)
         await seedDal.upsertSeedStaff(
           { ...staff, userId: userId(userKey) },
@@ -314,6 +319,8 @@ export async function runSeed({
       return {
         counts: {
           ...chatCounts,
+          ...peopleCounts,
+          chatMessages: chatCounts.chatMessages + peopleCounts.chatMessages,
           users: data.users.length,
           branches: data.branches.length,
           floors: data.floors.length,

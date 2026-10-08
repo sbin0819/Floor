@@ -14,8 +14,10 @@ import {
   branches,
   branchStaff,
   chatSpaces,
+  chatRooms,
   floorPlans,
   floors,
+  friendships,
   messages,
   spaceBlocks,
   spacePhotos,
@@ -55,7 +57,9 @@ const expectedCounts = {
   spacePhotos: 65,
   branchCovers: 5,
   chatSpaces: 2,
-  chatMessages: 8,
+  chatMessages: 13,
+  friendships: 3,
+  directRooms: 2,
 };
 
 describe("transactional development seed", () => {
@@ -99,6 +103,7 @@ describe("transactional development seed", () => {
         spacePhotos,
         chatSpaces,
         chatMessages: messages,
+        friendships,
       }).map(async ([name, table]) => [
         name,
         (await database.db.select().from(table)).length,
@@ -106,6 +111,12 @@ describe("transactional development seed", () => {
     );
     return {
       ...Object.fromEntries(entries),
+      directRooms: (
+        await database.db
+          .select()
+          .from(chatRooms)
+          .where(eq(chatRooms.kind, "dm"))
+      ).length,
       branchCovers: (await database.db.select().from(branches)).filter(
         ({ coverPhotoPath }) => coverPhotoPath !== null,
       ).length,

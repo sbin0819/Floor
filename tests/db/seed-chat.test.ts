@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -59,17 +59,30 @@ describe("transactional team chat seed", () => {
     runSeed({ db: database.db, auth, now, resetPasswords: false });
   const state = async () => ({
     spaces: await database.db.select().from(chatSpaces).orderBy(chatSpaces.id),
-    rooms: await database.db.select().from(chatRooms).orderBy(chatRooms.id),
+    rooms: await database.db
+      .select()
+      .from(chatRooms)
+      .where(eq(chatRooms.kind, "text"))
+      .orderBy(chatRooms.id),
     messages: await database.db
       .select()
       .from(messages)
+      .where(
+        inArray(
+          messages.roomId,
+          database.db
+            .select({ id: chatRooms.id })
+            .from(chatRooms)
+            .where(eq(chatRooms.kind, "text")),
+        ),
+      )
       .orderBy(messages.roomId, messages.seq),
   });
 
   it("writes two general channels and eight sequenced messages, keeping channels and timestamps on rerun", async () => {
     expect((await seed()).counts).toMatchObject({
       chatSpaces: 2,
-      chatMessages: 8,
+      chatMessages: 13,
     });
     const first = await state();
     expect(first.spaces).toHaveLength(2);
@@ -250,7 +263,7 @@ describe("transactional team chat seed", () => {
     vi.spyOn(chatLoader, "loadSeedChat").mockReturnValue({ messages: [] });
     expect((await seed()).counts).toMatchObject({
       chatSpaces: 2,
-      chatMessages: 0,
+      chatMessages: 5,
     });
     const after = await state();
     expect(after.messages).toEqual([]);
