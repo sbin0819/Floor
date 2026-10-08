@@ -8,6 +8,7 @@ import type { OperatingState } from "@/features/bookings/operating-state";
 import type { Photo } from "@/lib/photos/schema";
 import type { MyBookingsMonthSelection } from "@/features/bookings/calendar";
 import type { DeskPart } from "@/features/bookings/desk-parts";
+import type { ParticipantSearchResult } from "@/features/bookings/participants";
 
 export type DeskPartSummary = {
   part: DeskPart;
@@ -166,6 +167,29 @@ export type MyBooking = {
   spaceName: string;
   spaceType: SpaceType;
   photo: Photo | null;
+};
+export type BookingForEditData = {
+  booking: {
+    id: string;
+    start: string;
+    end: string;
+    attendeeCount: number | null;
+    title: string | null;
+    started: boolean;
+  };
+  participants: ParticipantSearchResult[];
+  actor: BookingActor;
+  space: Pick<
+    VisibleSpace,
+    "id" | "type" | "name" | "capacity" | "amenities" | "photo"
+  >;
+  branch: Pick<BranchDetails, "id" | "name" | "timezone" | "openHours">;
+  floor: Pick<FloorSummary, "id" | "name">;
+  date: string;
+  now: string;
+  openHours: DayOpenHours | null;
+  bookings: DayBooking[];
+  blocks: SpaceDayData["blocks"];
 };
 export type MyBookingsData = {
   now: string;

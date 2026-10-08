@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { loadDeskDay } from "@/features/bookings/desk-day-loader";
+import { loadBookingForEdit } from "@/features/bookings/booking-edit-loader";
 import {
   createDeskParts,
   classifyDeskPart,
@@ -53,6 +54,7 @@ import type {
   MyBookingsMonthStream,
   SpaceDayData,
   SpaceType,
+  BookingForEditData,
 } from "@/features/bookings/types";
 import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
@@ -918,6 +920,15 @@ export function createBookingQueries(
           reason: block.reason,
         })),
       };
+    },
+    async getBookingForEdit(bookingId: string): Promise<BookingForEditData> {
+      const session = await readSession();
+      return loadBookingForEdit({
+        bookingId: validId(bookingId),
+        session,
+        current: now(),
+        db,
+      });
     },
     async getMyBookings(): Promise<MyBookingsData> {
       const session = await readSession();

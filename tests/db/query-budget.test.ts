@@ -27,6 +27,7 @@ import { createQueryMeter, type QueryMeasurement } from "./query-meter";
 describe("authenticated query execution budgets", () => {
   let database: TestDatabase;
   let actors: BookingActors;
+  let editableBookingId: string;
   let meter: ReturnType<typeof createQueryMeter>;
   const token = "query-budget-recipient-token";
   const measured: Record<string, QueryMeasurement> = {};
@@ -34,7 +35,7 @@ describe("authenticated query execution budgets", () => {
   beforeAll(async () => {
     database = await createTestDatabase();
     actors = await seedBookingActors(database);
-    await insertFixtureBooking(database, actors);
+    editableBookingId = (await insertFixtureBooking(database, actors)).id;
     await database.db.insert(teamInvites).values({
       teamId: actors.teamId,
       token,
@@ -136,6 +137,10 @@ describe("authenticated query execution budgets", () => {
         ),
     ],
     ["bookings.getMyBookings", () => bookings(actors.person).getMyBookings()],
+    [
+      "bookings.getBookingForEdit",
+      () => bookings(actors.person).getBookingForEdit(editableBookingId),
+    ],
     ["teams.getHomeData", () => teams().getHomeData()],
     ["teams.getTeamStartData.search", () => teams().getTeamStartData("그로스")],
     ["teams.getTeamStartData.noSearch", () => teams().getTeamStartData()],
@@ -182,6 +187,7 @@ describe("authenticated query execution budgets", () => {
           "bookings.getHomeFreeSpaces",
           "bookings.getHomeBookingLimits",
           "bookings.getBookingDestination",
+          "bookings.getBookingForEdit",
         ].includes(name)
           ? 3
           : 2,

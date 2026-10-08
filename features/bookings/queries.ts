@@ -61,6 +61,9 @@ export async function getSpaceDay(
 export async function getMyBookings() {
   return createBookingQueries().getMyBookings();
 }
+export async function getBookingForEdit(bookingId: string) {
+  return createBookingQueries().getBookingForEdit(bookingId);
+}
 export async function getMyBookingsMonth(input: MyBookingsMonthInput = {}) {
   return createBookingQueries().getMyBookingsMonth(input);
 }
