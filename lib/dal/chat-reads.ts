@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { chatRoomReads, chatRooms, teamMembers } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
@@ -26,26 +26,15 @@ export async function advanceRoomRead(
   const [cursor] = await database
     .insert(chatRoomReads)
     .select(
-      database
-        .select({
-          roomId: chatRooms.id,
-          userId: sql<string>`${input.userId}::uuid`.as("user_id"),
-          lastReadSeq:
-            sql<number>`least(${input.seq}, ${chatRooms.lastSeq})`.as(
-              "last_read_seq",
-            ),
-          muted: sql<boolean>`false`.as("muted"),
-          updatedAt: sql<Date>`${input.now.toISOString()}::timestamptz`.as(
-            "updated_at",
-          ),
-          createdAt: sql<Date>`${input.now.toISOString()}::timestamptz`.as(
-            "created_at",
-          ),
-        })
-        .from(chatRooms)
-        .where(eq(chatRooms.id, input.roomId))
-        // 외래 키가 방을 뒤늦게 잠그지 않도록 보내기와 같은 방 → 읽은 행 순서를 유지한다.
-        .for("key share"),
+      // CTE 의존 순서로 사용자 → 방 → 읽은 행을 한 문장 안에서 잠근다.
+      sql`with locked_user as materialized (
+        select id from users where id = ${input.userId}::uuid for key share
+      ), locked_room as materialized (
+        select r.id, r.last_seq from chat_rooms r cross join locked_user u
+        where r.id = ${input.roomId}::uuid for key share of r
+      ) select id, ${input.userId}::uuid, least(${input.seq}, last_seq), false,
+        ${input.now.toISOString()}::timestamptz, ${input.now.toISOString()}::timestamptz
+        from locked_room`,
     )
     .onConflictDoUpdate({
       target: [chatRoomReads.roomId, chatRoomReads.userId],

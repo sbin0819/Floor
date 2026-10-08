@@ -28,6 +28,7 @@ import { markRoomReadSchema, sendMessageSchema } from "./schema";
 import type { ChatMessage } from "./types";
 import { excerptOf, extractMentions } from "./message-text";
 import { createMessageActions } from "./message-actions";
+import { createReactionActions } from "./reaction-actions";
 
 const limiter = createMemoryRateLimiter();
 export type ChatActionDependencies = Partial<ActionDependencies> & {
@@ -51,6 +52,7 @@ async function requireWritable(
 export function createChatActions(dependencies: ChatActionDependencies = {}) {
   return {
     ...createMessageActions(dependencies, dependencies.limiter ?? limiter),
+    ...createReactionActions(dependencies, dependencies.limiter ?? limiter),
     markRoomRead: createAction(
       {
         input: markRoomReadSchema,

@@ -17,3 +17,7 @@ export async function editMessage(input: unknown) {
 export async function deleteMessage(input: unknown) {
   return createChatActions().deleteMessage(input);
 }
+
+export async function setReaction(input: unknown) {
+  return createChatActions().setReaction(input);
+}

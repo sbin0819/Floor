@@ -122,6 +122,7 @@ export function createAction<Input, Output>(
             "days_ahead",
             "desk_per_person",
             "send_rate",
+            "reaction_rate",
           ].includes(error.details.message ?? "")) ||
           (code === "OVER_CAPACITY" &&
             ["attendee_count", "participants"].includes(

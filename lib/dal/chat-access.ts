@@ -92,3 +92,12 @@ export async function canWriteRoom(
   const room = await canReadRoom(userId, roomId, database);
   return { room, canWrite: room !== null && writableRoom(room) };
 }
+
+export async function canReactRoom(
+  userId: string,
+  roomId: string,
+  database?: DalDatabase,
+) {
+  const room = await canReadRoom(userId, roomId, database);
+  return { room, canReact: room !== null && room.archivedAt === null };
+}

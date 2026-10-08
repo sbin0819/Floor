@@ -136,7 +136,7 @@ describe("chat read actions", () => {
       code: "FORBIDDEN",
     });
   });
-  it("locks the room in the same INSERT SELECT statement before the read row", async () => {
+  it("locks the user then room in the same INSERT SELECT statement before the read row", async () => {
     const statements = vi.spyOn(database.client, "query");
     await actions().markRoomRead(input(3));
     const writes = statements.mock.calls
@@ -144,7 +144,7 @@ describe("chat read actions", () => {
       .filter((statement) => /insert into "chat_room_reads"/i.test(statement));
     expect(writes).toHaveLength(1);
     expect(writes[0]).toMatch(
-      /select[\s\S]*from "chat_rooms"[\s\S]*for key share[\s\S]*on conflict/i,
+      /locked_user as materialized[\s\S]*from users[\s\S]*for key share[\s\S]*locked_room as materialized[\s\S]*from chat_rooms r cross join locked_user[\s\S]*for key share of r[\s\S]*on conflict/i,
     );
     expect(writes[0]).toMatch(/least\(/i);
     expect(writes[0]).toMatch(/greatest\(/i);
