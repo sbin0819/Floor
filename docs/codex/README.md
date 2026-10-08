@@ -37,7 +37,7 @@
 | `docs/spec/roles-and-access.md` | Codex | 역할 4개, 권한 키 14개, `can()`, `canAccess()` 판정표 |
 | `docs/spec/floor-plan.md` | Codex | 평면도 JSON 형식과 검증 규칙 |
 | `docs/spec/design-tokens.md` | Codex | 색·타이포·간격·그림자, shadcn 변수 매핑. 2차에서 고친 값에 "(2차)" 표시 |
-| `docs/spec/examples/` | Codex | 강남점 7층 예시 평면도와 공간·팀·허용 팀 목록, 시드 데이터(`seed.json`: 지점 2곳, 층, 공간, 계정 6개, 예약), 사진 시드(`seed-photos.json`: 지점 대표 사진 2장, 공간 21곳의 사진 41장) |
+| `docs/spec/examples/` | Codex | 강남점 7층 예시 평면도와 공간·팀·허용 팀 목록, 시드 데이터(`seed.json`: 지점 5곳, 층 11곳, 공간 71곳, 계정 6개, 예약 21개), 사진 시드(`seed-photos.json`: 지점 대표 사진 5장, 공간 45곳의 사진 65장). 기존 DB에는 README의 `--branches` 추가 전용 명령을 사용 |
 | `public/seed/photos/` | 앱 | 공간과 지점의 그림 파일 29개 (1200×750 WebP). 이 프로젝트를 위해 그린 것이라 저작권 걱정이 없다 |
 | `docs/design/` | Codex | 처음 그린 시안 9장과 다이어그램 4장(`floor-*.png`), 07–09의 시안 11장(`ui-*.png`), 2차 시안 7장(`ui2-*.png`: 층 시간표, 층 목록과 공간 상세, 날짜 달력, 내 예약 달력, 홈, 지점 목록, 좁은 화면) |
 | `docs/jira-issues.md` | Codex | Jira 이슈 90개의 키·제목·에픽 사본. Codex는 Jira에 접속하지 않아서 이 파일로 이슈 키를 찾는다 |
