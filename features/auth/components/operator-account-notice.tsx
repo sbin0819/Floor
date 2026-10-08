@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AuthFeedback } from "@/features/auth/components/auth-fields";
 import { useAuthRequest } from "@/features/auth/components/use-auth-request";
 import { authMessages } from "@/features/auth/messages";
 import { authClient } from "@/lib/auth/client";
+import { redirectAfterSignOut } from "@/lib/auth/redirect-after-sign-out";
 
 export function OperatorAccountNotice() {
-  const router = useRouter();
   const request = useAuthRequest();
 
   return (
@@ -30,8 +29,7 @@ export function OperatorAccountNotice() {
               request.setMessage(authMessages.genericError);
               return;
             }
-            router.replace("/admin/login");
-            router.refresh();
+            redirectAfterSignOut("/admin/login");
           })
         }
       >

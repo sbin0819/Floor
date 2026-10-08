@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   refresh: vi.fn(),
+  documentRedirect: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -21,6 +22,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/auth/client", () => ({
   authClient: { signIn: { email: mocks.login }, signOut: mocks.signOut },
+}));
+vi.mock("@/lib/auth/redirect-after-sign-out", () => ({
+  redirectAfterSignOut: mocks.documentRedirect,
 }));
 
 beforeEach(() => {
@@ -60,8 +64,11 @@ describe("operator login", () => {
       screen.getByRole("button", { name: "다른 계정으로 로그인" }),
     );
     expect(mocks.signOut).toHaveBeenCalledOnce();
-    expect(mocks.replace).toHaveBeenCalledWith("/admin/login");
-    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(mocks.documentRedirect).toHaveBeenCalledExactlyOnceWith(
+      "/admin/login",
+    );
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   it("does not navigate if signing out failed", async () => {
@@ -77,6 +84,7 @@ describe("operator login", () => {
       authMessages.genericError,
     );
     expect(mocks.replace).not.toHaveBeenCalled();
+    expect(mocks.documentRedirect).not.toHaveBeenCalled();
     expect(screen.queryByText("secret session detail")).not.toBeInTheDocument();
   });
 });

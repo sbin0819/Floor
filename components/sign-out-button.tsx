@@ -1,13 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth/client";
+import { redirectAfterSignOut } from "@/lib/auth/redirect-after-sign-out";
 
 export function SignOutButton({ menuItem = false }: { menuItem?: boolean }) {
-  const router = useRouter();
   const submitting = useRef(false);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -22,8 +21,7 @@ export function SignOutButton({ menuItem = false }: { menuItem?: boolean }) {
         setFailed(true);
         return;
       }
-      router.replace("/login");
-      router.refresh();
+      redirectAfterSignOut("/login");
     } catch {
       setFailed(true);
     } finally {

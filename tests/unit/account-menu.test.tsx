@@ -13,12 +13,16 @@ const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   replace: vi.fn(),
   refresh: vi.fn(),
+  documentRedirect: vi.fn(),
 }));
 vi.mock("@/lib/auth/client", () => ({
   authClient: { signOut: mocks.signOut },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
+}));
+vi.mock("@/lib/auth/redirect-after-sign-out", () => ({
+  redirectAfterSignOut: mocks.documentRedirect,
 }));
 
 beforeEach(() => {
@@ -69,9 +73,12 @@ describe("account menu", () => {
     const item = screen.getByRole("menuitem", { name: "로그아웃" });
     await waitFor(() => expect(item).toHaveFocus());
     await user.keyboard("{Enter}");
-    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith("/login"));
+    await waitFor(() =>
+      expect(mocks.documentRedirect).toHaveBeenCalledExactlyOnceWith("/login"),
+    );
     expect(mocks.signOut).toHaveBeenCalledTimes(1);
-    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   it("keeps the pending action disabled and submits only once", async () => {
@@ -86,7 +93,7 @@ describe("account menu", () => {
     fireEvent.click(button);
     expect(mocks.signOut).toHaveBeenCalledTimes(1);
     await act(async () => pending.resolve({ error: null }));
-    expect(mocks.replace).toHaveBeenCalledWith("/login");
+    expect(mocks.documentRedirect).toHaveBeenCalledExactlyOnceWith("/login");
   });
 
   it("keeps the menu open to display a safe failure and allow retry", async () => {
@@ -99,7 +106,10 @@ describe("account menu", () => {
     expect(screen.queryByText(/private-token/)).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "로그아웃" })).toBeEnabled();
     expect(mocks.replace).not.toHaveBeenCalled();
+    expect(mocks.documentRedirect).not.toHaveBeenCalled();
     await user.click(screen.getByRole("menuitem", { name: "로그아웃" }));
-    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith("/login"));
+    await waitFor(() =>
+      expect(mocks.documentRedirect).toHaveBeenCalledExactlyOnceWith("/login"),
+    );
   });
 });
