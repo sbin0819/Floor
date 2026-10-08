@@ -33,6 +33,7 @@ const realtime = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: realtime.refresh }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/features/chat/actions", () => ({
   sendMessage: vi.fn(),
@@ -144,7 +145,7 @@ describe("chat message composer", () => {
   it("sends trimmed text on Enter, clears the draft and leaves Shift+Enter alone", () => {
     const onSend = vi.fn();
     render(<MessageComposer channelName="일반" onSend={onSend} />);
-    const input = screen.getByRole("textbox", { name: "메시지" });
+    const input = screen.getByRole("combobox", { name: "메시지" });
     expect(screen.getByRole("button", { name: "보내기" })).toBeDisabled();
     fireEvent.change(input, { target: { value: "  첫 줄\n다음 줄  " } });
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
@@ -158,7 +159,7 @@ describe("chat message composer", () => {
     (native) => {
       const onSend = vi.fn();
       render(<MessageComposer channelName="일반" onSend={onSend} />);
-      const input = screen.getByRole("textbox", { name: "메시지" });
+      const input = screen.getByRole("combobox", { name: "메시지" });
       fireEvent.change(input, { target: { value: "한글" } });
       fireEvent.keyDown(input, { key: "Enter", ...native });
       expect(onSend).not.toHaveBeenCalled();
@@ -168,7 +169,7 @@ describe("chat message composer", () => {
   it("counts Unicode code points and allows exactly 4000 but rejects 4001", () => {
     const onSend = vi.fn();
     render(<MessageComposer channelName="일반" onSend={onSend} />);
-    const input = screen.getByRole("textbox", { name: "메시지" });
+    const input = screen.getByRole("combobox", { name: "메시지" });
     expect(input).not.toHaveAttribute("maxlength");
     fireEvent.change(input, { target: { value: "😀".repeat(4000) } });
     expect(screen.getByText("0자 남았어요")).toHaveAttribute(
@@ -226,7 +227,7 @@ describe("chat channel presentation", () => {
       "true",
     );
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
   it("groups author headings but renders HTML and newlines as plain text", () => {
     setup(
@@ -263,7 +264,7 @@ describe("chat channel presentation", () => {
         canWrite: false,
         room: { ...data.room, archived, adminOnly: !archived },
       });
-      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
       expect(
         screen.getByText(
           archived ? "보관된 채널이에요" : "이 채널에는 관리자만 쓸 수 있어요",
@@ -291,7 +292,7 @@ describe("optimistic sending and streamed updates", () => {
       .fn<SendChatMessage>()
       .mockResolvedValue({ ok: false, code: "UNAUTHENTICATED" });
     setup(view({ messages: [] }), send);
-    fireEvent.change(screen.getByRole("textbox"), {
+    fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "세션 만료 메시지" },
     });
     fireEvent.click(screen.getByRole("button", { name: "보내기" }));
@@ -309,7 +310,7 @@ describe("optimistic sending and streamed updates", () => {
     const pending = deferred<ActionResult<ChatMessage>>();
     const send = vi.fn<SendChatMessage>(() => pending.promise);
     const result = setup(view({ messages: [] }), send);
-    fireEvent.change(screen.getByRole("textbox"), {
+    fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "이전 방 메시지" },
     });
     fireEvent.click(screen.getByRole("button", { name: "보내기" }));
@@ -344,7 +345,7 @@ describe("optimistic sending and streamed updates", () => {
     const pending = deferred<ActionResult<ChatMessage>>();
     const send = vi.fn<SendChatMessage>(() => pending.promise);
     const { container } = setup(view({ messages: [] }), send);
-    const input = screen.getByRole("textbox", { name: "메시지" });
+    const input = screen.getByRole("combobox", { name: "메시지" });
     fireEvent.change(input, { target: { value: "첫 메시지" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(send).toHaveBeenCalledOnce());
@@ -389,7 +390,7 @@ describe("optimistic sending and streamed updates", () => {
         }),
       }));
     setup(view({ messages: [] }), send);
-    const input = screen.getByRole("textbox", { name: "메시지" });
+    const input = screen.getByRole("combobox", { name: "메시지" });
     fireEvent.change(input, { target: { value: "하나" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(send).toHaveBeenCalledOnce());
@@ -426,7 +427,7 @@ describe("optimistic sending and streamed updates", () => {
         data: message({ body: input.body, clientId: input.clientId }),
       }));
     setup(view({ messages: [] }), send);
-    fireEvent.change(screen.getByRole("textbox"), {
+    fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "다시 보낼 내용" },
     });
     fireEvent.click(screen.getByRole("button", { name: "보내기" }));
@@ -447,7 +448,7 @@ describe("optimistic sending and streamed updates", () => {
         .fn<SendChatMessage>()
         .mockResolvedValue({ ok: false, code: "NOT_FOUND" }),
     );
-    fireEvent.change(screen.getByRole("textbox"), {
+    fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "보낼 수 없는 내용" },
     });
     fireEvent.click(screen.getByRole("button", { name: "보내기" }));

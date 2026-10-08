@@ -87,6 +87,7 @@ export const MessageList = memo(function MessageList({
   editingId,
   renderEditor,
   focusMessageId,
+  jumpToId,
 }: {
   messages: readonly DisplayMessage[];
   channelName: string;
@@ -105,6 +106,7 @@ export const MessageList = memo(function MessageList({
   editingId?: string | null;
   renderEditor?: (message: DisplayMessage) => ReactNode;
   focusMessageId?: string | null;
+  jumpToId?: string | null;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // 읽음 응답은 경계선을 지우지 않는다. 방이나 복구 세대가 바뀔 때만 다시 만든다.
@@ -116,6 +118,13 @@ export const MessageList = memo(function MessageList({
   const [jumpId, setJumpId] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [jumpError, setJumpError] = useState("");
+  const scrolledToEditor = useRef<string | null>(null);
+  useEffect(() => {
+    if (jumpToId) {
+      setJumpError("");
+      setJumpId(jumpToId);
+    }
+  }, [jumpToId]);
   const focusedIndex = messages.findIndex(({ id }) => id === focusedId);
   const getItemKey = useCallback(
     (index: number) => messageKey(messages[index]!, userId),
@@ -181,9 +190,14 @@ export const MessageList = memo(function MessageList({
     }
   }, [pendingFocus, rows]);
   useEffect(() => {
-    if (!focusMessageId) return;
+    if (!focusMessageId) {
+      scrolledToEditor.current = null;
+      return;
+    }
+    if (scrolledToEditor.current === focusMessageId) return;
     const index = messages.findIndex(({ id }) => id === focusMessageId);
     if (index < 0) return;
+    scrolledToEditor.current = focusMessageId;
     setFocusedId(focusMessageId);
     virtualizer.scrollToIndex(index, { align: "auto" });
   }, [focusMessageId, messages, virtualizer]);

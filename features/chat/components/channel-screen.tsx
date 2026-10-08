@@ -10,6 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { Hash, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,12 +21,14 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useRealtimeConnectionState } from "@/components/realtime-provider";
-import type { ChannelView } from "../types";
+import type { ChannelView, ChatReply } from "../types";
+import { excerptOf } from "../message-text";
 import { releaseRoomViewport, reportRoomViewport } from "../nav-state";
 import { ChannelMembers } from "./channel-members";
 import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
 import { MessageDeleteDialog } from "./message-delete-dialog";
+import { MessageEditor } from "./message-editor";
 import {
   useMessageMutations,
   withReactionIntents,
@@ -66,17 +69,54 @@ export function ChannelScreen({
   send?: SendChatMessage;
 }) {
   const messages = useChannelMessages(data, send);
+  const selectedMessage = useSearchParams().get("message");
   const mutations = useMessageMutations({
     roomId: data.room.id,
     userId: data.user.id,
     members: data.members,
   });
-  const [deleting, setDeleting] = useState<DisplayMessage | null>(null);
+  const [deleteState, setDeleting] = useState<{
+    roomId: string;
+    message: DisplayMessage;
+  } | null>(null);
+  const deleting =
+    deleteState?.roomId === data.room.id ? deleteState.message : null;
   const deleteOrigin = useRef<string | null>(null);
   const channelRef = useRef<HTMLElement>(null);
   const admin = data.members.some(
     (member) => member.id === data.user.id && member.admin,
   );
+  const [replyState, setReply] = useState<{
+    roomId: string;
+    reply: ChatReply;
+  } | null>(null);
+  const [editState, setEditing] = useState<{
+    roomId: string;
+    messageId: string;
+  } | null>(null);
+  const [composerFocus, setComposerFocus] = useState(0);
+  const reply = replyState?.roomId === data.room.id ? replyState.reply : null;
+  const editingId =
+    editState?.roomId === data.room.id ? editState.messageId : null;
+  const names = new Map(data.members.map(({ id, name }) => [id, name]));
+  const candidates = data.members.map(({ id, name }) => ({ userId: id, name }));
+  const edit = (message: DisplayMessage) =>
+    setEditing({ roomId: data.room.id, messageId: message.id });
+  const replyTo = (message: DisplayMessage) => {
+    const messageNames = new Map(names);
+    for (const mention of message.mentions)
+      messageNames.set(mention.userId, mention.name);
+    setReply({
+      roomId: data.room.id,
+      reply: {
+        id: message.id,
+        authorName: message.authorName,
+        excerpt: excerptOf(message.body, messageNames),
+        deleted: Boolean(message.deletedAt),
+      },
+    });
+    setComposerFocus((version) => version + 1);
+  };
   const returnMessageFocus = (id: string | null) => {
     [
       ...(channelRef.current?.querySelectorAll<HTMLElement>(
@@ -199,17 +239,44 @@ export function ChannelScreen({
             onViewport={onViewport}
             onRetry={messages.retry}
             onRemove={messages.remove}
+            editingId={editingId}
+            focusMessageId={editingId}
+            jumpToId={selectedMessage}
+            renderEditor={(message) => (
+              <MessageEditor
+                key={message.id}
+                messageId={message.id}
+                body={message.body}
+                names={
+                  new Map([
+                    ...names,
+                    ...message.mentions.map(
+                      ({ userId, name }) => [userId, name] as const,
+                    ),
+                  ])
+                }
+                members={candidates}
+                allowEveryone={admin}
+                onSave={mutations.edit}
+                onCancel={() => {
+                  setEditing(null);
+                  requestAnimationFrame(() => returnMessageFocus(message.id));
+                }}
+              />
+            )}
             actions={{
               userId: data.user.id,
               canWrite: data.canWrite,
               canReact: !data.room.archived,
               admin,
-              names: new Map(data.members.map(({ id, name }) => [id, name])),
+              names,
               react: mutations.react,
               onDelete: (message) => {
                 deleteOrigin.current = message.id;
-                setDeleting(message);
+                setDeleting({ roomId: data.room.id, message });
               },
+              onEdit: edit,
+              onReply: replyTo,
             }}
           />
           {data.canWrite ? (
@@ -217,6 +284,21 @@ export function ChannelScreen({
               key={data.room.id}
               channelName={data.room.name}
               onSend={messages.submit}
+              members={candidates}
+              allowEveryone={admin}
+              reply={reply}
+              onClearReply={() => setReply(null)}
+              focusVersion={composerFocus}
+              onEditLast={() => {
+                const last = messages.messages.findLast(
+                  (message) =>
+                    message.authorId === data.user.id &&
+                    message.kind === "text" &&
+                    !message.deletedAt &&
+                    !message.delivery,
+                );
+                if (last) edit(last);
+              }}
             />
           ) : (
             <p className="shrink-0 border-t border-border p-5 text-center text-sm text-muted-foreground">
@@ -240,6 +322,7 @@ export function ChannelScreen({
         )}
       </div>
       <MessageDeleteDialog
+        key={`${data.room.id}:${deleting?.id ?? "none"}`}
         message={deleting}
         userId={data.user.id}
         onClose={() => setDeleting(null)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,15 +27,24 @@ export function MessageDeleteDialog({
 }) {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
+  const requestScope = useRef({ active: true });
+  useEffect(() => {
+    const scope = { active: true };
+    requestScope.current = scope;
+    return () => {
+      scope.active = false;
+    };
+  }, [message?.id]);
   const remove = async () => {
     if (!message || lock.current) return;
     lock.current = true;
     setBusy(true);
+    const scope = requestScope.current;
     try {
-      if (await onDelete(message.id)) onClose();
+      if ((await onDelete(message.id)) && scope.active) onClose();
     } finally {
       lock.current = false;
-      setBusy(false);
+      if (scope.active) setBusy(false);
     }
   };
   return (

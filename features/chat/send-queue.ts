@@ -5,6 +5,7 @@ export type SendChatMessage = (input: {
   roomId: string;
   clientId: string;
   body: string;
+  replyToId?: string;
 }) => Promise<ActionResult<ChatMessage>>;
 export type QueuedMessage = {
   roomId: string;
@@ -52,6 +53,9 @@ export function createChatSendQueue({
             roomId: entry.roomId,
             clientId: entry.message.clientId,
             body: entry.message.body,
+            ...(entry.message.replyTo
+              ? { replyToId: entry.message.replyTo.id }
+              : {}),
           });
         } catch {
           // 결과를 받지 못했으므로 같은 ID로만 재전송한다. 뒤의 메시지가 앞서지 않는다.

@@ -89,6 +89,9 @@ describe("message row interactions", () => {
     );
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(rows[0]).toHaveFocus();
+    expect(rows[0]!.querySelector("[data-message-toolbar]")).toHaveClass(
+      "invisible",
+    );
     fireEvent.mouseEnter(rows[1]!);
     expect(within(rows[1]!).getByRole("toolbar")).toBeVisible();
   });

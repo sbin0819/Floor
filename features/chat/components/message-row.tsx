@@ -73,6 +73,7 @@ export const MessageRow = memo(function MessageRow({
   const [toolbar, setToolbar] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [dismissedToolbar, setDismissedToolbar] = useState(false);
   const [sheet, setSheet] = useState(false);
   const press = useRef<{
     timer: ReturnType<typeof setTimeout>;
@@ -108,6 +109,7 @@ export const MessageRow = memo(function MessageRow({
   const available = Object.values(permissions).some(Boolean);
   const returnFocus = () => {
     setToolbar(false);
+    setDismissedToolbar(true);
     article.current?.focus();
   };
   const toolbarProps: MessageToolbarProps = {
@@ -161,8 +163,10 @@ export const MessageRow = memo(function MessageRow({
         ref={article}
         aria-label={`${message.kind === "system" ? "시스템" : (message.authorName ?? "알 수 없는 사람")}, ${formatChatTime(message.createdAt)}`}
         tabIndex={tabIndex}
-        onFocus={() => {
+        onFocus={(event) => {
           setFocused(true);
+          if (!event.currentTarget.contains(event.relatedTarget))
+            setDismissedToolbar(false);
           onFocus?.();
         }}
         onBlur={(event) => {
@@ -171,7 +175,10 @@ export const MessageRow = memo(function MessageRow({
             setToolbar(false);
           }
         }}
-        onMouseEnter={() => setHovered(true)}
+        onMouseEnter={() => {
+          setHovered(true);
+          setDismissedToolbar(false);
+        }}
         onMouseLeave={() => setHovered(false)}
         onKeyDown={(event) => {
           if (
@@ -180,6 +187,7 @@ export const MessageRow = memo(function MessageRow({
             (event.key === "Enter" || event.key === " ")
           ) {
             event.preventDefault();
+            setDismissedToolbar(false);
             setToolbar(true);
           } else if (event.key === "Escape" && toolbar) {
             event.preventDefault();
@@ -249,6 +257,7 @@ export const MessageRow = memo(function MessageRow({
           {message.replyTo && !message.deletedAt && (
             <button
               type="button"
+              aria-label={`${message.replyTo.authorName ?? "알 수 없는 사람"} 님의 원문: ${message.replyTo.deleted ? "삭제된 메시지예요" : message.replyTo.excerpt}`}
               className="mb-1 flex min-h-11 max-w-full items-center gap-2 rounded-md border-l-2 border-border px-2 text-left text-xs text-muted-foreground hover:bg-muted"
               onClick={() => actions?.onJump?.(message.replyTo!.id)}
             >
@@ -268,7 +277,7 @@ export const MessageRow = memo(function MessageRow({
               </span>
             </button>
           )}
-          {editor ??
+          {(message.deletedAt ? null : editor) ??
             (message.deletedAt ? (
               <p className="text-sm text-muted-foreground italic">
                 삭제된 메시지예요
@@ -331,7 +340,7 @@ export const MessageRow = memo(function MessageRow({
         {available && !editor && !sheet && (
           <div
             ref={tools}
-            className={`absolute -top-10 right-1 z-10 ${hovered || focused || toolbar ? "" : "pointer-events-none invisible"}`}
+            className={`absolute -top-10 right-1 z-10 ${!dismissedToolbar && (hovered || focused || toolbar) ? "" : "pointer-events-none invisible"}`}
             data-message-toolbar
           >
             <MessageToolbar {...toolbarProps} />

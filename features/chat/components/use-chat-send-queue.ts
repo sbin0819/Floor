@@ -16,7 +16,7 @@ import {
   type QueuedMessage,
 } from "../send-queue";
 import { chatNavRevision, clearRoomUnread } from "../nav-state";
-import type { ChannelView } from "../types";
+import type { ChannelView, ChatReply } from "../types";
 import { emptyMessageDetails } from "../types";
 import {
   mergeChatMessages,
@@ -145,10 +145,11 @@ export function useChatSendQueue(data: ChannelView, send: SendChatMessage) {
     };
     queue.enqueue(entry);
   };
-  const submit = (body: string) => {
+  const submit = (body: string, reply?: ChatReply) => {
     const clientId = crypto.randomUUID();
     const message: DisplayMessage & { clientId: string } = {
       ...emptyMessageDetails(),
+      replyTo: reply ?? null,
       id: clientId,
       clientId,
       seq: 0,

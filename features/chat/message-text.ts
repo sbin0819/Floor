@@ -117,6 +117,12 @@ function mentionSpans(body: string) {
     .flatMap((span) => mentions(body, span));
 }
 
+export function messageMentionTokens(body: string) {
+  return mentionSpans(body).flatMap(({ start, end, part }) =>
+    part.type === "mention" ? [{ start, end, userId: part.userId }] : [],
+  );
+}
+
 function readLink(
   body: string,
   index: number,
