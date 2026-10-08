@@ -1,11 +1,18 @@
 export type RealtimeEvent =
   | {
       type: "room.activity";
-      spaceId: string;
+      spaceId: string | null;
+      roomKind: ChatRoomKind;
+      preview: {
+        messageId: string;
+        authorName: string;
+        excerpt: string;
+      } | null;
       roomId: string;
       seq: number;
       authorId: string | null;
     }
+  | { type: "room.read"; roomId: string; userId: string; seq: number }
   | { type: "friend.changed" }
   | { type: "notifications.changed" }
   | { type: "booking.changed"; spaceId: string }
@@ -51,7 +58,8 @@ export type RealtimeEvent =
     }
   | {
       type: "mention.created";
-      spaceId: string;
+      spaceId: string | null;
+      roomKind: ChatRoomKind;
       roomId: string;
       roomName: string;
       messageId: string;
@@ -75,6 +83,7 @@ export interface RealtimeSubscriber {
 }
 import type {
   ChatMention,
+  ChatRoomKind,
   ChatReply,
   ReactionEmoji,
 } from "@/features/chat/types";

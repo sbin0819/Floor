@@ -65,7 +65,7 @@ describe("chat read cursor constraints and unread boundaries", () => {
     seq: number | null,
     lastReadSeq: number | null = null,
   ) {
-    const nav = await queries().getMyChatNav();
+    const nav = (await queries().getMyChatNav()).spaces;
     expect(nav).toHaveLength(1);
     expect(nav[0]!.unread).toBe(seq !== null);
     expect(
@@ -167,7 +167,7 @@ describe("chat read cursor constraints and unread boundaries", () => {
       .update(chatRooms)
       .set({ archivedAt: chatNow })
       .where(eq(chatRooms.id, actors.roomId));
-    expect((await queries().getMyChatNav())[0]!.unread).toBe(false);
+    expect((await queries().getMyChatNav()).spaces[0]!.unread).toBe(false);
     expect(
       await queries().getChannelView(actors.spaceId, actors.roomId),
     ).toMatchObject({ firstUnreadSeq: 1, canWrite: false });
@@ -210,8 +210,8 @@ describe("chat read cursor constraints and unread boundaries", () => {
       await queries().getMyChatNav();
       expect(meter.stop()).toMatchObject({
         stages: 1,
-        statements: 1,
-        perStage: [1],
+        statements: 2,
+        perStage: [2],
       });
       meter.start();
       await queries().getChannelView(actors.spaceId, actors.roomId);

@@ -4,6 +4,7 @@ import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import {
   chatRoomReads,
+  chatRoomMembers,
   messageMentions,
   messageReactions,
   messages,
@@ -52,7 +53,7 @@ export async function listStoredMentions(
 
 export async function unreadMentionRecipients(
   input: {
-    teamId: string;
+    teamId: string | null;
     roomId: string;
     userIds: string[];
     seq: number;
@@ -61,6 +62,33 @@ export async function unreadMentionRecipients(
   database: DalDatabase,
 ) {
   if (!input.userIds.length) return [];
+  if (input.teamId === null) {
+    return database
+      .select({ userId: chatRoomMembers.userId })
+      .from(chatRoomMembers)
+      .leftJoin(
+        chatRoomReads,
+        and(
+          eq(chatRoomReads.roomId, input.roomId),
+          eq(chatRoomReads.userId, chatRoomMembers.userId),
+        ),
+      )
+      .where(
+        and(
+          eq(chatRoomMembers.roomId, input.roomId),
+          eq(chatRoomMembers.status, "active"),
+          inArray(chatRoomMembers.userId, input.userIds),
+          gt(
+            sql`${input.createdAt.toISOString()}::timestamptz`,
+            chatRoomMembers.joinedAt,
+          ),
+          or(
+            isNull(chatRoomReads.lastReadSeq),
+            gt(sql`${input.seq}::int`, chatRoomReads.lastReadSeq),
+          ),
+        ),
+      );
+  }
   return database
     .select({ userId: teamMembers.userId })
     .from(teamMembers)

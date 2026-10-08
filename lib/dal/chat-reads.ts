@@ -1,25 +1,39 @@
 import "server-only";
 
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import {
-  chatRoomReads,
-  chatRooms,
-  chatSpacePrefs,
-  teamMembers,
-} from "@/lib/db/schema";
+import { chatRoomReads, chatRooms, chatSpacePrefs } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
+import { readableRoomCondition } from "./chat-access";
+
+export function roomJoinedAt(userId: string) {
+  return sql`case when ${chatRooms.kind} = 'dm' then (
+    select m.joined_at from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = ${userId}::uuid
+  ) else (
+    select m.created_at from team_members m inner join chat_spaces s on s.team_id = m.team_id where s.id = ${chatRooms.spaceId} and m.user_id = ${userId}::uuid
+  ) end`;
+}
+
+export function unreadDirectCount(userId: string) {
+  return sql<number>`(select count(*)::integer from (
+    select 1 from messages candidate where candidate.room_id = ${chatRooms.id}
+      and candidate.seq > coalesce(${chatRoomReads.lastReadSeq}, 0)
+      and candidate.created_at > ${roomJoinedAt(userId)}
+      and candidate.author_id is distinct from ${userId}::uuid and candidate.deleted_at is null limit 100
+  ) unread_direct)`.mapWith(Number);
+}
 
 // 목록과 채널 화면이 같은 시작점을 사용한다. 재가입 전 기록과 내 메시지는 제외한다.
 export function firstUnreadSequence(userId: string) {
   return sql<number | null>`case when
-    (${chatRoomReads.roomId} is null and ${chatRooms.lastMessageAt} > ${teamMembers.createdAt})
+    (${chatRoomReads.roomId} is null and ${chatRooms.lastMessageAt} > ${roomJoinedAt(userId)})
     or (${chatRoomReads.roomId} is not null and ${chatRooms.lastSeq} > ${chatRoomReads.lastReadSeq})
     then (
       select min(unread_message.seq) from messages as unread_message
       where unread_message.room_id = ${chatRooms.id}
         and unread_message.author_id is distinct from ${userId}
-        and unread_message.created_at > ${teamMembers.createdAt}
+        and unread_message.created_at > ${roomJoinedAt(userId)}
+        and (${chatRooms.kind} <> 'dm' or unread_message.deleted_at is null)
         and (${chatRoomReads.roomId} is null or unread_message.seq > ${chatRoomReads.lastReadSeq})
     ) else null end`.mapWith(Number);
 }
@@ -27,7 +41,7 @@ export function firstUnreadSequence(userId: string) {
 export function unreadMentionCount(userId: string) {
   const unread = sql`candidate.room_id = ${chatRooms.id}
     and candidate.seq > coalesce(${chatRoomReads.lastReadSeq}, 0)
-    and candidate.created_at > ${teamMembers.createdAt}
+    and candidate.created_at > ${roomJoinedAt(userId)}
     and candidate.author_id is distinct from ${userId}
     and candidate.deleted_at is null`;
   // 두 인덱스로 후보를 찾고 UNION으로 @모두·개인 멘션이 겹친 메시지를 한 번만 센다.
@@ -53,10 +67,7 @@ export async function saveRoomMuted(
       select id from users where id = ${input.userId}::uuid for key share
     ), locked_room as materialized (
       select r.id from chat_rooms r cross join locked_user u
-      inner join chat_spaces s on s.id = r.space_id
-      inner join team_members m on m.team_id = s.team_id and m.user_id = u.id
-      where r.id = ${input.roomId}::uuid and r.kind = 'text'
-        and s.kind = 'team' and s.deleted_at is null for key share of r
+      where r.id = ${input.roomId}::uuid and ${readableRoomCondition(input.userId, sql`r.id`)} for key share of r
     ) select id, ${input.userId}::uuid, 0, ${input.muted},
       ${input.now.toISOString()}::timestamptz, ${input.now.toISOString()}::timestamptz
       from locked_room
@@ -110,10 +121,9 @@ export async function advanceRoomRead(
         select id from users where id = ${input.userId}::uuid for key share
       ), locked_room as materialized (
         select r.id, r.last_seq from chat_rooms r cross join locked_user u
-        where r.id = ${input.roomId}::uuid for key share of r
+        where r.id = ${input.roomId}::uuid and ${readableRoomCondition(input.userId, sql`r.id`)} for key share of r
       ) select id, ${input.userId}::uuid, least(${input.seq}, last_seq), false,
-        ${input.now.toISOString()}::timestamptz, ${input.now.toISOString()}::timestamptz
-        from locked_room`,
+      ${input.now.toISOString()}::timestamptz, ${input.now.toISOString()}::timestamptz from locked_room`,
     )
     .onConflictDoUpdate({
       target: [chatRoomReads.roomId, chatRoomReads.userId],
@@ -121,7 +131,24 @@ export async function advanceRoomRead(
         lastReadSeq: sql`greatest(${chatRoomReads.lastReadSeq}, excluded.last_read_seq)`,
         updatedAt: input.now,
       },
+      setWhere: sql`${chatRoomReads.lastReadSeq} < excluded.last_read_seq`,
     })
-    .returning({ lastReadSeq: chatRoomReads.lastReadSeq });
-  return cursor ?? null;
+    .returning({
+      lastReadSeq: chatRoomReads.lastReadSeq,
+      advanced: sql<boolean>`${chatRoomReads.lastReadSeq} > 0`,
+    });
+  if (cursor) return cursor;
+  // 동시 upsert의 no-op은 원래 statement snapshot이 아닌 새 snapshot의 실제 값을 읽는다.
+  const [stored] = await database
+    .select({ lastReadSeq: chatRoomReads.lastReadSeq })
+    .from(chatRoomReads)
+    .innerJoin(chatRooms, eq(chatRoomReads.roomId, chatRooms.id))
+    .where(
+      and(
+        eq(chatRoomReads.roomId, input.roomId),
+        eq(chatRoomReads.userId, input.userId),
+        readableRoomCondition(input.userId),
+      ),
+    );
+  return stored ? { ...stored, advanced: false } : null;
 }

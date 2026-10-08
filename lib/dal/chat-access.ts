@@ -22,6 +22,21 @@ export function readableTeamSpace(userId: string) {
   );
 }
 
+export function readableRoomCondition(
+  userId: string,
+  roomId = sql`${chatRooms.id}`,
+) {
+  return sql<boolean>`exists (select 1 from chat_rooms readable_room
+    where readable_room.id = ${roomId} and (
+      (readable_room.kind = 'text' and exists (
+        select 1 from chat_spaces s inner join team_members m on m.team_id = s.team_id
+        where s.id = readable_room.space_id and s.kind = 'team' and s.deleted_at is null and m.user_id = ${userId}::uuid
+      )) or (readable_room.kind = 'dm' and exists (
+        select 1 from chat_room_members m where m.room_id = readable_room.id and m.user_id = ${userId}::uuid and m.status = 'active'
+      ))
+    ))`;
+}
+
 export async function canReadRoom(
   userId: string,
   roomId: string,
@@ -30,6 +45,7 @@ export async function canReadRoom(
   const [room] = await database
     .select({
       id: chatRooms.id,
+      kind: chatRooms.kind,
       spaceId: chatSpaces.id,
       spaceName: teams.name,
       teamId: teams.id,
@@ -44,11 +60,27 @@ export async function canReadRoom(
       roomMuted: sql<boolean>`coalesce(${chatRoomReads.muted}, false)`,
       spaceMuted: sql<boolean>`coalesce(${chatSpacePrefs.muted}, false)`,
       role: teamMembers.role,
+      peer: sql<{
+        userId: string;
+        name: string;
+        username: string | null;
+      } | null>`(
+        select json_build_object('userId', u.id, 'name', u.name, 'username', u.username)
+        from users u where ${chatRooms.kind} = 'dm' and u.id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end
+      )`,
+      peerActive: sql<boolean>`exists (select 1 from chat_room_members m where m.room_id = ${chatRooms.id} and m.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end and m.status = 'active')`,
+      peerReadSeq:
+        sql<number>`coalesce((select r.last_read_seq from chat_room_reads r where r.room_id = ${chatRooms.id} and r.user_id = case when ${chatRooms.dmLowUserId} = ${userId} then ${chatRooms.dmHighUserId} else ${chatRooms.dmLowUserId} end), 0)`.mapWith(
+          Number,
+        ),
     })
     .from(chatRooms)
-    .innerJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
-    .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
-    .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
+    .leftJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
+    .leftJoin(teams, eq(chatSpaces.teamId, teams.id))
+    .leftJoin(
+      teamMembers,
+      and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, userId)),
+    )
     .leftJoin(
       chatSpacePrefs,
       and(
@@ -63,13 +95,7 @@ export async function canReadRoom(
         eq(chatRoomReads.userId, userId),
       ),
     )
-    .where(
-      and(
-        eq(chatRooms.id, roomId),
-        eq(chatRooms.kind, "text"),
-        readableTeamSpace(userId),
-      ),
-    )
+    .where(and(eq(chatRooms.id, roomId), readableRoomCondition(userId)))
     .limit(1);
   return room ?? null;
 }
@@ -92,7 +118,12 @@ export async function canReadSpace(
 export function writableRoom(
   room: NonNullable<Awaited<ReturnType<typeof canReadRoom>>>,
 ) {
-  return room.archivedAt === null && (!room.adminOnly || room.role === "admin");
+  return (
+    room.archivedAt === null &&
+    (room.kind === "dm"
+      ? room.peerActive
+      : !room.adminOnly || room.role === "admin")
+  );
 }
 
 export async function canWriteRoom(
@@ -110,5 +141,11 @@ export async function canReactRoom(
   database?: DalDatabase,
 ) {
   const room = await canReadRoom(userId, roomId, database);
-  return { room, canReact: room !== null && room.archivedAt === null };
+  return {
+    room,
+    canReact:
+      room !== null &&
+      room.archivedAt === null &&
+      (room.kind !== "dm" || room.peerActive),
+  };
 }

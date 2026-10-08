@@ -30,6 +30,8 @@ import { excerptOf, extractMentions } from "./message-text";
 import { createMessageActions } from "./message-actions";
 import { createReactionActions } from "./reaction-actions";
 import { createMuteActions } from "./mute-actions";
+import { listDirectMembers } from "@/lib/dal/direct";
+import { createDirectActions } from "./direct-actions";
 
 const limiter = createMemoryRateLimiter();
 export type ChatActionDependencies = Partial<ActionDependencies> & {
@@ -52,6 +54,7 @@ async function requireWritable(
 
 export function createChatActions(dependencies: ChatActionDependencies = {}) {
   return {
+    ...createDirectActions(dependencies),
     ...createMuteActions(dependencies),
     ...createMessageActions(dependencies, dependencies.limiter ?? limiter),
     ...createReactionActions(dependencies, dependencies.limiter ?? limiter),
@@ -60,14 +63,12 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
         input: markRoomReadSchema,
         authorize: "none",
         async handler({ session, input }) {
-          if (
-            !(await canReadRoom(
-              session.userId,
-              input.roomId,
-              dependencies.database,
-            ))
-          )
-            throw new ActionError("NOT_FOUND");
+          const room = await canReadRoom(
+            session.userId,
+            input.roomId,
+            dependencies.database,
+          );
+          if (!room) throw new ActionError("NOT_FOUND");
           const cursor = await advanceRoomRead(
             {
               ...input,
@@ -77,7 +78,24 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
             dependencies.database,
           );
           if (!cursor) throw new ActionError("NOT_FOUND");
-          return cursor;
+          if (room.kind === "dm" && cursor.advanced) {
+            try {
+              await (dependencies.publisher ?? getRealtimePublisher()).publish(
+                roomChannel(room.id),
+                {
+                  type: "room.read",
+                  roomId: room.id,
+                  userId: session.userId,
+                  seq: cursor.lastReadSeq,
+                },
+              );
+            } catch {
+              (dependencies.logError ?? console.error)(
+                "Chat realtime publication failed.",
+              );
+            }
+          }
+          return { lastReadSeq: cursor.lastReadSeq };
         },
       },
       dependencies,
@@ -142,6 +160,8 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                 message,
                 inserted: false,
                 spaceId: room.spaceId,
+                roomKind: room.kind,
+                peerId: room.peer?.userId,
                 roomName: room.name,
                 recipients: [] as string[],
                 names: new Map<string, string>(),
@@ -157,14 +177,18 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
               ))
             )
               throw new ActionError("INVALID_INPUT");
-            const members = await listChatMembers(room.teamId, transaction);
+            const members =
+              room.kind === "dm"
+                ? await listDirectMembers(room.id, transaction)
+                : await listChatMembers(room.teamId!, transaction);
             const names = new Map(
               members.map((member) => [member.id, member.name]),
             );
             const mentions = parsed.userIds.filter(
               (id) => id !== session.userId && names.has(id),
             );
-            const mentionsEveryone = parsed.everyone && room.role === "admin";
+            const mentionsEveryone =
+              parsed.everyone && (room.kind === "dm" || room.role === "admin");
             const message = await chatWrite.insertChatMessage(
               { ...input, mentionsEveryone, authorId: session.userId, now },
               transaction,
@@ -195,6 +219,8 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
               message: saved,
               inserted: true,
               spaceId: room.spaceId,
+              roomKind: room.kind,
+              peerId: room.peer?.userId,
               roomName: room.name,
               names,
               recipients: mentionsEveryone
@@ -219,10 +245,22 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                 },
               },
               {
-                channel: spaceChannel(result.spaceId),
+                channel:
+                  result.roomKind === "dm"
+                    ? userChannel(result.peerId!)
+                    : spaceChannel(result.spaceId!),
                 event: {
                   type: "room.activity",
                   spaceId: result.spaceId,
+                  roomKind: result.roomKind,
+                  preview:
+                    result.roomKind === "dm"
+                      ? {
+                          messageId: message.id,
+                          authorName: session.name,
+                          excerpt: excerptOf(message.body, result.names),
+                        }
+                      : null,
                   roomId: input.roomId,
                   seq: message.seq,
                   authorId: message.authorId,
@@ -235,8 +273,12 @@ export function createChatActions(dependencies: ChatActionDependencies = {}) {
                 event: {
                   type: "mention.created",
                   spaceId: result.spaceId,
+                  roomKind: result.roomKind,
                   roomId: input.roomId,
-                  roomName: result.roomName ?? "채널",
+                  roomName:
+                    result.roomKind === "dm"
+                      ? session.name
+                      : (result.roomName ?? "채널"),
                   messageId: message.id,
                   seq: message.seq,
                   authorName: session.name ?? "알 수 없는 사용자",

@@ -92,6 +92,8 @@ describe("sendMessage transaction", () => {
     );
     expect(publish).toHaveBeenLastCalledWith(`space:${actors.spaceId}`, {
       type: "room.activity",
+      roomKind: "text",
+      preview: null,
       spaceId: actors.spaceId,
       roomId: actors.roomId,
       seq: 3,
@@ -264,6 +266,8 @@ describe("sendMessage transaction", () => {
     expect(publish).toHaveBeenCalledTimes(2);
     expect(publish).toHaveBeenLastCalledWith(`space:${actors.spaceId}`, {
       type: "room.activity",
+      roomKind: "text",
+      preview: null,
       spaceId: actors.spaceId,
       roomId: actors.roomId,
       seq: 1,

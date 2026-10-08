@@ -44,6 +44,7 @@ const pageSchema = z.object({
   lastSeq: sequence,
   lastReadSeq: sequence.nullable(),
   firstUnreadSeq: sequence.nullable(),
+  peerReadSeq: sequence.nullable(),
 });
 
 export class ChatReadError extends Error {

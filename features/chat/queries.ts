@@ -11,3 +11,6 @@ export async function getChannelView(spaceId: string, roomId: string) {
 export async function getRoomMessagesPage(roomId: string, query: unknown) {
   return createChatQueries().getRoomMessagesPage(roomId, query);
 }
+export async function getDirectMessageView(roomId: string) {
+  return createChatQueries().getDirectMessageView(roomId);
+}

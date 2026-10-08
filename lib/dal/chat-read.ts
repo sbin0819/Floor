@@ -12,7 +12,7 @@ import {
   teams,
   users,
 } from "@/lib/db/schema";
-import { readableTeamSpace } from "./chat-access";
+import { readableRoomCondition, readableTeamSpace } from "./chat-access";
 import { firstUnreadSequence, unreadMentionCount } from "./chat-reads";
 import type { DalDatabase } from "./database";
 import { selectChatMessages } from "./chat-messages";
@@ -102,14 +102,10 @@ export async function listMessagesPage(
   // 방 메타데이터와 병렬로 실행되므로 이 SQL도 직접 소속을 확인한 행만 읽는다.
   const rows = await selectChatMessages(userId, database)
     .innerJoin(chatRooms, eq(messages.roomId, chatRooms.id))
-    .innerJoin(chatSpaces, eq(chatRooms.spaceId, chatSpaces.id))
-    .innerJoin(teams, eq(chatSpaces.teamId, teams.id))
-    .innerJoin(teamMembers, eq(teamMembers.teamId, teams.id))
     .where(
       and(
         eq(chatRooms.id, roomId),
-        eq(chatRooms.kind, "text"),
-        readableTeamSpace(userId),
+        readableRoomCondition(userId),
         before
           ? lt(messages.seq, cursor.before)
           : gt(messages.seq, cursor.after),

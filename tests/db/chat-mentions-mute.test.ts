@@ -92,7 +92,7 @@ describe("unread mentions and mute preferences", () => {
     return row!;
   }
   async function expectCount(count: number) {
-    const nav = await queries().getMyChatNav();
+    const nav = (await queries().getMyChatNav()).spaces;
     expect(nav[0]!.unreadMentions).toBe(count);
     expect(
       nav[0]!.channels.find((room) => room.id === actors.roomId)
@@ -138,31 +138,29 @@ describe("unread mentions and mute preferences", () => {
     await expectCount(1);
   });
   it("returns real counts above badge limits and isolates each user's mention and mute state", async () => {
-    await database.db
-      .insert(messages)
-      .values(
-        Array.from({ length: 101 }, (_, index) => ({
-          roomId: actors.roomId,
-          seq: index + 1,
-          authorId: actors.admin.userId,
-          body: "모두 멘션",
-          mentionsEveryone: true,
-          createdAt: chatNow,
-        })),
-      );
+    await database.db.insert(messages).values(
+      Array.from({ length: 101 }, (_, index) => ({
+        roomId: actors.roomId,
+        seq: index + 1,
+        authorId: actors.admin.userId,
+        body: "모두 멘션",
+        mentionsEveryone: true,
+        createdAt: chatNow,
+      })),
+    );
     await database.db
       .update(chatRooms)
       .set({ lastSeq: 101, lastMessageAt: chatNow })
       .where(eq(chatRooms.id, actors.roomId));
     await expectCount(101);
     await actions().setRoomMuted({ roomId: actors.roomId, muted: true });
-    const adminNav = await queries(actors.admin).getMyChatNav();
+    const adminNav = (await queries(actors.admin).getMyChatNav()).spaces;
     expect(
       adminNav[0]!.channels.find((room) => room.id === actors.roomId),
     ).toMatchObject({ muted: false, unreadMentions: 0 });
   });
   it("defaults missing preferences to false and counts to zero, including a space without active rooms", async () => {
-    expect((await queries().getMyChatNav())[0]).toMatchObject({
+    expect((await queries().getMyChatNav()).spaces[0]).toMatchObject({
       muted: false,
       unreadMentions: 0,
       unread: false,
@@ -175,7 +173,7 @@ describe("unread mentions and mute preferences", () => {
       .update(chatRooms)
       .set({ archivedAt: chatNow })
       .where(eq(chatRooms.spaceId, actors.spaceId));
-    expect(await queries().getMyChatNav()).toEqual([
+    expect((await queries().getMyChatNav()).spaces).toEqual([
       expect.objectContaining({
         muted: false,
         unreadMentions: 0,
@@ -189,7 +187,7 @@ describe("unread mentions and mute preferences", () => {
     expect(
       await actions().setRoomMuted({ roomId: actors.roomId, muted: true }),
     ).toEqual({ ok: true, data: { muted: true } });
-    let nav = (await queries().getMyChatNav())[0]!;
+    let nav = (await queries().getMyChatNav()).spaces[0]!;
     expect(nav).toMatchObject({
       muted: false,
       unread: false,
@@ -210,15 +208,15 @@ describe("unread mentions and mute preferences", () => {
       lastReadSeq: 0,
     });
     await actions().setSpaceMuted({ spaceId: actors.spaceId, muted: false });
-    nav = (await queries().getMyChatNav())[0]!;
+    nav = (await queries().getMyChatNav()).spaces[0]!;
     expect(nav.unread).toBe(false);
     await actions().setRoomMuted({ roomId: actors.roomId, muted: false });
-    expect((await queries().getMyChatNav())[0]!.unread).toBe(true);
+    expect((await queries().getMyChatNav()).spaces[0]!.unread).toBe(true);
   });
   it("space mute excludes all its rooms from the rail dot while returning their raw unread state", async () => {
     await message(1, { everyone: true });
     await actions().setSpaceMuted({ spaceId: actors.spaceId, muted: true });
-    const nav = (await queries().getMyChatNav())[0]!;
+    const nav = (await queries().getMyChatNav()).spaces[0]!;
     expect(nav).toMatchObject({
       muted: true,
       unread: false,
@@ -372,7 +370,7 @@ describe("unread mentions and mute preferences", () => {
       .update(chatRooms)
       .set({ archivedAt: chatNow })
       .where(eq(chatRooms.id, actors.roomId));
-    expect((await queries().getMyChatNav())[0]).toMatchObject({
+    expect((await queries().getMyChatNav()).spaces[0]).toMatchObject({
       unreadMentions: 0,
       unread: false,
     });
@@ -390,7 +388,7 @@ describe("unread mentions and mute preferences", () => {
     expect(
       await actions().setRoomMuted({ roomId: actors.roomId, muted: true }),
     ).toMatchObject({ code: "NOT_FOUND" });
-    expect(await queries().getMyChatNav()).toEqual([]);
+    expect((await queries().getMyChatNav()).spaces).toEqual([]);
   });
   it("locks user before room/space before preference rows in one write statement", async () => {
     const statements = vi.spyOn(database.client, "query");
@@ -413,24 +411,22 @@ describe("unread mentions and mute preferences", () => {
     );
   });
   it("retains nav [1], channel [1,2] and message page [2] SQL budgets with many channels", async () => {
-    await database.db
-      .insert(chatRooms)
-      .values(
-        Array.from({ length: 25 }, (_, index) => ({
-          kind: "text" as const,
-          spaceId: actors.spaceId,
-          name: `채널 ${index}`,
-        })),
-      );
+    await database.db.insert(chatRooms).values(
+      Array.from({ length: 25 }, (_, index) => ({
+        kind: "text" as const,
+        spaceId: actors.spaceId,
+        name: `채널 ${index}`,
+      })),
+    );
     await message(1, { everyone: true, mention: actors.member.userId });
     const meter = createQueryMeter(database.client);
     try {
       meter.start();
-      const nav = await queries().getMyChatNav();
+      const nav = (await queries().getMyChatNav()).spaces;
       expect(meter.stop()).toMatchObject({
         stages: 1,
-        statements: 1,
-        perStage: [1],
+        statements: 2,
+        perStage: [2],
       });
       expect(nav[0]!.unreadMentions).toBe(1);
       meter.start();

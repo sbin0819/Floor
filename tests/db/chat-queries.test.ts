@@ -65,7 +65,7 @@ describe("team chat access and queries", () => {
         clientId: "private-client",
       },
     ]);
-    const nav = await queries().getMyChatNav();
+    const nav = (await queries().getMyChatNav()).spaces;
     expect(nav).toHaveLength(1);
     expect(nav[0]).toMatchObject({
       id: actors.spaceId,
@@ -103,7 +103,7 @@ describe("team chat access and queries", () => {
         await queries(session).getChannelView(actors.spaceId, actors.roomId),
       ).toBeNull();
       expect(
-        (await queries(session).getMyChatNav()).some(
+        (await queries(session).getMyChatNav()).spaces.some(
           ({ id }) => id === actors.spaceId,
         ),
       ).toBe(false);
@@ -149,7 +149,7 @@ describe("team chat access and queries", () => {
       .set({ archivedAt: chatNow })
       .where(eq(chatRooms.id, actors.roomId));
     expect(
-      (await queries().getMyChatNav())[0]!.channels.some(
+      (await queries().getMyChatNav()).spaces[0]!.channels.some(
         ({ id }) => id === actors.roomId,
       ),
     ).toBe(false);
@@ -167,7 +167,7 @@ describe("team chat access and queries", () => {
       .update(chatSpaces)
       .set({ deletedAt: chatNow })
       .where(eq(chatSpaces.id, actors.spaceId));
-    expect(await queries().getMyChatNav()).toEqual([]);
+    expect((await queries().getMyChatNav()).spaces).toEqual([]);
   });
 
   it("allows admin-only writing only for team admins", async () => {
@@ -221,7 +221,9 @@ describe("team chat access and queries", () => {
       .set({ name: "고친 팀" })
       .where(eq(teams.id, team.id));
     expect(
-      (await queries().getMyChatNav()).some(({ name }) => name === "고친 팀"),
+      (await queries().getMyChatNav()).spaces.some(
+        ({ name }) => name === "고친 팀",
+      ),
     ).toBe(true);
   });
 

@@ -16,7 +16,14 @@ import {
   type RateLimiter,
 } from "@/lib/rate-limit/memory";
 import { messagePageQuerySchema } from "./schema";
-import type { ChannelView, ChatSpaceNav, RoomMessagesPage } from "./types";
+import type {
+  ChannelView,
+  ChatSpaceNav,
+  ChatNav,
+  DirectMessageView,
+  RoomMessagesPage,
+} from "./types";
+import { listDirectMembers, listDirectNav } from "@/lib/dal/direct";
 import { serializeChatMessage } from "@/lib/dal/chat-messages";
 
 const pageLimiter = createMemoryRateLimiter();
@@ -71,11 +78,15 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         lastSeq: room.lastSeq,
         lastReadSeq: room.lastReadSeq,
         firstUnreadSeq: room.firstUnreadSeq,
+        peerReadSeq: room.kind === "dm" ? room.peerReadSeq : null,
       };
     },
-    async getMyChatNav(): Promise<ChatSpaceNav[]> {
+    async getMyChatNav(): Promise<ChatNav> {
       const session = await readSession();
-      const rows = await listChatNav(session.userId, dependencies.database);
+      const [rows, directRows] = await Promise.all([
+        listChatNav(session.userId, dependencies.database),
+        listDirectNav(session.userId, dependencies.database),
+      ]);
       const spaces = new Map<string, ChatSpaceNav>();
       for (const row of rows) {
         let space = spaces.get(row.spaceId);
@@ -104,7 +115,14 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
           space.unreadMentions += row.unreadMentions;
         }
       }
-      return [...spaces.values()];
+      return {
+        spaces: [...spaces.values()],
+        directMessages: directRows.map((row) => ({
+          ...row,
+          lastMessageAt: row.lastMessageAt!.toISOString(),
+          unread: row.unreadCount > 0,
+        })),
+      };
     },
     async getChannelView(
       spaceId: string,
@@ -121,7 +139,14 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         roomId,
         dependencies.database,
       );
-      if (!room || room.spaceId !== spaceId.toLowerCase()) return null;
+      if (
+        !room ||
+        room.kind !== "text" ||
+        room.spaceId !== spaceId.toLowerCase() ||
+        !room.teamId ||
+        !room.spaceName
+      )
+        return null;
       const [messages, members] = await Promise.all([
         listRecentMessages(roomId, session.userId, dependencies.database),
         listChatMembers(room.teamId, dependencies.database),
@@ -147,6 +172,40 @@ export function createChatQueries(dependencies: ChatQueryDependencies = {}) {
         members,
         lastReadSeq: room.lastReadSeq,
         firstUnreadSeq: room.firstUnreadSeq,
+        canWrite: writableRoom(room),
+        now: (dependencies.now?.() ?? new Date()).toISOString(),
+      };
+    },
+    async getDirectMessageView(
+      roomId: string,
+    ): Promise<DirectMessageView | null> {
+      const session = await readSession();
+      if (!z.uuid().safeParse(roomId).success) return null;
+      const room = await canReadRoom(
+        session.userId,
+        roomId,
+        dependencies.database,
+      );
+      if (!room || room.kind !== "dm" || !room.peer) return null;
+      const [messages, members] = await Promise.all([
+        listRecentMessages(roomId, session.userId, dependencies.database),
+        listDirectMembers(roomId, dependencies.database),
+      ]);
+      return {
+        room: {
+          id: room.id,
+          archived: room.archivedAt !== null,
+          lastSeq: room.lastSeq,
+          muted: room.roomMuted,
+          unreadMentions: room.unreadMentions,
+        },
+        other: room.peer,
+        user: { id: session.userId, name: session.name },
+        members,
+        messages: messages.map(serializeChatMessage),
+        lastReadSeq: room.lastReadSeq,
+        firstUnreadSeq: room.firstUnreadSeq,
+        peerReadSeq: room.peerReadSeq,
         canWrite: writableRoom(room),
         now: (dependencies.now?.() ?? new Date()).toISOString(),
       };

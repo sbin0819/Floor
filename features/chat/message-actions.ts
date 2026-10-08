@@ -4,6 +4,7 @@ import { canReadRoom, canWriteRoom } from "@/lib/dal/chat-access";
 import * as writes from "@/lib/dal/chat-message-write";
 import { getChatMessage } from "@/lib/dal/chat-messages";
 import { listChatMembers } from "@/lib/dal/chat-read";
+import { listDirectMembers } from "@/lib/dal/direct";
 import {
   insertMessageMentions,
   lockRoomForMessage,
@@ -86,10 +87,10 @@ export function createMessageActions(
               original.kind !== "text"
             )
               throw new ActionError("NOT_FOUND");
-            const members = await listChatMembers(
-              currentAccess.room.teamId,
-              tx,
-            );
+            const members =
+              currentAccess.room.kind === "dm"
+                ? await listDirectMembers(target.roomId, tx)
+                : await listChatMembers(currentAccess.room.teamId!, tx);
             const names = new Map(
               members.map((member) => [member.id, member.name]),
             );
@@ -97,7 +98,9 @@ export function createMessageActions(
               (id) => id !== session.userId && names.has(id),
             );
             const everyone =
-              parsed.everyone && currentAccess.room.role === "admin";
+              parsed.everyone &&
+              (currentAccess.room.kind === "dm" ||
+                currentAccess.room.role === "admin");
             const oldMentions = new Set(
               (await writes.listStoredMentions(original.id, tx)).map(
                 (row) => row.userId,
@@ -167,8 +170,12 @@ export function createMessageActions(
               event: {
                 type: "mention.created",
                 spaceId: result.room.spaceId,
+                roomKind: result.room.kind,
                 roomId: target.roomId,
-                roomName: result.room.name ?? "채널",
+                roomName:
+                  result.room.kind === "dm"
+                    ? session.name
+                    : (result.room.name ?? "채널"),
                 messageId: message.id,
                 seq: message.seq,
                 authorName: session.name ?? "알 수 없는 사용자",

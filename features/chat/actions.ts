@@ -6,6 +6,10 @@ export async function sendMessage(input: unknown) {
   return createChatActions().sendMessage(input);
 }
 
+export async function openDirectMessage(input: unknown) {
+  return createChatActions().openDirectMessage(input);
+}
+
 export async function markRoomRead(input: unknown) {
   return createChatActions().markRoomRead(input);
 }
