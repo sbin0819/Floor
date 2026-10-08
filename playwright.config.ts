@@ -19,6 +19,7 @@ export default defineConfig({
       GOOGLE_CLIENT_SECRET: "",
       GITHUB_CLIENT_ID: "",
       GITHUB_CLIENT_SECRET: "",
+      ABLY_API_KEY: "",
     },
   },
 });
