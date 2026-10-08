@@ -19,6 +19,12 @@ export const markRoomReadSchema = z.strictObject({
   seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
 });
 
+export const editMessageSchema = z.strictObject({
+  messageId: z.uuid(),
+  body: messageBodySchema,
+});
+export const deleteMessageSchema = z.strictObject({ messageId: z.uuid() });
+
 const messageSequenceQuerySchema = z
   .string()
   .regex(/^\d+$/)
