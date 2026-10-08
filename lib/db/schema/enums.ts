@@ -43,3 +43,11 @@ export const appRole = pgEnum("app_role", [
   "operator",
 ]);
 export const grantTarget = pgEnum("grant_target", ["floor", "space"]);
+export const notificationType = pgEnum("notification_type", [
+  "booking_invited",
+  "booking_changed",
+  "booking_cancelled",
+  "booking_removed",
+  "participant_left",
+  "booking_reminder",
+]);

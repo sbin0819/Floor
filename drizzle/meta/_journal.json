@@ -71,6 +71,13 @@
       "when": 1791429335318,
       "tag": "0009_true_spitfire",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791430471851,
+      "tag": "0010_perfect_white_queen",
+      "breakpoints": true
     }
   ]
 }
