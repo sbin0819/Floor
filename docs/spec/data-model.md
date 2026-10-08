@@ -27,7 +27,9 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | `space_type` | `meeting_room`, `phone_booth`, `seminar`, `desk_area`, `desk`, `lounge` |
 | `plan_status` | `draft`, `published`, `archived` |
 | `booking_status` | `confirmed`, `cancelled` |
-| `chat_room_kind` | `booking`, `channel`, `inquiry`, `team` |
+| `chat_space_kind` | `team`, `branch`, `community` (지시서 20) |
+| `chat_room_kind` | `text`, `voice`, `dm`, `group_dm`, `meeting` (지시서 20에서 바꿈. 전에는 `booking`, `channel`, `inquiry`, `team`) |
+| `reaction_emoji` | `thumbs_up`, `heart`, `joy`, `tada`, `open_mouth`, `cry`, `pray`, `check` (지시서 22) |
 | `message_kind` | `text`, `system` |
 | `team_role` | `admin`, `member` |
 | `app_role` | `user`, `team_member`, `team_admin`, `operator` |
@@ -230,46 +232,115 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 - `bookings`와 같은 구간 검사를 둔다 (이름 `space_blocks_during_valid`). 끝이 없는 점검은 지원하지 않는다.
 - 예약 액션은 겹치는 점검이 있으면 `SPACE_BLOCKED`로 거절한다.
 
-### chat_rooms (채팅방)
+### chat_spaces (스페이스, 지시서 20)
+
+디스코드의 서버, 슬랙의 워크스페이스에 해당한다. 뜻과 규칙은 `docs/spec/chat.md`의 "스페이스".
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| id | uuid | PK |
+| kind | chat_space_kind | not null |
+| team_id | uuid | null 허용, FK → teams, 유일 (`chat_spaces_team_unique`) |
+| branch_id | uuid | null 허용, FK → branches, 유일 (`chat_spaces_branch_unique`) |
+| name | text | null 허용. 커뮤니티 스페이스만 쓴다. 팀 스페이스와 지점 라운지는 팀·지점의 이름을 그대로 보여준다 |
+| created_by | uuid | null 허용, FK → users. 커뮤니티 스페이스를 만든 사람 |
+| deleted_at | timestamptz | null 허용. 지운 스페이스(커뮤니티만)는 아무도 읽을 수 없다 |
+
+- `CHECK` (`chat_spaces_kind_ref`): `team`이면 `team_id`만 있고 `branch_id`·`name`은 없다. `branch`면 `branch_id`만 있고 `team_id`·`name`은 없다. `community`면 `name`과 `created_by`가 있고 `team_id`·`branch_id`는 없다.
+- 팀 스페이스의 멤버는 저장하지 않는다 (`team_members`에서 계산). 지점 라운지와 커뮤니티 스페이스의 멤버 테이블은 지시서 26에서 더한다.
+
+### chat_rooms (방, 지시서 20에서 새로 만듦)
+
+메시지가 쌓이는 곳 하나. 텍스트 채널, 음성 채널, DM, 그룹 DM, 회의 채널.
 
 | 컬럼 | 타입 | 제약 |
 | --- | --- | --- |
 | id | uuid | PK |
 | kind | chat_room_kind | not null |
-| booking_id | uuid | null 허용, FK → bookings, unique |
-| floor_id | uuid | null 허용, FK → floors |
-| team_id | uuid | null 허용, FK → teams |
+| space_id | uuid | null 허용, FK → chat_spaces. 채널(`text`, `voice`)만 |
+| name | text | null 허용. 채널만. 1–30자 |
+| topic | text | null 허용. 0–200자 |
+| admin_only | boolean | not null, 기본값 false. 관리자만 쓰는 채널 |
+| last_seq | bigint | not null, 기본값 0. Drizzle에서는 `bigint({ mode: 'number' })`. 이 방의 마지막 메시지 번호 |
+| last_message_at | timestamptz | null 허용 |
+| archived_at | timestamptz | null 허용 |
 
-- `CHECK` (이름 `chat_rooms_kind_ref`): `(kind <> 'booking' OR booking_id IS NOT NULL) AND (kind <> 'channel' OR floor_id IS NOT NULL) AND (kind <> 'team' OR team_id IS NOT NULL)`. `channel`은 라운지 채널, `team`은 팀 채널이다. 다른 참조 컬럼이 비어 있어야 한다는 제한은 두지 않는다.
-- `inquiry`(운영자 문의) 방이 어떤 컬럼으로 지점과 문의자를 가리킬지는 채팅 작업(PFQV-4)에서 정한다. 지금은 제약을 두지 않는다.
+- `CHECK` (`chat_rooms_kind_ref`): `text`, `voice`이면 `space_id`와 `name`이 있다. (DM, 그룹 DM, 회의 채널의 참조는 지시서 23–25가 컬럼과 함께 더한다.)
+- `CHECK` (`chat_rooms_name_length`): `name`이 있으면 1–30자, `topic`이 있으면 200자 이하.
+- 같은 스페이스에서 보관되지 않은 채널의 이름은 대소문자를 무시하고 유일하다 (`chat_rooms_space_name_unique`, `(space_id, lower(name)) WHERE archived_at IS NULL`).
+- 인덱스: `(space_id)`.
 
-### messages (메시지)
+### messages (메시지, 지시서 20에서 새로 만듦)
 
 | 컬럼 | 타입 | 제약 |
 | --- | --- | --- |
 | id | uuid | PK |
 | room_id | uuid | not null, FK → chat_rooms, on delete cascade |
-| seq | bigint | not null. 방별로 1씩 증가. Drizzle에서는 `bigint({ mode: 'number' })`. 기본값 없이 넣을 때 지정하고, 번호를 매기는 방식은 채팅 작업(PFQV-4)에서 정한다 |
+| seq | bigint | not null. 방별 번호. 넣을 때 그 방의 `last_seq`를 1 올려 받는다 (`docs/spec/chat.md` "데이터") |
 | author_id | uuid | null 허용, FK → users. 시스템 메시지는 null |
 | kind | message_kind | not null, 기본값 `text` |
 | body | text | not null |
-| space_ref | uuid | null 허용, FK → spaces (공간 태그) |
-| client_id | text | null 허용. 재전송 중복 방지용 |
+| client_id | text | null 허용. 브라우저가 만든 id. 다시 보내기가 두 번 저장되지 않게 |
+| reply_to_id | uuid | null 허용, FK → messages, ON DELETE SET NULL. 같은 방의 메시지 (지시서 22) |
+| mentions_everyone | boolean | not null, 기본값 false. `@모두` (지시서 22) |
+| edited_at | timestamptz | null 허용 (지시서 22) |
+| deleted_at | timestamptz | null 허용 (지시서 22). 지운 메시지는 본문이 빈 문자열이다 |
+| deleted_by | uuid | null 허용, FK → users (지시서 22) |
 
-- `unique (room_id, seq)` — 재연결 뒤 빠진 메시지를 `seq`로 찾는다.
-- `unique (room_id, client_id) where client_id is not null`
+- `unique (room_id, seq)` (`messages_room_id_seq_unique`) — 다시 연결한 뒤 빠진 메시지를 번호로 찾는다.
+- `unique (room_id, client_id) WHERE client_id IS NOT NULL` (`messages_room_id_client_id_unique`).
+- `CHECK` (`messages_author_kind`): `kind = 'system'`이면 `author_id`가 null이고, `text`면 null이 아니다.
+- `CHECK` (`messages_body_length`): 지워지지 않은 메시지는 `char_length(body)`가 1–4000, 지운 메시지(`deleted_at`이 있음)는 빈 문자열 (지시서 22에서 고침).
+- 본문 안의 멘션은 `<@{userId}>`, `<@everyone>`으로 저장한다 (`docs/spec/chat.md` "메시지").
+- 지금의 `space_ref`(공간 태그) 컬럼은 없앴다. 공간 태그는 뒤로 미룬다.
 
-### call_sessions (통화)
+### message_reactions (리액션, 지시서 22)
 
 | 컬럼 | 타입 | 제약 |
 | --- | --- | --- |
-| id | uuid | PK |
-| room_id | uuid | not null, FK → chat_rooms |
-| livekit_room | text | not null |
-| started_at | timestamptz | not null, 기본값 now() |
-| ended_at | timestamptz | null 허용 |
+| message_id | uuid | not null, FK → messages, on delete cascade |
+| user_id | uuid | not null, FK → users |
+| emoji | reaction_emoji | not null. `thumbs_up`, `heart`, `joy`, `tada`, `open_mouth`, `cry`, `pray`, `check` |
 
-- 방당 진행 중인 통화는 1개: `unique (room_id) where ended_at is null` (이름 `call_sessions_one_active`)
+- 기본 키 `(message_id, user_id, emoji)`.
+
+### message_mentions (멘션, 지시서 22)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| message_id | uuid | not null, FK → messages, on delete cascade |
+| user_id | uuid | not null, FK → users |
+
+- 기본 키 `(message_id, user_id)`. 인덱스 `(user_id, message_id)`.
+- `@모두`는 행으로 펼치지 않고 `messages.mentions_everyone`으로 둔다.
+
+### chat_space_prefs (스페이스의 개인 설정, 지시서 22)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| space_id | uuid | not null, FK → chat_spaces, on delete cascade |
+| user_id | uuid | not null, FK → users |
+| muted | boolean | not null, 기본값 false |
+| updated_at | timestamptz | not null |
+
+- 기본 키 `(space_id, user_id)`. 멤버 여부가 아니라 설정만 담는다.
+
+### chat_room_reads (읽은 자리, 지시서 21)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| room_id | uuid | not null, FK → chat_rooms, on delete cascade |
+| user_id | uuid | not null, FK → users |
+| last_read_seq | bigint | not null, 0 이상 (`chat_room_reads_seq_valid`). Drizzle에서는 `bigint({ mode: 'number' })` |
+| muted | boolean | not null, 기본값 false (지시서 22부터 쓴다) |
+| updated_at | timestamptz | not null |
+
+- 기본 키 `(room_id, user_id)`.
+- 행이 없으면 "들어온 뒤의 남의 메시지가 안 읽음"이다 (`docs/spec/chat.md` "읽음과 알림", 지시서 21). 읽은 번호는 줄지 않고 그 방의 `last_seq`를 넘지 않는다 (쓰는 문장이 `GREATEST`와 `LEAST`로 지킨다).
+
+### call_sessions (통화)
+
+지시서 20에서 지우고, 통화 작업(지시서 27)에서 `docs/spec/chat.md`의 "통화"에 맞게 다시 만든다.
 
 ### teams (팀)
 
@@ -369,7 +440,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 
 ## 테스트로 확인할 제약
 
-`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 23개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서, 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서, 18–20은 공간 사진 작업에서, 21은 사용 인원 작업(지시서 14)에서, 22는 참석자 초대 작업(16)에서, 23은 알림 작업(17)에서 만든다.
+`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 27개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서(8–10은 지시서 20에서 다시 썼다), 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서, 18–20은 공간 사진 작업에서, 21은 사용 인원 작업(지시서 14)에서, 22는 참석자 초대 작업(16)에서, 23은 알림 작업(17)에서, 24는 읽음 작업(21)에서, 25–27은 메시지 다듬기(22)에서 만든다.
 
 1. 같은 공간에 시간이 겹치는 `confirmed` 예약 두 개는 들어가지 않는다 (`23P01`).
 2. 끝과 시작이 맞닿은 예약(10:00–11:00, 11:00–12:00)은 들어간다.
@@ -378,9 +449,9 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 5. `during`이 비어 있는 경우, 시작이 무한인 경우, 끝이 무한인 경우, 경계가 `[)`가 아닌 경우(`[]`)는 각각 들어가지 않는다.
 6. 한 층에 draft 두 개는 들어가지 않는다. published 두 개도 들어가지 않는다.
 7. `(branch_id, level)`이 같은 층 두 개는 들어가지 않는다.
-8. 한 방에 끝나지 않은 통화 두 개는 들어가지 않는다.
-9. 한 방에 `seq`가 같은 메시지 두 개는 들어가지 않는다. `client_id`가 같은 메시지 두 개도 들어가지 않는다.
-10. `kind`에 맞는 참조가 없는 채팅방은 들어가지 않는다.
+8. 종류에 맞는 참조가 없는 스페이스는 들어가지 않는다 (`team`인데 `team_id`가 없음, `branch`인데 `name`이 있음, `community`인데 `name`이 없음 등). 같은 팀의 팀 스페이스 두 개는 들어가지 않는다. (지시서 20에서 바꿈. 전에는 통화 테이블의 제약이었다. 통화의 제약은 지시서 27이 새 번호로 더한다.)
+9. 한 방에 `seq`가 같은 메시지 두 개는 들어가지 않는다. `client_id`가 같은 메시지 두 개도 들어가지 않는다 (다른 방이면 들어간다). 작성자가 없는 `text` 메시지, 작성자가 있는 `system` 메시지, 본문이 빈 메시지와 4001자인 메시지는 들어가지 않는다. 방을 지우면 그 방의 메시지도 지워진다.
+10. 스페이스나 이름이 없는 채널(`text`, `voice`)은 들어가지 않는다. 같은 스페이스에 대소문자만 다른 같은 이름의 채널 두 개는 들어가지 않는다. 앞의 채널이 보관된 뒤에는 들어간다.
 11. 대소문자만 다른 같은 이름의 팀 두 개는 들어가지 않는다.
 12. `headcount`가 0이거나 1000을 넘는 팀은 들어가지 않는다.
 13. 같은 팀이 같은 이메일에 보낸 대기 중 초대 두 개는 들어가지 않는다. 앞의 초대가 취소·거절·수락된 뒤에는 들어간다.
@@ -394,3 +465,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 21. `attendee_count`가 0이거나 501인 예약은 들어가지 않는다. null, 1, 500은 들어간다.
 22. 같은 예약에 같은 사람의 참석자 행 두 개는 들어가지 않는다. 예약을 지우면 그 예약의 참석자 행도 지워진다.
 23. 같은 사람, 같은 예약, 같은 `scheduled_for`의 `booking_reminder` 알림 두 개는 들어가지 않는다. 종류가 다르면(예: `booking_invited`) 들어간다. 예약을 지우면 그 예약의 알림도 지워진다.
+24. 같은 방에 같은 사람의 읽은 자리 두 개는 들어가지 않는다. `last_read_seq`가 -1이면 들어가지 않는다. 방을 지우면 그 방의 읽은 자리도 지워진다. (지시서 21)
+25. 지워지지 않은 메시지의 빈 본문, 지운 메시지의 빈 문자열이 아닌 본문은 들어가지 않는다. (지시서 22)
+26. 같은 메시지에 같은 사람의 같은 이모지 리액션 두 개는 들어가지 않는다 (다른 이모지는 들어간다). enum에 없는 이모지는 들어가지 않는다. 메시지를 지우면(행 삭제) 리액션과 멘션도 지워진다. (지시서 22)
+27. 같은 메시지에 같은 사람의 멘션 두 개, 같은 스페이스에 같은 사람의 설정 두 개는 들어가지 않는다. (지시서 22)

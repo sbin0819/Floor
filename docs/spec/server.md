@@ -13,9 +13,10 @@
 | 가입, 로그인, 로그아웃, 이메일 인증, 비밀번호 재설정 | Better Auth의 Route Handler (`/api/auth/[...all]`) | 인증 라이브러리가 쿠키와 OAuth 콜백을 직접 다룸 |
 | 팀 만들기, 초대, 가입 요청 | Server Action | 다른 쓰기와 같은 래퍼를 쓴다 |
 | 첫 화면 데이터 | Server Component에서 `features/*/queries.ts` 호출 | 읽기에는 액션을 쓰지 않음 |
-| 게시된 평면도 JSON, 이전 메시지 불러오기 | Route Handler (GET) | 액션은 POST라 캐시가 안 되고, 한 번에 하나씩만 실행됨 |
+| 게시된 평면도 JSON | Route Handler (GET, 캐시) | 액션은 POST라 캐시가 안 되고, 한 번에 하나씩만 실행됨 |
+| 채팅의 이전 메시지와 빠진 메시지, 채팅 목록의 안 읽음 | Route Handler (GET, `private, no-store`. 지시서 21) | 액션은 한 번에 하나씩만 실행되어 보내기를 늦춤 |
 | 참석자 찾기 (입력하는 동안의 검색), 알림의 수와 목록 (주기적으로 다시 읽기) | Route Handler (GET, `Cache-Control: private, no-store`) | 액션은 한 번에 하나씩 실행돼 입력을 따라가지 못하고, `router.refresh()`는 그 화면의 모든 조회를 다시 돌림. 핸들러는 `features/*/queries.ts`를 부르기만 하고, 세션 확인은 그 함수가 한다 (`docs/spec/booking-2.md`) |
-| 실시간 반영 (예약 상태, 새 메시지, 평면도 게시) | 브라우저가 실시간 채널을 직접 구독 | 액션은 서버가 먼저 보내는 통신을 못 함 |
+| 실시간 반영 (예약 상태, 새 메시지, 평면도 게시) | 브라우저가 실시간 채널(Ably)을 직접 구독. 토큰은 Route Handler `POST /api/realtime/token` | 액션은 서버가 먼저 보내는 통신을 못 함. 액션은 하나씩 차례로 실행되므로 토큰 발급에 쓰지 않음 |
 | 도면 이미지 업로드 | 액션이 서명된 업로드 주소 발급 → 브라우저가 저장소로 직접 업로드 | 액션 요청 본문 기본 한도가 1MB |
 | 통화 종료 같은 외부 웹훅 | Route Handler (POST) | 외부 서비스가 호출할 고정 주소가 필요 |
 
@@ -132,7 +133,7 @@ export async function requireOperatorPage(): Promise<Session>;            // adm
 
 ## 실시간
 
-실시간 서비스는 아직 정하지 않았다. 모양만 고정한다: 서버는 커밋 뒤에 이벤트를 발행하고, 브라우저는 채널을 구독한다.
+서비스는 Ably다 (지시서 20). 서버는 커밋 뒤에 이벤트를 발행하고, 브라우저는 채널을 구독한다. 규칙 전체는 `docs/spec/chat.md`의 "실시간 (Ably)".
 
 ```ts
 // 서버
@@ -145,20 +146,34 @@ export interface RealtimeSubscriber {
 }
 ```
 
-- 채널 이름은 헬퍼로만 만든다: `floor:{floorId}`, `room:{roomId}`, `user:{userId}`.
-- 이벤트에는 내용 전체가 아니라 "무엇이 바뀌었는지"만 싣는다. 브라우저는 그걸 받아 해당 데이터를 다시 조회한다. 채팅 메시지만 예외로 본문을 포함하고, 놓친 메시지는 `seq`로 보정한다.
+- 채널 이름은 헬퍼로만 만든다: `floor:{floorId}`, `room:{roomId}`, `user:{userId}`, `space:{spaceId}`.
+- 이벤트에는 내용 전체가 아니라 "무엇이 바뀌었는지"만 싣는다. 브라우저는 그걸 받아 해당 데이터를 다시 조회한다. 채팅 메시지만 예외로 본문을 포함하고, 놓친 메시지는 `seq`로 보정한다. 이메일은 어떤 이벤트에도 싣지 않는다.
 
 ```ts
+export type ReactionEmoji = 'thumbs_up' | 'heart' | 'joy' | 'tada' | 'open_mouth' | 'cry' | 'pray' | 'check'; // 지시서 22
+
 export type RealtimeEvent =
   | { type: 'booking.changed'; spaceId: string }
   | { type: 'space.status_changed'; spaceId: string }            // 점검 등록·해제
   | { type: 'plan.published'; floorId: string; version: number }
   | { type: 'message.created'; roomId: string; id: string; seq: number;
-      authorId: string | null; kind: 'text' | 'system'; body: string; createdAt: string };
+      authorId: string | null; authorName: string | null; kind: 'text' | 'system';
+      body: string; clientId: string | null; createdAt: string;
+      // 지시서 22부터. 새 메시지라 editedAt·deletedAt은 null, reactions는 []
+      replyTo: { id: string; authorName: string | null; excerpt: string; deleted: boolean } | null;
+      mentions: { userId: string; name: string }[]; mentionsEveryone: boolean;
+      editedAt: null; deletedAt: null; reactions: [] }
+  | { type: 'room.activity'; spaceId: string; roomId: string; seq: number; authorId: string | null } // space: 채널. 본문 없음 (지시서 21)
+  | { type: 'message.updated'; roomId: string; id: string; seq: number; body: string; mentions: { userId: string; name: string }[]; mentionsEveryone: boolean; editedAt: string } // 지시서 22
+  | { type: 'message.deleted'; roomId: string; id: string; seq: number }
+  | { type: 'reaction.changed'; roomId: string; messageId: string; emoji: ReactionEmoji; userId: string; added: boolean; count: number }
+  | { type: 'mention.created'; spaceId: string | null; roomId: string; roomName: string; messageId: string; seq: number; authorName: string; excerpt: string }; // user: 채널
 ```
 
-- 셋업 단계에서는 아무 일도 하지 않는 구현과 테스트용 메모리 구현만 둔다. 실제 서비스 연결은 PFQV-54에서 한다.
-- 실시간 채널 토큰을 발급할 때도 `canAccess()`를 거친다.
+- 서버의 발행기는 `lib/realtime/server.ts`의 `getRealtimePublisher()`가 고른다: `ABLY_API_KEY`가 있으면 Ably, 없으면 아무 일도 하지 않는 구현. 테스트는 메모리 구현이나 가짜를 주입한다. 발행이 실패해도 액션은 성공이고 오류는 기록만 한다.
+- 예약·운영자 액션의 발행(`booking.changed` 등)은 아직 아무 일도 하지 않는 구현을 쓴다 (PFQV-19).
+- 브라우저의 토큰은 Route Handler `POST /api/realtime/token`이 Ably 토큰 요청으로 준다. `clientId`는 사용자 id, 유효 시간 10분, 권한은 정확한 채널 이름만이고 발행 권한은 없다. 권한에 방을 넣을 때마다 그 방을 읽을 수 있는지(`canReadRoom`) 판정한다.
+- 브라우저의 연결은 앱의 틀에 하나만 둔다.
 
 ## 환경 변수
 
@@ -171,5 +186,6 @@ export type RealtimeEvent =
 | `NEXT_PUBLIC_APP_URL` | 아니오 | 기본값 `http://localhost:3000`. 인증의 기준 주소로도 쓴다 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 아니오 | 둘 다 있을 때만 구글 로그인을 켠다 |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | 아니오 | 둘 다 있을 때만 GitHub 로그인을 켠다 |
+| `ABLY_API_KEY` | 아니오 | 있을 때만 실시간을 켠다 (지시서 20). 서버에서만 읽는다 |
 
 실시간, LiveKit, 파일 저장소 변수는 해당 작업에서 추가한다.

@@ -40,12 +40,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/18-edit-booking.md` | 예약 바꾸기(시간, 인원, 참석자, 제목) 작업 지시서 (끝남) | 그 작업에서 왜 그렇게 했는지 확인할 때 |
 | `docs/codex/19-app-shell.md` | 앱의 틀(레일 + 사이드바, 위 줄, 서랍) 작업 지시서 | 그 작업을 받았을 때 |
 | `docs/codex/20-chat-foundation.md` | 채팅 기반(테이블, 팀 스페이스, 텍스트 채널, Ably) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/21-chat-reads.md` | 읽음과 연결(안 읽음, 이전 메시지, 다시 연결, 보내기 대기열) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/22-message-polish.md` | 메시지 다듬기(답장, 수정·삭제, 리액션, 멘션, 꾸밈, 입력 중, 빨간 수, 음소거) 작업 지시서 | 그 작업을 받았을 때 |
 | `docs/spec/ui.md` | 화면 구성, 로딩 상태(스켈레톤, 바뀌는 부분만 바꾸기), 조회 속도 예산, 화면별 구성과 문구 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/ui-2.md` | 화면 구성 2차: 공간 사진, 날짜 달력, 층 시간표, 내 예약 달력, 홈·지점 목록·공간 상세. `ui.md`와 다르면 이 문서가 맞다 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
 | `docs/spec/booking.md` | 지점 → 층 → 공간 → 예약 흐름, 사용자 행동별 데이터, 시간 규칙, 한도 | 공간 목록·예약을 만질 때 |
 | `docs/spec/booking-2.md` | 예약 2차: 예약 프로세스 전체, 좌석 예약, 사용 인원, 인원으로 거르기, 참석자 초대, 알림, 예약 바꾸기. `booking.md`와 다르면 이 문서가 맞다 | 예약·내 예약·알림을 만질 때 |
-| `docs/spec/chat.md` | 채팅·통화·자료 공유의 정의와 앱의 틀(레일과 사이드바). 지시서가 나온 범위만 구현 대상이다 (지시서 19: 앱의 틀, 20: 채팅 기반). 앱의 틀에 대해 `ui.md`, `ui-2.md`와 다르면 이 문서가 맞다 | 앱의 틀이나 채팅을 만질 때 |
+| `docs/spec/chat.md` | 채팅·통화·자료 공유의 정의와 앱의 틀(레일과 사이드바). 지시서가 나온 범위만 구현 대상이다 (지시서 19: 앱의 틀, 20: 채팅 기반, 21: 읽음과 연결, 22: 메시지 다듬기). 앱의 틀에 대해 `ui.md`, `ui-2.md`와 다르면 이 문서가 맞다 | 앱의 틀이나 채팅을 만질 때 |
 | `docs/spec/space-admin.md` | 운영자가 지점·층·공간·이용 대상을 입력하는 규칙 | 운영자 화면을 만질 때 |
 | `docs/spec/data-model.md` | 테이블, 컬럼, 제약 | DB 스키마·쿼리를 만질 때 |
 | `docs/spec/server.md` | Server Actions 규칙, 결과 타입, 데이터 접근 계층, 세션, 메일, 실시간 | 서버 코드를 만질 때 |
@@ -74,7 +76,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 패키지 매니저: pnpm 12. Node 22 LTS (22.12 이상)
 - 배포 대상: Vercel (지금 배포하지는 않는다)
 
-아직 정하지 않은 것: 실시간 서비스(Ably·Pusher 등), 메일 발송 서비스(Resend 등). 이 둘은 인터페이스 뒤에 숨기고 임시 구현만 둔다. 임의로 서비스를 고르거나 SDK를 설치하지 않는다.
+실시간 서비스는 Ably로 정했다 (지시서 20이 `ably` 패키지를 설치한다). 아직 정하지 않은 것: 메일 발송 서비스(Resend 등), 파일 저장소. 이것들은 인터페이스 뒤에 숨기고 임시 구현만 둔다. 임의로 서비스를 고르거나 SDK를 설치하지 않는다.
 
 ## 명령어
 
@@ -129,7 +131,7 @@ docs/                명세와 작업 지시서
 
 - 쓰기는 전부 Server Actions로 한다. 별도 API 서버를 만들지 않는다.
 - 첫 화면 데이터는 Server Component에서 `features/*/queries.ts`의 읽기 함수를 불러 읽는다. queries가 `lib/dal`과 `canAccess()`를 쓴다. 읽기에 Server Action을 쓰지 않는다.
-- Route Handler는 캐시되는 GET(게시된 평면도 JSON, 이전 메시지), 외부 웹훅, Better Auth(`app/api/auth/[...all]/route.ts`), 화면이 떠 있는 동안 되풀이해 읽는 두 가지 GET(참석자 찾기 `/api/participants/search`, 알림 `/api/notifications`. `docs/spec/booking-2.md`), 그리고 실시간 토큰 `POST /api/realtime/token`(Ably 토큰 요청. DB에 쓰지 않는다. `docs/spec/chat.md`)에만 쓴다. 참석자 찾기, 알림, 실시간 토큰은 캐시하지 않고(`private, no-store`), `features/*/queries.ts`의 함수를 부르기만 하며, 세션은 그 함수가 확인한다. 이 목록에 없는 읽기를 Route Handler로 만들지 않는다. 가입·로그인·로그아웃은 Better Auth가 처리하므로 Server Action 래퍼를 거치지 않는다. 그 밖의 쓰기는 예외가 없다.
+- Route Handler는 캐시되는 GET(게시된 평면도 JSON), 채팅의 되풀이 읽기 GET 두 가지(메시지 페이지 `/api/rooms/[roomId]/messages`: 이전 메시지와 다시 연결한 뒤의 빠진 메시지, 채팅 목록 `/api/chat/nav`: 레일·사이드바의 안 읽음. 캐시하지 않는다. 지시서 21), 외부 웹훅, Better Auth(`app/api/auth/[...all]/route.ts`), 화면이 떠 있는 동안 되풀이해 읽는 두 가지 GET(참석자 찾기 `/api/participants/search`, 알림 `/api/notifications`. `docs/spec/booking-2.md`), 그리고 실시간 토큰 `POST /api/realtime/token`(Ably 토큰 요청. DB에 쓰지 않는다. `docs/spec/chat.md`)에만 쓴다. 참석자 찾기, 알림, 실시간 토큰은 캐시하지 않고(`private, no-store`), `features/*/queries.ts`의 함수(실시간 토큰은 `features/chat/realtime-token.ts`)를 부르기만 하며, 세션은 그 함수가 확인한다. 이 목록에 없는 읽기를 Route Handler로 만들지 않는다. 가입·로그인·로그아웃은 Better Auth가 처리하므로 Server Action 래퍼를 거치지 않는다. 그 밖의 쓰기는 예외가 없다.
 - Better Auth를 직접 부르는 곳은 `lib/auth/*`, 인증의 Route Handler(`app/api/auth/[...all]/route.ts`), 브라우저용 인증 클라이언트(`lib/auth/client.ts`)뿐이다. 다른 코드는 `getSession()`, `requireSession()`, `requirePageSession()`, `requireOperatorPage()`만 쓴다.
 - 모든 Server Action은 누구나 호출할 수 있는 공개 POST 주소로 취급한다. 순서는 세션 확인 → zod 검증 → 권한 확인 → 실행이고, `lib/actions`의 래퍼로만 만든다.
 - 액션은 예외를 던지지 않고 `{ ok: true, data }` 또는 `{ ok: false, code }`를 돌려준다. 코드 목록은 `docs/spec/server.md`에 있다.
@@ -146,7 +148,7 @@ DB
 - 예약 겹침은 DB의 EXCLUDE 제약이 최종 방어선이다. 애플리케이션 코드의 사전 검사로 대신하지 않는다. 시드 스크립트만 예외로, 자기 예약을 넣기 전에 겹침을 조회해 건너뛴다.
 - 예약 행은 지우지 않고 취소한다. 시드 스크립트가 자기 id의 예약을 지우고 다시 넣는 것만 예외다.
 - 상태를 바꾸는 쓰기(취소, 승인, 수락, 보관)는 "지금 그 상태일 때만 바꾸는" `UPDATE … WHERE … RETURNING` 한 문장으로 한다. 먼저 읽고 나서 바꾸지 않는다. 개수 한도와 "예약이 있으면 안 됨" 같은 검사는 같은 트랜잭션에서 기준 행을 잠근 뒤 센다.
-- 날짜와 시각 계산은 지점의 시간대로 하고 `lib/time`의 함수를 쓴다. 서버나 브라우저의 시간대에 기대는 호출(`getHours()`, 시간대 없는 `toLocaleString()` 등)을 쓰지 않는다.
+- 날짜와 시각 계산은 지점의 시간대로 하고 `lib/time`의 함수를 쓴다. 예외: 지점이 없는 채팅의 날짜와 시각은 `Asia/Seoul`로 쓴다 (`docs/spec/chat.md`). 서버나 브라우저의 시간대에 기대는 호출(`getHours()`, 시간대 없는 `toLocaleString()` 등)을 쓰지 않는다.
 - 현재 시각이 결과를 바꾸는 쓰기와 조회는 SQL의 `now()`를 쓰지 않고, 함수가 받은 현재 시각을 바인딩한다. 테스트가 시각을 고정한다.
 - 여러 행을 잠글 때의 순서는 층 → 공간 → 사용자·팀이다.
 - id는 uuid, 시간은 `timestamptz`, 예약·점검 시간은 `tstzrange`(`[시작, 끝)`)다. DB는 snake_case, TypeScript는 camelCase다.

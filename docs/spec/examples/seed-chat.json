@@ -1,0 +1,13 @@
+{
+  "note": "채팅 기반(지시서 20)의 가상 데이터다. 팀 스페이스는 seed.json의 팀마다 시드가 만들고(이 파일에 적지 않는다), 각 팀 스페이스의 기본 채널 '일반'에 아래 메시지를 순서대로 넣는다. teamId는 seed.json의 teams[].id, authorKey는 seed.json의 users[].key다. minutesAgo는 시드를 돌린 시각에서 뺀 분이고, 목록 순서와 같은 순서(오래된 것부터)여야 한다. 메시지 번호(seq)는 목록 순서대로 1부터 매긴다. 다시 돌려도 같아야 한다(그 스페이스의 메시지를 지우고 다시 넣는다).",
+  "messages": [
+    { "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff", "authorKey": "designAdmin", "minutesAgo": 1500, "body": "디자인팀 채널을 열었어요. 리뷰 자료와 일정은 여기서 이야기해요." },
+    { "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff", "authorKey": "designMember", "minutesAgo": 1490, "body": "좋아요! 이번 주 리뷰는 목요일 오전이죠?" },
+    { "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff", "authorKey": "designAdmin", "minutesAgo": 1480, "body": "네, 세미나룸으로 잡아 둘게요." },
+    { "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff", "authorKey": "both", "minutesAgo": 95, "body": "사이드바 시안 v3 올렸어요. 레일 폭은 72px로 맞췄어요." },
+    { "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff", "authorKey": "designMember", "minutesAgo": 92, "body": "확인했어요. 오후에 코멘트 남길게요." },
+    { "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff", "authorKey": "designAdmin", "minutesAgo": 12, "body": "오늘 3시 전에 다 같이 한 번 볼까요?" },
+    { "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b", "authorKey": "growthAdmin", "minutesAgo": 300, "body": "그로스팀 채널이에요. 실험 결과는 여기에 공유해 주세요." },
+    { "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b", "authorKey": "both", "minutesAgo": 240, "body": "온보딩 실험 1주 차 결과 정리 중이에요." }
+  ]
+}
