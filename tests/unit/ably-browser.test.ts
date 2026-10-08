@@ -54,6 +54,65 @@ afterEach(() => {
 });
 
 describe("Ably browser connection ownership", () => {
+  it("authorizes presence without a message consumer and leaves before detach even when leave rejects", async () => {
+    const { realtime, requestToken, client, calls } = setup();
+    const presence = client.channel("room:a").presence;
+    presence.leave.mockImplementation(async () => {
+      calls.push("leave:room:a");
+      throw new Error("private details");
+    });
+    const observer = realtime.observePresence("room:a", vi.fn());
+    observer.update({ typing: true, name: "김서연" });
+    realtime.start();
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith({
+      rooms: ["a"],
+      spaces: [],
+    });
+    expect(presence.enter).toHaveBeenCalledExactlyOnceWith({
+      typing: true,
+      name: "김서연",
+    });
+    observer.close();
+    await vi.runAllTimersAsync();
+    expect(calls.indexOf("leave:room:a")).toBeLessThan(
+      calls.indexOf("detach:room:a"),
+    );
+    const next = realtime.observePresence("room:b", vi.fn());
+    next.update({ typing: true });
+    await vi.runAllTimersAsync();
+    expect(
+      client.channel("room:b").presence.enter,
+    ).toHaveBeenCalledExactlyOnceWith({ typing: true });
+  });
+  it("never enters presence when the returned token grants only subscribe", async () => {
+    const { realtime, requestToken, client } = setup();
+    requestToken.mockResolvedValue({
+      ...fakeTokenRequest,
+      capability: JSON.stringify({ "room:a": ["subscribe"] }),
+    });
+    const observer = realtime.observePresence("room:a", vi.fn());
+    observer.update({ typing: true });
+    realtime.start();
+    await vi.runAllTimersAsync();
+    expect(client.channel("room:a").subscribe).toHaveBeenCalledTimes(1);
+    expect(client.channel("room:a").presence.enter).not.toHaveBeenCalled();
+    expect(client.channel("room:a").presence.subscribe).not.toHaveBeenCalled();
+  });
+  it("releases the last presence observer without detaching a remaining message subscriber", async () => {
+    const { realtime, client } = setup();
+    realtime.subscribe("room:a", vi.fn());
+    const observer = realtime.observePresence("room:a", vi.fn());
+    observer.update({ typing: true });
+    realtime.start();
+    await vi.runAllTimersAsync();
+    observer.close();
+    await vi.runAllTimersAsync();
+    const channel = client.channel("room:a");
+    expect(channel.presence.leave).toHaveBeenCalledTimes(1);
+    expect(channel.presence.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(channel.detach).not.toHaveBeenCalled();
+  });
   it("does not reuse a preflight token when the room changes before the SDK starts authentication", async () => {
     const { realtime, client, loadClient, requestToken, emitConnection } =
       setup();

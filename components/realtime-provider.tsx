@@ -2,10 +2,12 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useEffectEvent,
   useState,
+  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -18,6 +20,11 @@ import {
 } from "@/lib/realtime/ably-browser";
 import { userChannel } from "@/lib/realtime/channels";
 import type { RealtimeEvent } from "@/lib/realtime/types";
+import type { PresenceMember } from "@/lib/realtime/ably-browser-client";
+import type {
+  PresenceData,
+  PresenceObserver,
+} from "@/lib/realtime/ably-presence";
 
 const RealtimeContext = createContext<BrowserRealtime | null>(null);
 const subscribeDisabled = () => () => {};
@@ -80,5 +87,29 @@ export function useRealtimeLifecycle(
   useEffect(
     () => realtime?.subscribeLifecycle((event) => handleEvent(event)),
     [realtime],
+  );
+}
+
+export function useRealtimePresence(
+  channel: string | null,
+  onMembers: (members: readonly PresenceMember[]) => void,
+) {
+  const realtime = useContext(RealtimeContext);
+  const observer = useRef<PresenceObserver | null>(null);
+  const receive = useEffectEvent(onMembers);
+  useEffect(() => {
+    if (!realtime || !channel) return;
+    const current = realtime.observePresence(channel, (members) =>
+      receive(members),
+    );
+    observer.current = current;
+    return () => {
+      observer.current = null;
+      current.close();
+    };
+  }, [channel, realtime]);
+  return useCallback(
+    (data: PresenceData) => observer.current?.update(data),
+    [],
   );
 }

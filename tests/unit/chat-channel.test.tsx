@@ -9,6 +9,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RealtimeEvent } from "@/lib/realtime/types";
+import type { PresenceMember } from "@/lib/realtime/ably-browser-client";
 import type { ActionResult } from "@/lib/actions/result";
 import type { ChannelView, ChatMessage } from "@/features/chat/types";
 import { emptyMessageDetails } from "@/features/chat/types";
@@ -30,6 +31,8 @@ const realtime = vi.hoisted(() => ({
   ) => void,
   connection: "disabled",
   refresh: vi.fn(),
+  presenceUpdate: vi.fn(),
+  presenceReceive: vi.fn() as (members: readonly PresenceMember[]) => void,
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: realtime.refresh }),
@@ -52,6 +55,13 @@ vi.mock("@/components/realtime-provider", () => ({
   },
   useRealtimeConnectionState: () => realtime.connection,
   useRealtimeLifecycle: () => {},
+  useRealtimePresence: (
+    _channel: string | null,
+    receive: typeof realtime.presenceReceive,
+  ) => {
+    realtime.presenceReceive = receive;
+    return realtime.presenceUpdate;
+  },
 }));
 
 const now = "2026-10-08T03:00:00Z";
@@ -134,6 +144,7 @@ beforeEach(() => {
   restoreViewport = installChatViewport();
   realtime.refresh.mockReset();
   realtime.connection = "disabled";
+  realtime.presenceUpdate.mockReset();
   vi.mocked(fetchRoomMessagesPage).mockReset();
 });
 afterEach(() => {
@@ -186,6 +197,40 @@ describe("chat message composer", () => {
 });
 
 describe("chat channel presentation", () => {
+  it("wires typing to the composer and clears it when sending", () => {
+    setup(view(), async (input) => ({
+      ok: true,
+      data: message({ body: input.body, clientId: input.clientId }),
+    }));
+    fireEvent.change(screen.getByRole("combobox", { name: "메시지" }), {
+      target: { value: "안녕" },
+    });
+    expect(realtime.presenceUpdate).toHaveBeenCalledWith({
+      typing: true,
+      name: "박지훈",
+    });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "메시지" }), {
+      key: "Enter",
+    });
+    expect(realtime.presenceUpdate).toHaveBeenLastCalledWith({ typing: false });
+  });
+  it("shows verified typing names even to a read-only channel member", () => {
+    const { container } = setup(view({ canWrite: false }));
+    act(() =>
+      realtime.presenceReceive([
+        {
+          clientId: "other",
+          connectionId: "tab",
+          timestamp: Date.now(),
+          data: { typing: true, name: "믿지 않는 이름" },
+        },
+      ]),
+    );
+    expect(container.querySelector("[data-chat-typing]")).toHaveTextContent(
+      "이서연 님이 입력하고 있어요",
+    );
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
   it("shows one mobile member sheet and returns focus to its trigger", async () => {
     vi.stubGlobal(
       "matchMedia",

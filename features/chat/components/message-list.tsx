@@ -99,7 +99,11 @@ export const MessageList = memo(function MessageList({
   loadingOlder?: boolean;
   historyError?: boolean;
   onLoadOlder?: (maxMessages?: number) => Promise<void>;
-  onViewport?: (atBottom: boolean, seq: number | null) => void;
+  onViewport?: (
+    atBottom: boolean,
+    seq: number | null,
+    visibleSeq?: number | null,
+  ) => void;
   onRetry: (message: DisplayMessage) => void;
   onRemove: (message: DisplayMessage) => void;
   actions?: MessageActions;
@@ -281,7 +285,11 @@ export const MessageList = memo(function MessageList({
   useEffect(() => {
     if (!initialized) return;
     setSeenThrough((previous) => Math.max(previous, visibleSeq));
-    onViewport(atBottom, atBottom && lastSeq > 0 ? lastSeq : null);
+    onViewport(
+      atBottom,
+      atBottom && lastSeq > 0 ? lastSeq : null,
+      visibleSeq || null,
+    );
   }, [atBottom, initialized, lastSeq, onViewport, visibleSeq]);
   useEffect(() => () => onViewport(false, null), [onViewport]);
 

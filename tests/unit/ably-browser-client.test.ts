@@ -25,6 +25,14 @@ const sdk = vi.hoisted(() => ({
   detach: vi.fn(async () => {}),
   onChannel: vi.fn(),
   offChannel: vi.fn(),
+  presence: {
+    get: vi.fn(async () => [] as unknown[]),
+    subscribe: vi.fn(async () => {}),
+    unsubscribe: vi.fn(),
+    enter: vi.fn(async () => {}),
+    update: vi.fn(async () => {}),
+    leave: vi.fn(async () => {}),
+  },
 }));
 
 const created: Extract<RealtimeEvent, { type: "message.created" }> = {
@@ -72,6 +80,7 @@ beforeEach(() => {
     detach: sdk.detach,
     on: sdk.onChannel,
     off: sdk.offChannel,
+    presence: sdk.presence,
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -325,5 +334,37 @@ describe("Ably SDK bridge", () => {
     expect(listener.mock.calls).toEqual([[true], [false]]);
     stop();
     expect(sdk.offChannel).toHaveBeenCalledExactlyOnceWith(callback);
+  });
+  it("uses SDK presence snapshots and forwards only member identity, timestamp and untrusted data", async () => {
+    const client = await loadAblyBrowserClient(vi.fn());
+    const presence = client.channel("room:a").presence;
+    const data = { typing: true, name: "이름은 검증 전" };
+    sdk.presence.get.mockResolvedValue([
+      {
+        clientId: "u",
+        connectionId: "tab",
+        timestamp: 1,
+        data,
+        extras: { private: true },
+        id: "sdk-message",
+        action: "enter",
+      },
+    ]);
+    await expect(presence.get()).resolves.toEqual([
+      { clientId: "u", connectionId: "tab", timestamp: 1, data },
+    ]);
+    const listener = vi.fn();
+    await presence.subscribe(listener);
+    await presence.enter(data);
+    await presence.update({ typing: false });
+    presence.unsubscribe(listener);
+    await presence.leave();
+    expect(sdk.presence.subscribe).toHaveBeenCalledExactlyOnceWith(listener);
+    expect(sdk.presence.unsubscribe).toHaveBeenCalledExactlyOnceWith(listener);
+    expect(sdk.presence.enter).toHaveBeenCalledExactlyOnceWith(data);
+    expect(sdk.presence.update).toHaveBeenCalledExactlyOnceWith({
+      typing: false,
+    });
+    expect(sdk.presence.leave).toHaveBeenCalledTimes(1);
   });
 });

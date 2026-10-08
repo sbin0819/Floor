@@ -125,10 +125,27 @@ export interface BrowserConnectionChange {
 }
 
 export interface BrowserChannel {
+  presence: BrowserPresence;
   subscribe(listener: (event: RealtimeEvent) => void): Promise<void>;
   unsubscribe(listener: (event: RealtimeEvent) => void): void;
   onAttached(listener: (resumed: boolean) => void): () => void;
   detach(): Promise<void>;
+}
+
+export type PresenceMember = {
+  clientId: string;
+  connectionId: string;
+  timestamp: number;
+  data: unknown;
+};
+
+export interface BrowserPresence {
+  get(): Promise<PresenceMember[]>;
+  subscribe(listener: () => void): Promise<void>;
+  unsubscribe(listener: () => void): void;
+  enter(data: Record<string, unknown>): Promise<void>;
+  update(data: Record<string, unknown>): Promise<void>;
+  leave(): Promise<void>;
 }
 
 export interface AblyBrowserClient {
@@ -172,6 +189,23 @@ export async function loadAblyBrowserClient(
         (message: { data?: unknown }) => void
       >();
       return {
+        presence: {
+          async get() {
+            return (await channel.presence.get()).map(
+              ({ clientId, connectionId, timestamp, data }) => ({
+                clientId,
+                connectionId,
+                timestamp,
+                data: data as unknown,
+              }),
+            );
+          },
+          subscribe: (listener) => channel.presence.subscribe(listener),
+          unsubscribe: (listener) => channel.presence.unsubscribe(listener),
+          enter: (data) => channel.presence.enter(data),
+          update: (data) => channel.presence.update(data),
+          leave: () => channel.presence.leave(),
+        },
         async subscribe(listener) {
           const handler = (message: { data?: unknown }) => {
             const parsed = eventSchema.safeParse(message.data);

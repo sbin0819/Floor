@@ -178,9 +178,11 @@ describe("virtual message list", () => {
       <MessageList {...props} messages={range(1, 30)} onViewport={viewport} />,
     );
     const region = screen.getByRole("region");
-    await waitFor(() => expect(viewport).toHaveBeenLastCalledWith(true, 30));
+    await waitFor(() =>
+      expect(viewport).toHaveBeenLastCalledWith(true, 30, 30),
+    );
     fireEvent.scroll(region, { target: { scrollTop: 1_200 } });
-    expect(viewport).toHaveBeenLastCalledWith(false, null);
+    expect(viewport).toHaveBeenLastCalledWith(false, null, 22);
     result.unmount();
     expect(viewport).toHaveBeenLastCalledWith(false, null);
   });
@@ -233,7 +235,7 @@ describe("virtual message list", () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
     });
     rendered.mockClear();
-    const input = screen.getByRole("textbox", { name: "메시지" });
+    const input = screen.getByRole("combobox", { name: "메시지" });
     for (const value of ["안", "안녕", "안녕하세요"])
       fireEvent.change(input, { target: { value } });
     expect(input).toHaveValue("안녕하세요");

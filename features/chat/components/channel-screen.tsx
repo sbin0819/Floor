@@ -29,10 +29,8 @@ import { MessageComposer } from "./message-composer";
 import { MessageList } from "./message-list";
 import { MessageDeleteDialog } from "./message-delete-dialog";
 import { MessageEditor } from "./message-editor";
-import {
-  useMessageMutations,
-  withReactionIntents,
-} from "./use-message-mutations";
+import { useMessageMutations } from "./use-message-mutations";
+import { useTyping } from "./use-typing";
 import type { DisplayMessage } from "./message-state";
 import { useMessageHistory } from "./use-message-history";
 import { useRoomRead } from "./use-room-read";
@@ -69,6 +67,13 @@ export function ChannelScreen({
   send?: SendChatMessage;
 }) {
   const messages = useChannelMessages(data, send);
+  const { reportVisible } = messages;
+  const typing = useTyping({
+    roomId: data.room.id,
+    user: data.user,
+    members: data.members,
+    enabled: !data.room.archived,
+  });
   const selectedMessage = useSearchParams().get("message");
   const mutations = useMessageMutations({
     roomId: data.room.id,
@@ -97,7 +102,9 @@ export function ChannelScreen({
   const [composerFocus, setComposerFocus] = useState(0);
   const reply = replyState?.roomId === data.room.id ? replyState.reply : null;
   const editingId =
-    editState?.roomId === data.room.id ? editState.messageId : null;
+    data.canWrite && editState?.roomId === data.room.id
+      ? editState.messageId
+      : null;
   const names = new Map(data.members.map(({ id, name }) => [id, name]));
   const candidates = data.members.map(({ id, name }) => ({ userId: id, name }));
   const edit = (message: DisplayMessage) =>
@@ -143,15 +150,16 @@ export function ChannelScreen({
     seq: number | null;
   }>({ roomId: data.room.id, seq: null });
   const onViewport = useCallback(
-    (atBottom: boolean, seq: number | null) => {
+    (atBottom: boolean, seq: number | null, visibleSeq?: number | null) => {
       reportRoomViewport(client, data.room.id, atBottom);
+      reportVisible(visibleSeq ?? seq);
       setVisible((previous) =>
         previous.roomId === data.room.id && previous.seq === seq
           ? previous
           : { roomId: data.room.id, seq },
       );
     },
-    [client, data.room.id],
+    [client, data.room.id, reportVisible],
   );
   useEffect(
     () => () => releaseRoomViewport(client, data.room.id),
@@ -225,7 +233,7 @@ export function ChannelScreen({
             channelName={data.room.name}
             now={data.now}
             userId={data.user.id}
-            messages={messages.messages.map(withReactionIntents)}
+            messages={messages.messages}
             firstUnreadSeq={
               messages.historyReset
                 ? messages.historyReset.firstUnreadSeq
@@ -283,7 +291,11 @@ export function ChannelScreen({
             <MessageComposer
               key={data.room.id}
               channelName={data.room.name}
-              onSend={messages.submit}
+              onSend={(body, reply) => {
+                messages.submit(body, reply);
+                typing.stopTyping();
+              }}
+              onInput={typing.onInput}
               members={candidates}
               allowEveryone={admin}
               reply={reply}
@@ -307,6 +319,14 @@ export function ChannelScreen({
                 : "이 채널에는 관리자만 쓸 수 있어요"}
             </p>
           )}
+          <p
+            role="status"
+            aria-live="polite"
+            className="min-h-6 shrink-0 px-4 pb-1 text-xs text-muted-foreground md:px-6"
+            data-chat-typing
+          >
+            {typing.label}
+          </p>
         </div>
         {wide && membersOpen && (
           <aside

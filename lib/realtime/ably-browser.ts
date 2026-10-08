@@ -8,7 +8,9 @@ import {
   type BrowserAuthCallback,
   type BrowserChannel,
   type RealtimeTokenInput,
+  type PresenceMember,
 } from "@/lib/realtime/ably-browser-client";
+import { createPresenceRegistry, type PresenceObserver } from "./ably-presence";
 import type { RealtimeEvent, RealtimeSubscriber } from "@/lib/realtime/types";
 
 export type RealtimeConnectionState = ConnectionState | "disabled";
@@ -17,6 +19,10 @@ export type RealtimeLifecycleEvent =
   | { type: "channel"; channel: string; state: "attached"; resumed: boolean };
 
 export interface BrowserRealtime extends RealtimeSubscriber {
+  observePresence(
+    channel: string,
+    onMembers: (members: readonly PresenceMember[]) => void,
+  ): PresenceObserver;
   start(): void;
   close(): void;
   getSnapshot(): RealtimeConnectionState;
@@ -32,7 +38,7 @@ type Binding = {
   stopAttached: () => void;
 };
 
-function grantedChannels(token: TokenRequest): Set<string> {
+function grantedChannels(token: TokenRequest) {
   const capability: unknown = JSON.parse(token.capability);
   if (
     !capability ||
@@ -41,6 +47,7 @@ function grantedChannels(token: TokenRequest): Set<string> {
   )
     throw new RealtimeTokenError(502);
   const channels = new Set<string>();
+  const presenceChannels = new Set<string>();
   for (const [name, operations] of Object.entries(capability)) {
     if (
       !Array.isArray(operations) ||
@@ -49,8 +56,10 @@ function grantedChannels(token: TokenRequest): Set<string> {
       throw new RealtimeTokenError(502);
     if (!name.includes("*") && operations.includes("subscribe"))
       channels.add(name);
+    if (!name.includes("*") && operations.includes("presence"))
+      presenceChannels.add(name);
   }
-  return channels;
+  return { channels, presenceChannels };
 }
 
 export function createAblyBrowserRealtime({
@@ -64,6 +73,7 @@ export function createAblyBrowserRealtime({
 } = {}): BrowserRealtime {
   const listeners = new Map<string, Set<(event: RealtimeEvent) => void>>();
   const bindings = new Map<string, Binding>();
+  const presence = createPresenceRegistry();
   const stateListeners = new Set<() => void>();
   const lifecycleListeners = new Set<(event: RealtimeLifecycleEvent) => void>();
   let state: RealtimeConnectionState = "initialized";
@@ -74,7 +84,9 @@ export function createAblyBrowserRealtime({
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
   let dirty = false;
-  let authorization: { scope: string; channels: Set<string> } | undefined;
+  let authorization:
+    | { scope: string; channels: Set<string>; presenceChannels: Set<string> }
+    | undefined;
   let failureScope: string | undefined;
   let recoveredFailure = false;
   const failedChannels = new Set<string>();
@@ -103,6 +115,7 @@ export function createAblyBrowserRealtime({
     timer = undefined;
     stopConnection?.();
     stopConnection = undefined;
+    presence.reset();
     for (const binding of bindings.values()) {
       binding.channel.unsubscribe(binding.listener);
       binding.stopAttached();
@@ -177,7 +190,7 @@ export function createAblyBrowserRealtime({
             cached?.scope === scope ? cached.token : await requestToken(input);
           if (!active || version !== generation) break;
           if (JSON.stringify(currentChannels()) !== scope) continue;
-          authorization = { scope, channels: grantedChannels(token) };
+          authorization = { scope, ...grantedChannels(token) };
           callback(null, token);
           schedule();
           return;
@@ -227,6 +240,7 @@ export function createAblyBrowserRealtime({
         binding.stopAttached();
         bindings.delete(name);
         try {
+          await presence.unbind(name);
           await binding.channel.detach();
         } catch {
           // failed 채널은 detach도 실패한다. SDK 객체를 버려 다음 방을 막지 않게 한다.
@@ -281,6 +295,14 @@ export function createAblyBrowserRealtime({
           }
         });
       }
+      for (const [name, binding] of bindings) {
+        if (
+          authorization.presenceChannels.has(name) &&
+          presence.hasObservers(name)
+        )
+          presence.bind(name, binding.channel.presence);
+        else await presence.unbind(name);
+      }
     } catch {
       if (active && version === generation) setState("disconnected");
     } finally {
@@ -289,7 +311,34 @@ export function createAblyBrowserRealtime({
     }
   }
 
+  const subscribe: RealtimeSubscriber["subscribe"] = (channel, onEvent) => {
+    const subscribers = listeners.get(channel) ?? new Set();
+    const listener = (event: RealtimeEvent) => onEvent(event);
+    subscribers.add(listener);
+    listeners.set(channel, subscribers);
+    schedule();
+    return () => {
+      subscribers.delete(listener);
+      if (!subscribers.size && listeners.get(channel) === subscribers) {
+        listeners.delete(channel);
+        schedule();
+      }
+    };
+  };
+
   return {
+    observePresence(channel, onMembers) {
+      const stop = subscribe(channel, () => {});
+      const observer = presence.observe(channel, onMembers);
+      return {
+        update: observer.update,
+        close() {
+          observer.close();
+          stop();
+          schedule();
+        },
+      };
+    },
     start() {
       if (active) return;
       active = true;
@@ -306,19 +355,6 @@ export function createAblyBrowserRealtime({
       lifecycleListeners.add(listener);
       return () => lifecycleListeners.delete(listener);
     },
-    subscribe(channel, onEvent) {
-      const subscribers = listeners.get(channel) ?? new Set();
-      const listener = (event: RealtimeEvent) => onEvent(event);
-      subscribers.add(listener);
-      listeners.set(channel, subscribers);
-      schedule();
-      return () => {
-        subscribers.delete(listener);
-        if (!subscribers.size && listeners.get(channel) === subscribers) {
-          listeners.delete(channel);
-          schedule();
-        }
-      };
-    },
+    subscribe,
   };
 }

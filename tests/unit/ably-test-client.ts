@@ -7,6 +7,8 @@ import type {
   BrowserChannel,
   BrowserConnectionChange,
   RealtimeTokenInput,
+  PresenceMember,
+  BrowserPresence,
 } from "@/lib/realtime/ably-browser-client";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
@@ -46,6 +48,20 @@ export function createFakeAblyBrowser() {
     const listeners = new Set<(event: RealtimeEvent) => void>();
     const attachedListeners = new Set<(resumed: boolean) => void>();
     const channel = {
+      presence: {
+        get: vi.fn(async (): Promise<PresenceMember[]> => []),
+        subscribe: vi.fn<BrowserPresence["subscribe"]>(async () => {}),
+        unsubscribe: vi.fn<BrowserPresence["unsubscribe"]>(() => {}),
+        enter: vi.fn<BrowserPresence["enter"]>(async () => {
+          calls.push(`enter:${name}`);
+        }),
+        update: vi.fn<BrowserPresence["update"]>(async () => {
+          calls.push(`update:${name}`);
+        }),
+        leave: vi.fn(async () => {
+          calls.push(`leave:${name}`);
+        }),
+      },
       subscribe: vi.fn(async (listener: (event: RealtimeEvent) => void) => {
         calls.push(`subscribe:${name}`);
         listeners.add(listener);
