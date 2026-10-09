@@ -52,7 +52,7 @@ export function hitTest(
   index: PlanSpatialIndex,
   camera: Camera,
   screenPoint: Point,
-  options: { kinds?: readonly ("space" | "seat")[] } = {},
+  options: { kinds?: readonly ("space" | "seat" | "fixture")[] } = {},
 ): PolygonShape | null {
   const point = toWorld(screenPoint, camera);
   const kinds = options.kinds ?? ["space", "seat"];
@@ -60,7 +60,9 @@ export function hitTest(
     .search({ minX: point[0], maxX: point[0], minY: point[1], maxY: point[1] })
     .filter(
       (shape): shape is PolygonShape =>
-        (shape.kind === "space" || shape.kind === "seat") &&
+        (shape.kind === "space" ||
+          shape.kind === "seat" ||
+          shape.kind === "fixture") &&
         kinds.includes(shape.kind),
     );
   const priority = (shape: PlanShape) => (shape.kind === "seat" ? 1 : 0);

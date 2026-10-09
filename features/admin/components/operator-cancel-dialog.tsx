@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBookingTime } from "@/features/bookings/format";
-import { cancelBookingAsOperator } from "../booking-actions";
+import { cancelBookingAsOperator } from "@/features/admin/booking-actions";
 import {
   cancellationPresets,
   cancelBookingAsOperatorSchema,

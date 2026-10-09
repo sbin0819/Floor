@@ -22,7 +22,7 @@ import {
   clearRoomUnread,
 } from "../nav-state";
 import type { ChatReply, ChatAttachment } from "../types";
-import { discardUploads } from "../upload-actions";
+import { discardUploads } from "@/features/chat/upload-actions";
 import type { RoomMessageSource } from "../room-message-source";
 import { emptyMessageDetails } from "../types";
 import {

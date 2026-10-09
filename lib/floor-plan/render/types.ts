@@ -55,6 +55,7 @@ export type PlanColors = Record<PlanStateKind | "fixture", PlanPalette> & {
   focus: string;
   shadow: string;
   maintenancePattern?: CanvasPattern;
+  issue?: PlanPalette;
   seatMine?: PlanPalette;
   seatBooked?: PlanPalette;
   heat?: readonly [PlanPalette, PlanPalette, PlanPalette, PlanPalette];

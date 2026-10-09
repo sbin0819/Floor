@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { UsernameForm } from "@/features/people/components/username-form";
 import { PersonProfileContent } from "@/features/people/components/person-card";
-import * as actions from "../actions";
+import * as actions from "@/features/settings/actions";
 import { updateNameSchema } from "../schema";
 import type { ProfileSettings as ProfileSettingsData } from "../types";
 import { SettingsCard } from "./settings-shell";

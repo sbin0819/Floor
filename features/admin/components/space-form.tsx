@@ -29,7 +29,7 @@ export function SpaceForm({
   floorId: string;
   space?: AdminSpace;
   canManage: boolean;
-  onSaved?: () => void;
+  onSaved?: (data: { spaceId: string }) => void;
 }) {
   const id = useId();
   const [type, setType] = useState<AdminSpace["type"]>(

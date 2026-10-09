@@ -6,7 +6,7 @@ import {
   createUploads,
   completeUploads,
   discardUploads,
-} from "../upload-actions";
+} from "@/features/chat/upload-actions";
 import { createUploadController } from "../upload-controller";
 import { uploadFile } from "../upload-file";
 

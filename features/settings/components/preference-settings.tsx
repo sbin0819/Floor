@@ -16,7 +16,7 @@ import {
 import { setDefaultBranch } from "@/features/bookings/actions";
 import { applyChatPreferences } from "@/features/chat/nav-state";
 import { NOTIFICATION_SUMMARY_KEY } from "@/features/notifications/components/use-notifications";
-import { updatePreferences } from "../actions";
+import { updatePreferences } from "@/features/settings/actions";
 import type { Preferences } from "../schema";
 import type { PreferenceSettings as PreferenceSettingsData } from "../types";
 import { SettingsCard } from "./settings-shell";

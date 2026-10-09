@@ -103,3 +103,4 @@ export const updatePreferences = readOnlyAction;
 export const dismissHomeChecklist = readOnlyAction;
 export const updateRoleSettings = readOnlyAction;
 export const resetRoleSettings = readOnlyAction;
+export const saveFloorPlanDraft = readOnlyAction;

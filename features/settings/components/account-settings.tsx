@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AuthField } from "@/features/auth/components/auth-fields";
 import type { AccountSettings as AccountSettingsData } from "../types";
-import * as actions from "../actions";
+import * as actions from "@/features/settings/actions";
 import { changePasswordSchema } from "../schema";
 import { SettingsCard } from "./settings-shell";
 

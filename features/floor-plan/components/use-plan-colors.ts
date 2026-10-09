@@ -71,6 +71,11 @@ export function readPlanColors(root: HTMLElement): PlanColors {
     ),
     neutral: palette("background", "border", "foreground"),
     fixture: palette("secondary", "border", "muted-foreground"),
+    issue: palette(
+      "status-busy",
+      "status-busy-strong",
+      "status-busy-foreground",
+    ),
     maintenancePattern,
   };
 }
