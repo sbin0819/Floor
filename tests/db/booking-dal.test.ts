@@ -293,7 +293,7 @@ describe("booking data access", () => {
       { spaceId, during: range("09:00", "10:00"), createdBy: userId },
       {
         spaceId,
-        during: range("10:30", "11:30"),
+        during: range("10:30", "11:00"),
         createdBy: userId,
         reason: "점검",
       },
