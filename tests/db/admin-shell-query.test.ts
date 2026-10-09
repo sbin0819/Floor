@@ -91,6 +91,7 @@ describe("operator shell projection and budget", () => {
             "maintenance",
             "roles",
             "plans",
+            "announcements",
           ],
           maintenanceCount: 0,
         },

@@ -1,7 +1,7 @@
 "use client";
 
-import { Clock3 } from "lucide-react";
-import type { MouseEvent } from "react";
+import { Clock3, Megaphone } from "lucide-react";
+import { useId, useState, type MouseEvent } from "react";
 import { cn } from "cn";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -29,6 +29,8 @@ export function NotificationRow({
   onActivate: NotificationActivate;
   pending?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const bodyId = useId();
   const presentation = notificationPresentation(item);
   const booking =
     item.type !== "friend_request" &&
@@ -73,20 +75,21 @@ export function NotificationRow({
           />
         )}
       </span>
-      {item.type === "booking_reminder" ? (
+      {item.type === "booking_reminder" ||
+      item.type === "branch_announcement" ? (
         <span
           aria-hidden="true"
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
         >
-          <Clock3 className="size-5" />
+          {item.type === "branch_announcement" ? (
+            <Megaphone className="size-5" />
+          ) : (
+            <Clock3 className="size-5" />
+          )}
         </span>
       ) : (
         <UserAvatar
-          name={
-            item.type === "branch_announcement"
-              ? "공지"
-              : (item.data.actorName ?? "회원")
-          }
+          name={item.data.actorName ?? "회원"}
           avatar={item.actorAvatar ?? { color: "gray", photoUrl: null }}
           size={40}
         />
@@ -122,7 +125,34 @@ export function NotificationRow({
       return;
     }
     onActivate(item, event);
+    if (item.type === "branch_announcement") setExpanded((value) => !value);
   }
+  if (item.type === "branch_announcement")
+    return (
+      <div>
+        <button
+          type="button"
+          aria-label={label}
+          disabled={pending}
+          aria-expanded={expanded}
+          aria-controls={bodyId}
+          className={className}
+          onClick={activate}
+        >
+          {content}
+        </button>
+        {expanded && (
+          <div
+            id={bodyId}
+            role="region"
+            aria-label={`${item.data.branchName} 공지 내용`}
+            className="px-4 pb-4 pl-11 text-sm leading-6 wrap-anywhere whitespace-pre-wrap"
+          >
+            {item.data.body}
+          </div>
+        )}
+      </div>
+    );
   return item.href ? (
     <a
       href={item.href}

@@ -108,3 +108,4 @@ export const createPlanBackgroundUpload = readOnlyAction;
 export const confirmPlanBackgroundUpload = readOnlyAction;
 export const publishFloorPlan = readOnlyAction;
 export const restorePlanVersion = readOnlyAction;
+export const sendAnnouncement = readOnlyAction;

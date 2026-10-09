@@ -17,6 +17,7 @@ import {
   Menu,
   Wrench,
   PencilRuler,
+  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +51,7 @@ const icons = {
   maintenance: Wrench,
   roles: KeyRound,
   plans: PencilRuler,
+  announcements: Megaphone,
 };
 
 export function AdminShellNavigation({

@@ -20,6 +20,7 @@ const actionModules = [
   "features/admin/access-actions",
   "features/admin/booking-actions",
   "features/admin/maintenance-actions",
+  "features/admin/announcement-actions",
   "features/admin/role-settings-actions",
   "features/floor-plan/actions",
   "features/teams/actions",
