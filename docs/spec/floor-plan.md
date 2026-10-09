@@ -65,7 +65,7 @@ zod 스키마와 `superRefine`으로 검사한다. DB가 필요 없다.
 - 도형 `id`는 문서 전체에서 중복 없음
 - `openings[].wallId`는 문서 안의 벽 id
 - 같은 `spaceId`를 가리키는 `spaces[]` 도형은 1개, `seats[]`도 1개
-- 크기 상한 (지시서 38): 공간 도형 300개, 좌석 2000개, 벽 300개, 문 300개, 고정물 100개, 다각형·벽의 꼭짓점 64개. JSON으로 바꾼 크기 1MB
+- 크기 상한 (지시서 38): 공간 도형 300개, 좌석 2000개, 벽 300개, 문 300개, 고정물 100개, 다각형·벽의 꼭짓점 64개, `bounds`의 `w`·`h` 100,000mm 이하. JSON으로 바꾼 UTF-8 바이트(`TextEncoder`) 900KB 이하 (서버 액션의 몸통 한도 1MB 안에 들어가게)
 - `at`(openings)은 0 이상 1 이하, `opacity`는 0 이상 1 이하
 
 ### 게시할 때 검사 (지시서 38–39, PFQV-41)
@@ -77,7 +77,7 @@ export type PlanIssue = { code: PlanIssueCode; shapeId?: string; message: string
 type PlanContext = {
   floorId: string;
   floorAccess: AccessScope; floorAllowedTeamIds: string[];
-  spaces: { id: string; floorId: string; type: SpaceType; name: string; bookable: boolean;
+  spaces: { id: string; floorId: string; parentId: string | null; type: SpaceType; name: string; bookable: boolean;
             archived: boolean; access: AccessScope | null; allowedTeamIds: string[] }[]; // 이 층의 보관되지 않은 공간 + 문서가 가리키는 행
 };
 ```
@@ -89,14 +89,16 @@ type PlanContext = {
 | `SPACE_ARCHIVED` | 보관된 공간을 가리킴 | 막음 | 둘 다 |
 | `SPACE_IS_DESK` | 공간 도형이 좌석(`desk`) 행을 가리킴. 좌석은 `seats[]`로만 | 막음 | 둘 다 |
 | `SHAPE_MISSING` | 이 층의 보관되지 않은 공간(좌석 제외) 가운데 도형이 없는 것. 라운지도 포함 | 막음 | 둘 다 |
-| `POLYGON_SELF_INTERSECT` | 다각형의 변이 서로 교차함 (이웃한 변이 꼭짓점을 나누는 것은 교차가 아님) | 막음 | 둘 다 |
+| `POLYGON_SELF_INTERSECT` | 단순 다각형이 아님: 이웃하지 않은 변끼리 만남(교차, 꼭짓점이 다른 변 위에 닿음), 연속한 같은 점(길이 0인 변), 이웃한 두 변이 같은 직선 위에서 되돌아감 | 막음 | 둘 다 |
 | `POLYGON_TOO_SMALL` | 면적 0.5㎡(500,000㎟) 미만 | 막음 | 둘 다 |
 | `SPACE_OVERLAP` | 공간 도형끼리, 또는 공간 도형과 고정물이 겹침. 변이 맞닿는 것은 괜찮다 | 막음 | 둘 다 |
-| `LABEL_OUTSIDE` | `label.at`이 그 다각형 밖 | 막음 | 둘 다 |
+| `LABEL_OUTSIDE` | `label.at`이 그 다각형 밖 (경계 위는 밖으로 친다) | 막음 | 둘 다 |
 | `SEAT_OUTSIDE_AREA` | 좌석의 중심이 `desk_area` 공간 도형 정확히 하나의 안에 있지 않음 | 막음 | 둘 다 |
 | `SEAT_OVERLAP` | 좌석의 사각형(회전 반영)끼리 겹침 | 막음 | 둘 다 |
-| `SEAT_LABEL_MISSING` | 이름이 없는 좌석 (DB에 없는 새 좌석은 `label`이 꼭 있어야 한다) | 막음 | 둘 다 |
-| `SEAT_LABEL_DUPLICATE` | 같은 층에서 좌석 이름이 겹침 (대소문자 무시) | 막음 | 둘 다 |
+| `SEAT_LABEL_MISSING` | DB에 없는 새 좌석인데 `label`이 없음. DB에 있는 좌석은 `label`이 없으면 DB의 이름을 쓴다 ("실제 이름" = `label ?? spaces.name`) | 막음 | 둘 다 |
+| `SEAT_LABEL_DUPLICATE` | 좌석의 실제 이름이 같은 층의 다른 좌석이나 보관되지 않은 다른 공간(회의실, 라운지 등)의 이름과 겹침 (대소문자 무시. `spaces_floor_name_unique`와 같은 범위) | 막음 | 둘 다 |
+| `SEAT_ARCHIVED` | 좌석의 `spaceId`가 보관된 좌석 행 | 막음 | 둘 다 |
+| `OPENING_OFF_WALL` | 문의 양 끝이 벽의 한 변 안에 들어가지 않음 (모서리나 닫힌 벽의 이음점에 걸침, 변보다 넓음) | 막음 | 둘 다 |
 | `SEAT_NOT_DESK` | 좌석의 `spaceId`가 DB에 있는데 `desk`가 아님, 또는 다른 층의 좌석 | 막음 | 둘 다 |
 | `ACCESS_TEAMS_EMPTY` | 이용 대상이 "지정한 팀"인데 허용 팀이 없음 (층 또는 공간) | 막음 | 둘 다 |
 | `ACCESS_WIDER_THAN_FLOOR` | 공간의 이용 대상이 층보다 넓음 | 막음 | 둘 다 |
@@ -104,7 +106,15 @@ type PlanContext = {
 | `AREA_HAS_BOOKINGS` | 처음 좌석이 생기는 `desk_area`에 구역 단위의 앞으로의 확정 예약이 있음 | 막음 | 서버만 |
 | `SPACE_NO_SEATS` | 좌석 행이 있던 `desk_area`에서 좌석이 모두 없어짐 (구역은 계속 `bookable = false`) | 알림만 | 둘 다 |
 
-- 겹침 판정은 정수 좌표의 단순 다각형끼리다: 한쪽의 변이 다른 쪽의 변과 끝점이 아닌 곳에서 교차하거나, 한쪽의 꼭짓점이 다른 쪽의 안(경계 위는 밖으로 친다)에 있거나, 두 다각형이 같으면 겹친다. 오목한 다각형도 같은 방법으로 본다. 곱셈은 `number`의 안전한 정수 범위 안이다 (좌표가 100,000mm 이하라서).
+- 겹침 판정은 단순 다각형 A, B 사이에서 이렇게 한다 (맞닿기만 한 것은 겹침이 아니다).
+  1. 두 변이 양쪽 모두 끝점이 아닌 곳에서 서로를 가로지르면(진교차) 겹친다.
+  2. 그렇지 않으면 A의 각 변을 B의 변과 만나는 점(교점, 접점, B의 꼭짓점)에서 조각으로 나누고, 조각의 중점이 B의 안(경계 위는 밖)에 있으면 겹친다. B에 대해서도 같은 일을 한다. 중점이 반정수가 되지 않게 좌표를 2배로 해서 정수로 계산한다.
+  3. 모든 조각이 상대의 경계 위에만 있으면(같은 다각형, 또는 경계가 모두 맞닿음) A의 안쪽 점 하나(아래 "라벨의 가운데"와 같은 방법)가 B의 안이면 겹친다.
+  - 테스트에 반드시 넣는 반례: A = (0,0)–(10,10) 사각형과 B = (0,0)–(10,5) 사각형(포함, 겹침), A의 오른쪽 변에 붙인 C = (10,2)–(20,8)(T자 접점, 겹침 아님), 사각형 안에 꼭짓점이 변의 중점에 걸린 마름모(겹침).
+- 좌석(회전한 사각형)은 회전이 90°의 배수면 좌표를 2배로 한 정수로 정확히 계산하고, 그 밖의 각도는 0.5mm 허용 오차를 둔 실수로 계산한다. 간격 0으로 맞닿은 좌석은 겹침이 아니다.
+- 공간 도형의 겹침 하나는 쌍마다 문제 하나이고 `shapeId`는 문서에서 나중에 나오는 도형이다.
+- 라벨의 가운데: 경계 상자의 중심이 다각형 안이면 그 점, 아니면 그 중심을 지나는 가로선과 다각형이 만드는 가장 긴 안쪽 구간의 중점. 새 도형과 패널의 "가운데"가 이 점을 쓰고, 도형을 옮기거나 크기·꼭짓점을 바꾸는 명령은 `label.at`도 같이 옮긴다 (이동은 같은 만큼, 크기·꼭짓점은 "가운데"를 다시 계산).
+- 곱셈은 `number`의 안전한 정수 범위 안이다 (`bounds`가 100,000mm 이하라서).
 - "막음"이 하나라도 있으면 게시할 수 없다 (`PLAN_INVALID`, `message`는 쓰지 않고 결과의 `issues`로 돌려준다). "알림만"은 게시 확인 창에 보여주고 게시를 막지 않는다.
 - 편집기에서는 문제가 있는 도형을 주황(아래 "색"의 "편집기의 검사 문제")으로 강조하고, 위쪽의 "검사 문제 N" 버튼과 오른쪽 패널의 목록에서 그 도형으로 이동할 수 있다.
 - 메시지 문장은 화면 문구로 쓴다. 예: "회의실 D: 이용 대상이 '지정한 팀'인데 허용 팀이 없어요."
@@ -114,7 +124,7 @@ type PlanContext = {
 - 게시된 문서는 수정하지 않고 새 버전으로만 바꾼다. 그래서 클라이언트는 (평면도 id)를 키로 문서를 영구 캐시할 수 있다.
 - 층마다 초안은 하나다 (`floor_plans_one_draft`). 초안은 편집기에서 처음 저장할 때 만든다: 게시본이 있으면 그 문서와 배경 이미지 키를 복사하고, 없으면 빈 문서(벽·도형 없음, `bounds`는 30,000×20,000)로 시작한다. 버전 번호는 그 층의 가장 큰 번호 + 1이다.
 - 초안 저장은 `revision`으로 낙관적 동시성을 지킨다 (아래 "편집기"의 "저장").
-- 게시 트랜잭션(지시서 39): 층 행 잠금 → 초안 잠금 → 다시 검사(위 표, 서버만 포함) → 좌석 행 맞추기(아래 "좌석 행") → 기존 게시본 `archived` → 초안 `published`(`published_at` = 지금) → `floors.published_plan_id` 갱신. 커밋 뒤 `floor:{floorId}`에 `plan.published`를 보낸다.
+- 게시 트랜잭션(지시서 39): 층 행 `FOR UPDATE` → 초안 잠금과 `revision` 확인 → 이 층의 보관되지 않은 공간 행 모두 `FOR SHARE`(공간 관리의 고치기·보관과 겹치지 않게) → 다시 검사(위 표, 서버만 포함) → 보관하거나 이름을 바꿀 좌석 행과 처음 좌석이 생기는 구역 행을 `FOR UPDATE` → 좌석 행 맞추기(아래 "좌석 행") → 기존 게시본 `archived` → 초안 `published`(`published_at` = 지금) → `floors.published_plan_id` 갱신. 커밋 뒤 `floor:{floorId}`에 `plan.published`를 보낸다. 게시가 막히면 아무것도 쓰지 않는다.
 - 지난 버전(`published`, `archived`)은 편집기의 "버전" 목록에서 본다. "이 버전으로 초안 만들기"는 그 문서를 지금 초안에 덮어쓴다 (초안이 있으면 확인을 받는다. 초안이 없으면 새로 만든다). 지난 버전을 바로 다시 게시하는 기능은 없다. 초안을 거쳐 같은 검사를 받는다.
 
 ### 좌석 행 (지시서 39)
@@ -128,9 +138,10 @@ type PlanContext = {
 | 없음 | 이 층의 보관되지 않은 좌석 | `archived_at` = 지금. 앞으로의 확정 예약이 있으면 게시를 막는다 (`SEAT_REMOVED_WITH_BOOKINGS`) |
 
 - 처음 좌석이 생긴 `desk_area`는 `bookable = false`로 바꾼다 (`docs/spec/data-model.md`의 `spaces` 규칙). 구역 단위의 앞으로의 예약이 있으면 막는다 (`AREA_HAS_BOOKINGS`).
-- 좌석의 이름 유일성은 `spaces_floor_name_unique`가 DB에서도 지킨다. 같은 게시 안에서 이름을 맞바꾸는 경우(A-01 ↔ A-02)를 위해 이름을 바꾸는 행은 먼저 임시 이름(`~{id 앞 8자}`)으로 바꾼 뒤 최종 이름으로 바꾼다.
-- 보관된 좌석의 id가 문서에 다시 나오면 되살리지 않는다. 편집기는 새 좌석에 언제나 새 uuid를 준다.
-- 좌석 예약의 겹침과 보관 사이의 경쟁: 게시는 보관할 좌석 행을 `FOR UPDATE`로 잠근 뒤 앞으로의 예약을 센다. 좌석 예약 액션은 이미 좌석 행을 `FOR SHARE`로 잠근다 (`lib/dal/bookings.ts`의 `lockSpaceForBooking`). 잠근 뒤 `archived_at`을 다시 보는지는 지시서 39가 확인하고, 보지 않으면 더한다.
+- 좌석 행을 쓰는 순서: 보관 → 이름을 바꾸는 행을 임시 이름(`~{행 id 전체}`)으로 → 최종 이름으로 → 새 행 만들기. 같은 게시 안에서 이름을 맞바꾸거나(A-01 ↔ A-02), 지운 좌석의 이름을 새 좌석이 받아도 `spaces_floor_name_unique`에 걸리지 않게 하려는 것이다. 그래도 23505(`spaces_floor_name_unique`)가 나면 `PLAN_INVALID`와 `SEAT_LABEL_DUPLICATE`로 바꾼다.
+- 보관된 좌석의 id가 문서에 다시 나오면 되살리지 않고 막는다 (`SEAT_ARCHIVED`). 지난 버전을 초안으로 꺼낼 때(`restorePlanVersion`) 보관된 좌석에는 새 uuid를 주고 이름은 그대로 둔다. 편집기는 새 좌석에 언제나 새 uuid를 준다.
+- 좌석 예약과 게시의 경쟁: 좌석 예약 액션은 층 행 `FOR SHARE` → 구역 → 좌석 행 `FOR SHARE` 순서로 잠그고, 잠근 뒤 좌석의 `archived_at`을 다시 본다 (`features/bookings/create-desk-booking-factory.ts`. 지금 코드 그대로). 게시는 층 행 `FOR UPDATE`를 먼저 잡으므로 둘은 층 행에서 줄을 선다.
+- "앞으로의 확정 예약"은 `status = 'confirmed'`이고 `upper(during) > 지금`인 예약이다 (진행 중인 예약 포함). `AREA_HAS_BOOKINGS`는 구역 행 자체의 예약만 센다 (좌석의 예약은 세지 않는다).
 
 ## 예시 파일
 
@@ -163,7 +174,7 @@ type PlanContext = {
 
 - 그리기는 `requestAnimationFrame` 한 번에 모은다. 카메라가 바뀌면 세 층을 모두, 상태가 바뀌면 상태 층의 그 도형이 차지하는 영역(dirty rect, 화면 좌표의 경계 상자 + 2px)만, hover·선택이 바뀌면 덧그림 층만 다시 그린다.
 - `devicePixelRatio`를 반영해 캔버스 크기를 정하고, `ResizeObserver`로 크기 변화를 받는다.
-- 문(`openings[]`)의 `at`은 벽 polyline 전체 길이에 대한 비율이다 (닫힌 벽은 마지막 점에서 첫 점으로 가는 변까지 포함한 길이). 그 위치의 변 위에 폭만큼 벽을 끊고, `door`면 사분원 호를 그린다.
+- 문(`openings[]`)의 `at`은 벽 polyline 전체 길이에 대한 비율이다 (닫힌 벽은 마지막 점에서 첫 점으로 가는 변까지 포함한 길이). 문은 한 변 안에 있어야 한다 (`OPENING_OFF_WALL`). 그 위치의 변 위에 폭만큼 벽을 끊고, `door`면 사분원 호를 그린다. 렌더러, 편집기, 검사가 같은 함수(`lib/floor-plan/openings.ts`)로 위치를 계산한다.
 - 라벨은 도형이 화면에서 충분히 클 때만 그린다: 공간 이름은 화면 너비 54px 이상, 아랫줄(정원·상태)은 높이 46px 이상, 좌석 이름은 좌석 너비 34px 이상. 글자 크기는 11–13px (`docs/spec/design-tokens.md`의 "평면도 라벨").
 
 ### 색
@@ -188,7 +199,7 @@ type PlanContext = {
 
 ### 성능 (지시서 34, PFQV-21)
 
-- `/dev/stress-render`(개발 모드에서만 열리는 페이지. 배포 빌드에서는 `notFound()`)가 공간 400개, 좌석 3,000개, 벽 200개의 합성 문서를 만들어 그린다. 문서는 시드 값으로 만드는 결정적 함수(`lib/floor-plan/render/stress-document.ts`)다.
+- `/dev/stress-render`(개발 모드에서만 열리는 페이지. 배포 빌드에서는 `notFound()`)가 공간 300개, 좌석 2,000개, 벽 200개의 합성 문서(스키마의 크기 상한 안)를 만들어 그린다. 문서는 시드 값으로 만드는 결정적 함수(`lib/floor-plan/render/stress-document.ts`)다.
 - Playwright 테스트가 그 페이지에서 확대·이동을 5초 동안 되풀이하며 프레임 시간을 잰다 (`performance.now()`로 rAF 간격). 목표 p95 16ms 이하. CI의 기계 차이를 생각해 테스트는 p95 33ms를 넘으면 실패하고, 결과(p50, p95)를 출력해 둔다.
 - 상태 하나가 바뀔 때 상태 층 전체를 다시 그리지 않는다는 것을 단위 테스트로 확인한다 (그리기 함수에 기록용 가짜 컨텍스트를 주입).
 
@@ -200,13 +211,14 @@ type PlanContext = {
 
 - 층 화면의 보기에 "평면도"를 더한다: `FloorView = 'plan' | 'list' | 'timeline'`. 순서는 평면도, 목록, 시간표다.
 - 게시된 평면도가 없는 층은 "평면도" 탭을 보여주지 않는다. 주소나 쿠키가 `plan`이어도 목록으로 그린다.
-- 기본 보기: 쿠키 `floor_view`가 있으면 그 값, 없으면 화면이 1024px 이상이고 평면도가 있으면 `plan`, 그 밖은 `list`. 서버는 화면 너비를 모르므로 쿠키가 없을 때는 지금처럼 클라이언트가 정한다(`use-wide-screen`).
+- 기본 보기: 쿠키 `floor_view`가 있으면 그 값. 없으면 화면이 1024px 이상일 때 평면도가 있으면 `plan`, 없으면 `timeline`(지금 규칙), 1024px 미만이면 `list`. 서버는 화면 너비를 모르므로 쿠키가 없을 때는 지금처럼 클라이언트가 정한다(`useFloorView`, `use-wide-screen`). 정해지기 전에 보기를 CSS로 숨겨 둘 때 캔버스의 크기가 0이면 화면 맞춤과 그리기를 크기가 생길 때까지 미룬다.
 - 평면도에서 공간을 고르면 목록과 같은 `space` 주소 값과 같은 오른쪽 상세(420px)·아래 시트를 쓴다. 다른 주소 값(`date`, `people`, `detail`)도 같다.
 
 ### 데이터
 
 - `getFloorDay`의 결과에 `plan: { id: string; version: number } | null`을 더한다. 층 행을 읽는 문장에 `floor_plans`를 붙여 읽는다 (문장을 더하지 않는다).
-- 문서는 Route Handler `GET /api/floor-plans/[planId]`가 준다 (AGENTS.md의 "캐시되는 GET(게시된 평면도 JSON)"). 세션이 있고, 그 평면도가 `published` 또는 `archived`이고, 그 층에 접근할 수 있어야 한다 (`canAccessFloor`). 아니면 404. 응답은 문서에서 `background`와 좌석의 `label`을 뺀 것이다. 헤더 `Cache-Control: private, max-age=31536000, immutable`. 게시된 문서는 바뀌지 않으므로 평면도 id가 곧 캐시 키다.
+- 문서는 Route Handler `GET /api/floor-plans/[planId]`가 준다 (AGENTS.md의 "캐시되는 GET(게시된 평면도 JSON)"). 세션이 없으면 401, 평면도가 없거나 `published`·`archived`가 아니거나 그 지점에서 `floor.view`가 없거나 층에 접근할 수 없으면(`canAccessFloor`) 404. 응답은 허용한 필드만 골라 만든다: `schema`, `unit`, `bounds`, `walls`, `openings`, `spaces`, `seats`(`id`, `spaceId`, `at`, `size`, `rotation`만), `fixtures`. `background`와 좌석의 `label`은 싣지 않는다. 성공 헤더 `Cache-Control: private, max-age=31536000, immutable`, 오류 헤더 `private, no-store`. 게시된 문서는 바뀌지 않으므로 평면도 id가 곧 캐시 키다.
+- 문서의 공간 도형 가운데 `getFloorDay`에 없는 `spaceId`(게시 뒤 보관된 공간)는 "예약 없이 쓰는 곳" 색으로 이름 없이 그리고 고를 수 없다. 게시 뒤 새로 생겨 도형이 없는 공간은 평면도에 없다 (목록·시간표에서 고른다. 다음 게시에서 `SHAPE_MISSING`이 알린다).
 - 브라우저는 TanStack Query의 키 `['floor-plan', planId]`, `staleTime: Infinity`로 읽는다.
 - 상태는 `getFloorDay`의 공간별 `intervals`와 `summary`에서 계산한다 (새 조회 없음). 접근할 수 없는 공간(`kind: 'restricted'`)은 이름 없이 "전용 공간"과 자물쇠로만 그린다.
 - 좌석의 상태는 층 단위로 읽지 않는다. 좌석은 구역을 골랐을 때 `getSpaceDay`의 좌석 데이터로 칠한다 (아래 "좌석 고르기"). 구역을 고르기 전에는 좌석을 바탕색(테두리만)으로 그리고, 구역 라벨 아랫줄에 "빈 자리 17석" 같은 구간 요약(`deskParts`)을 쓴다.
@@ -217,14 +229,25 @@ type PlanContext = {
 - 처음 값: 오늘이면 지금을 30분 단위로 내린 시각(운영 시간 전이면 여는 시각, 끝난 뒤면 마지막 칸), 다른 날이면 여는 시각. 쉬는 날은 막대 없이 "쉬는 날이에요".
 - 막대의 값은 주소에 넣지 않는다 (클라이언트 상태). 날짜를 바꾸면 처음 값으로 돌아간다.
 - 그 시각의 상태: 점검 > 내 예약 > 예약됨 > 비어 있음. 예약할 수 없는 공간(라운지)은 언제나 "예약 없이 쓰는 곳"이다.
-- 라벨 아랫줄은 목록의 상태 줄(`space-status-line.ts`)과 같은 문장을 그 시각 기준으로 만든다: "6인 · 14:00까지 비어 있음", "8인 · 12:30까지 예약됨", "점검 중 · 내일 12:00까지".
+- 라벨 아랫줄은 순수 함수 `planStatusText(space, at)`가 공간의 `intervals`(운영 시간으로 잘린 `{ start, end, kind }`)에서 만든다. 목록의 상태 줄(`space-status-line.ts`)은 서버가 "지금" 기준으로 만든 `summary`에 기대므로 쓰지 않는다.
+
+| 그 시각의 상태 | 문장 |
+| --- | --- |
+| 비어 있음, 다음 예약·점검 있음 | "{정원}인 · {다음 시작}까지 비어 있음" |
+| 비어 있음, 그날 더 없음 | "{정원}인 · 운영 종료까지 비어 있음" |
+| 예약됨 | "{정원}인 · {이어진 예약의 끝}까지 예약됨" |
+| 내 예약 | "내 예약 · {끝}까지" |
+| 점검 중 | "점검 중 · {끝}까지". 끝이 운영 종료와 같으면(잘린 구간) "점검 중 · 운영 종료까지" |
+| 운영 시간 밖 | "운영 시간이 아니에요" |
+
+  이어진 예약은 맞닿은 같은 종류의 구간을 하나로 친다. 시각은 지점 시간대의 "HH:mm"이다.
 - 요약 줄: "빈 공간 4 · 예약됨 3 · 점검 1" (그 시각, 접근할 수 있는 예약 가능 공간만).
 
 ### 다루기
 
 - 마우스: 끌면 이동, 휠은 세로 이동이고 Ctrl/⌘+휠과 트랙패드 핀치는 확대. 오른쪽 아래에 +, −, 맞춤, 배율(%).
 - 터치: 한 손가락 끌기는 이동, 두 손가락은 확대·이동 (Pointer Events로 직접 만든다. 제스처 라이브러리를 더하지 않는다). 탭은 고르기.
-- hover(마우스만): 공간 위에 말풍선 "회의실 C · 8인 / 10:30–12:30 예약됨 · 디자인팀". 다른 사람 예약의 제목은 싣지 않는다 (목록과 같은 노출 규칙).
+- hover(마우스만): 공간 위에 말풍선 "회의실 C · 8인"과 둘째 줄 `planStatusText`. 다른 사람 예약의 제목과 예약한 사람·팀은 싣지 않는다. 말풍선의 글은 순수 함수 `planTooltipText`로 만들어 테스트한다.
 - 공간을 누르면 고른다: 파란 3px 테두리와 그림자, `space` 주소 값. 전용 공간은 고를 수 없고 말풍선만 "다른 팀 전용이에요".
 - 처음 그릴 때와 층을 바꿀 때는 화면 맞춤. 공간을 고르면 그 공간이 화면 밖에 있을 때만 그쪽으로 옮긴다.
 
@@ -238,7 +261,8 @@ type PlanContext = {
 
 ### 좌석 고르기 (지시서 34)
 
-- 평면도가 있는 층에서 좌석이 있는 데스크 구역을 고르면, 그 구역으로 확대(구역이 화면의 80%)하고 좌석에 이름과 상태를 그린다. 좌석의 상태 다섯 가지와 판정은 `docs/spec/booking-2.md`의 "좌석 고르기"와 같다 (데이터도 같은 `getSpaceDay`).
+- 평면도가 있는 층에서 좌석이 있는 데스크 구역을 고르면, 그 구역으로 확대(구역이 화면의 80%)하고 좌석에 이름과 상태를 그린다. 좌석의 상태 다섯 가지와 판정, 색, 좌석 버튼의 이름("A-15, 비어 있음")은 `docs/spec/booking-2.md`의 "좌석 배치도"와 같다.
+- 좌석 데이터는 새로 읽지 않는다. 오른쪽 상세(서버의 `getSpaceDay`)의 좌석 고르기가 받은 좌석 목록(id, 이름, 고른 구간의 상태)과 고른 좌석을 지금의 `draftStore`(zustand, `useBookingDeskSelection`)에 올리고, 평면도는 그 스토어를 읽어 좌석을 칠한다. 평면도에서 좌석을 누르면 같은 스토어의 고른 좌석을 바꾼다.
 - 오른쪽 상세(1024px 미만은 아래 시트)에는 지금의 좌석 고르기에서 좌석표(`SeatMap`)를 뺀 나머지가 나온다: 구간 고르기, 고른 좌석, "이 좌석의 오늘", 예약 줄. 좌석은 평면도에서 누르거나, 평면도에 포커스가 있을 때 방향키로 옮겨 고른다 (좌석 사이의 이동 규칙은 공간과 같다).
 - 평면도가 없는 층, 또는 목록·시간표 보기에서는 지금의 좌석표를 그대로 쓴다.
 - 구역에서 나가면(Esc, 다른 공간 고르기, 상세 닫기) 확대 전 카메라로 돌아간다.
@@ -255,7 +279,8 @@ type PlanContext = {
 - `booking.changed`, `space.status_changed`를 받으면 300ms 동안 모았다가 층 데이터와 (열려 있으면) 공간 상세를 다시 읽는다. 다시 읽는 방법은 지금 그 데이터를 읽는 방법을 따른다 (서버 컴포넌트면 `router.refresh()`).
 - `plan.published`를 받으면 새 평면도 id를 얻기 위해 층 데이터를 다시 읽는다. 고른 공간이 새 문서에 없으면 고른 것을 푼다.
 - 다시 그린 공간은 200ms 동안 테두리를 한 번 밝혔다 돌아간다 (`prefers-reduced-motion`이면 하지 않는다).
-- 실시간 토큰은 내가 접근할 수 있는 모든 층의 `floor:`에 `subscribe`만 준다 (`docs/spec/server.md`의 "실시간").
+- 연결이 끊겼다가 이어졌는데 그동안의 메시지를 이어 받지 못했으면(`useRealtimeLifecycle`의 `attached` + `resumed: false`) 층 데이터를 한 번 다시 읽는다.
+- 실시간 토큰은 내가 접근할 수 있는 모든 층의 `floor:`에 `subscribe`만 준다 (`docs/spec/server.md`의 "실시간"). 권한은 토큰을 받을 때 정해지므로, 새로 접근하게 된 층은 다음 토큰(최대 10분 뒤)부터 구독된다. 그 전에는 브라우저가 그 채널을 조용히 건너뛴다 (알려진 한계).
 - 예약·운영자 액션의 층 이벤트 발행을 아무 일도 하지 않는 구현에서 `getRealtimePublisher()`로 바꾼다.
 
 ### 홈의 작은 평면도 (지시서 34)
@@ -284,7 +309,7 @@ type PlanContext = {
 ### 저장
 
 - 마지막 변경 1.5초 뒤, 그리고 탭을 떠날 때(`visibilitychange`) 자동 저장한다. 저장 중에 또 바뀌면 끝난 뒤 한 번 더 저장한다.
-- 액션 `saveFloorPlanDraft({ floorId, revision, document })` (`plan.edit`): 스키마 검사(크기 상한 포함) → 층 행 잠금 → 초안이 없으면 만들고(위 "버전과 게시") 있으면 `revision`이 같은지 본다. 다르면 `STALE`. 같으면 문서를 바꾸고 `revision + 1`, `updated_at`, `updated_by`. 결과 `{ planId, version, revision, savedAt }`.
+- 액션 `saveFloorPlanDraft({ floorId, basePlanId, revision, document })` (`plan.edit`): 스키마 검사(크기 상한 포함) → 초안이 있으면 초안 행을 `FOR UPDATE`로 잠그고 `revision`이 같은지 본다 (다르면 `STALE`). 초안이 없으면 층 행을 `FOR UPDATE`로 잠근 뒤 다시 확인하고, `revision`이 null이 아니거나 `basePlanId`(편집기를 열 때의 게시본 id, 없으면 null)가 지금 게시본과 다르면 `STALE`, 같으면 초안을 만든다(위 "버전과 게시"). 문서를 바꾸고 `revision + 1`, `updated_at`, `updated_by`. 결과 `{ planId, version, revision, savedAt }`. 자동 저장마다 층 행을 잠그지 않는다 (그 층의 예약이 층 행을 `FOR SHARE`로 잡기 때문).
 - 처음 열 때 초안이 없으면 `revision`은 `null`이고 첫 저장이 초안을 만든다. 첫 저장 전에 다른 운영자가 초안을 만들었으면 `STALE`이다.
 - 상태 칩: "자동 저장됨 11:42", "저장 중", "저장하지 못했어요 · 다시 시도". `STALE`이면 "다른 곳에서 이 초안을 바꿨어요" 창에서 "새로 불러오기"(내 변경은 버린다)만 준다.
 - 저장은 검사 결과와 상관없이 된다. 막는 것은 게시뿐이다.
@@ -315,7 +340,7 @@ type PlanContext = {
 - 문 도구(D): 벽 위를 누르면 그 자리에 문이 생긴다 (폭 기본 900mm, 종류 문/뚫린 곳). 문은 벽 위에서만 끌어 옮길 수 있다. 벽을 옮기거나 꼭짓점을 바꾸면 `at`(비율) 그대로 따라간다.
 - 꼭짓점 편집: 다각형이나 벽을 더블클릭하면 꼭짓점 손잡이가 나온다. 끌어서 옮기고, 변 위를 더블클릭하면 꼭짓점을 더하고, 꼭짓점을 고르고 Delete로 지운다 (다각형 3개, 벽 2개 미만은 안 된다). Esc로 나온다.
 - 스냅(PFQV-39): 격자, 다른 도형의 꼭짓점(화면 8px 안), 직각(Shift를 누르면 직전 점에서 0°·45°·90°). 스냅이 걸리면 그 점이나 선을 덧그림 층에 표시한다.
-- 배경 도면: 오른쪽 패널(축척 도구 M)에서 이미지(PNG, JPG, WebP, 10MB 이하)를 올린다. 브라우저가 긴 변 4,096px 이하의 WebP로 바꿔 올린다 (900KB를 넘으면 품질을 낮춰 다시. 공간 사진과 같은 방식, `docs/spec/admin.md`의 "사진"). 저장소 키는 `plan-backgrounds/{planId}/{uuid}.webp`이고 `floor_plans.background_image`에 둔다. 액션 `uploadPlanBackground`는 초안에만 쓴다.
-- 배경 보기: Route Handler `GET /api/plan-backgrounds/[planId]` (`plan.edit`가 있는 그 지점의 운영자만, `private, no-store`). 멤버에게는 내려보내지 않는다.
+- 배경 도면: 오른쪽 패널(축척 도구 M)에서 이미지(PNG, JPG, WebP, 10MB 이하)를 올린다. 브라우저가 긴 변 4,096px 이하의 WebP(3MB 이하)로 바꿔 운영자 파일 저장소(R2, `docs/spec/admin.md`의 "운영자 파일 저장소")에 바로 올린다. 키는 `plan-backgrounds/{planId}/{uuid}.webp`이고 `floor_plans.background_image`에 둔다. 올리기는 초안에만 한다. 올리기는 `background_image` 컬럼만 바꾸고 문서는 바꾸지 않는다: 올린 뒤 편집기가 명령으로 문서의 `background`(기본 배율 1px = 10mm, 투명도 0.35)를 넣고 평소처럼 자동 저장한다.
+- 배경 보기: Route Handler `GET /api/plan-backgrounds/[planId]`. 세션이 없으면 401, 그 지점의 `plan.edit`가 없거나 배경이 없으면 404. R2에서 읽어 그대로 흘려보낸다 (`private, no-store`). 멤버에게는 내려보내지 않는다.
 - 축척 맞추기: 배경 위의 두 점을 찍고 실제 거리(mm)를 넣으면 배경의 `transform`의 배율을 정한다. 그다음 배경을 끌어 옮기고(`transform`의 이동), 90°씩 돌리고, 투명도(0–100%)를 바꾸고, 잠근다. 잠긴 배경은 고를 수 없다.
-- 배경 지우기는 문서의 `background`와 `background_image`를 같이 지운다 (저장소의 파일은 그 초안이 게시되거나 버려질 때 지우지 않는다. 지난 버전이 가리킬 수 있다).
+- 배경 지우기는 문서의 `background`를 지우는 명령이다 (실행 취소할 수 있다). `background_image` 컬럼과 R2의 파일은 남긴다. 편집기는 문서에 `background`가 있을 때만 배경을 그린다.

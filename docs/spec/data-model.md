@@ -162,7 +162,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 - 대체 글의 길이: check `char_length(alt) between 1 and 120` (이름 `space_photos_alt_length`)
 - 사진의 크기는 저장하지 않는다. 화면이 가로세로 비율을 정하고 사진을 그 안에 채운다.
 - 같은 파일을 여러 공간이 가리킬 수 있다.
-- 운영자가 올린 사진(지시서 43)의 경로는 `/api/space-photos/{photoId}.webp`이고 파일은 저장소 키 `space-photos/{photoId}.webp`에 있다. 화면의 상한은 공간마다 8장이다 (DB는 10장).
+- 운영자가 올린 사진(지시서 43)의 경로는 `/api/space-photos/{photoId}.webp`이고 파일은 R2의 키 `space-photos/{photoId}.webp`에 있다 (`docs/spec/admin.md`의 "운영자 파일 저장소"). 화면의 상한은 공간마다 8장이다 (DB는 10장).
 - 누구에게 보이는지는 `docs/spec/ui-2.md`의 "사진"이 정한다. 공간의 이름을 볼 수 없는 사람에게는 사진도 내려보내지 않는다.
 - 인덱스: `(space_id, sort_order)`는 위의 unique가 겸한다
 
@@ -175,7 +175,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | version | integer | not null |
 | status | plan_status | not null, 기본값 `draft` |
 | document | jsonb | not null (형식은 `docs/spec/floor-plan.md`) |
-| background_image | text | null 허용. 편집용 배경 도면의 저장소 키. 평면도 JSON에는 키를 넣지 않는다 |
+| background_image | text | null 허용. 편집용 배경 도면의 R2 키(지시서 40부터). 평면도 JSON에는 키를 넣지 않는다 |
 | created_by | uuid | not null, FK → users |
 | published_at | timestamptz | null 허용 |
 | revision | integer | not null, 기본값 0. 초안을 저장할 때마다 1씩 올린다. 편집기의 낙관적 동시성 (지시서 38) |

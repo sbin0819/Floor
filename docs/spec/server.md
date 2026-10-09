@@ -17,7 +17,9 @@
 | 채팅의 이전 메시지와 빠진 메시지, 채팅 목록의 안 읽음 | Route Handler (GET, `private, no-store`. 지시서 21) `/api/rooms/[roomId]/messages`, `/api/chat/nav` | 액션은 한 번에 하나씩만 실행되어 보내기를 늦춤 |
 | 참석자 찾기 (입력하는 동안의 검색), 알림의 수와 목록 (주기적으로 다시 읽기) | Route Handler (GET, `Cache-Control: private, no-store`) | 액션은 한 번에 하나씩 실행돼 입력을 따라가지 못하고, `router.refresh()`는 그 화면의 모든 조회를 다시 돌림. 핸들러는 `features/*/queries.ts`를 부르기만 하고, 세션 확인은 그 함수가 한다 (`docs/spec/booking-2.md`) |
 | 실시간 반영 (예약 상태, 새 메시지, 평면도 게시) | 브라우저가 실시간 채널(Ably)을 직접 구독. 토큰은 Route Handler `POST /api/realtime/token` | 액션은 서버가 먼저 보내는 통신을 못 함. 액션은 하나씩 차례로 실행되므로 토큰 발급에 쓰지 않음 |
-| 도면 이미지 업로드 | 액션이 서명된 업로드 주소 발급 → 브라우저가 저장소로 직접 업로드 | 액션 요청 본문 기본 한도가 1MB |
+| 도면 이미지·공간 사진 업로드 (운영자) | 액션이 R2의 서명된 PUT 주소 발급 → 브라우저가 R2로 직접 업로드 → 확인 액션 (지시서 40, 43. `docs/spec/admin.md`의 "운영자 파일 저장소") | 액션 요청 본문 기본 한도가 1MB |
+| 운영자 파일 보기 | Route Handler (GET) `/api/space-photos/[file]`(지시서 43), `/api/plan-backgrounds/[planId]`(지시서 40) | 비공개 버킷에서 권한 확인 뒤 흐름으로 내려 준다 |
+| 운영자 화면의 미리보기 (점검의 겹치는 예약, 공지의 받는 사람 수, 게시 전 검사) | Server Action (지시서 36, 39, 41) | "읽기에는 액션을 쓰지 않음"의 예외. 입력이 멈춘 뒤 한 번씩만 부르고, 쓰기 액션과 같은 판정·잠금 없는 같은 계산을 써야 해서 |
 | 통화 종료 같은 외부 웹훅 | Route Handler (POST) | 외부 서비스가 호출할 고정 주소가 필요. LiveKit 웹훅 `POST /api/livekit/webhook`(서명 확인, 지시서 27) |
 | 파일 올리기의 몸통 (`local` 저장소) | Route Handler (PUT) `/api/uploads/[attachmentId]` | 25MB를 흐름으로 받는다. 뒤의 저장소에서는 서명된 주소로 바로 올리므로 없다. `Origin` 확인 (지시서 28) |
 | 파일 내려받기, 방의 파일 목록 | Route Handler (GET) `/api/files/[attachmentId]`, `/api/rooms/[roomId]/files` | 권한 확인 뒤 흐름으로 내려 주고 머리(`nosniff`, `sandbox` CSP, `attachment`)를 붙인다. 목록은 되풀이 읽기 (지시서 28) |
@@ -224,6 +226,7 @@ export type RealtimeEvent =
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | 아니오 | 둘 다 있을 때만 GitHub 로그인을 켠다 |
 | `ABLY_API_KEY` | 아니오 | 있을 때만 실시간을 켠다 (지시서 20). 서버에서만 읽는다 |
 | `FILE_STORAGE` | 아니오 | `local` 또는 `disabled`. 없으면 `NODE_ENV`가 `development`일 때만 `local`, 그 밖(배포, 테스트)은 `disabled` (지시서 28) |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET` | 아니오 | `R2_ENDPOINT`는 S3 API 주소(`https://{계정 id}.r2.cloudflarestorage.com`). 넷 다 있을 때만 운영자 파일 올리기(공간 사진, 배경 도면)를 켠다 (지시서 40). 서버에서만 읽는다. 채팅 파일은 쓰지 않는다 |
 | `FILE_STORAGE_DIR` | 아니오 | `local` 저장소의 폴더. 기본값 `.floor-local/uploads` (Git에 올리지 않는다) |
 | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | 아니오 | 셋 다 있을 때만 통화를 켠다 (지시서 27). 서버에서만 읽는다. 브라우저는 통화에 들어갈 때 서버가 돌려주는 주소로 붙는다 (`NEXT_PUBLIC_LIVEKIT_URL`은 쓰지 않는다) |
 

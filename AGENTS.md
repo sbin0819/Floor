@@ -54,6 +54,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/codex/30-profile-settings.md` | 프로필과 설정(아바타, 이름, 비밀번호, 로그인한 기기, 알림과 기본값) 작업 지시서 | 그 작업을 받았을 때 |
 | `docs/codex/31-team-management.md` | 팀 관리(팀 정보, 역할·직함, 내보내기·나가기, 팀 예약, 팀 지우기) 작업 지시서 | 그 작업을 받았을 때 |
 | `docs/codex/32-home.md` | 홈 정리(확인할 것, 최근 대화, Floor 시작하기) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/33-floor-plan-view.md` | 평면도 보기 1(Canvas 렌더러, 층 화면의 "평면도", 시간 막대, 접근성, 시드 평면도 11개) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/34-floor-plan-live.md` | 평면도 보기 2(실시간, 평면도에서 좌석 고르기, 모바일, Web Worker와 성능 측정, 홈의 작은 평면도) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/35-admin-dashboard.md` | 운영자 틀(메뉴, 지점 바꾸기, 모바일), 대시보드, 예약 현황과 운영자 취소 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/36-maintenance.md` | 점검 등록·고치기·해제와 겹치는 예약 함께 취소 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/37-roles.md` | 역할과 권한, 예약 한도 편집 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/38-plan-editor-1.md` | 평면도 편집기 1(검사, 초안 저장, 실행 취소, 공간 도형) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/39-plan-editor-2.md` | 평면도 편집기 2(좌석 배열, 게시와 좌석 행, 버전) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/40-plan-editor-3.md` | 평면도 편집기 3(벽·문·꼭짓점·스냅, 배경 도면, 운영자 파일 저장소 R2) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/41-announcements.md` | 공지(라운지 # 공지, 예약한 사람 알림) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/42-reports.md` | 신고 처리(지점 라운지와 회의 채널) 작업 지시서 | 그 작업을 받았을 때 |
+| `docs/codex/43-space-photos.md` | 공간 사진 올리기(R2) 작업 지시서 | 그 작업을 받았을 때 |
 | `docs/spec/ui.md` | 화면 구성, 로딩 상태(스켈레톤, 바뀌는 부분만 바꾸기), 조회 속도 예산, 화면별 구성과 문구 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/ui-2.md` | 화면 구성 2차: 공간 사진, 날짜 달력, 층 시간표, 내 예약 달력, 홈·지점 목록·공간 상세. `ui.md`와 다르면 이 문서가 맞다 | 화면이나 조회 함수를 만질 때 |
 | `docs/spec/auth.md` | 가입, 로그인, 세션, 운영자 계정, 팀 회원이 되는 세 가지 길 | 인증·세션·팀 가입을 만질 때 |
@@ -61,10 +72,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/spec/booking-2.md` | 예약 2차: 예약 프로세스 전체, 좌석 예약, 사용 인원, 인원으로 거르기, 참석자 초대, 알림, 예약 바꾸기. `booking.md`와 다르면 이 문서가 맞다 | 예약·내 예약·알림을 만질 때 |
 | `docs/spec/chat.md` | 채팅·통화·자료 공유의 정의와 앱의 틀(레일과 사이드바). 지시서가 나온 범위만 구현 대상이다 (지시서 19: 앱의 틀, 20: 채팅 기반, 21: 읽음과 연결, 22: 메시지 다듬기, 23: 사람 1, 24: 사람 2, 25: 회의 채널, 26: 스페이스, 27: 통화, 28: 자료 공유, 29: 말풍선). 앱의 틀에 대해 `ui.md`, `ui-2.md`와 다르면 이 문서가 맞다 | 앱의 틀이나 채팅을 만질 때 |
 | `docs/spec/space-admin.md` | 운영자가 지점·층·공간·이용 대상을 입력하는 규칙 | 운영자 화면을 만질 때 |
+| `docs/spec/admin.md` | 운영자 화면 2차: 메뉴와 주소, 대시보드, 예약 현황, 점검, 역할과 권한, 공지, 신고, 운영자 파일 저장소(R2), 공간 사진 (지시서 35–43) | 운영자 화면을 만질 때 |
 | `docs/spec/data-model.md` | 테이블, 컬럼, 제약 | DB 스키마·쿼리를 만질 때 |
 | `docs/spec/server.md` | Server Actions 규칙, 결과 타입, 데이터 접근 계층, 세션, 메일, 실시간 | 서버 코드를 만질 때 |
 | `docs/spec/roles-and-access.md` | 역할 4개, 권한 키, 기본값, 층·공간 접근 범위 | 권한·접근 판정을 만질 때 |
-| `docs/spec/floor-plan.md` | 평면도 JSON 형식과 검증 규칙 | 평면도 스키마·렌더러·편집기를 만질 때 |
+| `docs/spec/floor-plan.md` | 평면도 JSON 형식, 게시 검사, 버전과 좌석 행, 렌더러, 멤버의 평면도 보기, 편집기 (지시서 33–40) | 평면도 스키마·렌더러·편집기를 만질 때 |
 | `docs/spec/design-tokens.md` | 색, 타이포, 간격, shadcn 변수 매핑 | UI를 만질 때 |
 | `docs/spec/settings.md` | 프로필과 설정: 아바타, 이름, 비밀번호, 로그인한 기기, 알림과 기본값 (지시서 30) | 설정·아바타·미리 알림을 만질 때 |
 | `docs/spec/teams.md` | 팀 관리: 팀 화면의 탭, 역할·직함, 내보내기·나가기, 팀 예약, 팀 지우기 (지시서 31) | 팀을 만질 때 |
@@ -82,7 +94,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `docs/spec/examples/seed-spaces.json` | 스페이스의 시드: 라운지 멤버와 메시지, 커뮤니티 스페이스 (지시서 26) | 시드를 만질 때 |
 | `docs/spec/examples/seed-bookings-2.json` | 예약 2차의 시드: 사용 인원, 참석자, 좌석 예약, 좌석 점검 | 시드를 만질 때 |
 | `docs/spec/examples/seed-photos.json`, `public/seed/photos/` | 공간 사진과 지점 대표 사진의 시드와 그림 파일 29개 | 사진을 만질 때 |
-| `docs/jira-issues.md` | Jira 이슈 99개(에픽 9개 별도, 키는 PFQV-108까지)의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
+| `docs/jira-issues.md` | Jira 이슈 105개(에픽 9개 별도, 키는 PFQV-114까지)의 키·제목·에픽 사본 | 커밋에 붙일 이슈 키를 찾을 때, 작업 범위를 확인할 때 |
 
 ## 기술 스택 (확정)
 
@@ -152,7 +164,7 @@ docs/                명세와 작업 지시서
 
 - 쓰기는 전부 Server Actions로 한다. 별도 API 서버를 만들지 않는다.
 - 첫 화면 데이터는 Server Component에서 `features/*/queries.ts`의 읽기 함수를 불러 읽는다. queries가 `lib/dal`과 `canAccess()`를 쓴다. 읽기에 Server Action을 쓰지 않는다.
-- Route Handler는 캐시되는 GET(게시된 평면도 JSON), 채팅의 되풀이 읽기 GET 두 가지(메시지 페이지 `/api/rooms/[roomId]/messages`: 이전 메시지와 다시 연결한 뒤의 빠진 메시지, 채팅 목록 `/api/chat/nav`: 레일·사이드바의 안 읽음. 캐시하지 않는다. 지시서 21), 사람 찾기 `GET /api/people/search`와 프로필 카드 `GET /api/people/[userId]`(지시서 23), ⌘K의 사람 목록 `GET /api/people/contacts`(지시서 26. 모두 캐시하지 않는다), 외부 웹훅(LiveKit `POST /api/livekit/webhook`, 지시서 27), 통화의 아직 있음·나가기 `POST /api/calls/heartbeat`, `POST /api/calls/leave`(지시서 27. 쓰기지만 30초마다 보내고 탭을 닫을 때도 보내야 해서 예외로 둔다. `Origin`을 확인한다), 파일(지시서 28: 올리기의 몸통 `PUT /api/uploads/[attachmentId]`(`local` 저장소만, `Origin` 확인), 내려받기 `GET /api/files/[attachmentId]`, 방의 파일 목록 `GET /api/rooms/[roomId]/files`), Better Auth(`app/api/auth/[...all]/route.ts`), 화면이 떠 있는 동안 되풀이해 읽는 두 가지 GET(참석자 찾기 `/api/participants/search`, 알림 `/api/notifications`. `docs/spec/booking-2.md`), 그리고 실시간 토큰 `POST /api/realtime/token`(Ably 토큰 요청. DB에 쓰지 않는다. `docs/spec/chat.md`)에만 쓴다. 참석자 찾기, 알림, 실시간 토큰은 캐시하지 않고(`private, no-store`), `features/*/queries.ts`의 함수(실시간 토큰은 `features/chat/realtime-token.ts`)를 부르기만 하며, 세션은 그 함수가 확인한다. 이 목록에 없는 읽기를 Route Handler로 만들지 않는다. 가입·로그인·로그아웃은 Better Auth가 처리하므로 Server Action 래퍼를 거치지 않는다. 그 밖의 쓰기는 예외가 없다.
+- Route Handler는 캐시되는 GET(게시된 평면도 JSON `GET /api/floor-plans/[planId]`, 지시서 33), 운영자 파일 보기(배경 도면 `GET /api/plan-backgrounds/[planId]` 지시서 40, 공간 사진 `GET /api/space-photos/[file]` 지시서 43. 권한 확인 뒤 R2에서 흘려보낸다), 채팅의 되풀이 읽기 GET 두 가지(메시지 페이지 `/api/rooms/[roomId]/messages`: 이전 메시지와 다시 연결한 뒤의 빠진 메시지, 채팅 목록 `/api/chat/nav`: 레일·사이드바의 안 읽음. 캐시하지 않는다. 지시서 21), 사람 찾기 `GET /api/people/search`와 프로필 카드 `GET /api/people/[userId]`(지시서 23), ⌘K의 사람 목록 `GET /api/people/contacts`(지시서 26. 모두 캐시하지 않는다), 외부 웹훅(LiveKit `POST /api/livekit/webhook`, 지시서 27), 통화의 아직 있음·나가기 `POST /api/calls/heartbeat`, `POST /api/calls/leave`(지시서 27. 쓰기지만 30초마다 보내고 탭을 닫을 때도 보내야 해서 예외로 둔다. `Origin`을 확인한다), 파일(지시서 28: 올리기의 몸통 `PUT /api/uploads/[attachmentId]`(`local` 저장소만, `Origin` 확인), 내려받기 `GET /api/files/[attachmentId]`, 방의 파일 목록 `GET /api/rooms/[roomId]/files`), Better Auth(`app/api/auth/[...all]/route.ts`), 화면이 떠 있는 동안 되풀이해 읽는 두 가지 GET(참석자 찾기 `/api/participants/search`, 알림 `/api/notifications`. `docs/spec/booking-2.md`), 그리고 실시간 토큰 `POST /api/realtime/token`(Ably 토큰 요청. DB에 쓰지 않는다. `docs/spec/chat.md`)에만 쓴다. 참석자 찾기, 알림, 실시간 토큰은 캐시하지 않고(`private, no-store`), `features/*/queries.ts`의 함수(실시간 토큰은 `features/chat/realtime-token.ts`)를 부르기만 하며, 세션은 그 함수가 확인한다. 이 목록에 없는 읽기를 Route Handler로 만들지 않는다. 가입·로그인·로그아웃은 Better Auth가 처리하므로 Server Action 래퍼를 거치지 않는다. 그 밖의 쓰기는 예외가 없다.
 - Better Auth를 직접 부르는 곳은 `lib/auth/*`, 인증의 Route Handler(`app/api/auth/[...all]/route.ts`), 브라우저용 인증 클라이언트(`lib/auth/client.ts`)뿐이다. 다른 코드는 `getSession()`, `requireSession()`, `requirePageSession()`, `requireOperatorPage()`만 쓴다.
 - 모든 Server Action은 누구나 호출할 수 있는 공개 POST 주소로 취급한다. 순서는 세션 확인 → zod 검증 → 권한 확인 → 실행이고, `lib/actions`의 래퍼로만 만든다.
 - 액션은 예외를 던지지 않고 `{ ok: true, data }` 또는 `{ ok: false, code }`를 돌려준다. 코드 목록은 `docs/spec/server.md`에 있다.
@@ -165,7 +177,7 @@ docs/                명세와 작업 지시서
 DB
 
 - 스키마 변경은 `lib/db/schema`를 고치고 `pnpm db:generate`로 SQL을 만든다. 이미 커밋된 마이그레이션 파일은 고치지 않는다. 방금 만든(아직 커밋하지 않은) SQL에 기존 행을 맞추는 문장을 손으로 더하는 것은 지시서가 시킬 때만 한다.
-- 부분 유니크 인덱스, CHECK, 순환 FK, gist 인덱스는 Drizzle 스키마에 선언한다. Drizzle로 표현할 수 없는 것(확장 설치, EXCLUDE 제약)만 손으로 쓴 마이그레이션에 넣는다. 제약마다 `tests/db`에 확인하는 테스트를 둔다.
+- 부분 유니크 인덱스, CHECK, 순환 FK, gist 인덱스는 Drizzle 스키마에 선언한다. Drizzle로 표현할 수 없는 것(확장 설치, EXCLUDE 제약, 미룰 수 있는(`DEFERRABLE`) 유일 제약 — 지시서 43)만 손으로 쓴 마이그레이션(`drizzle-kit generate --custom`)에 넣고 스키마에 주석을 남긴다. 제약마다 `tests/db`에 확인하는 테스트를 둔다.
 - 예약 겹침은 DB의 EXCLUDE 제약이 최종 방어선이다. 애플리케이션 코드의 사전 검사로 대신하지 않는다. 시드 스크립트만 예외로, 자기 예약을 넣기 전에 겹침을 조회해 건너뛴다.
 - 예약 행은 지우지 않고 취소한다. 시드 스크립트가 자기 id의 예약을 지우고 다시 넣는 것만 예외다.
 - 상태를 바꾸는 쓰기(취소, 승인, 수락, 보관)는 "지금 그 상태일 때만 바꾸는" `UPDATE … WHERE … RETURNING` 한 문장으로 한다. 먼저 읽고 나서 바꾸지 않는다. 개수 한도와 "예약이 있으면 안 됨" 같은 검사는 같은 트랜잭션에서 기준 행을 잠근 뒤 센다.
