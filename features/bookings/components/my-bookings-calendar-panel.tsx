@@ -26,6 +26,7 @@ import { LeaveBookingButton } from "./leave-booking-button";
 import { BookingParticipantsSummary } from "./booking-participants-summary";
 import { EditBookingLink } from "./edit-booking-link";
 import { BookingChatLink } from "./booking-chat-link";
+import { bookingCancellationText } from "../cancellation";
 import {
   CalendarBookingData,
   type CalendarBookings,
@@ -51,7 +52,7 @@ function CalendarBookingCards({
         const kind = bookingChipKind(booking, now);
         const status =
           booking.status === "cancelled"
-            ? "취소됨"
+            ? bookingCancellationText(booking)
             : kind === "past"
               ? "이용 종료"
               : relativeBookingStatus(booking.start, booking.end, now);

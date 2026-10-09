@@ -215,12 +215,28 @@ export async function insertBooking(
 }
 
 export async function cancelBookingRecord(
-  { bookingId, userId, now }: { bookingId: string; userId: string; now: Date },
+  {
+    bookingId,
+    userId,
+    now,
+    cancellation,
+  }: {
+    bookingId: string;
+    userId: string;
+    now: Date;
+    cancellation?: { kind: "operator" | "maintenance"; reason: string };
+  },
   database: DalDatabase = getDb(),
 ) {
   const [booking] = await database
     .update(bookings)
-    .set({ status: "cancelled", cancelledAt: now, cancelledBy: userId })
+    .set({
+      status: "cancelled",
+      cancelledAt: now,
+      cancelledBy: userId,
+      cancelKind: cancellation?.kind ?? null,
+      cancelReason: cancellation?.reason ?? null,
+    })
     .where(
       and(
         eq(bookings.id, bookingId),

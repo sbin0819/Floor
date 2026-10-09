@@ -16,6 +16,7 @@ import {
   notificationBookingSnapshot,
 } from "@/features/notifications/builders";
 import { assertParticipantsLocked } from "./participant-transaction";
+import type { BookingCancellation } from "./cancellation";
 
 export type CancellationLocatedBooking = NonNullable<
   Awaited<ReturnType<typeof getBookingWithLocation>>
@@ -40,6 +41,7 @@ export async function cancelBookingInTransaction(
     preparedLocatedBooking: row,
     lockedUserIds,
     participantIds,
+    cancellation,
   }: {
     bookingId: string;
     actor: { id: string; name: string };
@@ -47,6 +49,7 @@ export async function cancelBookingInTransaction(
     preparedLocatedBooking: CancellationLocatedBooking;
     lockedUserIds: readonly string[];
     participantIds: readonly string[];
+    cancellation?: BookingCancellation;
   },
   transaction: DalDatabase,
 ): Promise<BookingCancellationEffects> {
@@ -59,7 +62,7 @@ export async function cancelBookingInTransaction(
   const isDesk = row.space.type === "desk";
   const ownDesk = isDesk && row.booking.userId === actor.id;
   const cancelled = await cancelBookingRecord(
-    { bookingId, userId: actor.id, now },
+    { bookingId, userId: actor.id, now, cancellation },
     transaction,
   );
   if (!cancelled) throw new ActionError("NOT_FOUND");
@@ -85,6 +88,7 @@ export async function cancelBookingInTransaction(
         ...(actor.id !== cancelled.userId ? [cancelled.userId] : []),
       ],
       now,
+      cancellation,
     });
     await insertNotifications(notifications, transaction);
     notificationUserIds = notifications.map(({ userId }) => userId);
@@ -97,7 +101,15 @@ export async function cancelBookingInTransaction(
           bookingId: cancelled.id,
           actorId: memberIds.includes(actor.id) ? actor.id : null,
           memberIds,
-          messages: [{ type: "booking_cancelled", actorName: actor.name }],
+          messages: [
+            {
+              type: "booking_cancelled",
+              actorName: actor.name,
+              ...(cancellation
+                ? { cancelKind: cancellation.kind, reason: cancellation.reason }
+                : {}),
+            },
+          ],
           changed: true,
           now,
         },

@@ -22,6 +22,10 @@ export const bookingStatus = pgEnum("booking_status", [
   "confirmed",
   "cancelled",
 ]);
+export const bookingCancelKind = pgEnum("booking_cancel_kind", [
+  "operator",
+  "maintenance",
+]);
 export const chatSpaceKind = pgEnum("chat_space_kind", [
   "team",
   "branch",

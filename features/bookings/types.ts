@@ -164,6 +164,8 @@ export type MyBooking = {
   teamName: string | null;
   status: "confirmed" | "cancelled";
   cancelledAt: string | null;
+  cancelKind?: "operator" | "maintenance" | null;
+  cancelReason?: string | null;
   branchId: string;
   branchName: string;
   floorId: string;

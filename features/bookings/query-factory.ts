@@ -169,6 +169,8 @@ const myBookingDto = (
   teamName: row.teamName,
   status: row.booking.status,
   cancelledAt: row.booking.cancelledAt?.toISOString() ?? null,
+  cancelKind: row.booking.cancelKind,
+  cancelReason: row.booking.cancelReason,
   branchId: row.branch.id,
   branchName: row.branch.name,
   floorId: row.floor.id,

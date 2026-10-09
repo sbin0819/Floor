@@ -1,6 +1,10 @@
 import { z } from "zod";
 import type { Avatar } from "@/lib/avatar";
 import { isValidTimeZone } from "@/lib/time/zoned";
+import {
+  cancellationKindSchema,
+  cancellationReasonSchema,
+} from "@/features/bookings/cancellation";
 
 export const bookingNotificationTypes = [
   "booking_invited",
@@ -45,11 +49,17 @@ export const bookingNotificationDataSchema = z
     previousStart: instant.optional(),
     previousEnd: instant.optional(),
     title: z.string().optional(),
+    cancelKind: cancellationKindSchema.optional(),
+    cancelReason: cancellationReasonSchema.optional(),
     minutesBefore: z
       .union([z.literal(30), z.literal(10), z.literal(5), z.literal(0)])
       .optional(),
   })
-  .refine((value) => Date.parse(value.end) > Date.parse(value.start));
+  .refine((value) => Date.parse(value.end) > Date.parse(value.start))
+  .refine(
+    (value) =>
+      (value.cancelKind === undefined) === (value.cancelReason === undefined),
+  );
 
 export const personNotificationDataSchema = z.strictObject({
   actorName: z.string().min(1),
@@ -173,6 +183,8 @@ export function parseNotificationData(
   const result = bookingNotificationDataSchema.safeParse(input);
   if (!result.success) return null;
   const value = result.data;
+  if (type !== "booking_cancelled" && value.cancelKind !== undefined)
+    return null;
   if (type === "booking_reminder")
     return value.minutesBefore !== undefined &&
       value.actorName === undefined &&

@@ -5,6 +5,7 @@ import {
   type BookingNotificationType,
   type NotificationContent,
 } from "./types";
+import type { BookingCancellation } from "@/features/bookings/cancellation";
 
 export const REMINDER_MINUTES = [30, 10, 5, 0] as const;
 export type ReminderMinutes = (typeof REMINDER_MINUTES)[number];
@@ -78,6 +79,7 @@ export function buildNotificationData(
     actorName?: string;
     previousDuring?: During;
     minutesBefore?: ReminderMinutes;
+    cancellation?: BookingCancellation;
   } = {},
 ): BookingNotificationData {
   const data = {
@@ -95,6 +97,12 @@ export function buildNotificationData(
     ...data,
     ...(options.actorName ? { actorName: options.actorName } : {}),
     ...(booking.title ? { title: booking.title } : {}),
+    ...(options.cancellation
+      ? {
+          cancelKind: options.cancellation.kind,
+          cancelReason: options.cancellation.reason,
+        }
+      : {}),
     ...(options.previousDuring
       ? {
           previousStart: options.previousDuring.start.toISOString(),
@@ -130,6 +138,7 @@ export function buildBookingNotifications({
   userIds,
   now,
   previousDuring,
+  cancellation,
 }: {
   type: Exclude<BookingNotificationType, "booking_reminder">;
   booking: NotificationBooking;
@@ -137,10 +146,12 @@ export function buildBookingNotifications({
   userIds: readonly string[];
   now: Date;
   previousDuring?: During;
+  cancellation?: BookingCancellation;
 }): BookingNotificationWrite[] {
   const data = buildNotificationData(booking, {
     actorName: actor.name,
     previousDuring,
+    cancellation,
   });
   if (!parseNotificationData(type, data))
     throw new Error("Invalid notification snapshot.");

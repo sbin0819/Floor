@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { formatBookingTime } from "@/features/bookings/format";
 import { isValidTimeZone, localDate } from "@/lib/time/zoned";
+import {
+  cancellationKindSchema,
+  cancellationReasonSchema,
+} from "@/features/bookings/cancellation";
 
 const personName = z.string().min(1);
 export const systemMessageDataSchema = z.discriminatedUnion("type", [
@@ -46,10 +50,17 @@ export const systemMessageDataSchema = z.discriminatedUnion("type", [
     names: z.array(personName).min(1).max(20),
   }),
   z.strictObject({ type: z.literal("participant_left"), name: personName }),
-  z.strictObject({
-    type: z.literal("booking_cancelled"),
-    actorName: personName,
-  }),
+  z
+    .strictObject({
+      type: z.literal("booking_cancelled"),
+      actorName: personName,
+      cancelKind: cancellationKindSchema.optional(),
+      reason: cancellationReasonSchema.optional(),
+    })
+    .refine(
+      (value) =>
+        (value.cancelKind === undefined) === (value.reason === undefined),
+    ),
   z.strictObject({ type: z.literal("huddle_started"), actorName: personName }),
   z.strictObject({
     type: z.literal("huddle_ended"),
@@ -105,6 +116,8 @@ export function systemMessageText(data: SystemMessageData): string {
     case "participant_left":
       return `${data.name} 님이 참석하지 않기로 했어요`;
     case "booking_cancelled":
+      if (data.cancelKind)
+        return `${data.cancelKind === "operator" ? "운영자가 예약을 취소했어요" : "점검으로 예약이 취소됐어요"} (${data.reason})`;
       return `${data.actorName} 님이 예약을 취소했어요`;
     case "huddle_started":
       return `${data.actorName} 님이 통화를 시작했어요`;

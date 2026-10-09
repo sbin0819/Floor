@@ -34,6 +34,7 @@ import { BookingParticipantsSummary } from "./booking-participants-summary";
 import { EditBookingLink } from "./edit-booking-link";
 import { MyBookingsViewLinks } from "./my-bookings-view-links";
 import { BookingChatLink } from "./booking-chat-link";
+import { bookingCancellationText } from "../cancellation";
 
 export type BookingHistoryTab = "upcoming" | "past";
 function BookingList({
@@ -78,7 +79,7 @@ function BookingList({
               const status = upcoming
                 ? relativeBookingStatus(booking.start, booking.end, now)
                 : booking.status === "cancelled"
-                  ? "취소됨"
+                  ? bookingCancellationText(booking)
                   : "이용 종료";
               return (
                 <li

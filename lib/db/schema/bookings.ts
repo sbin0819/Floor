@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { tstzrange } from "../range";
 import { createdAt, id } from "./common";
-import { bookingStatus } from "./enums";
+import { bookingCancelKind, bookingStatus } from "./enums";
 import { spaces } from "./spaces";
 import { teams } from "./teams";
 import { users } from "./users";
@@ -37,6 +37,8 @@ export const bookings = pgTable(
     cancelledBy: uuid("cancelled_by").references(() => users.id, {
       onDelete: "restrict",
     }),
+    cancelKind: bookingCancelKind("cancel_kind"),
+    cancelReason: text("cancel_reason"),
     createdAt: createdAt(),
   },
   (table) => [
@@ -51,6 +53,14 @@ export const bookings = pgTable(
     check(
       "bookings_attendee_count_range",
       sql`${table.attendeeCount} IS NULL OR ${table.attendeeCount} BETWEEN 1 AND 500`,
+    ),
+    check(
+      "bookings_cancel_kind_consistent",
+      sql`(${table.cancelKind} IS NULL OR ${table.status} = 'cancelled') AND ((${table.cancelKind} IS NULL) = (${table.cancelReason} IS NULL))`,
+    ),
+    check(
+      "bookings_cancel_reason_length",
+      sql`${table.cancelReason} IS NULL OR char_length(${table.cancelReason}) BETWEEN 1 AND 200`,
     ),
     index("bookings_user_id_idx").on(table.userId),
     index("bookings_team_id_idx").on(table.teamId),

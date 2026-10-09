@@ -119,14 +119,32 @@ export function notificationPresentation({ type, data }: NotificationSnapshot) {
             strong: false,
           },
         ]
-      : [
-          { text: data.actorName ?? "회원", strong: true },
-          { text: " 님이 ", strong: false },
-          { text: data.spaceName, strong: true },
-          { text: actionText[type], strong: false },
-        ];
+      : type === "booking_cancelled" && data.cancelKind
+        ? [
+            {
+              text: data.cancelKind === "operator" ? "운영자가 " : "점검으로 ",
+              strong: false,
+            },
+            { text: data.spaceName, strong: true },
+            {
+              text:
+                data.cancelKind === "operator"
+                  ? " 예약을 취소했어요"
+                  : " 예약이 취소됐어요",
+              strong: false,
+            },
+          ]
+        : [
+            { text: data.actorName ?? "회원", strong: true },
+            { text: " 님이 ", strong: false },
+            { text: data.spaceName, strong: true },
+            { text: actionText[type], strong: false },
+          ];
   const time = formatBookingTime(data.start, data.end, data.timezone);
   let dateTime = `${notificationDate(data.start, data.timezone)} ${time}`;
+  if (type === "booking_cancelled" && data.cancelReason) {
+    dateTime = `${data.cancelKind === "operator" ? "이유: " : ""}${data.cancelReason} · ${dateTime}`;
+  }
   if (type === "booking_changed" && data.previousStart && data.previousEnd) {
     const previousDate = localDate(new Date(data.previousStart), data.timezone);
     const date = localDate(new Date(data.start), data.timezone);
