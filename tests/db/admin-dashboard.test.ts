@@ -200,7 +200,7 @@ describe("operator dashboard queries and utilization", () => {
       await expect(query(input)).rejects.toMatchObject({ code: "NOT_FOUND" });
     }
   });
-  it("matches pure utilization after cutting bookings and merging overlapping maintenance, including comparison period", async () => {
+  it("matches pure utilization after cutting bookings and merging adjacent maintenance, including comparison period", async () => {
     const reserved = [
       bookingRange("08:00", "14:00"),
       bookingRange("17:00", "20:00"),
@@ -215,10 +215,10 @@ describe("operator dashboard queries and utilization", () => {
     });
     const blocked = [
       bookingRange("10:00", "12:00"),
-      bookingRange("11:00", "13:00"),
+      bookingRange("12:00", "13:00"),
     ];
     await block(actors.publicSpaceId, "10:00", "12:00");
-    await block(actors.publicSpaceId, "11:00", "13:00");
+    await block(actors.publicSpaceId, "12:00", "13:00");
     await insertFixtureBooking(database, actors, {
       during: bookingRange("09:00", "12:00", "2026-09-30"),
     });
@@ -296,7 +296,10 @@ describe("operator dashboard queries and utilization", () => {
       (await query()).spaces.find(({ id }) => id === actors.deskAreaId)
         ?.utilization,
     ).toBe(1);
-    await block(actors.deskId, "09:00", "18:00");
+    await database.db
+      .update(spaceBlocks)
+      .set({ during: bookingRange("09:00", "18:00") })
+      .where(eq(spaceBlocks.spaceId, actors.deskId));
     expect(
       (await query()).spaces.find(({ id }) => id === actors.deskAreaId)
         ?.utilization,
@@ -560,14 +563,14 @@ describe("operator dashboard queries and utilization", () => {
     await block(actors.restrictedFloorSpaceId, "13:00", "14:00");
     await block(actors.publicSpaceId, "12:00", "13:00", "2026-10-14");
     await block(
-      actors.publicSpaceId,
+      actors.secondSpaceId,
       "12:10",
       "13:00",
       "2026-10-14",
       "경계 밖",
     );
     await block(
-      actors.publicSpaceId,
+      actors.secondSpaceId,
       "11:00",
       "12:10",
       "2026-10-07",
@@ -611,7 +614,7 @@ describe("operator dashboard queries and utilization", () => {
           reason: "경계 안",
         },
         {
-          spaceId: actors.publicSpaceId,
+          spaceId: actors.secondSpaceId,
           createdBy: actors.operator.userId,
           during: {
             start: new Date("2026-03-08T10:00:00Z"),

@@ -67,6 +67,7 @@ export const bookings = pgTable(
   ],
 );
 
+// Drizzle는 EXCLUDE를 표현하지 못하므로 space_blocks_no_overlap은 custom migration에서 선언한다.
 export const spaceBlocks = pgTable(
   "space_blocks",
   {

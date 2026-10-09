@@ -140,7 +140,9 @@ export function createAction<Input, Output>(
             "admin_teams",
           ].includes(error.details.message ?? "")) ||
           (code === "INVALID_INPUT" &&
-            error.details.message === "not_cancellable") ||
+            ["not_cancellable", "maintenance_state"].includes(
+              error.details.message ?? "",
+            )) ||
           (code === "OVER_CAPACITY" &&
             ["attendee_count", "participants"].includes(
               error.details.message ?? "",

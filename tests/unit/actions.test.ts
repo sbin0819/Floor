@@ -18,6 +18,37 @@ const session: Session = {
 const dependencies = { getSession: async () => session, logError: vi.fn() };
 
 describe("createAction", () => {
+  it("preserves STALE and only the allowlisted maintenance state message", async () => {
+    const action = (error: ActionError) =>
+      createAction(
+        {
+          input: z.unknown(),
+          authorize: "none",
+          handler: () => {
+            throw error;
+          },
+        },
+        dependencies,
+      );
+    expect(await action(new ActionError("STALE"))(null)).toEqual({
+      ok: false,
+      code: "STALE",
+    });
+    expect(
+      await action(
+        new ActionError("INVALID_INPUT", { message: "maintenance_state" }),
+      )(null),
+    ).toEqual({
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "maintenance_state",
+    });
+    expect(
+      await action(
+        new ActionError("INTERNAL", { message: "maintenance_state" }),
+      )(null),
+    ).toEqual({ ok: false, code: "INTERNAL" });
+  });
   it.each(["attendee_count", "participants"] as const)(
     "returns a trusted capacity field %s",
     async (message) => {

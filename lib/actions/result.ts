@@ -7,6 +7,7 @@ export type ActionErrorCode =
   | "NOT_FOUND"
   | "BOOKING_CONFLICT"
   | "SPACE_BLOCKED"
+  | "STALE"
   | "LIMIT_EXCEEDED"
   | "PLAN_INVALID"
   | "TEAM_NAME_TAKEN"
@@ -54,6 +55,7 @@ export type ActionErrorDetails = {
     | "desk_per_person"
     | "attendee_count"
     | "not_cancellable"
+    | "maintenance_state"
     | "participants";
   fieldErrors?: Record<string, string[]>;
 };

@@ -2,6 +2,18 @@ import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import { getOperatorBranches } from "@/lib/dal";
 import { createAdminQueries } from "./query-factory";
+import { createMaintenanceQueries } from "./maintenance-query-factory";
+import type {
+  MaintenanceListInput,
+  PreviewMaintenanceInput,
+} from "./maintenance-schema";
+
+export async function getMaintenanceList(input: MaintenanceListInput) {
+  return createMaintenanceQueries().getMaintenanceList(input);
+}
+export async function previewMaintenance(input: PreviewMaintenanceInput) {
+  return createMaintenanceQueries().previewMaintenance(input);
+}
 import {
   createAdminDashboardQueries,
   type AdminDashboardInput,
