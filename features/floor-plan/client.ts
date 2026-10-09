@@ -15,5 +15,7 @@ export function floorPlanQueryOptions(planId: string) {
     queryKey: ["floor-plan", planId] as const,
     queryFn: ({ signal }) => fetchFloorPlan(planId, signal),
     staleTime: Infinity,
+    // 접근 거절도 재시도하지 않는다. 전체 보기의 오류 화면에서 명시적으로 다시 읽는다.
+    retry: false,
   });
 }

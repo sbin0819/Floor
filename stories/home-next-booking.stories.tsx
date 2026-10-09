@@ -2,6 +2,24 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HomeNextBooking } from "@/features/bookings/components/home-next-booking";
 import type { MyCalendarBooking } from "@/features/bookings/types";
+import { useState, type ReactNode } from "react";
+import {
+  floorPlanStoryDocument,
+  floorPlanStorySpaceIds,
+} from "./floor-plan-fixtures";
+
+function HomeStoryFrame({ children }: { children: ReactNode }) {
+  const [client] = useState(() => {
+    const query = new QueryClient();
+    query.setQueryData(["floor-plan", "story-plan"], floorPlanStoryDocument);
+    return query;
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <div className="mx-auto max-w-6xl">{children}</div>
+    </QueryClientProvider>
+  );
+}
 
 const booking: MyCalendarBooking = {
   relation: "owner",
@@ -38,11 +56,9 @@ const meta = {
   tags: ["autodocs"],
   decorators: [
     (Story) => (
-      <QueryClientProvider client={new QueryClient()}>
-        <div className="mx-auto max-w-3xl">
-          <Story />
-        </div>
-      </QueryClientProvider>
+      <HomeStoryFrame>
+        <Story />
+      </HomeStoryFrame>
     ),
   ],
   args: {
@@ -118,6 +134,20 @@ export const DeskReservation: Story = {
             path: "/seed/photos/open-desk-oak.webp",
             alt: "가상 오픈 데스크 좌석",
           },
+        },
+      ],
+    },
+  },
+};
+export const WithMiniPlan: Story = {
+  args: {
+    data: {
+      now: "2026-10-07T06:25:00Z",
+      bookings: [
+        {
+          ...booking,
+          spaceId: floorPlanStorySpaceIds.meetingC,
+          plan: { id: "story-plan", version: 1 },
         },
       ],
     },

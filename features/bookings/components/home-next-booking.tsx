@@ -23,6 +23,7 @@ import { deskPartLabels } from "@/features/bookings/desk-parts";
 import { BookingTime } from "./booking-time";
 import { LeaveBookingButton } from "./leave-booking-button";
 import { BookingParticipantsSummary } from "./booking-participants-summary";
+import { HomeMiniPlan } from "@/features/floor-plan/components/home-mini-plan";
 
 const linkClass =
   "inline-flex min-h-11 items-center gap-1 rounded-lg text-sm text-primary focus-visible:outline-2 focus-visible:outline-ring hover:underline";
@@ -48,74 +49,85 @@ export function HomeNextBooking({ data }: { data: HomeUpcomingBookingsData }) {
   return (
     <section
       aria-label="다음 예약"
-      className="overflow-hidden rounded-xl border border-border bg-card shadow-card"
+      className="@container overflow-hidden rounded-xl border border-border bg-card shadow-card"
     >
       <h2 className="px-5 pt-5 font-semibold">다음 예약</h2>
       <div className="flex flex-col gap-5 p-5 has-[[data-cancelling=true]]:opacity-50 md:flex-row md:items-center">
-        <SpacePhoto
-          photo={bookingPhoto(booking)}
-          type={booking.spaceType}
-          size="fill"
-          eager
-          className="h-[150px] w-full shrink-0 rounded-lg md:w-[232px]"
-          sizes="(max-width: 767px) calc(100vw - 72px), 232px"
-          decorative
-        />
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <StatusLine kind={status.kind}>{status.label}</StatusLine>
-            {status.remaining && (
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {status.remaining}
-              </span>
-            )}
-          </div>
-          <p className="text-[28px] leading-tight font-bold tabular-nums">
-            <BookingTime booking={booking} />
-          </p>
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <h3 className="font-semibold">{bookingSpaceLabel(booking)}</h3>
-            {booking.desk && <Badge variant="secondary">좌석</Badge>}
-            {booking.attendeeCount != null && (
-              <Badge variant="secondary" className="tabular-nums">
-                {booking.attendeeCount}명
-              </Badge>
-            )}
-            <p className="text-sm text-muted-foreground">
-              {booking.branchName} {booking.floorName} ·{" "}
-              {booking.teamName ?? "개인"}
-              {booking.title && ` · ${booking.title}`}
+        <div
+          className={`flex min-w-0 flex-1 flex-col gap-5 ${booking.plan ? "@min-[880px]:flex-row @min-[880px]:items-center" : "md:flex-row md:items-center"}`}
+        >
+          <SpacePhoto
+            photo={bookingPhoto(booking)}
+            type={booking.spaceType}
+            size="fill"
+            eager
+            className={`h-[150px] w-full shrink-0 rounded-lg ${booking.plan ? "@min-[880px]:w-[232px]" : "md:w-[232px]"}`}
+            sizes="(max-width: 767px) calc(100vw - 72px), 232px"
+            decorative
+          />
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <StatusLine kind={status.kind}>{status.label}</StatusLine>
+              {status.remaining && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {status.remaining}
+                </span>
+              )}
+            </div>
+            <p className="text-[28px] leading-tight font-bold tabular-nums">
+              <BookingTime booking={booking} />
             </p>
-          </div>
-          <BookingParticipantsSummary booking={booking} />
-          <div className="flex flex-wrap items-center gap-2">
-            {!booking.desk && (
-              <Button asChild variant="outline">
-                <Link href={`/m/${booking.id}`}>
-                  <MessageSquare aria-hidden="true" className="size-4" />
-                  채팅
-                </Link>
-              </Button>
-            )}
-            {spaceHref && (
-              <Button asChild variant="outline">
-                <Link href={spaceHref}>일정 보기</Link>
-              </Button>
-            )}
-            {canLeaveBooking(booking, data.now) ? (
-              <LeaveBookingButton bookingId={booking.id} />
-            ) : (
-              booking.relation === "owner" &&
-              booking.canCancel &&
-              isUnfinishedBooking(booking, data.now) && (
-                <CancelBookingButton
-                  bookingId={booking.id}
-                  triggerLabel="예약 취소"
-                />
-              )
-            )}
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <h3 className="font-semibold">{bookingSpaceLabel(booking)}</h3>
+              {booking.desk && <Badge variant="secondary">좌석</Badge>}
+              {booking.attendeeCount != null && (
+                <Badge variant="secondary" className="tabular-nums">
+                  {booking.attendeeCount}명
+                </Badge>
+              )}
+              <p className="text-sm text-muted-foreground">
+                {booking.branchName} {booking.floorName} ·{" "}
+                {booking.teamName ?? "개인"}
+                {booking.title && ` · ${booking.title}`}
+              </p>
+            </div>
+            <BookingParticipantsSummary booking={booking} />
+            <div className="flex flex-wrap items-center gap-2">
+              {!booking.desk && (
+                <Button asChild variant="outline">
+                  <Link href={`/m/${booking.id}`}>
+                    <MessageSquare aria-hidden="true" className="size-4" />
+                    채팅
+                  </Link>
+                </Button>
+              )}
+              {spaceHref && (
+                <Button asChild variant="outline">
+                  <Link href={spaceHref}>일정 보기</Link>
+                </Button>
+              )}
+              {canLeaveBooking(booking, data.now) ? (
+                <LeaveBookingButton bookingId={booking.id} />
+              ) : (
+                booking.relation === "owner" &&
+                booking.canCancel &&
+                isUnfinishedBooking(booking, data.now) && (
+                  <CancelBookingButton
+                    bookingId={booking.id}
+                    triggerLabel="예약 취소"
+                  />
+                )
+              )}
+            </div>
           </div>
         </div>
+        {booking.relation === "owner" && booking.plan && (
+          <HomeMiniPlan
+            planId={booking.plan.id}
+            spaceId={booking.spaceId}
+            seatId={booking.desk?.id}
+          />
+        )}
       </div>
       <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border px-5 py-2">
         {next ? (

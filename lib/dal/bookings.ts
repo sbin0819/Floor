@@ -21,6 +21,7 @@ import {
   branches,
   chatRooms,
   floors,
+  floorPlans,
   spaceBlocks,
   spacePhotos,
   spaces,
@@ -231,7 +232,11 @@ export async function cancelBookingRecord(
   return booking ?? null;
 }
 
-function locatedBookings(database: DalDatabase, userId: string) {
+function locatedBookings(
+  database: DalDatabase,
+  userId: string,
+  includePlan = false,
+) {
   const area = alias(spaces, "booking_desk_area");
   return database
     .select({
@@ -246,6 +251,14 @@ function locatedBookings(database: DalDatabase, userId: string) {
       photo: { path: spacePhotos.path, alt: spacePhotos.alt },
       isOwner: sql<boolean>`${bookings.userId} = ${userId}`,
       participantNames: bookingParticipantNames,
+      homePlan: includePlan
+        ? sql<{ id: string; version: number } | null>`(
+            select jsonb_build_object('id', ${floorPlans.id}, 'version', ${floorPlans.version})
+            from ${floorPlans} where ${floorPlans.id} = ${floors.publishedPlanId}
+              and ${floorPlans.floorId} = ${floors.id}
+              and ${floorPlans.status} = 'published' and ${bookings.userId} = ${userId}
+          )`
+        : sql<null>`null`,
     })
     .from(bookings)
     .leftJoin(chatRooms, eq(chatRooms.bookingId, bookings.id))
@@ -281,7 +294,7 @@ export async function listMyUpcomingBookings(
   now: Date,
   database: DalDatabase = getDb(),
 ) {
-  return locatedBookings(database, userId)
+  return locatedBookings(database, userId, true)
     .where(
       and(
         ownedOrInvitedBooking(userId),

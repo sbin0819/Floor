@@ -15,6 +15,7 @@ import type { Session } from "@/lib/auth/types";
 import { getFloorPlanWithAccess } from "@/lib/dal/floor-plans";
 import {
   accessGrants,
+  bookingParticipants,
   floorPlans,
   floors,
   roleSettings,
@@ -25,6 +26,7 @@ import {
   bookingDate,
   bookingNow,
   bookingRange,
+  insertFixtureBooking,
   seedBookingActors,
   type BookingActors,
 } from "./booking-helper";
@@ -370,5 +372,37 @@ describe("floor-plan read authorization and budgets", () => {
       sql`select count(*)::int as count from floor_plans`,
     );
     expect(raw.rows[0]?.count).toBe(1);
+  });
+  it("joins only the owner's current published plan into the existing next-booking statement", async () => {
+    const row = await plan();
+    await database.db
+      .update(floors)
+      .set({ publishedPlanId: row.id })
+      .where(eq(floors.id, actors.floorId));
+    const booking = await insertFixtureBooking(database, actors);
+    await database.db
+      .insert(bookingParticipants)
+      .values({ bookingId: booking.id, userId: actors.member.userId });
+    meter.start();
+    const owner = await bookingQueries().getHomeUpcomingBookings();
+    expect(meter.stop().perStage).toEqual([1]);
+    expect(owner.bookings[0]?.plan).toEqual({ id: row.id, version: 1 });
+    expect(JSON.stringify(owner)).not.toContain("private-background");
+    const invited = await createBookingQueries({
+      database: database.db,
+      requireSession: async () => actors.member,
+      now: () => bookingNow,
+    }).getHomeUpcomingBookings();
+    expect(invited.bookings[0]).toMatchObject({
+      relation: "invited",
+      plan: null,
+    });
+    await database.db
+      .update(floorPlans)
+      .set({ status: "archived" })
+      .where(eq(floorPlans.id, row.id));
+    expect(
+      (await bookingQueries().getHomeUpcomingBookings()).bookings[0]?.plan,
+    ).toBeNull();
   });
 });

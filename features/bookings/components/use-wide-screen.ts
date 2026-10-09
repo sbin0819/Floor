@@ -11,8 +11,12 @@ export type MatchMedia = (
 >;
 const browserMatchMedia: MatchMedia = (query) => window.matchMedia(query);
 const serverSnapshot = () => true;
+const narrowServerSnapshot = () => false;
 
-export function useWideScreen(matchMedia: MatchMedia = browserMatchMedia) {
+export function useWideScreen(
+  matchMedia: MatchMedia = browserMatchMedia,
+  serverWide = true,
+) {
   const media = useMemo(
     () =>
       typeof window === "undefined" ||
@@ -28,6 +32,13 @@ export function useWideScreen(matchMedia: MatchMedia = browserMatchMedia) {
     },
     [media],
   );
-  const snapshot = useCallback(() => media?.matches ?? true, [media]);
-  return useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+  const snapshot = useCallback(
+    () => media?.matches ?? serverWide,
+    [media, serverWide],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    snapshot,
+    serverWide ? serverSnapshot : narrowServerSnapshot,
+  );
 }

@@ -398,6 +398,7 @@ export function createBookingQueries(
           await listMyUpcomingBookings(session.userId, current, db)
         ).map((row) => ({
           ...myBookingDto(row),
+          plan: row.homePlan,
           canCancel: row.isOwner && row.booking.during.end > current,
         })),
       };

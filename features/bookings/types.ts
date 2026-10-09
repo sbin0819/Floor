@@ -222,7 +222,7 @@ export type HomeHeaderData = {
 };
 export type HomeUpcomingBookingsData = {
   now: string;
-  bookings: MyCalendarBooking[];
+  bookings: (MyCalendarBooking & { plan?: FloorSummary["plan"] })[];
 };
 export type HomeWeekBooking = Pick<
   MyBooking,
