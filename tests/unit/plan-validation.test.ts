@@ -283,12 +283,27 @@ describe("validatePlan", () => {
       ),
     ).toEqual([]);
   });
-  it("validates a 2,000-seat and 300-space document within 200ms without future seat rules", () => {
+  it("validates a 2,000-seat and 300-space document within 200ms", () => {
     const doc = floorPlanSchema.parse(createStressDocument());
     const ctx = context({
-      spaces: doc.spaces.map(({ spaceId }, index) =>
-        space({ id: spaceId, name: `공간 ${index}` }),
-      ),
+      spaces: [
+        ...doc.spaces.map(({ spaceId }, index) =>
+          space({
+            id: spaceId,
+            name: `공간 ${index}`,
+            type: "desk_area",
+            bookable: false,
+          }),
+        ),
+        ...doc.seats.map(({ spaceId }, index) =>
+          space({
+            id: spaceId,
+            name: `좌석 ${index}`,
+            type: "desk",
+            parentId: doc.spaces[index % 300]!.spaceId,
+          }),
+        ),
+      ],
     });
     const before = performance.now();
     expect(validatePlan(doc, ctx)).toEqual([]);

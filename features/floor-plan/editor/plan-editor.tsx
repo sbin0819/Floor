@@ -28,6 +28,7 @@ import type { SaveFloorPlanDraftInput } from "../editor-schema";
 import type { FloorPlanDocument, PlanPoint } from "@/lib/floor-plan/types";
 import type { PlanStates } from "@/lib/floor-plan/render/types";
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
+import { hydrateSeatLabels } from "@/lib/floor-plan/seats";
 import { createPlanEditorStore, type PlanEditorSource } from "./store";
 import { createPlanAutosave } from "./autosave";
 import { createPlanValidation } from "./validation";
@@ -62,8 +63,10 @@ export function editorSource(data: PlanEditorData): PlanEditorSource {
   return {
     floorId: data.floor.id,
     basePlanId: data.published?.planId ?? null,
-    document:
+    document: hydrateSeatLabels(
       data.draft?.document ?? data.published?.document ?? createEmptyPlan(),
+      data.spaces,
+    ),
     draft: data.draft
       ? {
           planId: data.draft.planId,

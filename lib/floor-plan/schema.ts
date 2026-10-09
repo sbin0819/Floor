@@ -9,6 +9,12 @@ const positiveInteger = z.int().positive();
 const shapeId = z.string().min(1);
 const polygon = z.array(point).min(3).max(64);
 export const MAX_FLOOR_PLAN_BYTES = 900 * 1024;
+export const seatLabelSchema = z
+  .string()
+  .refine((value) => !value.includes("\0"), "이름에 NUL 문자를 넣을 수 없어요.")
+  .trim()
+  .min(1)
+  .max(20);
 
 export const floorPlanSchema = z
   .strictObject({
@@ -57,6 +63,7 @@ export const floorPlanSchema = z
           at: point,
           size: z.tuple([positiveInteger, positiveInteger]),
           rotation: z.int(),
+          label: seatLabelSchema.optional(),
         }),
       )
       .max(2000),

@@ -212,7 +212,7 @@ export function polygonsOverlap(a: Polygon, b: Polygon): boolean {
   return sample !== null && pointInPolygonStrict(sample, b);
 }
 
-function rectanglePoints(rect: Rectangle, doubled: boolean): PlanPoint[] {
+function rectangleAxes(rect: Rectangle): readonly [Point, Point] {
   const rotation = ((rect.rotation % 360) + 360) % 360;
   const angle = (rotation * Math.PI) / 180;
   const [cos, sin]: Point =
@@ -226,45 +226,49 @@ function rectanglePoints(rect: Rectangle, doubled: boolean): PlanPoint[] {
           ] as const
         )[rotation / 90]!
       : [Math.cos(angle), Math.sin(angle)];
-  const scale = doubled ? 2 : 1;
-  return (
-    [
-      [-1, -1],
-      [1, -1],
-      [1, 1],
-      [-1, 1],
-    ] as const
-  ).map(([x, y]): PlanPoint => [
-    scale * rect.at[0] +
-      ((x * rect.size[0] * cos - y * rect.size[1] * sin) * scale) / 2,
-    scale * rect.at[1] +
-      ((x * rect.size[0] * sin + y * rect.size[1] * cos) * scale) / 2,
-  ]);
+  return [
+    [cos, sin],
+    [-sin, cos],
+  ];
+}
+
+export function rotatedRectangleBounds(rect: Rectangle) {
+  const [[cos, sin]] = rectangleAxes(rect);
+  const x = (Math.abs(cos) * rect.size[0] + Math.abs(sin) * rect.size[1]) / 2;
+  const y = (Math.abs(sin) * rect.size[0] + Math.abs(cos) * rect.size[1]) / 2;
+  return {
+    minX: rect.at[0] - x,
+    maxX: rect.at[0] + x,
+    minY: rect.at[1] - y,
+    maxY: rect.at[1] + y,
+  };
 }
 
 export function rotatedRectanglesOverlap(a: Rectangle, b: Rectangle): boolean {
   const exact = a.rotation % 90 === 0 && b.rotation % 90 === 0;
-  const pa = rectanglePoints(a, exact);
-  const pb = rectanglePoints(b, exact);
-  for (const polygon of [pa, pb]) {
-    for (let i = 0; i < 2; i++) {
-      const p = polygon[i]!;
-      const q = polygon[i + 1]!;
-      const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
-      const axis: PlanPoint = exact
-        ? [-Math.sign(q[1] - p[1]), Math.sign(q[0] - p[0])]
-        : [-(q[1] - p[1]) / length, (q[0] - p[0]) / length];
-      const project = (points: Polygon) =>
-        points.map(([x, y]) => x * axis[0] + y * axis[1]);
-      const xa = project(pa);
-      const xb = project(pb);
-      if (
-        Math.min(Math.max(...xa), Math.max(...xb)) -
-          Math.max(Math.min(...xa), Math.min(...xb)) <=
-        (exact ? 0 : 0.5)
-      )
-        return false;
-    }
+  const aa = rectangleAxes(a);
+  const ba = rectangleAxes(b);
+  const dot = (x: Point, y: Point) => {
+    const value = x[0] * y[0] + x[1] * y[1];
+    // 정수 각도의 평행축은 긴 변에서도 삼각함수의 미세한 오차를 증폭하지 않는다.
+    return Math.abs(value) < 1e-12
+      ? 0
+      : Math.abs(Math.abs(value) - 1) < 1e-12
+        ? Math.sign(value)
+        : value;
+  };
+  const distance: Point = [b.at[0] - a.at[0], b.at[1] - a.at[1]];
+  for (const axis of [...aa, ...ba]) {
+    // 꼭짓점끼리 빼면 매우 긴 변 옆의 짧은 변이 소실될 수 있어 중심과 축으로 투영한다.
+    const ra =
+      a.size[0] * Math.abs(dot(axis, aa[0])) +
+      a.size[1] * Math.abs(dot(axis, aa[1]));
+    const rb =
+      b.size[0] * Math.abs(dot(axis, ba[0])) +
+      b.size[1] * Math.abs(dot(axis, ba[1]));
+    const separation = Math.abs(distance[0] * axis[0] + distance[1] * axis[1]);
+    const overlap = Math.min(2 * ra, 2 * rb, ra + rb - 2 * separation);
+    if (overlap <= (exact ? 0 : 1)) return false;
   }
   return true;
 }

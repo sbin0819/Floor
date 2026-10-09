@@ -6,7 +6,10 @@ import {
   pointInPolygonStrict,
   polygonArea,
   polygonsOverlap,
+  rotatedRectangleBounds,
+  rotatedRectanglesOverlap,
 } from "./geometry";
+import { createSeatAreaResolver, seatDisplayName } from "./seats";
 import type { PlanIssue, PlanIssueCode } from "./issues";
 import type { FloorPlanDocument, PlanPoint } from "./types";
 
@@ -172,5 +175,100 @@ export function validatePlan(
     }
     index.insert(item);
   });
+  issues.push(...validateSeats(document, context));
+  return issues;
+}
+
+function validateSeats(
+  document: FloorPlanDocument,
+  context: PlanContext,
+): PlanIssue[] {
+  const issues: PlanIssue[] = [];
+  const rows = new Map(
+    context.spaces.map((row) => [row.id.toLowerCase(), row]),
+  );
+  const onFloor = (row: PlanContext["spaces"][number]) =>
+    row.floorId.toLowerCase() === context.floorId.toLowerCase();
+  const areaOf = createSeatAreaResolver(document, context);
+  const occupied = new Set<string>();
+  const names = new Map<string, number>();
+  const countName = (name: string) =>
+    names.set(name.toLowerCase(), (names.get(name.toLowerCase()) ?? 0) + 1);
+  // 이전 좌석 이름이 아니라 게시 뒤 남는 이름끼리 비교해야 이름 교환과 재사용이 가능하다.
+  for (const row of context.spaces) {
+    if (onFloor(row) && !row.archived && row.type !== "desk")
+      countName(row.name);
+  }
+  const seats = document.seats.map((seat) => {
+    const row = rows.get(seat.spaceId.toLowerCase());
+    const name = seatDisplayName(seat, row);
+    if (name !== null) countName(name);
+    return { ...rotatedRectangleBounds(seat), seat, row, name };
+  });
+  const index = new RBush<(typeof seats)[number]>().load(seats);
+  for (const item of seats) {
+    const { seat, row, name } = item;
+    const add = (code: PlanIssueCode, message: string) =>
+      issues.push({ code, shapeId: seat.id, message });
+    const area = areaOf(seat);
+    if (!area)
+      add(
+        "SEAT_OUTSIDE_AREA",
+        `${name ?? "좌석"}: 좌석의 중심을 데스크 구역 하나의 안쪽에 놓아 주세요.`,
+      );
+    else occupied.add(area.id.toLowerCase());
+    if (row && (row.type !== "desk" || !onFloor(row)))
+      add("SEAT_NOT_DESK", `${name ?? "좌석"}: 이 층의 좌석 행이 아니에요.`);
+    if (row?.archived && row.type === "desk")
+      add(
+        "SEAT_ARCHIVED",
+        `${name ?? "좌석"}: 보관된 좌석이에요. 새 좌석으로 바꿔 주세요.`,
+      );
+    if (!row && name === null)
+      add("SEAT_LABEL_MISSING", "새 좌석의 이름을 입력해 주세요.");
+    if (name !== null && (names.get(name.toLowerCase()) ?? 0) > 1)
+      add(
+        "SEAT_LABEL_DUPLICATE",
+        `${name}: 같은 층의 다른 공간이나 좌석과 이름이 같아요.`,
+      );
+    // 좌석은 첫 충돌만 표시한다. 밀집된 잘못된 2,000석에서도 문제 목록이 쌍 수로 늘지 않는다.
+    const other = index
+      .search(item)
+      .find(
+        (candidate) =>
+          candidate !== item && rotatedRectanglesOverlap(seat, candidate.seat),
+      );
+    if (other)
+      add(
+        "SEAT_OVERLAP",
+        `${name ?? "좌석"}: ${other.name ?? "다른 좌석"}과 겹쳐요.`,
+      );
+  }
+  const previousAreas = new Set(
+    context.spaces
+      .filter(
+        (row) =>
+          onFloor(row) && !row.archived && row.type === "desk" && row.parentId,
+      )
+      .map((row) => row.parentId!.toLowerCase()),
+  );
+  for (const row of context.spaces) {
+    if (
+      !onFloor(row) ||
+      row.archived ||
+      row.type !== "desk_area" ||
+      !previousAreas.has(row.id.toLowerCase()) ||
+      occupied.has(row.id.toLowerCase())
+    )
+      continue;
+    const shape = document.spaces.find(
+      (shape) => shape.spaceId.toLowerCase() === row.id.toLowerCase(),
+    );
+    issues.push({
+      code: "SPACE_NO_SEATS",
+      ...(shape ? { shapeId: shape.id } : {}),
+      message: `${row.name}: 좌석이 모두 없어져요. 구역은 예약 없이 쓰는 곳으로 남아요.`,
+    });
+  }
   return issues;
 }

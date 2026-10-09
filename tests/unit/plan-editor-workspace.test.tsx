@@ -113,6 +113,28 @@ function empty() {
   data.published = null;
   return data;
 }
+it("hydrates legacy seat names only in the editor source without changing the published document", () => {
+  const data = planEditorFixture();
+  data.published!.document.seats = [
+    {
+      id: "seat-one",
+      spaceId: planEditorIds.spaceC,
+      at: [2000, 2000],
+      size: [1400, 700],
+      rotation: 0,
+    },
+  ];
+  data.spaces.push({
+    ...data.spaces[0]!,
+    id: planEditorIds.spaceC,
+    type: "desk",
+    name: "A-01",
+  });
+  const source = editorSource(data);
+  expect(source.document.seats[0]).toHaveProperty("label", "A-01");
+  expect(data.published!.document.seats[0]).not.toHaveProperty("label");
+  expect(source.draft).toBeNull();
+});
 function mount(
   data = empty(),
   save = vi

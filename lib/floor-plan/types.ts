@@ -29,6 +29,7 @@ export type FloorPlanDocument = {
     at: PlanPoint;
     size: [number, number];
     rotation: number;
+    label?: string;
   }[];
   fixtures: {
     id: string;
@@ -41,3 +42,5 @@ export type FloorPlanDocument = {
     opacity: number;
   };
 };
+
+export type PlanSeat = FloorPlanDocument["seats"][number];

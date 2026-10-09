@@ -26,3 +26,7 @@ export type PlanIssue = {
   shapeId?: string;
   message: string;
 };
+
+export function isBlockingPlanIssue(issue: PlanIssue): boolean {
+  return issue.code !== "SPACE_NO_SEATS";
+}
