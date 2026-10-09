@@ -32,6 +32,7 @@ import {
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import { canAccess, canAccessFloor } from "@/lib/permissions/can-access";
 import { loadSeedData } from "@/lib/seed/data";
+import { loadSeedPlans } from "@/lib/seed/plans";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { runSeed } from "@/lib/seed/run-seed";
 import { getOpenHours } from "@/lib/time/open-hours";
@@ -54,7 +55,7 @@ const expectedCounts = {
   teamMembers: 5,
   branchStaff: 5,
   accessGrants: 2,
-  floorPlans: 1,
+  floorPlans: 11,
   bookings: 30,
   spaceBlocks: 5,
   spacePhotos: 65,
@@ -216,6 +217,18 @@ describe("transactional development seed", () => {
     expect((await database.db.select().from(floorPlans))[0]!.status).toBe(
       "published",
     );
+    const allPlans = await database.db.select().from(floorPlans);
+    const allFloors = await database.db.select().from(floors);
+    for (const plan of [...fixtures.floorPlans, ...loadSeedPlans(fixtures)]) {
+      expect(allPlans.find(({ id }) => id === plan.id)).toMatchObject({
+        floorId: plan.floorId,
+        status: "published",
+        document: plan.document,
+      });
+      expect(
+        allFloors.find(({ id }) => id === plan.floorId)?.publishedPlanId,
+      ).toBe(plan.id);
+    }
     const rows = await database.db.select().from(bookings);
     expect(rows.filter(({ status }) => status === "confirmed")).toHaveLength(
       26,
@@ -601,7 +614,7 @@ describe("transactional development seed", () => {
       .update(floors)
       .set({ publishedPlanId: otherId })
       .where(eq(floors.id, input.floorId));
-    expect((await seed()).counts.floorPlans).toBe(0);
+    expect((await seed()).counts.floorPlans).toBe(10);
     expect(
       (
         await database.db

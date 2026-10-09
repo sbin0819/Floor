@@ -3,6 +3,10 @@ import { parseEnv } from "@/lib/env";
 import { SeedError } from "@/lib/seed/errors";
 import { loadSeedData } from "@/lib/seed/data";
 import {
+  floorPlansTarget,
+  type FloorPlansReceipt,
+} from "@/lib/seed/floor-plans-receipt";
+import {
   chatSpacesTarget,
   type ChatSpacesReceipt,
 } from "@/lib/seed/chat-spaces-receipt";
@@ -59,6 +63,15 @@ function dependencies(
       .mockResolvedValue(),
     archiveChatSpacesReceipt: vi
       .fn<SeedCommandDependencies["archiveChatSpacesReceipt"]>()
+      .mockResolvedValue(null),
+    readFloorPlansReceipt: vi
+      .fn<SeedCommandDependencies["readFloorPlansReceipt"]>()
+      .mockResolvedValue(null),
+    writeFloorPlansReceipt: vi
+      .fn<SeedCommandDependencies["writeFloorPlansReceipt"]>()
+      .mockResolvedValue(),
+    archiveFloorPlansReceipt: vi
+      .fn<SeedCommandDependencies["archiveFloorPlansReceipt"]>()
       .mockResolvedValue(null),
     stdout: vi.fn(),
     stderr: vi.fn(),
@@ -547,7 +560,7 @@ describe("explicit full-data reset safety", () => {
     expect(deps.runSeed).toHaveBeenCalledOnce();
     expect(deps.archiveReceipt).toHaveBeenCalledOnce();
     expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
-      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
+      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스·평면도 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
     );
     expect(deps.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
     expect(deps.closeDatabase).toHaveBeenCalledOnce();
@@ -764,7 +777,7 @@ describe("chat-spaces additions command", () => {
       target.targetHash,
     );
     expect(d.stderr).toHaveBeenCalledExactlyOnceWith(
-      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
+      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스·평면도 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
     );
     expect(d.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
     expect(d.closeDatabase).toHaveBeenCalledOnce();
@@ -778,6 +791,152 @@ describe("chat-spaces additions command", () => {
     expect(d.readChatSpacesReceipt).not.toHaveBeenCalled();
     expectNoDatabaseUse(d);
     expect(JSON.stringify(d.stderr.mock.calls)).not.toContain("%2546loor");
+  });
+});
+
+describe("floor-plans additions command", () => {
+  const target = floorPlansTarget(connectionString);
+  const receipt: FloorPlansReceipt = {
+    version: 1,
+    mode: "floor-plans",
+    targetHash: target.targetHash,
+    manifestHash: "a".repeat(64),
+    appliedAt: currentTime.toISOString(),
+    added: [],
+    skippedFloorIds: [loadSeedData().floorPlans[0]!.floorId],
+  };
+  const applied = {
+    counts: { floorPlans: 10 },
+    skippedBookings: 0,
+    accounts: [],
+    floorPlans: { applied: true, receipt },
+  };
+  const deps = () =>
+    dependencies({ AUTH_SECRET: undefined, SEED_ALLOW_HOST: "localhost" });
+  it.each([
+    ["--reset-passwords"],
+    ["--branches", "invalid"],
+    ["--booking-round2"],
+    ["--chat-spaces"],
+    ["--reset-data", "--confirm-reset"],
+    ["--confirm-reset"],
+  ])(
+    "rejects other modes %j before configuration or DB work",
+    async (...flags) => {
+      const d = deps();
+      expect(await runSeedCommand(["--floor-plans", ...flags], d)).toBe(1);
+      expect(d.getEnvironment).not.toHaveBeenCalled();
+      expect(d.readFloorPlansReceipt).not.toHaveBeenCalled();
+      expectNoDatabaseUse(d);
+    },
+  );
+  it.each([undefined, "other", "LOCALHOST"])(
+    "requires exact local host approval (%s)",
+    async (allowed) => {
+      const d = dependencies({
+        AUTH_SECRET: undefined,
+        SEED_ALLOW_HOST: allowed,
+      });
+      expect(await runSeedCommand(["--floor-plans"], d)).toBe(1);
+      expect(d.readFloorPlansReceipt).not.toHaveBeenCalled();
+      expectNoDatabaseUse(d);
+    },
+  );
+  it("writes the target receipt only after commit and reports skipped floors without credentials", async () => {
+    const d = deps();
+    let commit!: (value: typeof applied) => void;
+    d.runSeed.mockReturnValue(
+      new Promise((resolve) => {
+        commit = resolve;
+      }),
+    );
+    const command = runSeedCommand(["--floor-plans"], d);
+    await vi.waitFor(() => expect(d.runSeed).toHaveBeenCalledOnce());
+    expect(d.runSeed).toHaveBeenCalledWith({
+      now: currentTime,
+      resetPasswords: false,
+      floorPlans: {
+        targetHash: target.targetHash,
+        databaseName: target.databaseName,
+        receipt: null,
+      },
+    });
+    expect(d.writeFloorPlansReceipt).not.toHaveBeenCalled();
+    commit(applied);
+    expect(await command).toBe(0);
+    expect(d.writeFloorPlansReceipt).toHaveBeenCalledExactlyOnceWith(receipt);
+    expect(d.stdout).toHaveBeenCalledWith(
+      expect.stringContaining("평면도가 있어 건너뛴 층: 강남점"),
+    );
+    const output = JSON.stringify([d.stdout.mock.calls, d.stderr.mock.calls]);
+    for (const secret of [
+      connectionString,
+      target.databaseName,
+      target.targetHash,
+      "private-db-password",
+      "비밀번호는",
+    ])
+      expect(output).not.toContain(secret);
+    expect(d.closeDatabase).toHaveBeenCalledOnce();
+  });
+  it("does not rewrite a validated completion receipt", async () => {
+    const d = deps();
+    d.readFloorPlansReceipt.mockResolvedValue(receipt);
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      counts: { floorPlans: 0 },
+      floorPlans: { applied: false, receipt },
+    });
+    expect(await runSeedCommand(["--floor-plans"], d)).toBe(0);
+    expect(d.writeFloorPlansReceipt).not.toHaveBeenCalled();
+    expect(d.stdout).toHaveBeenCalledWith(
+      "평면도 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
+    );
+  });
+  it("rejects unreadable receipts before DB work", async () => {
+    const d = deps();
+    d.readFloorPlansReceipt.mockRejectedValue(new Error("private file"));
+    expect(await runSeedCommand(["--floor-plans"], d)).toBe(1);
+    expectNoDatabaseUse(d);
+    expect(JSON.stringify(d.stderr.mock.calls)).not.toContain("private file");
+  });
+  it("does not record failed transactions and reports committed receipt failure without retry or rollback claims", async () => {
+    const d = deps();
+    d.runSeed.mockRejectedValue(new SeedError("fixture failure"));
+    expect(await runSeedCommand(["--floor-plans"], d)).toBe(1);
+    expect(d.writeFloorPlansReceipt).not.toHaveBeenCalled();
+    d.runSeed.mockResolvedValue(applied);
+    d.writeFloorPlansReceipt.mockRejectedValue(new Error("private file"));
+    expect(await runSeedCommand(["--floor-plans"], d)).toBe(1);
+    expect(d.runSeed).toHaveBeenCalledTimes(2);
+    expect(d.stderr).toHaveBeenLastCalledWith(
+      "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
+    );
+    expect(d.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
+  });
+  it("archives the new receipt only after a confirmed successful reset", async () => {
+    const d = dependencies({ SEED_ALLOW_HOST: "localhost" });
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      floorPlans: undefined,
+      reset: { migrationCount: 25, counts: {} },
+    });
+    expect(await runSeedCommand(["--reset-data", "--confirm-reset"], d)).toBe(
+      0,
+    );
+    expect(d.archiveFloorPlansReceipt).toHaveBeenCalledExactlyOnceWith(
+      target.targetHash,
+    );
+    expect(
+      d.archiveFloorPlansReceipt.mock.invocationCallOrder[0],
+    ).toBeGreaterThan(d.runSeed.mock.invocationCallOrder[0]!);
+    d.archiveFloorPlansReceipt.mockRejectedValue(new Error("private path"));
+    expect(await runSeedCommand(["--reset-data", "--confirm-reset"], d)).toBe(
+      1,
+    );
+    expect(d.stderr).toHaveBeenLastCalledWith(
+      expect.stringContaining("예약 2차·스페이스·평면도 표식"),
+    );
   });
 });
 

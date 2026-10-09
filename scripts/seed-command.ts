@@ -2,6 +2,11 @@ import { parseArgs } from "node:util";
 import { SeedError } from "@/lib/seed/errors";
 import type { SeedResult } from "@/lib/seed/run-seed";
 import { loadSeedData } from "@/lib/seed/data";
+import {
+  floorPlansTarget,
+  type FloorPlansOptions,
+  type FloorPlansReceipt,
+} from "@/lib/seed/floor-plans-receipt";
 import { validateSeedBranchIds } from "@/lib/seed/scope";
 import {
   bookingRound2HostHash,
@@ -14,6 +19,7 @@ import {
 } from "@/lib/seed/chat-spaces-receipt";
 
 export const seedUsage =
+  "pnpm db:seed --floor-plans (평면도 행이 없는 시드 층에만 추가, 다른 모드와 병용 불가)\n" +
   "pnpm db:seed --chat-spaces (라운지·커뮤니티 추가만, 기존 계정·대화 보존. 다른 모드와 병용 불가)\n" +
   "pnpm db:seed [--reset-passwords] [--help]\npnpm db:seed --branches <UUID,UUID,...> (없는 지점만 추가, 기존 지점·계정은 변경하지 않음)\npnpm db:seed --booking-round2 (예약 2차 추가분만 적용, 다른 범위·비밀번호 초기화와 함께 사용 불가)\npnpm db:seed --reset-data --confirm-reset (기존 개발 데이터 전체 삭제 후 시드 재생성, 복구 불가. 로컬 DB도 정확한 SEED_ALLOW_HOST 필수)";
 
@@ -32,6 +38,7 @@ export type SeedCommandDependencies = {
     branchIds?: readonly string[];
     bookingRound2?: { hostHash: string; receipt: BookingRound2Receipt | null };
     chatSpaces?: ChatSpacesOptions;
+    floorPlans?: FloorPlansOptions;
   }) => Promise<SeedResult>;
   readReceipt: (hostHash: string) => Promise<BookingRound2Receipt | null>;
   writeReceipt: (receipt: BookingRound2Receipt) => Promise<void>;
@@ -41,6 +48,11 @@ export type SeedCommandDependencies = {
   ) => Promise<ChatSpacesReceipt | null>;
   writeChatSpacesReceipt: (receipt: ChatSpacesReceipt) => Promise<void>;
   archiveChatSpacesReceipt: (targetHash: string) => Promise<string | null>;
+  readFloorPlansReceipt: (
+    targetHash: string,
+  ) => Promise<FloorPlansReceipt | null>;
+  writeFloorPlansReceipt: (receipt: FloorPlansReceipt) => Promise<void>;
+  archiveFloorPlansReceipt: (targetHash: string) => Promise<string | null>;
   closeDatabase: () => Promise<void>;
   stdout: (message: string) => void;
   stderr: (message: string) => void;
@@ -73,6 +85,20 @@ export async function runSeedCommand(
   if (values.help) {
     dependencies.stdout(seedUsage);
     return 0;
+  }
+  if (
+    values["floor-plans"] &&
+    (values.branches !== undefined ||
+      values["booking-round2"] ||
+      values["chat-spaces"] ||
+      values["reset-passwords"] ||
+      values["reset-data"] ||
+      values["confirm-reset"])
+  ) {
+    dependencies.stderr(
+      "--floor-plans는 다른 시드 범위나 초기화 옵션과 함께 쓸 수 없어요.",
+    );
+    return 1;
   }
   if (
     values["chat-spaces"] &&
@@ -142,6 +168,7 @@ export async function runSeedCommand(
       ...(!branchIds &&
       !values["booking-round2"] &&
       !values["chat-spaces"] &&
+      !values["floor-plans"] &&
       !environment.AUTH_SECRET
         ? ["AUTH_SECRET"]
         : []),
@@ -153,11 +180,14 @@ export async function runSeedCommand(
       return 1;
     }
     hostname = databaseHost(environment.DATABASE_URL!);
-    if (values["chat-spaces"] || values["reset-data"])
-      chatTarget = chatSpacesTarget(environment.DATABASE_URL!);
+    if (values["chat-spaces"] || values["reset-data"] || values["floor-plans"])
+      chatTarget = values["floor-plans"]
+        ? floorPlansTarget(environment.DATABASE_URL!)
+        : chatSpacesTarget(environment.DATABASE_URL!);
     if (
       (values["reset-data"] ||
         values["chat-spaces"] ||
+        values["floor-plans"] ||
         (hostname !== "localhost" && hostname !== "127.0.0.1")) &&
       environment.SEED_ALLOW_HOST !== hostname
     ) {
@@ -209,6 +239,23 @@ export async function runSeedCommand(
     }
   }
   let exitCode = 0;
+  let floorPlans: FloorPlansOptions | undefined;
+  if (values["floor-plans"] && chatTarget) {
+    try {
+      floorPlans = {
+        targetHash: chatTarget.targetHash,
+        databaseName: chatTarget.databaseName,
+        receipt: await dependencies.readFloorPlansReceipt(
+          chatTarget.targetHash,
+        ),
+      };
+    } catch {
+      dependencies.stderr(
+        "평면도 적용 표식을 읽지 못했어요. DB를 변경하지 않았어요. 표식과 적용 상태를 확인해 주세요.",
+      );
+      return 1;
+    }
+  }
   let appliedWithoutReceipt = false;
   let resetWithoutReceiptArchive = false;
   try {
@@ -224,6 +271,7 @@ export async function runSeedCommand(
       ...(branchIds ? { branchIds } : {}),
       ...(bookingRound2 ? { bookingRound2 } : {}),
       ...(chatSpaces ? { chatSpaces } : {}),
+      ...(floorPlans ? { floorPlans } : {}),
     });
     if (values["reset-data"]) {
       if (!result.reset)
@@ -235,6 +283,9 @@ export async function runSeedCommand(
         bookingRound2HostHash(hostname),
       );
       const archivedChat = await dependencies.archiveChatSpacesReceipt(
+        chatTarget!.targetHash,
+      );
+      const archivedPlans = await dependencies.archiveFloorPlansReceipt(
         chatTarget!.targetHash,
       );
       resetWithoutReceiptArchive = false;
@@ -252,6 +303,10 @@ export async function runSeedCommand(
       if (archivedChat)
         dependencies.stdout(
           "이 DB의 이전 스페이스 적용 표식을 같은 폴더에 보관했어요.",
+        );
+      if (archivedPlans)
+        dependencies.stdout(
+          "이 DB의 이전 평면도 적용 표식을 같은 폴더에 보관했어요.",
         );
     }
     if (bookingRound2) {
@@ -296,6 +351,35 @@ export async function runSeedCommand(
         "다음 건수는 이번에 추가한 행이며 DB 전체 건수가 아니에요.",
       );
     }
+    if (floorPlans) {
+      if (!result.floorPlans)
+        throw new SeedError(
+          "평면도 적용 결과를 확인하지 못했어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.",
+        );
+      if (result.floorPlans.applied) {
+        appliedWithoutReceipt = true;
+        if (result.floorPlans.receipt.targetHash !== floorPlans.targetHash)
+          throw new Error("Receipt target mismatch");
+        await dependencies.writeFloorPlansReceipt(result.floorPlans.receipt);
+        appliedWithoutReceipt = false;
+      }
+      dependencies.stdout(
+        result.floorPlans.applied
+          ? "평면도 추가분을 적용하고 완료 표식을 저장했어요."
+          : "평면도 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
+      );
+      const data = loadSeedData();
+      for (const id of result.floorPlans.receipt.skippedFloorIds) {
+        const floor = data.floors.find((row) => row.id === id);
+        const branch = data.branches.find((row) => row.id === floor?.branchId);
+        dependencies.stdout(
+          `평면도가 있어 건너뛴 층: ${branch?.name ?? "시드 지점"} ${floor?.name ?? id}`,
+        );
+      }
+      dependencies.stdout(
+        "다음 건수는 이번에 추가한 행이며 DB 전체 건수가 아니에요.",
+      );
+    }
     dependencies.stdout("시드 데이터를 준비했어요.");
     if (result.branchScope) {
       dependencies.stdout(
@@ -316,14 +400,14 @@ export async function runSeedCommand(
         `건너뛴 회의 메시지: ${result.skippedMeetingMessages}개`,
       );
     dependencies.stdout(
-      `${result.branchScope || bookingRound2 || chatSpaces ? "참조한 기존 계정 (변경 없음)" : "계정"}: ${result.accounts.join(", ")}`,
+      `${result.branchScope || bookingRound2 || chatSpaces || floorPlans ? "참조한 기존 계정 (변경 없음)" : "계정"}: ${result.accounts.join(", ")}`,
     );
-    if (!result.branchScope && !bookingRound2 && !chatSpaces)
+    if (!result.branchScope && !bookingRound2 && !chatSpaces && !floorPlans)
       dependencies.stdout("비밀번호는 README에 있어요.");
   } catch (error) {
     dependencies.stderr(
       resetWithoutReceiptArchive
-        ? "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요."
+        ? "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스·평면도 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요."
         : appliedWithoutReceipt
           ? "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요."
           : error instanceof SeedError
@@ -353,6 +437,7 @@ function parseSeedArguments(args: string[]) {
       "confirm-reset": { type: "boolean", default: false },
       "booking-round2": { type: "boolean", default: false },
       "chat-spaces": { type: "boolean", default: false },
+      "floor-plans": { type: "boolean", default: false },
       branches: { type: "string" },
       help: { type: "boolean", default: false },
     },

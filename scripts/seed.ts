@@ -4,6 +4,7 @@ import { runSeed } from "@/lib/seed/run-seed";
 import { runSeedCommand } from "./seed-command";
 import { createSeedReceiptStore } from "./seed-receipt";
 import { createChatSpacesReceiptStore } from "./chat-spaces-receipt";
+import { createFloorPlansReceiptStore } from "./floor-plans-receipt";
 
 void runSeedCommand(process.argv.slice(2), {
   getEnvironment: getEnv,
@@ -11,6 +12,7 @@ void runSeedCommand(process.argv.slice(2), {
   runSeed,
   ...createSeedReceiptStore(),
   ...createChatSpacesReceiptStore(),
+  ...createFloorPlansReceiptStore(),
   closeDatabase,
   stdout: (message) => console.log(message),
   stderr: (message) => console.error(message),

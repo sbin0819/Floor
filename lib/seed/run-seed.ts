@@ -45,6 +45,13 @@ import type { BookingRound2Receipt } from "@/lib/seed/booking-round2-receipt";
 import { resetSeedDatabase } from "@/lib/dal/seed-reset";
 import { seedMigrations } from "./migrations";
 import { applyChatSpacesSeed } from "./chat-spaces";
+import { loadSeedPlans } from "./plans";
+import { applyFloorPlansSeed } from "./floor-plans";
+import {
+  validateFloorPlansOptions,
+  type FloorPlansOptions,
+  type FloorPlansReceipt,
+} from "./floor-plans-receipt";
 import {
   validateChatSpacesOptions,
   type ChatSpacesOptions,
@@ -59,6 +66,7 @@ export type SeedResult = {
   branchScope?: { addedBranchIds: string[]; skippedBranchIds: string[] };
   bookingRound2?: { applied: boolean; receipt: BookingRound2Receipt };
   chatSpaces?: { applied: boolean; receipt: ChatSpacesReceipt };
+  floorPlans?: { applied: boolean; receipt: FloorPlansReceipt };
   reset?: { migrationCount: number; counts: Record<string, number> };
 };
 
@@ -70,6 +78,7 @@ export async function runSeed({
   branchIds,
   bookingRound2,
   chatSpaces,
+  floorPlans,
   resetData = false,
 }: {
   db?: TransactionDatabase;
@@ -79,10 +88,24 @@ export async function runSeed({
   branchIds?: readonly string[];
   bookingRound2?: BookingRound2Options;
   chatSpaces?: ChatSpacesOptions;
+  floorPlans?: FloorPlansOptions;
   resetData?: boolean;
 }): Promise<SeedResult> {
   if (!Number.isFinite(now.getTime()))
     throw new SeedError("시드 기준 시각이 올바르지 않아요.");
+  if (floorPlans !== undefined) {
+    if (
+      branchIds !== undefined ||
+      bookingRound2 !== undefined ||
+      chatSpaces !== undefined ||
+      resetPasswords ||
+      resetData
+    )
+      throw new SeedError(
+        "평면도 전용 모드는 다른 범위·초기화·비밀번호 재설정과 함께 쓸 수 없어요.",
+      );
+    validateFloorPlansOptions(floorPlans);
+  }
   if (chatSpaces !== undefined) {
     if (
       branchIds !== undefined ||
@@ -112,6 +135,15 @@ export async function runSeed({
   let current = "시드 데이터";
   try {
     const data = loadSeedData();
+    const plans = [...data.floorPlans, ...loadSeedPlans(data)];
+    if (floorPlans !== undefined) {
+      current = "평면도 추가 전용 데이터";
+      return await withTransaction(
+        (database) =>
+          applyFloorPlansSeed({ ...floorPlans, data, plans, now }, database),
+        db,
+      );
+    }
     const photos = loadSeedPhotos(data);
     const bookingExtras = loadSeedBookings2(data);
     const chat = loadSeedChat(data);
@@ -293,8 +325,8 @@ export async function runSeed({
         data.accessGrants,
         database,
       );
-      let plans = 0;
-      for (const { createdByKey, ...plan } of data.floorPlans) {
+      let planCount = 0;
+      for (const { createdByKey, ...plan } of plans) {
         current = `평면도 ${plan.id}`;
         if (
           await seedDal.putSeedPlan(
@@ -302,7 +334,7 @@ export async function runSeed({
             database,
           )
         )
-          plans++;
+          planCount++;
       }
       const branches = new Map(
         data.branches.map((branch) => [branch.id, branch]),
@@ -452,7 +484,7 @@ export async function runSeed({
           teamMembers: data.teamMembers.length,
           branchStaff: data.branchStaff.length,
           accessGrants: data.accessGrants.length,
-          floorPlans: plans,
+          floorPlans: planCount,
           bookings: timeBookings + deskResult.bookings,
           spaceBlocks: data.spaceBlocks.length + deskResult.spaceBlocks,
           spacePhotos: photos.spacePhotos.length,
@@ -474,9 +506,9 @@ export async function runSeed({
       throw new SeedError(
         `${current}: 다른 행이 같은 고유 값을 사용하고 있어요. 시드를 되돌렸어요.`,
       );
-    if (resetData || chatSpaces !== undefined)
+    if (resetData || chatSpaces !== undefined || floorPlans !== undefined)
       throw new SeedError(
-        `${chatSpaces === undefined ? "초기화" : "스페이스 추가"} 완료 여부를 확인하지 못했어요. 연결 오류는 커밋 응답 유실일 수 있어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.`,
+        `${floorPlans !== undefined ? "평면도 추가" : chatSpaces === undefined ? "초기화" : "스페이스 추가"} 완료 여부를 확인하지 못했어요. 연결 오류는 커밋 응답 유실일 수 있어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.`,
       );
     throw new SeedError(
       `${current}: 시드를 완료하지 못했어요. 모든 시드 변경을 되돌렸어요.`,
