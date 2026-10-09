@@ -3,6 +3,8 @@ import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/user-avatar";
+import { notificationAge } from "@/features/notifications/format";
+import { reportsHref } from "../report-navigation";
 import type { AdminDashboardData } from "../dashboard-types";
 import { AdminDashboardFilters } from "./admin-dashboard-filters";
 import { AdminDashboardPlan } from "./admin-dashboard-plan";
@@ -351,6 +353,23 @@ export function AdminDashboard({ data }: { data: AdminDashboardData }) {
             >
               {data.cards.maintenanceCount}곳
             </Card>
+            {data.reportSummary && (
+              <Card
+                title="처리할 신고"
+                detail={
+                  data.reportSummary.oldestAt
+                    ? `가장 오래된 것 ${notificationAge(data.reportSummary.oldestAt, data.now, data.branch.timezone)}`
+                    : "처리할 신고가 없어요"
+                }
+              >
+                <Link
+                  href={reportsHref(data.branch.id, "open")}
+                  className="inline-flex min-h-11 items-center rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {data.reportSummary.count}건
+                </Link>
+              </Card>
+            )}
           </div>
           <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
             <Utilization data={data} />

@@ -13,5 +13,8 @@ export function spaceSettingsTabs(space: Pick<SpaceSettings, "kind" | "role">) {
           ...(space.role === "owner" ? [{ key: "danger", name: "위험" }] : []),
         ]
       : []),
+    ...(space.kind === "branch" && space.role !== "member"
+      ? [{ key: "banned", name: "내보낸 사람" }]
+      : []),
   ];
 }

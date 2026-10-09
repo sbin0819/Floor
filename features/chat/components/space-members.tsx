@@ -28,7 +28,7 @@ export function SpaceMembers({
   const headingId = useId();
   if (
     banned &&
-    (data.space.kind !== "community" ||
+    (!["community", "branch"].includes(data.space.kind) ||
       data.space.role === "member" ||
       data.view !== "full")
   )
@@ -39,7 +39,11 @@ export function SpaceMembers({
     <section aria-labelledby={headingId} className="space-y-4">
       <h2 id={headingId} className="text-lg font-bold">
         {banned ? (
-          "들어올 수 없는 사람"
+          data.space.kind === "branch" ? (
+            "내보낸 사람"
+          ) : (
+            "들어올 수 없는 사람"
+          )
         ) : (
           <span>
             멤버 <span className="tabular-nums">{data.memberCount}</span>명
@@ -55,7 +59,9 @@ export function SpaceMembers({
         <ul
           aria-label={
             banned
-              ? "들어올 수 없는 사람 목록"
+              ? data.space.kind === "branch"
+                ? "내보낸 사람 목록"
+                : "들어올 수 없는 사람 목록"
               : data.view === "limited"
                 ? "관리자 목록"
                 : "멤버 목록"
@@ -107,7 +113,9 @@ export function SpaceMembers({
       ) : (
         <p className="text-sm text-muted-foreground">
           {banned
-            ? "들어올 수 없는 사람이 없어요"
+            ? data.space.kind === "branch"
+              ? "내보낸 사람이 없어요"
+              : "들어올 수 없는 사람이 없어요"
             : data.view === "limited"
               ? "아직 참여한 관리자가 없어요"
               : "아직 멤버가 없어요"}
@@ -128,17 +136,19 @@ function MemberControls({
   currentUserId: string;
   banned: boolean;
 }) {
-  if (space.kind !== "community" || space.role === "member") return null;
+  if (!["community", "branch"].includes(space.kind) || space.role === "member")
+    return null;
   const input = { spaceId: space.id, userId: member.userId };
   if (banned)
     return (
       <MemberAction
-        label="풀어 주기"
+        label={space.kind === "branch" ? "풀기" : "풀어 주기"}
         action={unbanSpaceMember}
         input={input}
         message="다시 들어올 수 있게 했어요"
       />
     );
+  if (space.kind !== "community") return null;
   if (
     member.userId.toLowerCase() === currentUserId.toLowerCase() ||
     member.role === "owner"

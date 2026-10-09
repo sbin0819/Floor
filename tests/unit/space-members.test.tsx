@@ -285,10 +285,10 @@ describe("space member settings", () => {
 
   it.each([
     fixture("member"),
-    fixture("admin", "branch"),
+    fixture("member", "branch"),
     fixture("admin", "team"),
   ])(
-    "does not render a banned tab outside its community management scope",
+    "does not render a banned tab outside its authorized management scope",
     (data) => {
       const { container } = mount(data, member.userId, true);
       expect(container).toBeEmptyDOMElement();

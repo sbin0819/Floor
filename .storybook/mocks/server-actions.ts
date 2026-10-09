@@ -7,6 +7,8 @@ const readOnlyAction: (
   code: "FORBIDDEN",
 });
 
+export const resolveReports = readOnlyAction;
+
 export const createBooking = readOnlyAction;
 export const joinLounge = readOnlyAction;
 export const createCommunitySpace = readOnlyAction;

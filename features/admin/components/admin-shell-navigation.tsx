@@ -18,6 +18,7 @@ import {
   Wrench,
   PencilRuler,
   Megaphone,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ const icons = {
   roles: KeyRound,
   plans: PencilRuler,
   announcements: Megaphone,
+  reports: Shield,
 };
 
 export function AdminShellNavigation({
@@ -155,6 +157,15 @@ export function AdminShellNavigation({
                 >
                   <Icon aria-hidden="true" className="size-4 shrink-0" />
                   {adminMenuLabels[menu]}
+                  {menu === "reports" &&
+                    (current.reportSummary?.count ?? 0) > 0 && (
+                      <span
+                        className="ml-auto rounded-full bg-sidebar-accent px-2 py-0.5 text-xs tabular-nums"
+                        aria-label={`처리할 신고 ${current.reportSummary?.count}개`}
+                      >
+                        {current.reportSummary?.count}
+                      </span>
+                    )}
                   {menu === "maintenance" &&
                     (current.maintenanceCount ?? 0) > 0 && (
                       <span
