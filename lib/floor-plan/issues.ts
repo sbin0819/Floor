@@ -1,1 +1,28 @@
-export type PlanIssue = { code: string; shapeId?: string; message: string };
+export type PlanIssueCode =
+  | "SPACE_UNKNOWN"
+  | "SPACE_OTHER_FLOOR"
+  | "SPACE_ARCHIVED"
+  | "SPACE_IS_DESK"
+  | "SHAPE_MISSING"
+  | "POLYGON_SELF_INTERSECT"
+  | "POLYGON_TOO_SMALL"
+  | "SPACE_OVERLAP"
+  | "LABEL_OUTSIDE"
+  | "SEAT_OUTSIDE_AREA"
+  | "SEAT_OVERLAP"
+  | "SEAT_LABEL_MISSING"
+  | "SEAT_LABEL_DUPLICATE"
+  | "SEAT_ARCHIVED"
+  | "OPENING_OFF_WALL"
+  | "SEAT_NOT_DESK"
+  | "ACCESS_TEAMS_EMPTY"
+  | "ACCESS_WIDER_THAN_FLOOR"
+  | "SEAT_REMOVED_WITH_BOOKINGS"
+  | "AREA_HAS_BOOKINGS"
+  | "SPACE_NO_SEATS";
+
+export type PlanIssue = {
+  code: PlanIssueCode;
+  shapeId?: string;
+  message: string;
+};
