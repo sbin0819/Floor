@@ -84,6 +84,35 @@ describe("environment", () => {
       parseEnv({ SEED_ALLOW_HOST: " DEV-DB.example.test " }).SEED_ALLOW_HOST,
     ).toBe(" DEV-DB.example.test ");
   });
+  it("accepts absent, partial and complete optional R2 settings", () => {
+    const empty = {
+      R2_ACCESS_KEY_ID: "",
+      R2_SECRET_ACCESS_KEY: "",
+      R2_ENDPOINT: "",
+      R2_BUCKET: "",
+    };
+    for (const key of Object.keys(empty)) {
+      expect(parseEnv({})[key as keyof typeof empty]).toBeUndefined();
+      expect(parseEnv(empty)[key as keyof typeof empty]).toBeUndefined();
+    }
+    expect(parseEnv({ R2_BUCKET: "floor-images" }).R2_BUCKET).toBe(
+      "floor-images",
+    );
+    expect(
+      parseEnv({
+        R2_ACCESS_KEY_ID: "fake-access",
+        R2_SECRET_ACCESS_KEY: "fake-secret",
+        R2_ENDPOINT: "https://test.r2.cloudflarestorage.com",
+        R2_BUCKET: "floor-images",
+      }),
+    ).toMatchObject({ R2_BUCKET: "floor-images" });
+  });
+  it.each(["http://example.invalid", "ftp://example.invalid", "not-a-url"])(
+    "rejects the non-HTTPS R2 endpoint %s",
+    (R2_ENDPOINT) => {
+      expect(() => parseEnv({ R2_ENDPOINT })).toThrow();
+    },
+  );
   it("accepts supplied database and app URLs", () => {
     expect(
       parseEnv({

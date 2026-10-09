@@ -17,6 +17,13 @@ const envSchema = z
       z.enum(["local", "disabled"]).optional(),
     ),
     FILE_STORAGE_DIR: optionalValue,
+    R2_ACCESS_KEY_ID: optionalValue,
+    R2_SECRET_ACCESS_KEY: optionalValue,
+    R2_ENDPOINT: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.url({ protocol: /^https$/ }).optional(),
+    ),
+    R2_BUCKET: optionalValue,
     AUTH_SECRET: optionalValue.refine(
       (value) =>
         value === undefined || new TextEncoder().encode(value).length >= 32,
