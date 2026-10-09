@@ -139,6 +139,8 @@ export function createAction<Input, Output>(
             "password_attempts",
             "admin_teams",
           ].includes(error.details.message ?? "")) ||
+          (code === "INVALID_INPUT" &&
+            error.details.message === "not_cancellable") ||
           (code === "OVER_CAPACITY" &&
             ["attendee_count", "participants"].includes(
               error.details.message ?? "",

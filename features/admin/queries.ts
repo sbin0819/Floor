@@ -6,9 +6,17 @@ import {
   createAdminDashboardQueries,
   type AdminDashboardInput,
 } from "./dashboard-query-factory";
+import {
+  createAdminBookingQueries,
+  type AdminBookingsInput,
+} from "./booking-query-factory";
 
 export async function getAdminDashboard(input: AdminDashboardInput) {
   return createAdminDashboardQueries().getAdminDashboard(input);
+}
+
+export async function getAdminBookings(input: AdminBookingsInput) {
+  return createAdminBookingQueries().getAdminBookings(input);
 }
 export async function getAdminBranch(branchId: string) {
   return createAdminQueries().getAdminBranch(branchId);

@@ -54,7 +54,7 @@ export type ActionResult<T> =
 export type ActionErrorCode =
   | 'UNAUTHENTICATED'    // 세션 없음
   | 'FORBIDDEN'          // can() 또는 canAccess() 실패
-  | 'INVALID_INPUT'      // zod 검증 실패. fieldErrors를 채운다
+  | 'INVALID_INPUT'      // zod 검증 실패. fieldErrors를 채운다. 예외: 운영자 취소의 not_cancellable은 필드가 없는 상태 오류다
   | 'NOT_FOUND'
   | 'BOOKING_CONFLICT'   // 겹치는 예약 (Postgres 23P01)
   | 'SPACE_BLOCKED'      // 점검 구간과 겹침

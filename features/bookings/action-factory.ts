@@ -1,4 +1,5 @@
 import type { ActionDependencies } from "@/lib/actions/create-action";
+import { reportPostCommitFailure } from "@/lib/actions/post-commit-log";
 import type { LiveKitServer } from "@/lib/calls/types";
 import { evictCalls } from "@/lib/calls/evict";
 import type { DalDatabase, TransactionDatabase } from "@/lib/dal";
@@ -14,18 +15,25 @@ export type BookingDependencies = Partial<ActionDependencies> & {
   chatPublisher?: RealtimePublisher;
 };
 
-export function evictBookingCalls(
+export async function evictBookingCalls(
   userIds: readonly string[],
   dependencies: BookingDependencies,
 ) {
-  return Promise.all(
-    [...new Set(userIds)].map((userId) =>
-      evictCalls(userId, {
-        ...dependencies,
-        publisher: dependencies.chatPublisher,
-      }),
-    ),
-  );
+  try {
+    await Promise.all(
+      [...new Set(userIds)].map((userId) =>
+        evictCalls(userId, {
+          ...dependencies,
+          publisher: dependencies.chatPublisher,
+        }),
+      ),
+    );
+  } catch {
+    reportPostCommitFailure(
+      "Booking call eviction failed.",
+      dependencies.logError,
+    );
+  }
 }
 
 export function bookingActionDependencies(
@@ -47,8 +55,9 @@ export async function publishBookingChatEvents(
       events,
     );
   } catch {
-    (dependencies.logError ?? console.error)(
+    reportPostCommitFailure(
       "Booking chat publication failed.",
+      dependencies.logError,
     );
   }
 }
@@ -64,8 +73,9 @@ export async function publishBookingChange(
       { type: "booking.changed", spaceId },
     );
   } catch {
-    (dependencies.logError ?? console.error)(
+    reportPostCommitFailure(
       "Booking realtime publication failed.",
+      dependencies.logError,
     );
   }
 }

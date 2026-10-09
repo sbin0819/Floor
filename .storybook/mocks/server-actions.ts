@@ -56,6 +56,7 @@ export const markRoomRead = async (input: { seq: number }) => ({
 export const updateBooking = readOnlyAction;
 export const createDeskBooking = readOnlyAction;
 export const cancelBooking = readOnlyAction;
+export const cancelBookingAsOperator = readOnlyAction;
 export const leaveBooking = readOnlyAction;
 export const setDefaultBranch = readOnlyAction;
 export const markNotificationRead = readOnlyAction;

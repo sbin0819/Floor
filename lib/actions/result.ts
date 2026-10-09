@@ -53,6 +53,7 @@ export type ActionErrorDetails = {
     | "admin_teams"
     | "desk_per_person"
     | "attendee_count"
+    | "not_cancellable"
     | "participants";
   fieldErrors?: Record<string, string[]>;
 };

@@ -51,7 +51,10 @@ export function useAdminMutation<T>({
     mutationFn: (input: unknown) => action(input),
     onSuccess(result) {
       if (!result.ok) {
-        const text = adminErrorMessage(result.code);
+        const text =
+          result.message === "not_cancellable"
+            ? "이미 끝났거나 취소된 예약이에요. 다시 확인해 주세요"
+            : adminErrorMessage(result.code);
         setMessage(text);
         setErrors(
           Object.fromEntries(
@@ -62,6 +65,7 @@ export function useAdminMutation<T>({
           ),
         );
         toast.error(text);
+        if (result.message === "not_cancellable") router.refresh();
         return;
       }
       toast.success(

@@ -1,4 +1,5 @@
 import type { ActionDependencies } from "@/lib/actions/create-action";
+import { reportPostCommitFailure } from "@/lib/actions/post-commit-log";
 import { getPostgresError } from "@/lib/actions/errors";
 import { ActionError } from "@/lib/actions/result";
 import type { Session } from "@/lib/auth/types";
@@ -93,8 +94,9 @@ export async function publishAdminSpaceChange(
       },
     );
   } catch {
-    (dependencies.logError ?? console.error)(
+    reportPostCommitFailure(
       "Space update notification failed.",
+      dependencies.logError,
     );
   }
 }
