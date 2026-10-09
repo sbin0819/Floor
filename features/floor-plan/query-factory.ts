@@ -13,6 +13,7 @@ import { loadPermissionContext } from "@/lib/permissions/context";
 export type FloorPlanQueryDependencies = {
   database?: DalDatabase;
   requireSession?: () => Promise<Session>;
+  now?: () => Date;
 };
 
 export function createFloorPlanQueries(

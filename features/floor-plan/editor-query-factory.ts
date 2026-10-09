@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readBookingNow } from "@/features/bookings/request-clock";
 import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import { getBranch } from "@/lib/dal/branches";
@@ -39,9 +40,10 @@ export function createPlanEditorQueries(
       if (!floor || floor.branchId !== branchId)
         throw new ActionError("NOT_FOUND");
       requireEditor(context, floor.branchId);
+      const now = dependencies.now?.() ?? readBookingNow(db !== undefined);
       const [sources, spaces] = await Promise.all([
         listPlanEditorSources(floorId, session.userId, db),
-        listPlanEditorSpaces(floorId, session.userId, db),
+        listPlanEditorSpaces(floorId, session.userId, db, now),
       ]);
       const draft = sources.find((row) => row.status === "draft");
       const published = sources.find((row) => row.status === "published");

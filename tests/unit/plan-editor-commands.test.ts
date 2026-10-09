@@ -40,7 +40,7 @@ describe("editor commands and transforms", () => {
     expect(restored.walls).toBe(doc.walls);
     expect(command.apply(restored)).toEqual(next);
   });
-  it("does not delete walls or seats and treats empty edits as no-ops", () => {
+  it("does not delete walls and treats empty edits as no-ops", () => {
     const doc = editorDocument();
     expect(deleteShapesCommand(doc, ["wall", "missing"])).toBeNull();
     expect(

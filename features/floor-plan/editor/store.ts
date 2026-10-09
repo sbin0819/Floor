@@ -6,7 +6,7 @@ import type { Camera } from "@/lib/floor-plan/render/types";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
 import type { Command } from "./commands";
 
-export type EditorTool = "select" | "rectangle" | "polygon";
+export type EditorTool = "select" | "rectangle" | "polygon" | "seat-array";
 export type PlanDraft = { planId: string; version: number; revision: number };
 export type PlanEditorSource = {
   floorId: string;
@@ -29,6 +29,7 @@ export type PlanEditorState = PlanEditorSource & {
   saveError: ActionErrorCode | null;
   issues: readonly PlanIssue[];
   validationPending: boolean;
+  writeLocked: boolean;
   execute(command: Command | null): boolean;
   undo(): boolean;
   redo(): boolean;
@@ -36,13 +37,16 @@ export type PlanEditorState = PlanEditorSource & {
   setTool(tool: EditorTool): void;
   setSnap(enabled: boolean): void;
   setCamera(camera: Camera | null): void;
+  setWriteLocked(locked: boolean): void;
   replaceSource(source: PlanEditorSource): void;
 };
 export type PlanEditorStore = StoreApi<PlanEditorState>;
 
 function selection(document: FloorPlanDocument, ids: readonly string[]) {
   const available = new Set(
-    [...document.spaces, ...document.fixtures].map(({ id }) => id),
+    [...document.spaces, ...document.fixtures, ...document.seats].map(
+      ({ id }) => id,
+    ),
   );
   return [...new Set(ids)].filter((id) => available.has(id));
 }
@@ -72,9 +76,11 @@ export function createPlanEditorStore(
     saveError: null,
     issues: [],
     validationPending: false,
+    writeLocked: false,
     execute(command) {
       if (!command) return false;
       const state = get();
+      if (state.writeLocked || state.saveState === "stale") return false;
       const document = command.apply(state.document);
       if (document === state.document) return false;
       set({
@@ -88,6 +94,7 @@ export function createPlanEditorStore(
     },
     undo() {
       const state = get();
+      if (state.writeLocked || state.saveState === "stale") return false;
       const command = state.undoStack.at(-1);
       if (!command) return false;
       const document = command.revert(state.document);
@@ -102,6 +109,7 @@ export function createPlanEditorStore(
     },
     redo() {
       const state = get();
+      if (state.writeLocked || state.saveState === "stale") return false;
       const command = state.redoStack.at(-1);
       if (!command) return false;
       const document = command.apply(state.document);
@@ -138,6 +146,9 @@ export function createPlanEditorStore(
         return;
       set({ camera });
     },
+    setWriteLocked(writeLocked) {
+      if (writeLocked !== get().writeLocked) set({ writeLocked });
+    },
     replaceSource(next) {
       set({
         ...sourceFields(next),
@@ -153,6 +164,7 @@ export function createPlanEditorStore(
         saveError: null,
         issues: [],
         validationPending: false,
+        writeLocked: false,
       });
     },
   }));

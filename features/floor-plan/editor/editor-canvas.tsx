@@ -22,12 +22,11 @@ import {
 import { useEditorStore, useEditorValue } from "./editor-context";
 import { useEditorCanvas } from "./use-editor-canvas";
 import { deleteShapesCommand, type Command } from "./commands";
+import { moveShapesCommand, resizeShapeCommand, snapPoint } from "./transforms";
 import {
-  duplicateFixturesCommand,
-  moveShapesCommand,
-  resizeShapeCommand,
-  snapPoint,
-} from "./transforms";
+  duplicateEditableShapesCommand,
+  rotateSeatsCommand,
+} from "./seat-commands";
 import {
   hitHandle,
   insideSelection,
@@ -54,10 +53,14 @@ export function EditorCanvas({
   states,
   onPolygon,
   focusIds,
+  previewSeats,
+  onSeatArray,
 }: {
   states: PlanStates;
   onPolygon: (polygon: PlanPoint[]) => void;
   focusIds?: readonly string[];
+  previewSeats?: readonly FloorPlanDocument["seats"][number][] | null;
+  onSeatArray?: () => void;
 }) {
   const store = useEditorStore();
   const document = useEditorValue((state) => state.document);
@@ -65,7 +68,9 @@ export function EditorCanvas({
   const issues = useEditorValue((state) => state.issues);
   const snap = useEditorValue((state) => state.snap);
   const tool = useEditorValue((state) => state.tool);
-  const stale = useEditorValue((state) => state.saveState === "stale");
+  const stale = useEditorValue(
+    (state) => state.saveState === "stale" || state.writeLocked,
+  );
   const gesture = useRef<Gesture | null>(null);
   const spaceHeld = useRef(false);
   const [polygon, setPolygon] = useState<PlanPoint[]>([]);
@@ -80,8 +85,18 @@ export function EditorCanvas({
       marquee,
       preview,
       snap,
+      previewSeats,
     }),
-    [selectedIds, issues, drawing, polygon, marquee, preview, snap],
+    [
+      selectedIds,
+      issues,
+      drawing,
+      polygon,
+      marquee,
+      preview,
+      snap,
+      previewSeats,
+    ],
   );
   const {
     host,
@@ -156,7 +171,7 @@ export function EditorCanvas({
       )
         return;
       const state = store.getState();
-      if (state.saveState === "stale") return;
+      if (state.saveState === "stale" || state.writeLocked) return;
       if (event.code === "Space" && target === host.current) {
         event.preventDefault();
         spaceHeld.current = true;
@@ -196,21 +211,27 @@ export function EditorCanvas({
       } else if (modifier && key === "d") {
         event.preventDefault();
         state.execute(
-          duplicateFixturesCommand(
+          duplicateEditableShapesCommand(
             state.document,
             state.selectedIds,
-            new Map(state.selectedIds.map((id) => [id, crypto.randomUUID()])),
+            () => crypto.randomUUID(),
           ),
         );
       } else if (
         !modifier &&
         !event.altKey &&
-        ["v", "r", "p", "g"].includes(key)
+        ["v", "r", "p", "g", "s"].includes(key)
       ) {
         event.preventDefault();
         setPolygon([]);
         setDrawing([]);
         if (key === "g") state.setSnap(!state.snap);
+        else if (key === "s") onSeatArray?.();
+        else if (
+          key === "r" &&
+          state.document.seats.some(({ id }) => state.selectedIds.includes(id))
+        )
+          state.execute(rotateSeatsCommand(state.document, state.selectedIds));
         else
           state.setTool(
             key === "v" ? "select" : key === "r" ? "rectangle" : "polygon",
@@ -264,7 +285,7 @@ export function EditorCanvas({
       window.removeEventListener("blur", blur);
       spaceHeld.current = false;
     };
-  }, [store, host, polygon, onPolygon]);
+  }, [store, host, polygon, onPolygon, onSeatArray]);
   const clearGesture = () => {
     gesture.current = null;
     setPreview(null);
@@ -368,7 +389,8 @@ export function EditorCanvas({
             gesture.current = { ...base, kind: "rectangle" };
           else {
             const selectedBox =
-              selectedIds.length === 1
+              selectedIds.length === 1 &&
+              !document.seats.some(({ id }) => id === selectedIds[0])
                 ? selectionBox(document, selectedIds)
                 : null;
             const handle =
@@ -382,9 +404,10 @@ export function EditorCanvas({
               };
             else {
               const shape = hitTest(index, current, point, {
-                kinds: ["space", "fixture"],
+                kinds: ["seat", "space", "fixture"],
               });
               if (shape) {
+                if (tool === "seat-array") store.getState().setTool("select");
                 const ids = event.shiftKey
                   ? selectedIds.includes(shape.id)
                     ? selectedIds.filter((id) => id !== shape.id)
@@ -418,7 +441,10 @@ export function EditorCanvas({
         onPointerUp={(event) => {
           const active = gesture.current;
           if (!active || active.id !== event.pointerId) return;
-          if (store.getState().saveState === "stale") {
+          if (
+            store.getState().saveState === "stale" ||
+            store.getState().writeLocked
+          ) {
             clearGesture();
             return;
           }
@@ -470,9 +496,10 @@ export function EditorCanvas({
         />
       </div>
       <p id="editor-canvas-help" className="sr-only">
-        V 선택, R 사각형, P 다각형, G 스냅, 방향키 이동, Shift와 방향키로 크게
-        이동, Delete 지우기, Escape 취소, Command 또는 Control Z 실행 취소. 공간
-        목록에서 도형을 골라 숫자로도 바꿀 수 있어요.
+        V 선택, R 사각형 또는 좌석 회전, P 다각형, S 좌석 배열, G 스냅, 방향키
+        이동, Shift와 방향키로 크게 이동, Delete 지우기, Escape 취소, Command
+        또는 Control Z 실행 취소. 공간 목록에서 도형을 골라 숫자로도 바꿀 수
+        있어요.
       </p>
       <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border bg-background px-3 py-2 text-xs tabular-nums">
         격자 100mm · 스냅 {snap ? "켜짐" : "꺼짐"} · 층 크기{" "}
@@ -545,7 +572,12 @@ export function EditorCanvas({
         className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:top-3 focus-within:left-3 focus-within:z-10 focus-within:max-h-80 focus-within:overflow-y-auto focus-within:rounded-lg focus-within:border focus-within:bg-background focus-within:p-2"
       >
         {scene.shapes
-          .filter((shape) => shape.kind === "space" || shape.kind === "fixture")
+          .filter(
+            (shape) =>
+              shape.kind === "space" ||
+              shape.kind === "fixture" ||
+              shape.kind === "seat",
+          )
           .map((shape) => (
             <li key={shape.id}>
               <button
@@ -554,13 +586,19 @@ export function EditorCanvas({
                 aria-pressed={selectedIds.includes(shape.id)}
                 onClick={() => {
                   store.getState().select([shape.id]);
+                  store.getState().setTool("select");
                   store
                     .getState()
                     .setCamera(ensureVisible(current, shape.bounds, viewport));
                 }}
               >
                 {shape.spaceId
-                  ? (states.get(shape.spaceId)?.name ?? "연결을 확인할 공간")
+                  ? shape.kind === "seat"
+                    ? (document.seats.find(({ id }) => id === shape.id)
+                        ?.label ??
+                      states.get(shape.spaceId)?.name ??
+                      "이름 없는 좌석")
+                    : (states.get(shape.spaceId)?.name ?? "연결을 확인할 공간")
                   : shape.kind === "fixture"
                     ? (shape.label ?? "고정물")
                     : "도형"}

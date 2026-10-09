@@ -11,6 +11,7 @@ import {
   Redo2,
   Eye,
   AlertTriangle,
+  Armchair,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ import { saveFloorPlanDraft } from "@/features/floor-plan/actions";
 import type { PlanEditorData } from "../editor-types";
 import type { SaveFloorPlanDraftInput } from "../editor-schema";
 import type { FloorPlanDocument, PlanPoint } from "@/lib/floor-plan/types";
-import type { PlanStates } from "@/lib/floor-plan/render/types";
+import type { PlanStates, PlanShapeState } from "@/lib/floor-plan/render/types";
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
 import { hydrateSeatLabels } from "@/lib/floor-plan/seats";
 import { createPlanEditorStore, type PlanEditorSource } from "./store";
@@ -41,6 +42,7 @@ import { PlanEditorFrame } from "./editor-frame";
 import { EditorCanvas } from "./editor-canvas";
 import { EditorProperties } from "./editor-properties";
 import { EditorConnectDialog } from "./editor-connect-dialog";
+import { SeatArrayPanel } from "./seat-array-panel";
 import {
   connectSpaceCommand,
   createFixtureCommand,
@@ -110,6 +112,7 @@ function EditorWorkspace({
   const document = useEditorValue((state) => state.document);
   const selectedIds = useEditorValue((state) => state.selectedIds);
   const tool = useEditorValue((state) => state.tool);
+  const writeLocked = useEditorValue((state) => state.writeLocked);
   const snap = useEditorValue((state) => state.snap);
   const saveState = useEditorValue((state) => state.saveState);
   const savedAt = useEditorValue((state) => state.savedAt);
@@ -124,6 +127,11 @@ function EditorWorkspace({
   const previewButton = useRef<HTMLButtonElement>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [inputError, setInputError] = useState("");
+  const [arrayPreview, setArrayPreview] = useState<{
+    document: FloorPlanDocument;
+    areaId: string;
+    seats: readonly FloorPlanDocument["seats"][number][];
+  } | null>(null);
   const [focusIds, setFocusIds] = useState<readonly string[]>([]);
   const connectionRef = useRef<Connection | null>(null);
   const [reloadKey, setReloadKey] = useState<string | null>(null);
@@ -133,6 +141,53 @@ function EditorWorkspace({
     search = useSearchParams();
   const ownPath = `/admin/branches/${data.branch.id}/floors/${data.floor.id}/plan`;
   const isCurrentPath = pathname.replace(/\/$/, "").toLowerCase() === ownPath;
+  const selectedArea =
+    selectedIds.length === 1
+      ? document.spaces.find(
+          (shape) =>
+            shape.id === selectedIds[0] &&
+            data.spaces.some(
+              (space) =>
+                space.id.toLowerCase() === shape.spaceId.toLowerCase() &&
+                space.floorId === data.floor.id &&
+                space.type === "desk_area" &&
+                !space.archived,
+            ),
+        )
+      : undefined;
+  const openSeatArray = useCallback(() => {
+    const state = store.getState();
+    if (state.saveState === "stale" || state.writeLocked) return;
+    const shape =
+      state.selectedIds.length === 1
+        ? state.document.spaces.find(({ id }) => id === state.selectedIds[0])
+        : undefined;
+    if (
+      !shape ||
+      !data.spaces.some(
+        (space) =>
+          space.id.toLowerCase() === shape.spaceId.toLowerCase() &&
+          space.floorId === data.floor.id &&
+          space.type === "desk_area" &&
+          !space.archived,
+      )
+    ) {
+      setInputError("데스크 구역을 먼저 골라 주세요");
+      return;
+    }
+    setInputError("");
+    state.setTool("seat-array");
+  }, [store, data.spaces, data.floor.id]);
+  const previewArray = useCallback(
+    (seats: readonly FloorPlanDocument["seats"][number][] | null) => {
+      setArrayPreview(
+        seats && selectedArea
+          ? { document, areaId: selectedArea.id, seats }
+          : null,
+      );
+    },
+    [document, selectedArea],
+  );
   const mutation = useMutation({
     mutationKey: ["plan-editor-save", data.floor.id],
     scope: { id: `plan-editor-save-${data.floor.id}` },
@@ -190,22 +245,29 @@ function EditorWorkspace({
     store.getState().replaceSource(editorSource(data));
     connectionRef.current = null;
   }, [readKey, reloadKey, data, store, isCurrentPath]);
-  const states: PlanStates = useMemo(
-    () =>
-      new Map(
-        data.spaces
-          .filter((space) => space.floorId === data.floor.id)
-          .map((space) => [
-            space.id,
-            {
-              kind: "free" as const,
-              name: space.name,
-              deskArea: space.type === "desk_area",
-            },
-          ]),
-      ),
-    [data.spaces, data.floor.id],
-  );
+  const states: PlanStates = useMemo(() => {
+    const values = new Map<string, PlanShapeState>(
+      data.spaces
+        .filter((space) => space.floorId === data.floor.id)
+        .map((space) => [
+          space.id,
+          {
+            kind: "free" as const,
+            name: space.name,
+            deskArea: space.type === "desk_area",
+          },
+        ]),
+    );
+    for (const seat of document.seats)
+      values.set(seat.spaceId.toLowerCase(), {
+        kind: "free",
+        name:
+          seat.label ??
+          values.get(seat.spaceId.toLowerCase())?.name ??
+          "이름 없는 좌석",
+      });
+    return values;
+  }, [data.spaces, data.floor.id, document.seats]);
   const closeConnection = () => {
     connectionRef.current = null;
     setConnection(null);
@@ -213,7 +275,7 @@ function EditorWorkspace({
   const openPolygon = useCallback(
     (polygon: PlanPoint[]) => {
       const state = store.getState();
-      if (state.saveState === "stale") return;
+      if (state.saveState === "stale" || state.writeLocked) return;
       const test = {
         ...createEmptyPlan(),
         bounds: state.document.bounds,
@@ -242,7 +304,8 @@ function EditorWorkspace({
     if (
       connectionRef.current !== captured ||
       captured.epoch !== state.epoch ||
-      state.saveState === "stale"
+      state.saveState === "stale" ||
+      state.writeLocked
     )
       return;
     const id = captured.shapeId ?? crypto.randomUUID();
@@ -276,7 +339,7 @@ function EditorWorkspace({
     state.setTool("select");
     closeConnection();
   };
-  const disabled = saveState === "stale";
+  const disabled = saveState === "stale" || writeLocked;
   const saveLabel =
     saveState === "saving"
       ? "저장 중"
@@ -369,39 +432,66 @@ function EditorWorkspace({
                 <Icon />
               </Button>
             ))}
+            <Button
+              variant={tool === "seat-array" ? "default" : "ghost"}
+              size="icon"
+              aria-label="좌석 배열 (S)"
+              aria-pressed={tool === "seat-array"}
+              disabled={disabled}
+              onClick={openSeatArray}
+            >
+              <Armchair />
+            </Button>
           </>
         }
         panel={
-          <EditorProperties
-            branchId={data.branch.id}
-            floorId={data.floor.id}
-            document={document}
-            spaces={data.spaces}
-            selectedIds={selectedIds}
-            issues={issues}
-            validationPending={validationPending}
-            tool={tool}
-            snap={snap}
-            disabled={disabled}
-            onSnap={(value) => store.getState().setSnap(value)}
-            onCommand={(command) => {
-              if (!disabled) store.getState().execute(command);
-            }}
-            onSelect={(ids) => {
-              store.getState().select(ids);
-              setFocusIds([...ids]);
-            }}
-            onCreatePolygon={openPolygon}
-            onConnect={(shapeId) => {
-              const next: Connection = {
-                token: crypto.randomUUID(),
-                epoch: store.getState().epoch,
-                shapeId,
-              };
-              connectionRef.current = next;
-              setConnection(next);
-            }}
-          />
+          tool === "seat-array" && selectedArea ? (
+            <SeatArrayPanel
+              key={selectedArea.id}
+              document={document}
+              areaId={selectedArea.id}
+              spaces={data.spaces}
+              disabled={disabled}
+              onPreview={previewArray}
+              onCancel={() => store.getState().setTool("select")}
+              onCommand={(command) => {
+                if (store.getState().execute(command)) setArrayPreview(null);
+              }}
+            />
+          ) : (
+            <EditorProperties
+              branchId={data.branch.id}
+              floorId={data.floor.id}
+              document={document}
+              spaces={data.spaces}
+              selectedIds={selectedIds}
+              issues={issues}
+              validationPending={validationPending}
+              tool={tool}
+              snap={snap}
+              disabled={disabled}
+              onSnap={(value) => store.getState().setSnap(value)}
+              onSeatArray={openSeatArray}
+              onCommand={(command) => {
+                if (!disabled) store.getState().execute(command);
+              }}
+              onSelect={(ids) => {
+                store.getState().select(ids);
+                store.getState().setTool("select");
+                setFocusIds([...ids]);
+              }}
+              onCreatePolygon={openPolygon}
+              onConnect={(shapeId) => {
+                const next: Connection = {
+                  token: crypto.randomUUID(),
+                  epoch: store.getState().epoch,
+                  shapeId,
+                };
+                connectionRef.current = next;
+                setConnection(next);
+              }}
+            />
+          )
         }
       >
         {wide && (
@@ -409,6 +499,14 @@ function EditorWorkspace({
             states={states}
             onPolygon={openPolygon}
             focusIds={focusIds}
+            onSeatArray={openSeatArray}
+            previewSeats={
+              tool === "seat-array" &&
+              arrayPreview?.document === document &&
+              arrayPreview.areaId === selectedArea?.id
+                ? arrayPreview.seats
+                : null
+            }
           />
         )}
         {inputError && (
@@ -448,7 +546,7 @@ function EditorWorkspace({
           <PlanCanvas document={document} states={states} onSelect={() => {}} />
         </DialogContent>
       </Dialog>
-      <Dialog open={wide && disabled}>
+      <Dialog open={wide && saveState === "stale"}>
         <DialogContent
           showCloseButton={false}
           onEscapeKeyDown={(event) => event.preventDefault()}

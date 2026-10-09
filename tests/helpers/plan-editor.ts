@@ -90,6 +90,7 @@ export function planEditorFixture(): PlanEditorData {
         allowedTeamIds: [],
         capacity: 8,
         amenities: ["monitor", "whiteboard"],
+        futureBookingCount: 0,
       },
       {
         id: planEditorIds.spaceB,
@@ -103,6 +104,7 @@ export function planEditorFixture(): PlanEditorData {
         allowedTeamIds: [],
         capacity: 16,
         amenities: ["projector"],
+        futureBookingCount: 0,
       },
     ],
     canManageSpaces: true,

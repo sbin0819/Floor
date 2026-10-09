@@ -247,6 +247,61 @@ it("keeps local edits and undo history when space metadata refreshes", async () 
   await tick(1500);
   expect(app.save).toHaveBeenCalledOnce();
 });
+it("opens arrays only for a desk area and preserves names, counts and a single undo step", async () => {
+  const data = planEditorFixture();
+  data.spaces[0] = { ...data.spaces[0]!, type: "desk_area", bookable: false };
+  data.spaces.push({
+    ...data.spaces[0]!,
+    id: planEditorIds.spaceC,
+    parentId: planEditorIds.spaceA,
+    type: "desk",
+    name: "A-01",
+    bookable: true,
+    futureBookingCount: 2,
+  });
+  data.published!.document.seats = [
+    {
+      id: "seat-a",
+      spaceId: planEditorIds.spaceC,
+      at: [2000, 2000],
+      size: [1400, 700],
+      rotation: 0,
+    },
+  ];
+  const h = mount(data);
+  fireEvent.click(screen.getByRole("button", { name: "좌석 배열 (S)" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "데스크 구역을 먼저 골라 주세요",
+  );
+  act(() => mocks.store!.getState().select(["space-a"]));
+  fireEvent.click(screen.getByRole("button", { name: "좌석 배열 (S)" }));
+  fireEvent.click(screen.getByRole("button", { name: "배열 적용" }));
+  expect(mocks.store!.getState().changeId).toBe(0);
+  expect(screen.getByText("변경된 좌석이 없어요")).toBeVisible();
+  fireEvent.change(screen.getByLabelText("칸 수"), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: "배열 적용" }));
+  expect(mocks.store!.getState().document.seats).toHaveLength(2);
+  expect(mocks.store!.getState().document.seats[0]!.spaceId).toBe(
+    planEditorIds.spaceC,
+  );
+  expect(mocks.store!.getState().undoStack).toHaveLength(1);
+  act(() => mocks.store!.getState().select(["seat-a"]));
+  expect(screen.getByLabelText("좌석 이름")).toHaveValue("A-01");
+  expect(screen.getByText(/예약 2건이 남아 있어요/)).toBeVisible();
+  fireEvent.change(screen.getByLabelText("좌석 이름"), {
+    target: { value: "A-30" },
+  });
+  fireEvent.blur(screen.getByLabelText("좌석 이름"));
+  expect(mocks.store!.getState().document.seats[0]!.label).toBe("A-30");
+  const changed = {
+    ...data,
+    spaces: data.spaces.map((space) => ({ ...space, name: "서버 갱신 이름" })),
+  };
+  h.rerender(h.content(changed));
+  expect(mocks.store!.getState().document.seats[0]!.label).toBe("A-30");
+  await tick(1500);
+  expect(h.save).toHaveBeenCalledOnce();
+});
 it("shows a retry after failure without retry loops and retries the current document", async () => {
   const save = vi
     .fn<(input: unknown) => Promise<ActionResult<SaveFloorPlanDraftResult>>>()

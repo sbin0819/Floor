@@ -3,6 +3,7 @@ import {
   polygonLabelPoint,
 } from "@/lib/floor-plan/geometry";
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
+import { seatPolygon } from "@/lib/floor-plan/render/scene";
 import type { FloorPlanDocument, PlanPoint } from "@/lib/floor-plan/types";
 import {
   addShapeCommand,
@@ -56,10 +57,23 @@ function selected(
     ...document.fixtures
       .filter(({ id }) => wanted.has(id))
       .map((shape): EditableShape => ({ collection: "fixtures", shape })),
+    ...document.seats
+      .filter(({ id }) => wanted.has(id))
+      .map((shape): EditableShape => ({ collection: "seats", shape })),
   ];
+}
+function shapePoints(value: EditableShape): PlanPoint[] {
+  return value.collection === "seats"
+    ? seatPolygon(value.shape).map(([x, y]): PlanPoint => [x, y])
+    : value.shape.polygon;
 }
 function translate(value: EditableShape, delta: PlanPoint): EditableShape {
   const point = ([x, y]: PlanPoint): PlanPoint => [x + delta[0], y + delta[1]];
+  if (value.collection === "seats")
+    return {
+      collection: "seats",
+      shape: { ...value.shape, at: point(value.shape.at) },
+    };
   const polygon = value.shape.polygon.map(point);
   return value.collection === "spaces"
     ? {
@@ -124,9 +138,11 @@ export function moveShapesCommand(
 ): Command | null {
   const values = selected(document, ids);
   if (!values.length) return null;
-  const box = bounds(values.flatMap(({ shape }) => shape.polygon));
+  const box = bounds(values.flatMap(shapePoints));
   const target = snapPoint([box.x + delta[0], box.y + delta[1]], options.snap);
-  const offset: PlanPoint = [target[0] - box.x, target[1] - box.y];
+  const offset: PlanPoint = options.snap
+    ? [Math.round(target[0] - box.x), Math.round(target[1] - box.y)]
+    : snapPoint(delta, false);
   return replaceShapesCommand(
     document,
     values.map((value) => translate(value, offset)),
@@ -140,7 +156,7 @@ export function resizeShapeCommand(
   options: { snap: boolean },
 ): Command | null {
   const value = selected(document, [id])[0];
-  if (!value) return null;
+  if (!value || value.collection === "seats") return null;
   const before = bounds(value.shape.polygon);
   if (before.width <= 0 || before.height <= 0) return null;
   const start = snapPoint([box.x, box.y], options.snap);
@@ -173,7 +189,7 @@ export function setRectangleCommand(
   box: Rectangle,
 ): Command | null {
   const value = selected(document, [id])[0];
-  if (!value) return null;
+  if (!value || value.collection === "seats") return null;
   const points = value.shape.polygon;
   const xs = new Set(points.map(([x]) => x)),
     ys = new Set(points.map(([, y]) => y));
@@ -256,11 +272,11 @@ export function alignShapesCommand(
 ): Command | null {
   const values = selected(document, ids);
   if (values.length < 2) return null;
-  const group = bounds(values.flatMap(({ shape }) => shape.polygon));
+  const group = bounds(values.flatMap(shapePoints));
   return replaceShapesCommand(
     document,
     values.map((value) => {
-      const box = bounds(value.shape.polygon);
+      const box = bounds(shapePoints(value));
       let dx = 0,
         dy = 0;
       if (alignment === "left") dx = group.x - box.x;

@@ -23,6 +23,7 @@ import {
 import { isRectangle, rectanglePoints } from "./canvas-geometry";
 import { spaceTypeLabels } from "@/features/bookings/format";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
+import { SeatProperties } from "./seat-properties";
 
 function NumberField({
   label,
@@ -86,6 +87,7 @@ type Props = {
   onConnect: (shapeId: string) => void;
   onCreatePolygon: (polygon: PlanPoint[]) => void;
   onSnap: (enabled: boolean) => void;
+  onSeatArray?: () => void;
 };
 export function EditorProperties(props: Props) {
   const {
@@ -112,6 +114,13 @@ export function EditorProperties(props: Props) {
           ({ id }) => id === selectedIds[0],
         )
       : undefined;
+  const seat =
+    selectedIds.length === 1
+      ? document.seats.find(({ id }) => id === selectedIds[0])
+      : undefined;
+  const desk = seat
+    ? spaces.find(({ id }) => id.toLowerCase() === seat.spaceId.toLowerCase())
+    : undefined;
   const space =
     shape && "spaceId" in shape
       ? spaces.find(
@@ -148,12 +157,24 @@ export function EditorProperties(props: Props) {
         <h2 className="text-base font-bold">
           {selectedIds.length > 1
             ? `도형 ${selectedIds.length}개`
-            : shape
-              ? "spaceId" in shape
-                ? "공간 도형"
-                : "고정물"
-              : "층 크기"}
+            : seat
+              ? "좌석"
+              : shape
+                ? "spaceId" in shape
+                  ? "공간 도형"
+                  : "고정물"
+                : "층 크기"}
         </h2>
+        {seat && (
+          <SeatProperties
+            document={document}
+            seatId={seat.id}
+            displayName={seat.label ?? desk?.name ?? null}
+            bookingCount={desk?.futureBookingCount ?? 0}
+            disabled={disabled}
+            onCommand={onCommand}
+          />
+        )}
         {!shape && selectedIds.length === 0 && (
           <>
             <div className="grid grid-cols-2 gap-3">
@@ -195,6 +216,15 @@ export function EditorProperties(props: Props) {
               </p>
             </div>
           </>
+        )}
+        {space?.type === "desk_area" && props.onSeatArray && (
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={props.onSeatArray}
+          >
+            좌석 배열
+          </Button>
         )}
         {shape && box && isRectangle(shape.polygon) && (
           <div className="grid grid-cols-2 gap-3">

@@ -505,6 +505,48 @@ describe("editor canvas pointer and keyboard", () => {
     expect(h.store.getState().selectedIds).toEqual([]);
     expect(h.store.getState().tool).toBe("select");
   });
+  it("selects seats before their area, rotates and duplicates with an empty label in one command", () => {
+    const doc = editorDocument();
+    doc.seats = [
+      {
+        id: "seat",
+        spaceId: "20000000-0000-4000-8000-000000000002",
+        at: [2000, 2000],
+        size: [1400, 700],
+        rotation: 0,
+        label: "A-01",
+      },
+    ];
+    const h = harness(editorStore(doc));
+    h.tap([2000, 2000]);
+    expect(h.store.getState().selectedIds).toEqual(["seat"]);
+    h.key("r");
+    expect(h.store.getState().document.seats[0]!.rotation).toBe(90);
+    expect(h.store.getState().tool).toBe("select");
+    h.key("ArrowRight");
+    expect(h.store.getState().document.seats[0]!.at).toEqual([2100, 2000]);
+    h.key("d", { metaKey: true });
+    const copy = h.store.getState().document.seats[1]!;
+    expect(copy.id).not.toBe("seat");
+    expect(copy.spaceId).not.toBe(doc.seats[0]!.spaceId);
+    expect(copy).not.toHaveProperty("label");
+    expect(h.store.getState().undoStack).toHaveLength(3);
+    h.key("z", { metaKey: true });
+    expect(h.store.getState().document.seats).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "A-01" })).toBeInTheDocument();
+    h.key("Delete");
+    expect(h.store.getState().document.seats).toHaveLength(0);
+  });
+  it("drops active gestures and keyboard edits while publishing locks the editor", () => {
+    const h = harness();
+    h.down([2000, 2000]);
+    h.move([2500, 2500]);
+    act(() => h.store.getState().setWriteLocked(true));
+    h.up([2500, 2500]);
+    for (const key of ["r", "Delete", "ArrowRight"]) h.key(key);
+    expect(h.store.getState().changeId).toBe(0);
+    expect(h.store.getState().tool).toBe("select");
+  });
   it("drops an in-progress drag if a STALE response arrives before pointerup", () => {
     const h = harness();
     h.down([2000, 2000]);
@@ -560,6 +602,30 @@ describe("editor canvas pointer and keyboard", () => {
 });
 
 describe("editor canvas geometry", () => {
+  it("includes rotated seats in selection bounds and marquee without turning walls into editable shapes", () => {
+    const doc = editorDocument();
+    doc.seats = [
+      {
+        id: "seat",
+        spaceId: "20000000-0000-4000-8000-000000000002",
+        at: [2000, 2000],
+        size: [1400, 700],
+        rotation: 90,
+      },
+    ];
+    const box = selectionBox(doc, ["seat"])!;
+    expect(box.minX).toBeCloseTo(1650);
+    expect(box.minY).toBeCloseTo(1300);
+    expect(box.maxX).toBeCloseTo(2350);
+    expect(box.maxY).toBeCloseTo(2700);
+    const seat = createScene(doc).shapes.find(({ id }) => id === "seat")!;
+    expect(
+      insideSelection({ minX: 1000, minY: 1000, maxX: 3000, maxY: 3000 }, seat),
+    ).toBe(true);
+    expect(
+      insideSelection({ minX: 1800, minY: 1000, maxX: 3000, maxY: 3000 }, seat),
+    ).toBe(false);
+  });
   it("opts into fixture hits without changing member default seat/space priority", () => {
     const doc = editorDocument();
     doc.fixtures[0]!.polygon = doc.spaces[0]!.polygon;

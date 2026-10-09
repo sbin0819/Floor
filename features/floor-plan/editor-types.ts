@@ -5,6 +5,7 @@ import type { AccessScope } from "@/lib/permissions/types";
 export type PlanEditorSpace = PlanContext["spaces"][number] & {
   capacity: number | null;
   amenities: string[];
+  futureBookingCount: number;
 };
 export type PlanEditorData = {
   branch: { id: string; name: string; timezone: string };

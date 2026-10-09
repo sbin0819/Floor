@@ -169,6 +169,71 @@ describe("floor-plan draft editor", () => {
     });
     expect(await allPlans()).toEqual([before]);
   });
+  it("reads published-seat future counts once without counting draft-only, ended or cancelled bookings or adding SQL", async () => {
+    const doc = document();
+    doc.seats.push({
+      id: "published-seat",
+      spaceId: fixture.deskId,
+      at: [1000, 1000],
+      size: [1000, 500],
+      rotation: 0,
+    });
+    await plan({ document: doc });
+    await plan({
+      version: 2,
+      status: "draft",
+      document: {
+        ...doc,
+        seats: [
+          ...doc.seats,
+          {
+            id: "draft-seat",
+            spaceId: fixture.otherDeskId,
+            at: [3000, 1000],
+            size: [1000, 500],
+            rotation: 0,
+          },
+        ],
+      },
+    });
+    await insertFixtureBooking(database, fixture, { spaceId: fixture.deskId });
+    await insertFixtureBooking(database, fixture, {
+      spaceId: fixture.deskId,
+      during: {
+        start: new Date(bookingNow.getTime() - 3600000),
+        end: new Date(bookingNow.getTime() - 600000),
+      },
+    });
+    await insertFixtureBooking(database, fixture, {
+      spaceId: fixture.deskId,
+      status: "cancelled",
+      cancelledAt: bookingNow,
+    });
+    await insertFixtureBooking(database, fixture, {
+      spaceId: fixture.otherDeskId,
+    });
+    const now = vi.fn(() => bookingNow);
+    meter.start();
+    const data = await createPlanEditorQueries({
+      database: database.db,
+      requireSession: async () => fixture.operator,
+      now,
+    }).getPlanEditor({ branchId: fixture.branchId, floorId: fixture.floorId });
+    expect(meter.stop().perStage).toEqual([4, 2]);
+    expect(now).toHaveBeenCalledOnce();
+    expect(
+      data.spaces.find((row) => row.id === fixture.deskId)?.futureBookingCount,
+    ).toBe(1);
+    expect(
+      data.spaces.find((row) => row.id === fixture.otherDeskId)
+        ?.futureBookingCount,
+    ).toBe(0);
+    expect(
+      data.spaces
+        .filter((row) => row.type !== "desk")
+        .every((row) => row.futureBookingCount === 0),
+    ).toBe(true);
+  });
   it("50. keeps updated_by nullable and restricts deleting its referenced user", async () => {
     const userId = crypto.randomUUID();
     await database.db.insert(users).values({
@@ -335,6 +400,7 @@ describe("floor-plan draft editor", () => {
       parentId: null,
       type: "meeting_room",
       name: "다른 층의 공간",
+      futureBookingCount: 0,
       capacity: null,
       bookable: false,
       amenities: [],

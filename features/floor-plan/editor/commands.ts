@@ -8,15 +8,18 @@ export type Command = {
 };
 export type SpaceShape = FloorPlanDocument["spaces"][number];
 export type FixtureShape = FloorPlanDocument["fixtures"][number];
+export type SeatShape = FloorPlanDocument["seats"][number];
 export type EditableShape =
   | { collection: "spaces"; shape: SpaceShape }
-  | { collection: "fixtures"; shape: FixtureShape };
+  | { collection: "fixtures"; shape: FixtureShape }
+  | { collection: "seats"; shape: SeatShape };
 
 type Change = {
   collection: EditableShape["collection"];
   index: number;
-  before: SpaceShape | FixtureShape | null;
-  after: SpaceShape | FixtureShape | null;
+  nextIndex?: number;
+  before: SpaceShape | FixtureShape | SeatShape | null;
+  after: SpaceShape | FixtureShape | SeatShape | null;
 };
 
 function applyChanges(
@@ -25,20 +28,26 @@ function applyChanges(
   reverse: boolean,
 ): FloorPlanDocument {
   let result = document;
-  for (const collection of ["spaces", "fixtures"] as const) {
+  for (const collection of ["spaces", "fixtures", "seats"] as const) {
     const patches = changes.filter(
       (change) => change.collection === collection,
     );
     if (!patches.length) continue;
-    const shapes: (SpaceShape | FixtureShape)[] = [...document[collection]];
+    const shapes: (SpaceShape | FixtureShape | SeatShape)[] = [
+      ...document[collection],
+    ];
     // 삭제를 모두 마친 뒤 원래 순서대로 삽입해야 다중 삭제의 인덱스가 어긋나지 않아요.
     const removing = new Set(
       patches.map((patch) => (reverse ? patch.after : patch.before)?.id),
     );
     const next = shapes.filter((shape) => !removing.has(shape.id));
-    for (const patch of [...patches].sort((a, b) => a.index - b.index)) {
+    const position = (patch: Change) =>
+      reverse ? patch.index : (patch.nextIndex ?? patch.index);
+    for (const patch of [...patches].sort(
+      (a, b) => position(a) - position(b),
+    )) {
       const value = reverse ? patch.before : patch.after;
-      if (value) next.splice(patch.index, 0, value);
+      if (value) next.splice(position(patch), 0, value);
     }
     result = { ...result, [collection]: next };
   }
@@ -87,13 +96,60 @@ export function deleteShapesCommand(
 ): Command | null {
   const selected = new Set(ids);
   const changes: Change[] = [];
-  for (const collection of ["spaces", "fixtures"] as const) {
+  for (const collection of ["spaces", "fixtures", "seats"] as const) {
     document[collection].forEach((shape, index) => {
       if (selected.has(shape.id))
         changes.push({ collection, index, before: shape, after: null });
     });
   }
   return changedCommand(document, changes, "도형 삭제");
+}
+
+export function replaceSeatsCommand(
+  document: FloorPlanDocument,
+  seats: readonly SeatShape[],
+  label: string,
+): Command | null {
+  if (new Set(seats.map(({ id }) => id)).size !== seats.length) return null;
+  const before = new Map(
+    document.seats.map((shape, index) => [shape.id, { shape, index }]),
+  );
+  const after = new Map(
+    seats.map((shape, index) => [shape.id, { shape, index }]),
+  );
+  const oldOrder = document.seats.filter(({ id }) => after.has(id));
+  const nextOrder = seats.filter(({ id }) => before.has(id));
+  const moved = new Set(
+    oldOrder
+      .filter((shape, index) => nextOrder[index]?.id !== shape.id)
+      .map(({ id }) => id),
+  );
+  const changes: Change[] = [];
+  for (const [id, old] of before) {
+    const next = after.get(id);
+    if (
+      !next ||
+      JSON.stringify(old.shape) !== JSON.stringify(next.shape) ||
+      moved.has(id)
+    )
+      changes.push({
+        collection: "seats",
+        index: old.index,
+        nextIndex: next?.index,
+        before: old.shape,
+        after: next?.shape ?? null,
+      });
+  }
+  for (const [id, next] of after) {
+    if (!before.has(id))
+      changes.push({
+        collection: "seats",
+        index: next.index,
+        before: null,
+        after: next.shape,
+      });
+  }
+  return changedCommand(document, changes, label);
 }
 
 export function replaceShapesCommand(

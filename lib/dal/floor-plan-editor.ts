@@ -5,6 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db/client";
 import {
   accessGrants,
+  bookings,
   branches,
   branchStaff,
   floorPlans,
@@ -89,12 +90,23 @@ export function listPlanEditorSpaces(
   floorId: string,
   userId: string,
   db: DalDatabase = getDb(),
+  now?: Date,
 ) {
   const sameFloor = eq(spaces.floorId, floorId);
   // 타 층 참조는 오류를 구분하는 식별자만 남긴다. 이름·부모·허용 팀은 읽지 않는다.
   return db
     .select({
       id: spaces.id,
+      futureBookingCount: now
+        ? sql<number>`case when ${sameFloor} and ${spaces.type} = 'desk'
+        and exists(select 1 from ${floorPlans} inner join ${floors} on ${floors}.published_plan_id = ${floorPlans}.id
+          cross join lateral jsonb_array_elements(${floorPlans}.document -> 'seats') as published_seat(value)
+          where ${floorPlans}.floor_id = ${floorId} and ${floorPlans}.status = 'published'
+            and lower(published_seat.value ->> 'spaceId') = ${spaces}.id::text)
+        then (select count(*)::int from ${bookings} where ${bookings}.space_id = ${spaces}.id
+          and ${bookings}.status = 'confirmed' and upper(${bookings}.during) > ${now.toISOString()}::timestamptz)
+        else 0 end`
+        : sql<number>`0`,
       floorId: spaces.floorId,
       parentId: sql<
         string | null

@@ -1,4 +1,4 @@
-import { boundsOf } from "@/lib/floor-plan/render/scene";
+import { boundsOf, seatPolygon } from "@/lib/floor-plan/render/scene";
 import type {
   Box,
   Camera,
@@ -66,7 +66,7 @@ export function resizedBox(box: Box, handle: Handle, point: Point) {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 export function editableShapes(document: FloorPlanDocument) {
-  return [...document.spaces, ...document.fixtures];
+  return [...document.spaces, ...document.fixtures, ...document.seats];
 }
 export function selectionBox(
   document: FloorPlanDocument,
@@ -74,12 +74,18 @@ export function selectionBox(
 ): Box | null {
   const shapes = editableShapes(document).filter(({ id }) => ids.includes(id));
   return shapes.length
-    ? boundsOf(shapes.flatMap(({ polygon }) => polygon))
+    ? boundsOf(
+        shapes.flatMap((shape) =>
+          "at" in shape ? seatPolygon(shape) : shape.polygon,
+        ),
+      )
     : null;
 }
 export function insideSelection(box: Box, shape: PlanShape) {
   return (
-    (shape.kind === "space" || shape.kind === "fixture") &&
+    (shape.kind === "space" ||
+      shape.kind === "fixture" ||
+      shape.kind === "seat") &&
     shape.bounds.minX >= box.minX &&
     shape.bounds.maxX <= box.maxX &&
     shape.bounds.minY >= box.minY &&

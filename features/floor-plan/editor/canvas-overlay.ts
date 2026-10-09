@@ -3,6 +3,7 @@ import { toScreen } from "@/lib/floor-plan/render/camera";
 import { handles, selectionBox } from "./canvas-geometry";
 import type { Box, PlanFrame, Point } from "@/lib/floor-plan/render/types";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
+import { seatPolygon } from "@/lib/floor-plan/render/scene";
 
 export type EditorOverlay = {
   selectedIds: readonly string[];
@@ -11,6 +12,7 @@ export type EditorOverlay = {
   marquee: Box | null;
   preview: FloorPlanDocument | null;
   snap: boolean;
+  previewSeats?: readonly FloorPlanDocument["seats"][number][] | null;
 };
 export function drawEditorOverlay(
   ctx: CanvasRenderingContext2D,
@@ -58,8 +60,15 @@ export function drawEditorOverlay(
     for (const shape of [
       ...overlay.preview.spaces,
       ...overlay.preview.fixtures,
+      ...overlay.preview.seats,
     ])
-      if (overlay.selectedIds.includes(shape.id)) outline(shape.polygon);
+      if (overlay.selectedIds.includes(shape.id))
+        outline("at" in shape ? seatPolygon(shape) : shape.polygon);
+    ctx.setLineDash([]);
+  }
+  if (overlay.previewSeats) {
+    ctx.setLineDash([6, 4]);
+    for (const seat of overlay.previewSeats) outline(seatPolygon(seat));
     ctx.setLineDash([]);
   }
   if (overlay.polygon.length) {
@@ -84,7 +93,10 @@ export function drawEditorOverlay(
   const a = toScreen([box.minX, box.minY], camera),
     b = toScreen([box.maxX, box.maxY], camera);
   ctx.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
-  if (overlay.selectedIds.length === 1) {
+  if (
+    overlay.selectedIds.length === 1 &&
+    !document.seats.some(({ id }) => id === overlay.selectedIds[0])
+  ) {
     ctx.fillStyle = colors.background;
     for (const { at } of handles(box)) {
       const [x, y] = toScreen(at, camera);
