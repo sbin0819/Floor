@@ -24,8 +24,9 @@
 | 주소 | 내용 |
 | --- | --- |
 | `/admin` | 운영하는 지점 목록. 지점을 누르면 그 지점으로 간다. 운영하는 지점이 하나면 바로 그 지점으로 보낸다 |
-| `/admin/branches/[branchId]` | 지점 정보와 운영 시간, 층 목록, 층 더하기 |
+| `/admin/branches/[branchId]/spaces` | 지점 정보와 운영 시간, 층 목록, 층 더하기. 지시서 35 전에는 `/admin/branches/[branchId]`였다 (`docs/spec/admin.md`의 "메뉴와 주소") |
 | `/admin/branches/[branchId]/floors/[floorId]` | 층 정보, 층의 이용 대상, 공간 목록, 공간 더하기·고치기 |
+| `/admin/branches/[branchId]/floors/[floorId]/spaces/[spaceId]` | 공간 화면: 정보, 이용 대상, 사진 탭 (지시서 43) |
 
 - 모두 `admin` 그룹이고 모든 페이지가 `requireOperatorPage()`를 부른다. 그다음 그 지점의 운영자인지 queries가 확인하고, 아니면 `notFound()`다.
 - 층 화면의 조회는 주소의 `branchId`를 믿지 않는다. 층 행에서 지점을 읽어 그 지점의 운영자인지 확인하고, 그 지점이 주소의 `branchId`와 다르면 `NOT_FOUND`다. 주소의 지점만 확인하고 층을 읽으면 A 지점 운영자가 B 지점의 층을 볼 수 있다.
@@ -169,9 +170,8 @@ input: { spaceId: string; access: 'everyone' | 'teams' | 'closed' | null; teamId
 
 ## 아직 하지 않는 것
 
-- 평면도 편집과 게시 (PFQV-38–41), 평면도 JSON 올리기
-- 좌석(`type = 'desk'`) 만들기와 자동 배열 (PFQV-39)
-- 점검 등록과 해제 (PFQV-42). 시드가 넣은 점검만 있다
-- 역할별 권한과 한도 설정 화면 (PFQV-60)
+지시서 33–43이 평면도 편집과 게시, 좌석 만들기와 자동 배열, 점검, 역할과 권한, 예약 현황을 만든다 (`docs/spec/admin.md`, `docs/spec/floor-plan.md`). 남는 것:
+
+- 평면도 JSON 올리기 (편집기로만 그린다)
 - 지점 만들기·지우기, 층 지우기, 시간대 바꾸기
-- 운영자의 예약 현황, 통계
+- 운영자 통계 내보내기

@@ -1,0 +1,95 @@
+{
+  "note": "평면도 1차(지시서 33)의 시드 평면도다. 강남점 7층(gangnam-7f.plan.json, seed.json의 floorPlans)을 뺀 10개 층이다. 형식은 seed.json의 floorPlans와 같고 documentFile은 docs/spec/examples/ 기준 경로다. floorName은 사람이 읽기 위한 값이고 시드는 쓰지 않는다. 모든 문서는 좌석이 없고, 공간 도형은 그 층의 seed.json spaces 행을 하나씩 가리킨다.",
+  "floorPlans": [
+    {
+      "id": "7dd4d372-16f9-5fe4-9327-663f1c774b07",
+      "floorId": "c5a98b1a-cd93-541d-9dca-ebdc7cf4f925",
+      "floorName": "강남점 6F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/gangnam-6f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "e4009e70-67c9-5869-9dcd-ddf36793d1e2",
+      "floorId": "8eb8bb7c-16b4-528b-9193-743cd3ef99ca",
+      "floorName": "강남점 8F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/gangnam-8f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "bc46fe83-a981-5c50-b71b-8d8a221e26f1",
+      "floorId": "90b04619-a92a-536a-bf8e-bb29eb7c2f94",
+      "floorName": "성수점 2F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/seongsu-2f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "66669d54-bf96-5ad9-b238-a96ac8130ee0",
+      "floorId": "29cb348b-97f1-58bd-83a2-1c1670899222",
+      "floorName": "성수점 3F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/seongsu-3f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "b813dd5d-e5cf-5545-9e85-971a83544d12",
+      "floorId": "26b59c6b-5467-5c31-919c-41fe14b5cb41",
+      "floorName": "홍대점 2F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/hongdae-2f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "4c85f2da-220c-5640-8254-e988e101d730",
+      "floorId": "b17f572b-f5d5-53ad-b584-9632e443fb1f",
+      "floorName": "홍대점 3F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/hongdae-3f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "2ca115bf-90c1-5753-84c7-e17a43e9c0ac",
+      "floorId": "c9e49e7b-cde4-57d8-99fd-b46c0ac844c9",
+      "floorName": "여의도점 10F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/yeouido-10f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "e5205e24-3b4b-59f8-abfc-5123b7e7cc56",
+      "floorId": "07412b2a-e5e9-56a9-9e01-eea5e6b67b94",
+      "floorName": "여의도점 11F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/yeouido-11f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "2736db31-db90-5681-a4b5-df1c1c5bf5a7",
+      "floorId": "3fbb4450-831e-5465-b9f3-ce0be8bc3f67",
+      "floorName": "판교점 4F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/pangyo-4f.plan.json",
+      "createdByKey": "admin"
+    },
+    {
+      "id": "8c3169f5-6074-5f2b-a961-f3ec575d0aa9",
+      "floorId": "79b607cc-194c-5eb5-9629-b47d469c82e0",
+      "floorName": "판교점 5F",
+      "version": 1,
+      "status": "published",
+      "documentFile": "plans/pangyo-5f.plan.json",
+      "createdByKey": "admin"
+    }
+  ]
+}

@@ -36,11 +36,11 @@
 | `booking.manage_team` | 팀원 예약 변경·취소 | team_admin |
 | `chat.team.moderate` | 팀 채널 메시지 삭제 | team_admin |
 | `team.manage_members` | 팀원 초대·내보내기, 역할·남의 직함 바꾸기, 팀 정보 수정, 팀 지우기 (지시서 31에서 넓힘. `docs/spec/teams.md`) | team_admin |
-| `booking.manage_all` | 모든 예약 변경·취소 | operator |
-| `branch.announce` | 공지 보내기, 라운지 메시지 삭제 | operator |
-| `space.manage` | 공간 상태·점검 관리 | operator |
+| `booking.manage_all` | 모든 예약 변경·취소, 운영자의 예약 현황 (지시서 35) | operator |
+| `branch.announce` | 공지 보내기, 라운지 메시지 삭제, 지점 범위의 신고 처리 (지시서 41–42) | operator |
+| `space.manage` | 공간 상태·점검 관리, 공간 사진 (지시서 36, 43) | operator |
 | `plan.edit` | 평면도 편집·게시, 층·공간 이용 대상 설정 | operator |
-| `stats.view` | 이용률 통계 보기 | operator |
+| `stats.view` | 이용률 통계 보기, 운영자 대시보드 (지시서 35) | operator |
 | `roles.manage` | 역할과 권한 설정 | operator |
 
 - 운영자는 팀 채널을 읽을 수 없다 (`chat.team` 없음). 팀의 사적인 공간이기 때문이다.
@@ -48,6 +48,7 @@
 - 운영자는 기본으로 `booking.team`이 없다.
 - `operator`의 `roles.manage`는 끌 수 없다. 스스로 잠그는 사고를 막기 위해서다. 저장할 때 서버가 강제로 넣는다.
 - 사람별·채널별 예외는 두지 않는다. 권한은 역할에만 붙인다.
+- 팀 단위로 판정하는 키(`chat.team`, `chat.team.moderate`, `team.manage_members`)는 `target.branchId` 없이 판정하므로 지점의 역할 설정이 영향을 주지 않는다. 그래서 역할과 권한 화면(지시서 37)은 이 세 줄을 읽기 전용으로 보여주고, 저장할 때도 기본값으로 둔다.
 
 ## 가진 역할 계산
 
@@ -78,7 +79,7 @@ can(ctx, permission, target): boolean
 
 1. `heldRoles(ctx, target)`를 구한다.
 2. 역할마다 권한 목록을 구한다. `target.branchId`가 있고 그 지점에 그 역할의 `role_settings` 행이 있으면 그 값을, 없으면 위 표의 기본값을 쓴다. 역할별로 따로 판단한다.
-3. `operator`의 목록에는 저장된 값과 상관없이 `roles.manage`를 항상 넣는다. (저장할 때 강제하는 것은 PFQV-60에서 한다.)
+3. `operator`의 목록에는 저장된 값과 상관없이 `roles.manage`를 항상 넣는다. (저장할 때도 넣는다. 지시서 37, `docs/spec/admin.md`의 "역할과 권한".)
 4. 합친 목록에 `permission`이 있으면 true.
 
 위 권한 표는 "역할이 더해 주는 권한"이다. `can()`의 결과는 가진 역할의 합집합이므로, 예를 들어 팀 관리자는 `booking.team`(team_member가 줌)과 `floor.view`(user가 줌)도 할 수 있다.

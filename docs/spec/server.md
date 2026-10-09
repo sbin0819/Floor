@@ -46,7 +46,8 @@
 ```ts
 export type ActionResult<T> =
   | { ok: true; data: T }
-  | { ok: false; code: ActionErrorCode; message?: string; fieldErrors?: Record<string, string[]> };
+  | { ok: false; code: ActionErrorCode; message?: string; fieldErrors?: Record<string, string[]>;
+      issues?: PlanIssue[] }; // PLAN_INVALID일 때만 (지시서 39. docs/spec/floor-plan.md)
 
 export type ActionErrorCode =
   | 'UNAUTHENTICATED'    // 세션 없음
@@ -56,7 +57,8 @@ export type ActionErrorCode =
   | 'BOOKING_CONFLICT'   // 겹치는 예약 (Postgres 23P01)
   | 'SPACE_BLOCKED'      // 점검 구간과 겹침
   | 'LIMIT_EXCEEDED'     // 한도 초과 (역할별 예약 한도, 관리하는 팀 수, 대기 중 초대·요청 수, 채팅의 하루 수와 인원 — message로 구분: send_rate, friend_daily, request_daily, space_count, call_full, password_attempts(지시서 30), admin_teams(지시서 31) 등)
-  | 'PLAN_INVALID'       // 평면도 게시 검증 실패
+  | 'PLAN_INVALID'       // 평면도 게시 검증 실패. issues를 채운다
+  | 'STALE'              // 읽은 뒤에 다른 사람이 먼저 바꿈: 평면도 초안의 revision(지시서 38), 역할 설정(지시서 37), 점검의 겹치는 예약(지시서 36)
   | 'TEAM_NAME_TAKEN'    // 같은 이름의 팀이 있음
   | 'ALREADY_MEMBER'     // 이미 그 팀의 팀원
   | 'ALREADY_REQUESTED'  // 대기 중인 가입 요청이 있음
@@ -200,13 +202,14 @@ export type RealtimeEvent =
 ```
 
 - 서버의 발행기는 `lib/realtime/server.ts`의 `getRealtimePublisher()`가 고른다: `ABLY_API_KEY`가 있으면 Ably, 없으면 아무 일도 하지 않는 구현. 테스트는 메모리 구현이나 가짜를 주입한다. 발행이 실패해도 액션은 성공이고 오류는 기록만 한다.
-- 예약·운영자 액션의 발행(`booking.changed` 등)은 아직 아무 일도 하지 않는 구현을 쓴다 (PFQV-19).
+- 예약·운영자 액션의 발행(`booking.changed` 등)은 지시서 33까지 아무 일도 하지 않는 구현을 쓰고, 지시서 34부터 `getRealtimePublisher()`를 쓴다 (PFQV-19).
 - 브라우저의 토큰은 Route Handler `POST /api/realtime/token`이 Ably 토큰 요청으로 준다. `clientId`는 사용자 id, 유효 시간 10분, 권한은 정확한 채널 이름만이고 발행 권한은 없다. 권한에 방을 넣을 때마다 그 방을 읽을 수 있는지(`canReadRoom`) 판정한다.
 - 브라우저의 연결은 앱의 틀에 하나만 둔다.
 - presence 데이터의 모양은 채널마다 다르고 섞지 않는다: `room:`은 입력 중 `{ typing: boolean; name: string }`(지시서 22. 이름은 믿지 않고 멤버 목록에서 찾는다), `space:`는 상태 `{ status: 'online' | 'away' | 'dnd'; auto: boolean }`(지시서 24. 직접 고른 상태는 `auto: false`, 자동 자리 비움은 `auto: true`). 같은 사람의 여러 연결은 방해 금지 → 직접 고른 자리 비움 → 온라인 → 자동 자리 비움 순으로 합친다.
 - 리액션 이벤트는 완전한 반응자 집합이 아니라 재조회 신호다. 기존 메시지 GET의 `before`/`after`만 써서 불러온 50개 번호 구간을 보정하고, 새 `ids` 모드나 별도 API는 만들지 않는다. 이벤트를 250ms 동안 페이지별로 묶고, QueryClient 수명의 대기열은 한 번에 하나·분당 최대 50회로 처리한다. 다시 연결하면 보이는 페이지 → 최신 페이지 → 나머지 순서, 백그라운드 페이지는 2초 간격이다. 실패 재시도와 페이지별 세대 확인으로 빠진 보정과 오래된 응답을 막는다 (지시서 22).
 - 채팅 쓰기는 사용자 행을 방 행보다 먼저 잠근다. 삭제의 `deleted_by`, 리액션, 읽은 자리의 외래 키도 예외가 아니다. 여러 사용자는 id 순서로 한 번씩 필요한 최종 잠금 세기로 잡고, 방을 잡은 뒤 사용자 잠금을 올리지 않는다 (지시서 22–25).
 - 지시서 24부터 토큰은 내가 속한 모든 스페이스(100개까지)의 `space:`에 `subscribe`와 `presence`를 준다. 입력의 `spaces`는 쓰지 않는다.
+- 지시서 34부터 토큰은 내가 접근할 수 있는 모든 층(`canAccessFloor`. 운영자는 자기 지점의 모든 층. 200개까지)의 `floor:`에 `subscribe`만 준다. 입력으로 층을 받지 않는다. 층 이벤트에는 공간 id만 있고 이름·예약한 사람은 없다.
 
 ## 환경 변수
 

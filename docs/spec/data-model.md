@@ -27,6 +27,8 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | `space_type` | `meeting_room`, `phone_booth`, `seminar`, `desk_area`, `desk`, `lounge` |
 | `plan_status` | `draft`, `published`, `archived` |
 | `booking_status` | `confirmed`, `cancelled` |
+| `booking_cancel_kind` | `operator`, `maintenance` (지시서 35. 운영자가 예약 현황에서, 또는 점검 등록으로 취소한 예약. 본인·팀 관리자의 취소는 null이고 `cancelled_by`로 가린다) |
+| `report_resolution` | `dismissed`, `message_deleted`, `member_banned` (지시서 42) |
 | `chat_space_kind` | `team`, `branch`, `community` (지시서 20) |
 | `chat_room_kind` | `text`, `voice`, `dm`, `group_dm`, `meeting` (지시서 20에서 바꿈. 전에는 `booking`, `channel`, `inquiry`, `team`) |
 | `reaction_emoji` | `thumbs_up`, `heart`, `joy`, `tada`, `open_mouth`, `cry`, `pray`, `check` (지시서 22) |
@@ -45,7 +47,7 @@ Neon Postgres 기준이다. 이 문서가 스키마의 기준이고, Drizzle 스
 | `app_role` | `user`, `team_member`, `team_admin`, `operator` |
 | `grant_target` | `floor`, `space` |
 | `join_request_status` | `pending`, `approved`, `rejected`, `cancelled` |
-| `notification_type` | `booking_invited`, `booking_changed`, `booking_cancelled`, `booking_removed`, `participant_left`, `booking_reminder`, `friend_request`, `friend_accepted` (지시서 23), `message_request` (지시서 24), `space_invite` (지시서 26), `team_removed`, `team_role_changed`, `team_deleted` (지시서 31) |
+| `notification_type` | `booking_invited`, `booking_changed`, `booking_cancelled`, `booking_removed`, `participant_left`, `booking_reminder`, `friend_request`, `friend_accepted` (지시서 23), `message_request` (지시서 24), `space_invite` (지시서 26), `team_removed`, `team_role_changed`, `team_deleted` (지시서 31), `branch_announcement` (지시서 41) |
 
 ## 테이블
 
@@ -154,12 +156,13 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | alt | text | not null. 대체 글 |
 | sort_order | integer | not null. 0부터. 0이 대표 사진이다 |
 
-- 한 공간에서 순서는 겹치지 않는다: `unique (space_id, sort_order)` (이름 `space_photos_space_order_unique`)
+- 한 공간에서 순서는 겹치지 않는다: `unique (space_id, sort_order)` (이름 `space_photos_space_order_unique`). 지시서 43부터 `DEFERRABLE INITIALLY IMMEDIATE`다 (순서를 한 문장으로 바꿀 때 문장 끝에서 검사하도록)
 - 순서의 범위: check `sort_order between 0 and 9` (이름 `space_photos_sort_order_range`). 공간 하나에 10장까지다
 - 경로의 형식: check `path ~ '^/[a-z0-9/_-]+\.(webp|png|jpg)$' and path !~ '//'` (이름 `space_photos_path_format`). 바깥 주소와 `..`가 들어갈 수 없다 (`.`은 확장자 앞에만 올 수 있다)
 - 대체 글의 길이: check `char_length(alt) between 1 and 120` (이름 `space_photos_alt_length`)
 - 사진의 크기는 저장하지 않는다. 화면이 가로세로 비율을 정하고 사진을 그 안에 채운다.
 - 같은 파일을 여러 공간이 가리킬 수 있다.
+- 운영자가 올린 사진(지시서 43)의 경로는 `/api/space-photos/{photoId}.webp`이고 파일은 저장소 키 `space-photos/{photoId}.webp`에 있다. 화면의 상한은 공간마다 8장이다 (DB는 10장).
 - 누구에게 보이는지는 `docs/spec/ui-2.md`의 "사진"이 정한다. 공간의 이름을 볼 수 없는 사람에게는 사진도 내려보내지 않는다.
 - 인덱스: `(space_id, sort_order)`는 위의 unique가 겸한다
 
@@ -175,11 +178,16 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | background_image | text | null 허용. 편집용 배경 도면의 저장소 키. 평면도 JSON에는 키를 넣지 않는다 |
 | created_by | uuid | not null, FK → users |
 | published_at | timestamptz | null 허용 |
+| revision | integer | not null, 기본값 0. 초안을 저장할 때마다 1씩 올린다. 편집기의 낙관적 동시성 (지시서 38) |
+| updated_at | timestamptz | null 허용. 초안을 마지막으로 저장한 시각 (지시서 38) |
+| updated_by | uuid | null 허용, FK → users. 마지막으로 저장한 사람 (지시서 38) |
 
 - `unique (floor_id, version)`
 - 층마다 draft는 최대 1개: `unique (floor_id) where status = 'draft'` (부분 유니크 인덱스, 이름 `floor_plans_one_draft`)
 - 층마다 published도 최대 1개: `unique (floor_id) where status = 'published'` (이름 `floor_plans_one_published`)
 - 게시된 문서는 수정하지 않는다. 바꾸려면 새 버전을 만든다.
+- `CHECK (revision >= 0)` (이름 `floor_plans_revision_nonnegative`, 지시서 38).
+- 저장·게시의 규칙은 `docs/spec/floor-plan.md`의 "버전과 게시", "편집기".
 
 ### bookings (예약)
 
@@ -196,10 +204,13 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | cancelled_at | timestamptz | null 허용. 취소한 시각 |
 | cancelled_by | uuid | null 허용, FK → users. 취소한 사람. 본인일 수도, 팀 관리자나 운영자일 수도 있다 |
 | updated_at | timestamptz | null 허용. 예약을 바꾼 시각. 바꾼 적이 없으면 null |
+| cancel_kind | booking_cancel_kind | null 허용. 운영자 취소(`operator`)와 점검 취소(`maintenance`)만 값이 있다 (지시서 35) |
+| cancel_reason | text | null 허용. 운영자·점검 취소의 이유. 1–200자 (지시서 35) |
 
 - 겹침 금지 (이름 `bookings_no_overlap`): `EXCLUDE USING gist (space_id WITH =, during WITH &&) WHERE (status = 'confirmed')`
 - 구간 검사 (이름 `bookings_during_valid`): `CHECK (NOT isempty(during) AND NOT lower_inf(during) AND NOT upper_inf(during) AND lower_inc(during) AND NOT upper_inc(during))`. 경계가 `[)`가 아니면 맞닿은 예약이 겹침으로 잡히므로 DB에서 강제한다.
 - 취소 기록 (이름 `bookings_cancel_consistent`): `CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL))`. 취소된 예약에는 취소 시각이 있고, 확정 예약에는 없다.
+- 취소의 종류와 이유 (이름 `bookings_cancel_kind_consistent`, 지시서 35): `CHECK ((cancel_kind IS NULL OR status = 'cancelled') AND ((cancel_kind IS NULL) = (cancel_reason IS NULL)))`. 이유의 길이 (이름 `bookings_cancel_reason_length`): `CHECK (cancel_reason IS NULL OR char_length(cancel_reason) BETWEEN 1 AND 200)`.
 - 사용 인원 (이름 `bookings_attendee_count_range`): `CHECK (attendee_count IS NULL OR attendee_count BETWEEN 1 AND 500)`. 정원을 넘는지는 DB가 아니라 예약할 때 서버가 본다.
 - 좌석 예약은 `space_id`가 좌석 행(`type = 'desk'`)인 예약이다. 오전·오후·종일 구간은 따로 저장하지 않고 `during`으로 판정한다 (`docs/spec/booking-2.md`).
 - 예약은 지우지 않는다. 취소하면 상태만 바꾼다. (시드 스크립트가 자기 id의 예약을 다시 넣는 것만 예외다.)
@@ -251,6 +262,8 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 - 인덱스: `gist (space_id, during)`
 - `bookings`와 같은 구간 검사를 둔다 (이름 `space_blocks_during_valid`). 끝이 없는 점검은 지원하지 않는다.
 - 예약 액션은 겹치는 점검이 있으면 `SPACE_BLOCKED`로 거절한다.
+- 같은 공간의 점검끼리는 겹치지 않는다 (이름 `space_blocks_no_overlap`, 지시서 36): `EXCLUDE USING gist (space_id WITH =, during WITH &&)`. 넣을 때 `23P01`이면 액션이 `INVALID_INPUT`(필드 `start`)으로 바꾼다.
+- 등록·고치기·해제·지우기는 `docs/spec/admin.md`의 "점검".
 
 ### chat_spaces (스페이스, 지시서 20)
 
@@ -425,6 +438,18 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 
 - 같은 사람이 같은 메시지를 두 번 신고할 수 없다: `unique (reporter_id, message_id) WHERE message_id IS NOT NULL` (`reports_message_unique`).
 - 인덱스: `(target_user_id)`, `(reporter_id, created_at)` (하루 20개를 셀 때).
+
+지시서 42에서 처리 기록을 더한다.
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| resolved_at | timestamptz | null 허용. 처리한 시각 |
+| resolved_by | uuid | null 허용, FK → users. 처리한 운영자 |
+| resolution | report_resolution | null 허용 |
+
+- `CHECK` (`reports_resolution_consistent`): `(resolved_at IS NULL) = (resolved_by IS NULL) AND (resolved_at IS NULL) = (resolution IS NULL)`.
+- 인덱스: 처리하지 않은 메시지 신고만의 부분 인덱스 `reports_open_message_idx` `(message_id) WHERE resolved_at IS NULL AND message_id IS NOT NULL`.
+- 누가 처리할 수 있는지와 범위는 `docs/spec/admin.md`의 "신고".
 
 ### chat_space_members (스페이스의 멤버, 지시서 26)
 
@@ -603,8 +628,27 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 | permissions | text[] | not null |
 | limits | jsonb | not null, 기본값 `'{}'`. 키가 없으면 코드 기본값, 값이 null이면 제한 없음 |
 | updated_at | timestamptz | not null, 기본값 now() |
+| updated_by | uuid | null 허용, FK → users. 마지막으로 바꾼 운영자 (지시서 37) |
 
 - PK `(branch_id, role)`. 행이 없으면 코드의 기본값을 쓴다 (`docs/spec/roles-and-access.md`).
+
+### announcements (공지, 지시서 41)
+
+| 컬럼 | 타입 | 제약 |
+| --- | --- | --- |
+| id | uuid | PK |
+| branch_id | uuid | not null, FK → branches |
+| author_id | uuid | not null, FK → users |
+| title | text | not null. 1–60자 |
+| body | text | not null. 1–500자 |
+| lounge_message_id | uuid | null 허용, FK → messages, on delete set null. 라운지 `# 공지`에 쓴 메시지 |
+| audience | jsonb | null 허용. 예약한 사람 알림의 조건 `{ date: 'YYYY-MM-DD', floorId: string \| null, spaceId: string \| null }` (`$type<AnnouncementAudience>`) |
+| recipient_count | integer | not null, 기본값 0. 알림을 받은 사람 수 |
+
+- `CHECK` (`announcements_text_length`): `char_length(title) BETWEEN 1 AND 60 AND char_length(body) BETWEEN 1 AND 500`.
+- 받는 곳이 하나 이상(`lounge_message_id` 또는 `audience`)인지는 넣는 액션이 지킨다. 라운지 메시지가 나중에 지워지면 `lounge_message_id`가 null이 될 수 있어서 DB 제약으로 두지 않는다.
+- 인덱스: `(branch_id, created_at desc)` (보낸 공지 목록과 하루 20개를 셀 때).
+- 알림은 `notifications`에 `branch_announcement`로 넣는다. `booking_id`는 null이고 `data`는 `{ branchName, title, body, announcementId }`다.
 
 ### access_grants (허용 팀)
 
@@ -621,7 +665,7 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 
 ## 테스트로 확인할 제약
 
-`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 47개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서(8–10은 지시서 20에서 다시 썼다), 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서, 18–20은 공간 사진 작업에서, 21은 사용 인원 작업(지시서 14)에서, 22는 참석자 초대 작업(16)에서, 23은 알림 작업(17)에서, 24는 읽음 작업(21)에서, 25–27은 메시지 다듬기(22)에서, 28–31은 사람 1(23)에서, 32–35는 사람 2(24)에서, 36은 회의 채널(25)에서, 37–39는 스페이스(26)에서, 40–42는 통화(27)에서, 43–44는 자료 공유(28)에서, 45는 프로필과 설정(30)에서, 46–47은 팀 관리(31)에서 만든다.
+`tests/db`에서 마이그레이션을 적용한 DB(PGlite)에 직접 넣어 보고 확인한다. 항목은 53개이고, 한 항목에 경우가 여럿이면 경우마다 따로 단언한다. 1–10은 셋업에서(8–10은 지시서 20에서 다시 썼다), 11–14는 가입·팀 전환 작업에서, 15–16은 예약 작업에서, 17은 운영자 공간 관리 작업에서, 18–20은 공간 사진 작업에서, 21은 사용 인원 작업(지시서 14)에서, 22는 참석자 초대 작업(16)에서, 23은 알림 작업(17)에서, 24는 읽음 작업(21)에서, 25–27은 메시지 다듬기(22)에서, 28–31은 사람 1(23)에서, 32–35는 사람 2(24)에서, 36은 회의 채널(25)에서, 37–39는 스페이스(26)에서, 40–42는 통화(27)에서, 43–44는 자료 공유(28)에서, 45는 프로필과 설정(30)에서, 46–47은 팀 관리(31)에서, 48은 예약 현황(35)에서, 49는 점검(36)에서, 50은 편집기 1(38)에서, 51은 공지(41)에서, 52는 신고 처리(42)에서, 53은 사진 올리기(43)에서 만든다.
 
 1. 같은 공간에 시간이 겹치는 `confirmed` 예약 두 개는 들어가지 않는다 (`23P01`).
 2. 끝과 시작이 맞닿은 예약(10:00–11:00, 11:00–12:00)은 들어간다.
@@ -670,3 +714,9 @@ Better Auth의 session, account, verification 모델이다. 컬럼 구성은 설
 45. `users.reminder_minutes`에 `{30,10,5,0}` 밖의 값(예: 15)은 들어가지 않는다. 빈 배열은 들어간다. (지시서 30)
 46. 같은 이름(대소문자만 다른 것 포함)의 지우지 않은 팀 둘은 들어가지 않는다. 한쪽에 `deleted_at`이 있으면 들어간다. (지시서 31)
 47. `teams`의 `deleted_at`과 `deleted_by`는 둘 다 있거나 둘 다 없다. (지시서 31)
+48. 확정 예약에 `cancel_kind`가 있으면, 취소된 예약에 `cancel_kind`만 있고 `cancel_reason`이 없으면(또는 그 반대), `cancel_reason`이 빈 문자열이거나 201자면 들어가지 않는다. 취소된 예약에 둘 다 없거나 둘 다 있으면 들어간다. (지시서 35)
+49. 같은 공간에 시간이 겹치는 점검 두 개는 들어가지 않는다 (`23P01`). 맞닿은 점검과 다른 공간의 같은 시간 점검은 들어간다. (지시서 36)
+50. `revision`이 -1인 평면도는 들어가지 않는다. (지시서 38)
+51. 제목이 빈 문자열이거나 61자인 공지, 내용이 501자인 공지는 들어가지 않는다. (지시서 41)
+52. `resolved_at`만 있거나 `resolution`만 있는 신고는 들어가지 않는다. 셋 다 있거나 셋 다 없으면 들어간다. (지시서 42)
+53. 한 공간의 사진 두 장의 `sort_order`(0과 1)를 한 문장의 `UPDATE`로 맞바꾸면 성공한다. 두 문장으로 나눠 첫 문장에서 겹치게 하면 실패한다. (지시서 43)
