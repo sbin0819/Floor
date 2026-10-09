@@ -18,6 +18,7 @@ import { initialPlanTime, planTimeValueText } from "../time";
 import { planStatesAt, planSummary, planTooltipText } from "../states";
 import { PlanCanvas } from "./plan-canvas";
 import { PlanTimeBar } from "./plan-time-bar";
+import { PlanTouchHint } from "./plan-touch-hint";
 
 export { fetchFloorPlan } from "../client";
 
@@ -179,6 +180,7 @@ export function FloorPlanView({
         </div>
       ) : (
         <div className="relative">
+          <PlanTouchHint />
           <PlanCanvas
             document={query.data}
             states={states}

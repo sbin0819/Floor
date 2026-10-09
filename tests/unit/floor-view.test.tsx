@@ -209,6 +209,22 @@ describe("floor view preference", () => {
     expect(screen.getByText("층 평면도 보기")).toBeVisible();
     expect(screen.queryByText("공간 목록 보기")).not.toBeInTheDocument();
   });
+  it("honors an explicit plan preference on narrow screens", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    window.history.replaceState(null, "", "?view=plan");
+    const data = floorDayFixture();
+    data.floor.plan = { id: first, version: 1 };
+    render(<FloorViews data={data} initialView={null} />);
+    expect(screen.getByText("층 평면도 보기")).toBeVisible();
+    expect(screen.queryByText("공간 목록 보기")).not.toBeInTheDocument();
+  });
   it("falls back to the list when a stale plan preference has no published plan", () => {
     window.history.replaceState(null, "", "?view=plan");
     render(<FloorViews data={floorDayFixture()} initialView="plan" />);

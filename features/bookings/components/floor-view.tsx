@@ -90,7 +90,7 @@ export function useFloorView(
   return {
     view,
     effectiveView:
-      (view === "plan" && (!hasPlan || !wide) ? "list" : view) ??
+      (view === "plan" && !hasPlan ? "list" : view) ??
       (wide ? (hasPlan ? "plan" : "timeline") : "list"),
     hasPlan,
     setPreference: preference?.set,
@@ -162,12 +162,7 @@ export function FloorViewControl({ className }: { className?: string }) {
           query.set("view", view);
           const href = `${floorHref(selection.branchId, floorId)}?${query}`;
           return (
-            <SegmentedLink
-              key={view}
-              selected={view === effectiveView}
-              className={view === "plan" ? "hidden lg:inline-flex" : undefined}
-              asChild
-            >
+            <SegmentedLink key={view} selected={view === effectiveView} asChild>
               <a
                 href={href}
                 aria-label={`${label} 보기`}

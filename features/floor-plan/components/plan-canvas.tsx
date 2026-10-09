@@ -23,6 +23,7 @@ import type {
 } from "@/lib/floor-plan/render/types";
 import { usePlanColors } from "./use-plan-colors";
 import { PlanAccessibility } from "./plan-accessibility";
+import { isPlanTap, pinchCamera } from "@/lib/floor-plan/render/gestures";
 
 export function PlanCanvas({
   document,
@@ -79,12 +80,9 @@ export function PlanCanvas({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [lastFocusedId, setLastFocusedId] = useState<string | null>(null);
   const colors = usePlanColors();
-  const gesture = useRef<{
-    id: number;
-    start: Point;
-    last: Point;
-    moved: boolean;
-  } | null>(null);
+  const pointers = useRef(
+    new Map<number, { start: Point; last: Point; moved: boolean }>(),
+  );
   useEffect(() => {
     const element = host.current;
     const canvases = [base.current, status.current, overlay.current];
@@ -310,36 +308,54 @@ export function PlanCanvas({
         data-plan-canvas
         className={cn(
           "relative overflow-hidden",
-          interactive && "h-[min(60dvh,640px)] min-h-96",
+          interactive && "h-[min(60dvh,640px)] min-h-96 touch-none",
           className,
         )}
         onPointerDown={(event) => {
           if (!interactive || event.button !== 0) return;
           const point = position(event);
-          gesture.current = {
-            id: event.pointerId,
+          pointers.current.set(event.pointerId, {
             start: point,
             last: point,
             moved: false,
-          };
+          });
+          if (pointers.current.size > 1)
+            for (const pointer of pointers.current.values())
+              pointer.moved = true;
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
           if (!interactive) return;
           const point = position(event);
-          const active = gesture.current;
-          if (active && active.id === event.pointerId) {
-            active.moved ||=
-              Math.hypot(
-                point[0] - active.start[0],
-                point[1] - active.start[1],
-              ) > 8;
-            if (active.moved) {
-              const dx = point[0] - active.last[0];
-              const dy = point[1] - active.last[1];
-              setCamera((value) => pan(value ?? fitted, dx, dy));
-            }
+          const active = pointers.current.get(event.pointerId);
+          if (active) {
+            const before = [...pointers.current.values()].map(
+              ({ last }) => last,
+            );
+            const previous = active.moved ? active.last : active.start;
+            active.moved ||= !isPlanTap(active.start, point);
             active.last = point;
+            const after = [...pointers.current.values()].map(
+              ({ last }) => last,
+            );
+            if (before.length > 1) {
+              setCamera((value) =>
+                pinchCamera(
+                  value ?? fitted,
+                  [before[0]!, before[1]!],
+                  [after[0]!, after[1]!],
+                  fitted.scale,
+                ),
+              );
+            } else if (active.moved) {
+              setCamera((value) =>
+                pan(
+                  value ?? fitted,
+                  point[0] - previous[0],
+                  point[1] - previous[1],
+                ),
+              );
+            }
             setHoveredId(null);
             onHover?.(null);
           } else if (event.pointerType === "mouse") {
@@ -350,16 +366,20 @@ export function PlanCanvas({
         }}
         onPointerUp={(event) => {
           if (!interactive) return;
-          const active = gesture.current;
-          if (!active || active.id !== event.pointerId) return;
-          gesture.current = null;
-          if (!active.moved) {
+          const active = pointers.current.get(event.pointerId);
+          if (!active) return;
+          pointers.current.delete(event.pointerId);
+          if (!active.moved && isPlanTap(active.start, position(event))) {
             const shape = candidate(position(event));
             if (shape) choose(shape);
           }
         }}
-        onPointerCancel={() => {
-          gesture.current = null;
+        onPointerCancel={(event) => {
+          pointers.current.delete(event.pointerId);
+          for (const pointer of pointers.current.values()) pointer.moved = true;
+        }}
+        onLostPointerCapture={(event) => {
+          pointers.current.delete(event.pointerId);
         }}
         onPointerLeave={() => {
           if (!interactive) return;

@@ -34,6 +34,11 @@ export function SpaceDetailContainer({
     space: space?.kind === "accessible" ? space : null,
   });
   const rightDetail = mode === "detail";
+  const mobilePlan = !wide && effectiveView === "plan";
+  const summary =
+    mobilePlan &&
+    !navigation?.location.detail &&
+    !(space?.kind === "accessible" && space.deskCount > 0);
   if (closed || navigation?.floorData?.openHours === null)
     return resolution ?? null;
   if (mode === "strip")
@@ -67,6 +72,7 @@ export function SpaceDetailContainer({
     <>
       {resolution}
       <Sheet
+        modal={!mobilePlan}
         open={open}
         onOpenChange={(next) => {
           if (next || !navigation) return;
@@ -94,8 +100,14 @@ export function SpaceDetailContainer({
           className={
             rightDetail
               ? "gap-0 overflow-hidden data-[side=right]:w-[420px] data-[side=right]:sm:max-w-none"
-              : "max-h-[85dvh] gap-0 overflow-hidden rounded-t-xl data-[side=bottom]:h-[85dvh]"
+              : summary
+                ? "max-h-[50dvh] gap-0 overflow-hidden rounded-t-xl data-[side=bottom]:h-auto"
+                : "max-h-[85dvh] gap-0 overflow-hidden rounded-t-xl data-[side=bottom]:h-[85dvh]"
           }
+          onInteractOutside={(event) => {
+            // 평면도를 움직이거나 다른 공간을 골라도 같은 시트가 유지된다.
+            if (mobilePlan) event.preventDefault();
+          }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             navigation?.restoreSpaceTrigger();

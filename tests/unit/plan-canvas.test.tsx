@@ -737,4 +737,93 @@ describe("plan canvas lifecycle", () => {
     fireEvent.pointerUp(element, { ...client(point), pointerId: 9 });
     expect(onSelect).not.toHaveBeenCalled();
   });
+  it("pinches two pointers around their moving midpoint without selecting on release", () => {
+    const onSelect = vi.fn();
+    const onHover = vi.fn();
+    const { container } = render(
+      <PlanCanvas
+        document={plan}
+        states={states}
+        onSelect={onSelect}
+        onHover={onHover}
+      />,
+    );
+    flushFrames();
+    const element = host(container);
+    expect(element).toHaveClass("touch-none");
+    const before = lastFrame().camera;
+    fireEvent.pointerDown(element, {
+      ...client([100, 100]),
+      pointerId: 1,
+      pointerType: "touch",
+      button: 0,
+    });
+    fireEvent.pointerDown(element, {
+      ...client([200, 100]),
+      pointerId: 2,
+      pointerType: "touch",
+      button: 0,
+    });
+    fireEvent.pointerMove(element, {
+      ...client([300, 100]),
+      pointerId: 2,
+      pointerType: "touch",
+    });
+    flushFrames();
+    expect(lastFrame().camera.scale).toBeCloseTo(before.scale * 2);
+    expect(toWorld([200, 100], lastFrame().camera)).toEqual(
+      toWorld([150, 100], before),
+    );
+    fireEvent.pointerUp(element, {
+      ...client([300, 100]),
+      pointerId: 2,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(element, {
+      ...client([120, 140]),
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerUp(element, {
+      ...client([120, 140]),
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onHover.mock.calls.every(([value]) => value === null)).toBe(true);
+  });
+  it("treats at most eight pixels as a tap but not a release far from the start without move events", () => {
+    const onSelect = vi.fn();
+    const { container } = render(
+      <PlanCanvas document={plan} states={states} onSelect={onSelect} />,
+    );
+    flushFrames();
+    const element = host(container);
+    const point = toScreen([120, 120], lastFrame().camera);
+    fireEvent.pointerDown(element, {
+      ...client(point),
+      pointerId: 1,
+      pointerType: "touch",
+      button: 0,
+    });
+    fireEvent.pointerUp(element, {
+      ...client([point[0] + 8, point[1]]),
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    expect(onSelect).toHaveBeenCalledOnce();
+    onSelect.mockClear();
+    fireEvent.pointerDown(element, {
+      ...client(point),
+      pointerId: 2,
+      pointerType: "touch",
+      button: 0,
+    });
+    fireEvent.pointerUp(element, {
+      ...client([point[0] + 20, point[1]]),
+      pointerId: 2,
+      pointerType: "touch",
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });

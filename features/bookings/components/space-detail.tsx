@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { PhotoGallery } from "@/components/photos/photo-gallery";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { useBranchDisplayNow } from "./branch-display-clock";
 import { hasDeskSeats, spaceDetailMode } from "../space-detail-mode";
 import { DeskPicker } from "./desk-picker";
 import { SpaceDetailLoading } from "./space-detail-loading";
+import { PlanSpaceSummary } from "@/features/floor-plan/components/plan-space-summary";
 
 export function SpaceDetail({ data }: { data: SpaceDayData }) {
   const { effectiveView } = useFloorView();
@@ -40,10 +42,26 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
   });
   const rightDetail = mode === "detail";
   const isDesk = hasDeskSeats(data.space) && data.desk !== null;
+  const compact =
+    !wide && effectiveView === "plan" && !isDesk && !workspace?.location.detail;
+  const title = useRef<HTMLHeadingElement>(null);
+  const previousSummary = useRef<string | null>(null);
+  const scope = `${data.branch.id}:${data.floor.id}:${data.date}:${data.space.id}`;
+  useEffect(() => {
+    if (
+      !compact &&
+      !wide &&
+      effectiveView === "plan" &&
+      previousSummary.current === scope
+    )
+      title.current?.focus();
+    previousSummary.current = compact ? scope : null;
+  }, [compact, wide, effectiveView, scope]);
   const status = getSpaceDayStatusLine({ ...data, now: displayNow });
   const isToday =
     data.date === localDate(new Date(displayNow), data.branch.timezone);
   if (isDesk && workspace && !floorSpace) return <SpaceDetailLoading />;
+  if (compact) return <PlanSpaceSummary data={data} now={displayNow} />;
   if (mode === "strip")
     return (
       <BookingForm
@@ -99,7 +117,13 @@ export function SpaceDetail({ data }: { data: SpaceDayData }) {
       </div>
       <header className="shrink-0 space-y-2 border-b border-border px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-bold">{data.space.name}</h2>
+          <h2
+            ref={title}
+            tabIndex={-1}
+            className="text-lg font-bold focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            {data.space.name}
+          </h2>
           {isToday && !isDesk && (
             <Badge
               className={cn(

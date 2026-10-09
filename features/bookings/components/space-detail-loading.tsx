@@ -23,6 +23,15 @@ export function SpaceDetailLoading() {
     space: space?.kind === "accessible" ? space : null,
   });
   if (desk) return <DeskPickerSkeleton />;
+  if (!wide && effectiveView === "plan" && !workspace?.location.detail)
+    return (
+      <SkeletonRegion className="space-y-4 p-5">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-4 w-52" />
+        <Skeleton className="h-7 w-full" />
+        <Skeleton className="h-11 w-full" />
+      </SkeletonRegion>
+    );
   if (mode !== "strip")
     return <SpaceDetailSkeleton expanded={mode === "detail"} />;
   return (
