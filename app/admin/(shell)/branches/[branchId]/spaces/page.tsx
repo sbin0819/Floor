@@ -5,6 +5,7 @@ import { ActionError } from "@/lib/actions/result";
 import { getAdminBranch } from "@/features/admin/queries";
 import { BranchDetail } from "@/features/admin/components/branch-detail";
 import { AdminBranchSkeleton } from "@/features/admin/components/admin-skeletons";
+import { AdminForbidden } from "@/features/admin/components/admin-forbidden";
 
 type Props = { params: Promise<{ branchId: string }> };
 async function BranchContent({ params }: Props) {
@@ -12,9 +13,10 @@ async function BranchContent({ params }: Props) {
   const { branchId } = await params;
   const data = await getAdminBranch(branchId).catch((error: unknown) => {
     if (error instanceof ActionError && error.code === "NOT_FOUND") notFound();
+    if (error instanceof ActionError && error.code === "FORBIDDEN") return null;
     throw error;
   });
-  return <BranchDetail data={data} />;
+  return data ? <BranchDetail data={data} /> : <AdminForbidden />;
 }
 export default function AdminBranchPage(props: Props) {
   return (

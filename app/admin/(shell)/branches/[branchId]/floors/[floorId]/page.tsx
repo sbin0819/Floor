@@ -5,6 +5,7 @@ import { ActionError } from "@/lib/actions/result";
 import { getAdminFloor } from "@/features/admin/queries";
 import { FloorDetail } from "@/features/admin/components/floor-detail";
 import { AdminFloorSkeleton } from "@/features/admin/components/admin-skeletons";
+import { AdminForbidden } from "@/features/admin/components/admin-forbidden";
 
 type Props = {
   params: Promise<{ branchId: string; floorId: string }>;
@@ -18,10 +19,12 @@ async function FloorContent({ params, searchParams }: Props) {
     (error: unknown) => {
       if (error instanceof ActionError && error.code === "NOT_FOUND")
         notFound();
+      if (error instanceof ActionError && error.code === "FORBIDDEN")
+        return null;
       throw error;
     },
   );
-  return <FloorDetail data={data} />;
+  return data ? <FloorDetail data={data} /> : <AdminForbidden />;
 }
 export default function AdminFloorPage(props: Props) {
   return (

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAdminQueries } from "@/features/admin/query-factory";
+import { createAdminShellQueries } from "@/features/admin/admin-shell-query-factory";
 import { createBookingQueries } from "@/features/bookings/query-factory";
 import { createTeamQueries } from "@/features/teams/query-factory";
 import { createChatQueries } from "@/features/chat/query-factory";
@@ -211,6 +212,14 @@ describe("authenticated query execution budgets", () => {
     ],
     ["teams.getInvitePageData", () => teams().getInvitePageData(token)],
     [
+      "admin.getAdminShell",
+      () =>
+        createAdminShellQueries({
+          database: database.db,
+          requireSession: async () => actors.operator,
+        }).getAdminShell(actors.branchId),
+    ],
+    [
       "admin.getAdminBranch.twoFloors",
       () => admin().getAdminBranch(actors.branchId),
     ],
@@ -250,6 +259,8 @@ describe("authenticated query execution budgets", () => {
           : 2,
       );
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
+      if (name === "admin.getAdminShell")
+        expect(result.perStage).toEqual([1, 3]);
       if (name === "home.getHomeTodo" || name === "home.getHomeChecklist") {
         expect(result.stages).toBe(1);
         expect(result.statements).toBeLessThanOrEqual(

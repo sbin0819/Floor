@@ -95,6 +95,8 @@ export function createAdminQueries(dependencies: AdminQueryDependencies = {}) {
     async getAdminBranch(branchId: string): Promise<AdminBranchData> {
       const session = await readSession();
       const data = await checkedBranch(session, validId(branchId));
+      if (!data.permissions.manageSpaces && !data.permissions.editAccess)
+        throw new ActionError("FORBIDDEN");
       const [floors, counts] = await Promise.all([
         listFloorsWithAccess(data.branch.id, db),
         countActiveSpacesByFloor(data.branch.id, db),
@@ -126,6 +128,8 @@ export function createAdminQueries(dependencies: AdminQueryDependencies = {}) {
       ]);
       if (!floor || floor.branchId !== expectedBranch)
         throw new ActionError("NOT_FOUND");
+      if (!data.permissions.manageSpaces && !data.permissions.editAccess)
+        throw new ActionError("FORBIDDEN");
       const query = normalizeTeamName(
         typeof teamQuery === "string" ? teamQuery : "",
       );

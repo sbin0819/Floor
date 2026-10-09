@@ -10,7 +10,7 @@ import Home from "@/app/(app)/page";
 import TeamPage from "@/app/(app)/teams/[teamId]/page";
 import TeamStartPage from "@/app/(app)/teams/start/page";
 import InvitePage from "@/app/(app)/invite/[token]/page";
-import AdminHome from "@/app/admin/page";
+import AdminHome from "@/app/admin/(shell)/page";
 import { requireOperatorPage, requirePageSession } from "@/lib/auth/session";
 import {
   getInvitePageData,

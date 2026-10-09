@@ -13,7 +13,7 @@ export function AdminBreadcrumb({
   const items = [
     { href: "/admin", name: "지점" },
     ...(branch
-      ? [{ href: `/admin/branches/${branch.id}`, name: branch.name }]
+      ? [{ href: `/admin/branches/${branch.id}/spaces`, name: branch.name }]
       : []),
     ...(branch && floor
       ? [

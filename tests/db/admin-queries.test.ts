@@ -124,9 +124,15 @@ describe("operator administration query boundaries", () => {
       .update(roleSettings)
       .set({ permissions: [] })
       .where(eq(roleSettings.branchId, fixture.branchId));
-    expect(
-      (await queries().getAdminBranch(fixture.branchId)).permissions,
-    ).toEqual({ manageSpaces: false, editAccess: false });
+    await expect(
+      queries().getAdminBranch(fixture.branchId),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      queries().getAdminFloor(fixture.branchId, fixture.floorId),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      queries().getAdminFloor(fixture.branchId, fixture.otherFloorId),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
   it("includes archived rooms and grant names, counts seats without returning seat rows or contact fields", async () => {
     await database.db.update(teams).set({ contactPhone: "010-9999-8888" });

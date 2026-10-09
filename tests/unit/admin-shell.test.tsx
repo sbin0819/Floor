@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import AdminLayout from "@/app/admin/layout";
+import { AdminShellFrame } from "@/features/admin/components/admin-shell-frame";
+import { AdminShellNavigation } from "@/features/admin/components/admin-shell-navigation";
 import { AdminBreadcrumb } from "@/features/admin/components/admin-breadcrumb";
 import {
   AdminHomeSkeleton,
@@ -13,6 +14,7 @@ import { getOperatingState } from "@/features/bookings/operating-state";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin/branches/branch",
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("@/components/sign-out-button", () => ({
   SignOutButton: () => <button>로그아웃</button>,
@@ -41,14 +43,14 @@ describe("operator breadcrumb", () => {
     {
       props: { branch },
       names: ["지점", "가상점"],
-      paths: ["/admin", "/admin/branches/branch"],
+      paths: ["/admin", "/admin/branches/branch/spaces"],
     },
     {
       props: { branch, floor },
       names: ["지점", "가상점", "7층"],
       paths: [
         "/admin",
-        "/admin/branches/branch",
+        "/admin/branches/branch/spaces",
         "/admin/branches/branch/floors/floor",
       ],
     },
@@ -108,11 +110,14 @@ describe("operator home", () => {
     expect(screen.getByText("층 0개 · 공간 0곳")).toBeVisible();
   });
 
-  it("keeps desktop navigation scroll separate from bottom logout and the mobile menu in normal flow", () => {
+  it("keeps desktop navigation scroll separate from bottom logout and fixes the mobile header", () => {
     const { container } = render(
-      <AdminLayout>
+      <AdminShellFrame
+        sidebar={<AdminShellNavigation />}
+        mobile={<AdminShellNavigation mobile />}
+      >
         <main>내용</main>
-      </AdminLayout>,
+      </AdminShellFrame>,
     );
     const aside = container.querySelector("aside")!;
     expect(aside).toHaveClass(
@@ -125,8 +130,8 @@ describe("operator home", () => {
     const menu = screen.getByRole("navigation", { name: "운영자 메뉴" });
     expect(menu.parentElement).toHaveClass(
       "min-h-0",
-      "lg:flex-1",
-      "lg:overflow-y-auto",
+      "flex-1",
+      "overflow-y-auto",
     );
     const logout = screen.getByRole("button", { name: "로그아웃" });
     expect(logout.parentElement).toBe(aside.lastElementChild);
@@ -138,7 +143,16 @@ describe("operator home", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["지점", "멤버 화면으로"]);
+    ).toEqual(["지점"]);
+    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(container.querySelector("header")).toHaveClass(
+      "sticky",
+      "top-0",
+      "z-45",
+    );
     expect(screen.getByRole("main")).toHaveTextContent("내용");
   });
 

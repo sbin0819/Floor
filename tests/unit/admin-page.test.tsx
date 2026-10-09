@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { cloneElement } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { redirect } from "next/navigation";
-import AdminHome from "@/app/admin/page";
+import AdminHome from "@/app/admin/(shell)/page";
 import { requireOperatorPage } from "@/lib/auth/session";
 import {
   getOperatorBranchCards,
@@ -17,6 +17,8 @@ vi.mock("@/features/admin/queries", () => ({
   getOperatorBranchCards: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/admin",
+  useRouter: () => ({ push: vi.fn() }),
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
   }),

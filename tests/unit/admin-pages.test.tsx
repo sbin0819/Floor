@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { notFound } from "next/navigation";
-import AdminBranchPage from "@/app/admin/branches/[branchId]/page";
-import AdminFloorPage from "@/app/admin/branches/[branchId]/floors/[floorId]/page";
+import AdminBranchPage from "@/app/admin/(shell)/branches/[branchId]/spaces/page";
+import AdminFloorPage from "@/app/admin/(shell)/branches/[branchId]/floors/[floorId]/page";
 import { getAdminBranch, getAdminFloor } from "@/features/admin/queries";
 import { requireOperatorPage } from "@/lib/auth/session";
 import { ActionError } from "@/lib/actions/result";
+import { AdminForbidden } from "@/features/admin/components/admin-forbidden";
 import { resolvePageContent } from "./page-test-utils";
 import {
   adminBranchFixture,
@@ -112,3 +113,17 @@ it("preserves genuine query failures", async () => {
   ).rejects.toThrow("storage unavailable");
   expect(notFound).not.toHaveBeenCalled();
 });
+it.each(["branch", "floor"])(
+  "shows the permission screen for a disabled %s menu without hiding it as missing",
+  async (kind) => {
+    vi.mocked(getAdminBranch).mockRejectedValue(new ActionError("FORBIDDEN"));
+    vi.mocked(getAdminFloor).mockRejectedValue(new ActionError("FORBIDDEN"));
+    const result = await resolvePageContent(
+      kind === "branch"
+        ? AdminBranchPage(branchProps())
+        : AdminFloorPage(floorProps()),
+    );
+    expect(result).toEqual(expect.objectContaining({ type: AdminForbidden }));
+    expect(notFound).not.toHaveBeenCalled();
+  },
+);

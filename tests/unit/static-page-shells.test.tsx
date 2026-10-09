@@ -17,7 +17,7 @@ import VerifyEmailPage from "@/app/(auth)/verify-email/page";
 import OperatorLoginPage from "@/app/(auth)/admin/login/page";
 import TeamsPage from "@/app/(app)/teams/page";
 import TeamStartPage from "@/app/(app)/teams/start/page";
-import AdminPage from "@/app/admin/page";
+import AdminPage from "@/app/admin/(shell)/page";
 import { MemberAuthFrame } from "@/features/auth/components/member-auth-frame";
 import { TeamDetailSkeleton } from "@/features/teams/components/team-skeletons";
 import { resolvePageContent } from "./page-test-utils";
@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("next/server", () => ({ connection: mocks.connection }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/admin",
   redirect: vi.fn(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
