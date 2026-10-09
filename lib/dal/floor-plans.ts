@@ -21,9 +21,19 @@ export async function getFloorPlanWithAccess(
         order by ${accessGrants.teamId}
       )`,
       // 편집 전용 정보는 DB에서부터 제외한다. 좌석 이름은 39 이후의 문서도 보호한다.
-      document: sql<FloorPlanDocument>`jsonb_set(
-        ${floorPlans.document} - 'background', '{seats}',
-        coalesce((select jsonb_agg(seat.value - 'label' order by seat.ordinality)
+      document: sql<FloorPlanDocument>`jsonb_build_object(
+        'schema', ${floorPlans.document} -> 'schema',
+        'unit', ${floorPlans.document} -> 'unit',
+        'bounds', ${floorPlans.document} -> 'bounds',
+        'walls', ${floorPlans.document} -> 'walls',
+        'openings', ${floorPlans.document} -> 'openings',
+        'spaces', ${floorPlans.document} -> 'spaces',
+        'fixtures', ${floorPlans.document} -> 'fixtures',
+        'seats', coalesce((select jsonb_agg(jsonb_build_object(
+          'id', seat.value -> 'id', 'spaceId', seat.value -> 'spaceId',
+          'at', seat.value -> 'at', 'size', seat.value -> 'size',
+          'rotation', seat.value -> 'rotation'
+        ) order by seat.ordinality)
           from jsonb_array_elements(${floorPlans.document} -> 'seats')
             with ordinality as seat(value, ordinality)), '[]'::jsonb)
       )`,

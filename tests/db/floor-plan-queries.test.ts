@@ -86,7 +86,12 @@ describe("floor-plan read authorization and budgets", () => {
     // DB에는 편집 전용 좌석 이름이 있어도 멤버용 SELECT가 읽지 않는다.
     const withLabels = {
       ...doc,
-      seats: doc.seats.map((seat) => ({ ...seat, label: "비공개 좌석 이름" })),
+      editorNote: "운영자 전용 메모",
+      seats: doc.seats.map((seat) => ({
+        ...seat,
+        label: "비공개 좌석 이름",
+        editorNote: "운영자 좌석 메모",
+      })),
     };
     const [row] = await database.db
       .insert(floorPlans)
@@ -158,13 +163,23 @@ describe("floor-plan read authorization and budgets", () => {
       delete expected.background;
       expect(data).toEqual(expected);
       expect(data).not.toHaveProperty("background");
+      expect(data).not.toHaveProperty("editorNote");
       expect(data.seats[0]).not.toHaveProperty("label");
+      expect(Object.keys(data.seats[0]!).sort()).toEqual([
+        "at",
+        "id",
+        "rotation",
+        "size",
+        "spaceId",
+      ]);
       expect(JSON.stringify(data)).not.toMatch(
         /private-background|비공개 좌석|createdBy|publishedAt/,
       );
       const dal = await getFloorPlanWithAccess(row.id, database.db);
       expect(dal?.document).not.toHaveProperty("background");
+      expect(dal?.document).not.toHaveProperty("editorNote");
       expect(dal?.document.seats[0]).not.toHaveProperty("label");
+      expect(dal?.document.seats[0]).not.toHaveProperty("editorNote");
     },
   );
   it("keeps floor team access independent from another floor and space grants", async () => {
