@@ -167,16 +167,38 @@ beforeEach(() => {
   );
   document.cookie = "floor_view=; Max-Age=0; Path=/";
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 describe("floor view preference", () => {
-  it("defaults to the list when the floor has no published plan", () => {
+  it("defaults to the timeline on wide screens without a published plan", () => {
     const html = renderToString(
       <FloorViews data={floorDayFixture()} initialView={null} />,
     );
-    expect(html).toContain("공간 목록 보기");
-    expect(html).not.toContain("층 시간표 보기");
+    expect(html).not.toContain("공간 목록 보기");
+    expect(html).toContain("층 시간표 보기");
     expect(html).not.toContain("층 평면도 보기");
   });
+  it.each([false, true])(
+    "defaults to the list on narrow screens (plan: %s)",
+    (hasPlan) => {
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn(() => ({
+          matches: false,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      );
+      const data = floorDayFixture();
+      if (hasPlan) data.floor.plan = { id: first, version: 1 };
+      render(<FloorViews data={data} initialView={null} />);
+      expect(screen.getByText("공간 목록 보기")).toBeVisible();
+      expect(screen.queryByText("층 시간표 보기")).not.toBeInTheDocument();
+      expect(screen.queryByText("층 평면도 보기")).not.toBeInTheDocument();
+    },
+  );
   it("defaults to the plan on wide screens only when a published plan exists", () => {
     const data = floorDayFixture();
     data.floor.plan = { id: first, version: 1 };
@@ -221,7 +243,7 @@ describe("floor view preference", () => {
   });
   it("updates native history and the preference without a router request", () => {
     render(tree());
-    expect(screen.getByRole("link", { name: "목록 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "시간표 보기" })).toHaveAttribute(
       "aria-current",
       "page",
     );

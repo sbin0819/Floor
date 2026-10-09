@@ -91,7 +91,7 @@ export function useFloorView(
     view,
     effectiveView:
       (view === "plan" && (!hasPlan || !wide) ? "list" : view) ??
-      (wide && hasPlan ? "plan" : "list"),
+      (wide ? (hasPlan ? "plan" : "timeline") : "list"),
     hasPlan,
     setPreference: preference?.set,
     override: preference?.override ?? null,
