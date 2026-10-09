@@ -3,7 +3,11 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import EditorPage from "@/app/admin/(editor)/branches/[branchId]/floors/[floorId]/plan/page";
 import PlansPage from "@/app/admin/(shell)/branches/[branchId]/plans/page";
-import { getPlanEditor } from "@/features/floor-plan/queries";
+import {
+  getPlanEditor,
+  getPlanVersions,
+  previewPublishFloorPlan,
+} from "@/features/floor-plan/queries";
 import { getAdminPlans } from "@/features/admin/queries";
 import { requireOperatorPage } from "@/lib/auth/session";
 import { PlanEditor } from "@/features/floor-plan/editor/plan-editor";
@@ -12,7 +16,12 @@ import { AdminPlans } from "@/features/admin/components/admin-plans";
 import { planEditorFixture, planEditorIds } from "@/tests/helpers/plan-editor";
 import { ActionError } from "@/lib/actions/result";
 import { resolvePageContent } from "./page-test-utils";
-vi.mock("@/features/floor-plan/queries", () => ({ getPlanEditor: vi.fn() }));
+import type { EditorPublishReads } from "@/features/floor-plan/editor/editor-publishing";
+vi.mock("@/features/floor-plan/queries", () => ({
+  getPlanEditor: vi.fn(),
+  getPlanVersions: vi.fn(),
+  previewPublishFloorPlan: vi.fn(),
+}));
 vi.mock("@/features/admin/queries", () => ({ getAdminPlans: vi.fn() }));
 vi.mock("@/features/floor-plan/editor/plan-editor", () => ({
   PlanEditor: vi.fn(),
@@ -36,6 +45,11 @@ beforeEach(() => {
     email: "admin@example.test",
   });
   vi.mocked(getPlanEditor).mockResolvedValue(planEditorFixture());
+  vi.mocked(getPlanVersions).mockResolvedValue([]);
+  vi.mocked(previewPublishFloorPlan).mockResolvedValue({
+    ok: false,
+    code: "STALE",
+  });
   vi.mocked(getAdminPlans).mockResolvedValue({
     branch: planEditorFixture().branch,
     floors: [],
@@ -86,6 +100,68 @@ it("only forwards a UUID reload marker without changing the floor key", async ()
     }),
   );
   expect(invalid.props.readKey).toBeNull();
+});
+it("starts only a validated preview read and streams its result without delaying the editor", async () => {
+  const key = "d8000000-0000-4000-8000-000000000001";
+  const draft = "d8000000-0000-4000-8000-000000000002";
+  const pending = new Promise<never>(() => {});
+  vi.mocked(previewPublishFloorPlan).mockReturnValue(pending);
+  const page = await resolvePageContent(
+    EditorPage({
+      params: params(),
+      searchParams: Promise.resolve({
+        preview: key,
+        draft,
+        revision: "3",
+        versions: key,
+      }),
+    }),
+  );
+  expect(page.type).toBe(PlanEditor);
+  expect((page.props.reads as EditorPublishReads).preview).toEqual({
+    key,
+    result: pending,
+  });
+  expect(previewPublishFloorPlan).toHaveBeenCalledWith({
+    branchId: planEditorIds.branch,
+    floorId: planEditorIds.floor,
+    expectedDraftId: draft,
+    revision: 3,
+  });
+  expect(getPlanVersions).not.toHaveBeenCalled();
+});
+it.each(["-1", "3x", "1e3", "2147483647", ["3"]])(
+  "does not read a malformed preview revision %s",
+  async (revision) => {
+    const page = await resolvePageContent(
+      EditorPage({
+        params: params(),
+        searchParams: Promise.resolve({
+          preview: planEditorIds.plan,
+          draft: planEditorIds.plan,
+          revision,
+        }),
+      }),
+    );
+    expect(page.props.reads).toEqual({});
+    expect(previewPublishFloorPlan).not.toHaveBeenCalled();
+  },
+);
+it("returns a permission failure in the version stream without disclosing raw errors", async () => {
+  vi.mocked(getPlanVersions).mockRejectedValue(new ActionError("FORBIDDEN"));
+  const page = await resolvePageContent(
+    EditorPage({
+      params: params(),
+      searchParams: Promise.resolve({ versions: planEditorIds.plan }),
+    }),
+  );
+  expect(
+    await (page.props.reads as EditorPublishReads).versions!.result,
+  ).toEqual({
+    ok: false,
+    code: "FORBIDDEN",
+  });
+  expect(previewPublishFloorPlan).not.toHaveBeenCalled();
 });
 it("does not query after session redirect and does not invent an empty editor on failures", async () => {
   vi.mocked(requireOperatorPage).mockRejectedValueOnce(new Error("LOGIN"));

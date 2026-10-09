@@ -32,6 +32,8 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/features/floor-plan/actions", () => ({
   saveFloorPlanDraft: vi.fn(),
+  publishFloorPlan: vi.fn(),
+  restorePlanVersion: vi.fn(),
 }));
 vi.mock("@/features/admin/actions", () => ({
   createSpace: vi.fn(),

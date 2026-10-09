@@ -43,6 +43,7 @@ import { EditorCanvas } from "./editor-canvas";
 import { EditorProperties } from "./editor-properties";
 import { EditorConnectDialog } from "./editor-connect-dialog";
 import { SeatArrayPanel } from "./seat-array-panel";
+import { EditorPublishing, type EditorPublishReads } from "./editor-publishing";
 import {
   connectSpaceCommand,
   createFixtureCommand,
@@ -83,15 +84,22 @@ export function PlanEditor({
   data,
   readKey = null,
   save = saveFloorPlanDraft,
+  reads,
 }: {
   data: PlanEditorData;
   readKey?: string | null;
   save?: typeof saveFloorPlanDraft;
+  reads?: EditorPublishReads;
 }) {
   const [store] = useState(() => createPlanEditorStore(editorSource(data)));
   return (
     <PlanEditorContext value={store}>
-      <EditorWorkspace data={data} readKey={readKey} save={save} />
+      <EditorWorkspace
+        data={data}
+        readKey={readKey}
+        save={save}
+        reads={reads}
+      />
     </PlanEditorContext>
   );
 }
@@ -103,10 +111,12 @@ function EditorWorkspace({
   data,
   readKey,
   save,
+  reads,
 }: {
   data: PlanEditorData;
   readKey: string | null;
   save: typeof saveFloorPlanDraft;
+  reads?: EditorPublishReads;
 }) {
   const store = useEditorStore();
   const document = useEditorValue((state) => state.document);
@@ -116,7 +126,6 @@ function EditorWorkspace({
   const snap = useEditorValue((state) => state.snap);
   const saveState = useEditorValue((state) => state.saveState);
   const savedAt = useEditorValue((state) => state.savedAt);
-  const draft = useEditorValue((state) => state.draft);
   const issues = useEditorValue((state) => state.issues);
   const validationPending = useEditorValue((state) => state.validationPending);
   const canUndo = useEditorValue((state) => state.undoStack.length > 0);
@@ -363,7 +372,6 @@ function EditorWorkspace({
               role="status"
               className="rounded-md bg-muted px-2 py-1 text-xs tabular-nums"
             >
-              {draft ? `초안 · 버전 ${draft.version} · ` : ""}
               {saveLabel}
             </span>
             {saveState === "error" && (
@@ -409,6 +417,12 @@ function EditorWorkspace({
               <Eye />
               멤버 화면 미리보기
             </Button>
+            <EditorPublishing
+              data={data}
+              autosave={autosave}
+              active={wide && isCurrentPath}
+              reads={reads}
+            />
           </>
         }
         toolbar={
