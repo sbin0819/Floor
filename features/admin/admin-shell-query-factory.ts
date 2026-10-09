@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
-import { getOperatorBranches } from "@/lib/dal";
+import { getMemberships, getOperatorBranches } from "@/lib/dal";
+import {
+  getOperatorRoleSettings,
+  getOngoingMaintenanceCounts,
+} from "@/lib/dal/admin-shell";
 import { can } from "@/lib/permissions/can";
-import { loadPermissionContext } from "@/lib/permissions/context";
 import type { AdminQueryDependencies } from "./query-factory";
 import type { AdminMenu, AdminShellData } from "./admin-shell-types";
 
@@ -16,19 +19,28 @@ export function createAdminShellQueries(
       const parsed = z.uuid().safeParse(input);
       if (!parsed.success) throw new ActionError("NOT_FOUND");
       const branchId = parsed.data.toLowerCase();
-      const assigned = await getOperatorBranches(
-        session.userId,
-        dependencies.database,
-      );
+      const [assigned, memberships, roleSettings] = await Promise.all([
+        getOperatorBranches(session.userId, dependencies.database),
+        getMemberships(session.userId, dependencies.database),
+        getOperatorRoleSettings(session.userId, dependencies.database),
+      ]);
       if (!assigned.some((branch) => branch.id === branchId))
         throw new ActionError("NOT_FOUND");
-      const context = await loadPermissionContext(
-        session,
-        assigned.map((branch) => branch.id),
-        dependencies.database,
-      );
+      const context = { userId: session.userId, ...memberships, roleSettings };
       if (!context.staffBranchIds.includes(branchId))
         throw new ActionError("NOT_FOUND");
+      const maintenanceBranchIds = assigned
+        .filter(
+          (branch) =>
+            context.staffBranchIds.includes(branch.id) &&
+            can(context, "space.manage", { branchId: branch.id }),
+        )
+        .map((branch) => branch.id);
+      const counts = await getOngoingMaintenanceCounts(
+        maintenanceBranchIds,
+        dependencies.now?.() ?? new Date(),
+        dependencies.database,
+      );
       return {
         branchId,
         branches: assigned
@@ -44,7 +56,15 @@ export function createAdminShellQueries(
               can(context, "plan.edit", target)
             )
               menus.push("spaces");
-            return { id: branch.id, name: branch.name, menus };
+            if (can(context, "space.manage", target)) menus.push("maintenance");
+            return {
+              id: branch.id,
+              name: branch.name,
+              menus,
+              ...(menus.includes("maintenance")
+                ? { maintenanceCount: counts.get(branch.id) ?? 0 }
+                : {}),
+            };
           }),
         user: { name: session.name },
       };

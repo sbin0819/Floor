@@ -1,9 +1,10 @@
-export type AdminMenu = "dashboard" | "bookings" | "spaces";
+export type AdminMenu = "dashboard" | "bookings" | "spaces" | "maintenance";
 
 export type AdminShellBranch = {
   id: string;
   name: string;
   menus: AdminMenu[];
+  maintenanceCount?: number;
 };
 
 export type AdminShellData = {

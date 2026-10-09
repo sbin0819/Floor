@@ -6,6 +6,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import type { AdminDashboardData } from "../dashboard-types";
 import { AdminDashboardFilters } from "./admin-dashboard-filters";
 import { AdminDashboardPlan } from "./admin-dashboard-plan";
+import { MaintenanceEndButton } from "./maintenance-end-button";
 import {
   dashboardComparison,
   dashboardDate,
@@ -236,7 +237,19 @@ function Upcoming({ data }: { data: AdminDashboardData }) {
 }
 function Maintenance({ data }: { data: AdminDashboardData }) {
   return (
-    <Section title="점검">
+    <Section
+      title="점검"
+      action={
+        data.canManageMaintenance ? (
+          <Link
+            href={`/admin/branches/${data.branch.id}/maintenance?create=1`}
+            className="flex min-h-11 items-center rounded-sm px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            + 등록
+          </Link>
+        ) : undefined
+      }
+    >
       {data.maintenance.length ? (
         <ul className="divide-y">
           {data.maintenance.map((item) => (
@@ -245,7 +258,7 @@ function Maintenance({ data }: { data: AdminDashboardData }) {
                 aria-hidden
                 className="mt-1 size-8 shrink-0 rounded-lg border bg-status-maintenance-hatch"
               />
-              <div className="min-w-0 space-y-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <p className="font-medium break-words">
                   {item.spaceName} · {item.floorName}
                   {item.reason && ` · ${item.reason}`}
@@ -267,6 +280,12 @@ function Maintenance({ data }: { data: AdminDashboardData }) {
                   {item.status === "ongoing" ? "진행 중" : "예정"}
                 </p>
               </div>
+              {data.canManageMaintenance && item.status === "ongoing" && (
+                <MaintenanceEndButton
+                  blockId={item.id}
+                  spaceName={item.spaceName}
+                />
+              )}
             </li>
           ))}
         </ul>

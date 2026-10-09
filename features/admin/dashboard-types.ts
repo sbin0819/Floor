@@ -22,6 +22,7 @@ export type AdminDashboardData = {
   floorId: string | null;
   period: DashboardPeriod;
   isToday: boolean;
+  canManageMaintenance: boolean;
   cards: {
     bookingCount: number;
     ongoingCount: number | null;

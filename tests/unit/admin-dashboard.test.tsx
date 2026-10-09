@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   AdminDashboard,
   AdminDashboardSkeleton,
@@ -20,6 +21,9 @@ import type { PlanCanvas } from "@/features/floor-plan/components/plan-canvas";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), canvas: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
+vi.mock("@/features/admin/maintenance-actions", () => ({
+  endMaintenance: vi.fn(),
+}));
 vi.mock("@/features/floor-plan/components/plan-canvas", () => ({
   PlanCanvas: (props: ComponentProps<typeof PlanCanvas>) => {
     mocks.canvas(props);
@@ -28,6 +32,33 @@ vi.mock("@/features/floor-plan/components/plan-canvas", () => ({
 }));
 
 describe("admin dashboard read-only display", () => {
+  it("offers registration and ending only when server confirmed space.manage", () => {
+    const data = adminDashboardFixture({ canManageMaintenance: true });
+    const client = new QueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <AdminDashboard data={data} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("link", { name: "+ 등록" })).toHaveAttribute(
+      "href",
+      `/admin/branches/${data.branch.id}/maintenance?create=1`,
+    );
+    expect(screen.getAllByRole("button", { name: /해제/ })).toHaveLength(
+      data.maintenance.filter((row) => row.status === "ongoing").length,
+    );
+    rerender(
+      <QueryClientProvider client={client}>
+        <AdminDashboard data={{ ...data, canManageMaintenance: false }} />
+      </QueryClientProvider>,
+    );
+    expect(
+      screen.queryByRole("link", { name: "+ 등록" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /해제/ }),
+    ).not.toBeInTheDocument();
+  });
   it("keeps fixed titles while loading without inventing zero or empty data", () => {
     render(<AdminDashboardSkeleton />);
     expect(screen.getByRole("heading", { name: "대시보드" })).toBeVisible();

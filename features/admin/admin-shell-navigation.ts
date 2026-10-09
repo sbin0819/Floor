@@ -4,6 +4,7 @@ export const adminMenuLabels: Record<AdminMenu, string> = {
   dashboard: "대시보드",
   bookings: "예약 현황",
   spaces: "공간 관리",
+  maintenance: "점검",
 };
 
 export function adminMenuHref(branchId: string, menu: AdminMenu) {
@@ -18,6 +19,7 @@ export function adminMenuAt(
   const base = adminMenuHref(branchId, "dashboard");
   if (pathname === base || pathname === `${base}/`) return "dashboard";
   if (pathname === `${base}/bookings`) return "bookings";
+  if (pathname === `${base}/maintenance`) return "maintenance";
   if (pathname === `${base}/spaces` || pathname.startsWith(`${base}/floors/`))
     return "spaces";
   return null;

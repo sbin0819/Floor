@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
 import {
   AdminDashboard,
   AdminDashboardSkeleton,
@@ -11,14 +13,21 @@ import { AdminShellFrame } from "@/features/admin/components/admin-shell-frame";
 import { AdminShellNavigation } from "@/features/admin/components/admin-shell-navigation";
 import type { AdminShellData } from "@/features/admin/admin-shell-types";
 
-const data = adminDashboardFixture();
+const data = adminDashboardFixture({ canManageMaintenance: true });
+function DashboardProvider({ children }: { children: ReactNode }) {
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: { mutations: { retry: false } } }),
+  );
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
 const shell: AdminShellData = {
   branchId: data.branch.id,
   branches: [
     {
       id: data.branch.id,
       name: data.branch.name,
-      menus: ["dashboard", "bookings", "spaces"],
+      menus: ["dashboard", "bookings", "spaces", "maintenance"],
+      maintenanceCount: 1,
     },
   ],
   user: { name: "김도윤" },
@@ -41,12 +50,14 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <AdminShellFrame
-        sidebar={<AdminShellNavigation data={shell} />}
-        mobile={<AdminShellNavigation data={shell} mobile />}
-      >
-        <Story />
-      </AdminShellFrame>
+      <DashboardProvider>
+        <AdminShellFrame
+          sidebar={<AdminShellNavigation data={shell} />}
+          mobile={<AdminShellNavigation data={shell} mobile />}
+        >
+          <Story />
+        </AdminShellFrame>
+      </DashboardProvider>
     ),
   ],
   args: { data },

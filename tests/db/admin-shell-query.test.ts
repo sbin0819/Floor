@@ -10,10 +10,21 @@ import {
 } from "vitest";
 import { createAdminShellQueries } from "@/features/admin/admin-shell-query-factory";
 import { ActionError } from "@/lib/actions/result";
-import { branches, branchStaff, roleSettings } from "@/lib/db/schema";
+import {
+  branches,
+  branchStaff,
+  roleSettings,
+  spaceBlocks,
+} from "@/lib/db/schema";
+import * as shellDal from "@/lib/dal/admin-shell";
 import type { Session } from "@/lib/auth/types";
 import { createTestDatabase, type TestDatabase } from "./helper";
-import { seedBookingActors, type BookingActors } from "./booking-helper";
+import {
+  bookingNow,
+  bookingRange,
+  seedBookingActors,
+  type BookingActors,
+} from "./booking-helper";
 import { createQueryMeter } from "./query-meter";
 
 describe("operator shell projection and budget", () => {
@@ -32,6 +43,7 @@ describe("operator shell projection and budget", () => {
     createAdminShellQueries({
       database: database.db,
       requireSession: async () => session ?? actors.operator,
+      now: () => bookingNow,
     });
 
   it("checks session before malformed input or any SQL", async () => {
@@ -72,7 +84,8 @@ describe("operator shell projection and budget", () => {
         {
           id: actors.branchId,
           name: "강남점",
-          menus: ["dashboard", "bookings", "spaces"],
+          menus: ["dashboard", "bookings", "spaces", "maintenance"],
+          maintenanceCount: 0,
         },
       ],
       user: { name: actors.operator.name },
@@ -80,12 +93,10 @@ describe("operator shell projection and budget", () => {
     expect(JSON.stringify(result)).not.toContain(actors.operator.email);
   });
   it("computes each branch menu using can rather than copying the current branch permissions", async () => {
-    await database.db
-      .insert(branchStaff)
-      .values({
-        branchId: actors.otherBranchId,
-        userId: actors.operator.userId,
-      });
+    await database.db.insert(branchStaff).values({
+      branchId: actors.otherBranchId,
+      userId: actors.operator.userId,
+    });
     await database.db.insert(roleSettings).values([
       {
         branchId: actors.branchId,
@@ -120,39 +131,72 @@ describe("operator shell projection and budget", () => {
       (await query().getAdminShell(actors.branchId)).branches[0]!.menus,
     ).toEqual(["dashboard"]);
   });
-  it("uses two stages [1,3] independent of the number of assigned branches", async () => {
+  it("uses two stages [4,1] including authorized maintenance counts independent of the number of assigned branches", async () => {
     const meter = createQueryMeter(database.client);
     try {
       meter.start();
       await query().getAdminShell(actors.branchId);
       expect(meter.stop()).toEqual({
         stages: 2,
-        statements: 4,
-        perStage: [1, 3],
+        statements: 5,
+        perStage: [4, 1],
       });
       const extra = Array.from({ length: 8 }, (_, index) => ({
         id: crypto.randomUUID(),
         name: `추가 ${index}점`,
       }));
       await database.db.insert(branches).values(extra);
-      await database.db
-        .insert(branchStaff)
-        .values(
-          extra.map(({ id }) => ({
-            branchId: id,
-            userId: actors.operator.userId,
-          })),
-        );
+      await database.db.insert(branchStaff).values(
+        extra.map(({ id }) => ({
+          branchId: id,
+          userId: actors.operator.userId,
+        })),
+      );
       meter.start();
       const result = await query().getAdminShell(actors.branchId);
       expect(meter.stop()).toEqual({
         stages: 2,
-        statements: 4,
-        perStage: [1, 3],
+        statements: 5,
+        perStage: [4, 1],
       });
       expect(result.branches).toHaveLength(9);
     } finally {
       meter.restore();
     }
+  });
+  it("counts ongoing blocks only and never queries counts for a branch without space.manage", async () => {
+    await database.db.insert(spaceBlocks).values([
+      {
+        spaceId: actors.publicSpaceId,
+        during: bookingRange("12:00", "13:00"),
+        createdBy: actors.operator.userId,
+      },
+      {
+        spaceId: actors.publicSpaceId,
+        during: bookingRange("13:00", "14:00"),
+        createdBy: actors.operator.userId,
+      },
+      {
+        spaceId: actors.secondSpaceId,
+        during: bookingRange("11:00", "12:10"),
+        createdBy: actors.operator.userId,
+      },
+    ]);
+    expect(
+      (await query().getAdminShell(actors.branchId)).branches[0]
+        ?.maintenanceCount,
+    ).toBe(1);
+    await database.db
+      .insert(roleSettings)
+      .values({
+        branchId: actors.branchId,
+        role: "operator",
+        permissions: ["stats.view"],
+      });
+    const read = vi.spyOn(shellDal, "getOngoingMaintenanceCounts");
+    const result = await query().getAdminShell(actors.branchId);
+    expect(read).toHaveBeenCalledWith([], bookingNow, database.db);
+    expect(result.branches[0]).not.toHaveProperty("maintenanceCount");
+    read.mockRestore();
   });
 });

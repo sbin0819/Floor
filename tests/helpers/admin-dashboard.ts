@@ -18,6 +18,7 @@ export function adminDashboardFixture(
     라운지: null,
   };
   return {
+    canManageMaintenance: false,
     branch: { ...spaceFile.branch, timezone: "Asia/Seoul", utilization: 0.68 },
     now: "2026-10-14T02:30:00.000Z",
     date: "2026-10-14",

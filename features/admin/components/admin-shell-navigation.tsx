@@ -9,7 +9,13 @@ import {
   useState,
   useTransition,
 } from "react";
-import { Building2, CalendarDays, LayoutDashboard, Menu } from "lucide-react";
+import {
+  Building2,
+  CalendarDays,
+  LayoutDashboard,
+  Menu,
+  Wrench,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -38,6 +44,7 @@ const icons = {
   dashboard: LayoutDashboard,
   bookings: CalendarDays,
   spaces: Building2,
+  maintenance: Wrench,
 };
 
 export function AdminShellNavigation({
@@ -137,6 +144,15 @@ export function AdminShellNavigation({
                 >
                   <Icon aria-hidden="true" className="size-4 shrink-0" />
                   {adminMenuLabels[menu]}
+                  {menu === "maintenance" &&
+                    (current.maintenanceCount ?? 0) > 0 && (
+                      <span
+                        className="ml-auto rounded-full bg-sidebar-accent px-2 py-0.5 text-xs tabular-nums"
+                        aria-label={`진행 중인 점검 ${current.maintenanceCount}개`}
+                      >
+                        {current.maintenanceCount}
+                      </span>
+                    )}
                 </Link>
               );
             })

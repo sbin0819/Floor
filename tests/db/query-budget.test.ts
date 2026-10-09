@@ -260,7 +260,7 @@ describe("authenticated query execution budgets", () => {
       );
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
       if (name === "admin.getAdminShell")
-        expect(result.perStage).toEqual([1, 3]);
+        expect(result.perStage).toEqual([4, 1]);
       if (name === "home.getHomeTodo" || name === "home.getHomeChecklist") {
         expect(result.stages).toBe(1);
         expect(result.statements).toBeLessThanOrEqual(

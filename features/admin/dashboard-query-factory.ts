@@ -194,6 +194,9 @@ export function createAdminDashboardQueries(
         floorId,
         period,
         isToday: date === today,
+        canManageMaintenance: can(context, "space.manage", {
+          branchId: branch.id,
+        }),
         cards: {
           ...cards,
           ongoingCount: date === today ? cards.ongoingCount : null,
