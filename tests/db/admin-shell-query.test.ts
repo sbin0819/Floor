@@ -84,7 +84,14 @@ describe("operator shell projection and budget", () => {
         {
           id: actors.branchId,
           name: "강남점",
-          menus: ["dashboard", "bookings", "spaces", "maintenance", "roles"],
+          menus: [
+            "dashboard",
+            "bookings",
+            "spaces",
+            "maintenance",
+            "roles",
+            "plans",
+          ],
           maintenanceCount: 0,
         },
       ],
@@ -112,7 +119,7 @@ describe("operator shell projection and budget", () => {
     const result = await query().getAdminShell(actors.branchId);
     expect(result.branches.map((row) => row.menus)).toEqual([
       ["bookings", "roles"],
-      ["spaces", "roles"],
+      ["spaces", "roles", "plans"],
     ]);
     await database.db
       .update(roleSettings)

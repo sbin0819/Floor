@@ -544,13 +544,11 @@ describe("editor canvas pointer and keyboard", () => {
     flushFrames();
     expect(h.store.getState().camera).toEqual(offscreen);
     act(() =>
-      h.store
-        .getState()
-        .execute(
-          moveShapesCommand(h.store.getState().document, ["a"], [100, 0], {
-            snap: false,
-          }),
-        ),
+      h.store.getState().execute(
+        moveShapesCommand(h.store.getState().document, ["a"], [100, 0], {
+          snap: false,
+        }),
+      ),
     );
     flushFrames();
     expect(h.store.getState().camera).toEqual(offscreen);

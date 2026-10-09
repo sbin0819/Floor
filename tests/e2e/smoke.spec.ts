@@ -231,6 +231,18 @@ test("비로그인 역할과 권한은 운영자 로그인으로 안내해요", 
   ).toBeVisible();
 });
 
+test("비로그인 평면도 편집기는 운영자 로그인으로 안내해요", async ({
+  page,
+}) => {
+  await page.goto(
+    "/admin/branches/11111111-1111-4111-8111-111111111111/floors/22222222-2222-4222-8222-222222222222/plan",
+  );
+  await expect(page).toHaveURL("http://127.0.0.1:3100/admin/login");
+  await expect(
+    page.getByRole("heading", { name: "운영자 로그인" }),
+  ).toBeVisible();
+});
+
 test("비로그인 홈은 DB에 접속하지 않고 로그인으로 안내해요", async ({
   page,
 }) => {

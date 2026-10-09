@@ -1,5 +1,5 @@
 export type AdminMenu =
-  "dashboard" | "bookings" | "spaces" | "maintenance" | "roles";
+  "dashboard" | "bookings" | "spaces" | "maintenance" | "roles" | "plans";
 
 export type AdminShellBranch = {
   id: string;

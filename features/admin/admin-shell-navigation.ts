@@ -6,6 +6,7 @@ export const adminMenuLabels: Record<AdminMenu, string> = {
   spaces: "공간 관리",
   maintenance: "점검",
   roles: "역할과 권한",
+  plans: "평면도 편집",
 };
 
 export function adminMenuHref(branchId: string, menu: AdminMenu) {
@@ -22,6 +23,11 @@ export function adminMenuAt(
   if (pathname === `${base}/bookings`) return "bookings";
   if (pathname === `${base}/maintenance`) return "maintenance";
   if (pathname === `${base}/roles`) return "roles";
+  if (
+    pathname === `${base}/plans` ||
+    /^\/floors\/[^/]+\/plan$/.test(pathname.slice(base.length))
+  )
+    return "plans";
   if (pathname === `${base}/spaces` || pathname.startsWith(`${base}/floors/`))
     return "spaces";
   return null;

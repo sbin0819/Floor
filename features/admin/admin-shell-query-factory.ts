@@ -58,6 +58,7 @@ export function createAdminShellQueries(
               menus.push("spaces");
             if (can(context, "space.manage", target)) menus.push("maintenance");
             if (can(context, "roles.manage", target)) menus.push("roles");
+            if (can(context, "plan.edit", target)) menus.push("plans");
             return {
               id: branch.id,
               name: branch.name,
