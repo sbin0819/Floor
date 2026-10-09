@@ -14,6 +14,8 @@ import * as schema from "@/lib/db/schema";
 import { createTestDatabase, type TestDatabase } from "./helper";
 
 const migrations = readMigrationFiles({ migrationsFolder: "./drizzle" });
+const historicalStart = 19;
+const historicalEnd = 25;
 const userId = "a3000000-0000-4000-8000-000000000001";
 const branchId = "a3000000-0000-4000-8000-000000000002";
 const secret = "private-password-hash-not-for-audit-output";
@@ -94,6 +96,25 @@ async function lounge(client: PGlite) {
   return { first, second };
 }
 
+async function existingBooking(client: PGlite) {
+  const floorId = crypto.randomUUID();
+  const spaceId = crypto.randomUUID();
+  const bookingId = crypto.randomUUID();
+  await client.query(
+    "insert into floors(id,branch_id,name,level) values($1,$2,'7F',7)",
+    [floorId, branchId],
+  );
+  await client.query(
+    "insert into spaces(id,floor_id,type,name) values($1,$2,'meeting_room','회의실')",
+    [spaceId, floorId],
+  );
+  await client.query(
+    "insert into bookings(id,space_id,user_id,during,status,cancelled_at) values($1,$2,$3,'[2026-10-09T03:00:00Z,2026-10-09T04:00:00Z)','cancelled','2026-10-08T03:00:00Z')",
+    [bookingId, spaceId, userId],
+  );
+  return bookingId;
+}
+
 describe("additive chat-space seed preservation audit", () => {
   it("returns catalog keys as text arrays understood by the installed Neon parser", async () =>
     withDatabase(async (_database, client) => {
@@ -148,8 +169,12 @@ describe("additive chat-space seed preservation audit", () => {
     }));
 
   it("preserves every old-column fingerprint across the actual six migrations and separately reports additions", async () =>
-    withDatabase(async (database, _client, apply) => {
-      expect(await preflightChatSpacesMigrations(database)).toBe(6);
+    withDatabase(async (database, client, apply) => {
+      await existingBooking(client);
+      expect(migrations.slice(historicalStart, historicalEnd)).toHaveLength(6);
+      expect(await preflightChatSpacesMigrations(database)).toBe(
+        migrations.length - historicalStart,
+      );
       const before = await captureChatSpacesAudit({}, database);
       expect(
         before.tables
@@ -163,8 +188,10 @@ describe("additive chat-space seed preservation audit", () => {
         "chat_space_members",
         "message_attachments",
       ]);
-      await apply(19, 25);
-      expect(await preflightChatSpacesMigrations(database)).toBe(0);
+      await apply(historicalStart, historicalEnd);
+      expect(await preflightChatSpacesMigrations(database)).toBe(
+        migrations.length - historicalEnd,
+      );
       const after = await captureChatSpacesAudit(
         { baseline: before },
         database,
@@ -203,11 +230,59 @@ describe("additive chat-space seed preservation audit", () => {
           { table: "chat_spaces", count: 1 },
         ]),
       );
-      for (const table of ["users", "auth_accounts", "auth_sessions"] as const)
+      for (const table of [
+        "users",
+        "auth_accounts",
+        "auth_sessions",
+        "bookings",
+      ] as const)
         expect(after.tables.find((row) => row.table === table)!.rows).toEqual(
           before.tables.find((row) => row.table === table)!.rows,
         );
-    }, 19));
+
+      // 26–32의 여섯 마이그레이션 검증과 이후 스키마 진화를 별도로 확인한다.
+      await apply(historicalEnd, migrations.length);
+      expect(await preflightChatSpacesMigrations(database)).toBe(0);
+      const latest = await captureChatSpacesAudit(
+        { baseline: after },
+        database,
+      );
+      const evolution = compareChatSpacesAudit(after, latest);
+      expect(evolution.addedColumns).toContainEqual({
+        table: "bookings",
+        columns: ["cancel_kind", "cancel_reason"],
+      });
+      for (const table of [
+        "users",
+        "auth_accounts",
+        "auth_sessions",
+        "bookings",
+      ] as const)
+        expect(latest.tables.find((row) => row.table === table)!.rows).toEqual(
+          after.tables.find((row) => row.table === table)!.rows,
+        );
+    }, historicalStart));
+
+  it("includes new cancellation columns in a current-schema protection baseline", async () =>
+    withDatabase(async (database, client) => {
+      const bookingId = await existingBooking(client);
+      const before = await captureChatSpacesAudit({}, database);
+      expect(
+        before.tables.find(({ table }) => table === "bookings")!.hashColumns,
+      ).toEqual(expect.arrayContaining(["cancel_kind", "cancel_reason"]));
+      await client.query(
+        "update bookings set cancel_kind='operator',cancel_reason='changed-private-reason' where id=$1",
+        [bookingId],
+      );
+      const after = await captureChatSpacesAudit(
+        { baseline: before },
+        database,
+      );
+      expect(() => compareChatSpacesAudit(before, after)).toThrow(
+        "보호 데이터",
+      );
+      expect(JSON.stringify(after)).not.toContain("changed-private-reason");
+    }));
 
   it("reports exact new row keys for a caller's independent additive whitelist", async () =>
     withDatabase(async (database, client) => {

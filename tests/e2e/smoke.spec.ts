@@ -201,6 +201,18 @@ test("비로그인 운영 지점 접근은 운영자 로그인으로 안내해�
   ).toBeVisible();
 });
 
+test("비로그인 운영 예약 현황은 운영자 로그인으로 안내해요", async ({
+  page,
+}) => {
+  await page.goto(
+    "/admin/branches/11111111-1111-4111-8111-111111111111/bookings",
+  );
+  await expect(page).toHaveURL("http://127.0.0.1:3100/admin/login");
+  await expect(
+    page.getByRole("heading", { name: "운영자 로그인" }),
+  ).toBeVisible();
+});
+
 test("비로그인 홈은 DB에 접속하지 않고 로그인으로 안내해요", async ({
   page,
 }) => {

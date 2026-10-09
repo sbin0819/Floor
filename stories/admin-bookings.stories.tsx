@@ -7,10 +7,26 @@ import {
   AdminBookingsSkeleton,
 } from "@/features/admin/components/admin-bookings";
 import { OperatorCancelDialog } from "@/features/admin/components/operator-cancel-dialog";
+import { AdminShellFrame } from "@/features/admin/components/admin-shell-frame";
+import { AdminShellNavigation } from "@/features/admin/components/admin-shell-navigation";
+import type { AdminShellData } from "@/features/admin/admin-shell-types";
 import {
   adminBookingFixture,
   adminBookingsFixture,
+  adminBookingBranchId,
 } from "@/tests/helpers/admin-bookings";
+
+const shell: AdminShellData = {
+  branchId: adminBookingBranchId,
+  branches: [
+    {
+      id: adminBookingBranchId,
+      name: "강남점",
+      menus: ["dashboard", "bookings", "spaces"],
+    },
+  ],
+  user: { name: "김도윤" },
+};
 
 function AdminBookingsStory({
   mode = "list",
@@ -91,7 +107,25 @@ const meta = {
   title: "운영자/AdminBookings",
   component: AdminBookingsStory,
   tags: ["autodocs"],
-  parameters: { nextjs: { appDirectory: true }, layout: "fullscreen" },
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: {
+        pathname: `/admin/branches/${adminBookingBranchId}/bookings`,
+      },
+    },
+    layout: "fullscreen",
+  },
+  decorators: [
+    (Story) => (
+      <AdminShellFrame
+        sidebar={<AdminShellNavigation data={shell} />}
+        mobile={<AdminShellNavigation data={shell} mobile />}
+      >
+        <Story />
+      </AdminShellFrame>
+    ),
+  ],
 } satisfies Meta<typeof AdminBookingsStory>;
 export default meta;
 type Story = StoryObj<typeof meta>;

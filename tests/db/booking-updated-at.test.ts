@@ -46,7 +46,7 @@ describe("nullable booking edit timestamp upgrade", () => {
         "SELECT to_jsonb(b) AS data FROM bookings b WHERE id = $1",
         [legacyId],
       );
-      for (const migration of migrations.slice(upgradeIndex))
+      for (const migration of migrations.slice(upgradeIndex, upgradeIndex + 1))
         for (const statement of migration.sql) await client.exec(statement);
       const after = await client.query<{ data: Record<string, unknown> }>(
         "SELECT to_jsonb(b) AS data FROM bookings b WHERE id = $1",
@@ -56,6 +56,22 @@ describe("nullable booking edit timestamp upgrade", () => {
         ...before.rows[0]?.data,
         updated_at: null,
       });
+      // 이 마이그레이션의 정확한 열 추가와 후속 마이그레이션의 기존 값 보존을 나눠 본다.
+      for (const migration of migrations.slice(upgradeIndex + 1))
+        for (const statement of migration.sql) await client.exec(statement);
+      const latest = await client.query<{ data: Record<string, unknown> }>(
+        "SELECT to_jsonb(b) AS data FROM bookings b WHERE id = $1",
+        [legacyId],
+      );
+      expect(latest.rows).toHaveLength(1);
+      expect(
+        Object.fromEntries(
+          Object.keys(after.rows[0]!.data).map((key) => [
+            key,
+            latest.rows[0]!.data[key],
+          ]),
+        ),
+      ).toEqual(after.rows[0]!.data);
       const inserted = await client.query<{ updated_at: Date | null }>(
         "INSERT INTO bookings (space_id, user_id, during) VALUES ($1, $2, '[2026-10-09 02:00Z,2026-10-09 03:00Z)') RETURNING updated_at",
         [spaceId, userId],

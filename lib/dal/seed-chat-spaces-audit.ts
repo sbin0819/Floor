@@ -26,6 +26,7 @@ export type ChatSpacesAudit = {
 const names = Object.keys(seedAuditTableKeys) as AuditTable[];
 // 이 적용은 지시서 25까지 끝난 DB만 지원한다. 그보다 오래된 채팅 테이블 재생성은 범위 밖이다.
 const requiredPrefix = 19;
+const minimumSupportedMigrations = 25;
 const introducedAt: Partial<Record<AuditTable, number>> = {
   chat_space_members: 19,
   chat_space_invites: 19,
@@ -58,7 +59,7 @@ async function appliedMigrations(database: DalDatabase) {
     .from(sql`drizzle.__drizzle_migrations`)
     .orderBy(sql`id`);
   if (
-    expected.length !== 25 ||
+    expected.length < minimumSupportedMigrations ||
     applied.length < requiredPrefix ||
     applied.length > expected.length ||
     applied.some(

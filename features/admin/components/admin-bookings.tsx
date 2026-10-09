@@ -255,7 +255,7 @@ const columns = [
 export function AdminBookingsFrame({ children }: { children: ReactNode }) {
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">
-      <header>
+      <header className="sticky top-[var(--admin-mobile-header-height,0px)] z-30 bg-background py-2">
         <h1 className="text-2xl font-bold">예약 현황</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           지점의 예약을 살펴보고 취소할 수 있어요

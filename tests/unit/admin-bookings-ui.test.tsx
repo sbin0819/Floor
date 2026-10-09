@@ -88,6 +88,14 @@ describe("admin booking read-only list", () => {
     render(<AdminBookingsSkeleton />);
     expect(screen.getByRole("heading", { name: "예약 현황" })).toBeVisible();
     expect(
+      screen.getByRole("heading", { name: "예약 현황" }).closest("header"),
+    ).toHaveClass(
+      "sticky",
+      "top-[var(--admin-mobile-header-height,0px)]",
+      "z-30",
+      "bg-background",
+    );
+    expect(
       screen.getByText("지점의 예약을 살펴보고 취소할 수 있어요"),
     ).toBeVisible();
     expect(
