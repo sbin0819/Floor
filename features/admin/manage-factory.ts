@@ -6,6 +6,7 @@ import {
   countActiveBookings,
   insertFloor,
   insertSpace,
+  lockAdminFloor,
   lockAdminSpace,
   maxFloorSortOrder,
   restoreSpaceRecord,
@@ -13,6 +14,7 @@ import {
   updateFloorRecord,
   updateSpaceRecord,
 } from "@/lib/dal/admin";
+import { getSpaceForAccess } from "@/lib/dal/spaces";
 import {
   adminActionDependencies,
   checkAdminBranch,
@@ -106,11 +108,27 @@ export function createAdminActions(dependencies: AdminDependencies = {}) {
       input: createSpaceSchema,
       authorize: ({ session, input }) =>
         checkAdminFloor(session, input.floorId, "space.manage", db),
-      handler: ({ input }) =>
-        withAdminConstraintErrors(async () => {
-          const row = await insertSpace(spaceValues(input.type, input), db);
-          return { spaceId: row.id };
-        }),
+      handler: ({ session, input }) =>
+        withAdminConstraintErrors(() =>
+          withTransaction(async (transaction) => {
+            if (!(await lockAdminFloor(input.floorId, "share", transaction)))
+              throw new ActionError("NOT_FOUND");
+            if (
+              !(await checkAdminFloor(
+                session,
+                input.floorId,
+                "space.manage",
+                transaction,
+              ))
+            )
+              throw new ActionError("FORBIDDEN");
+            const row = await insertSpace(
+              spaceValues(input.type, input),
+              transaction,
+            );
+            return { spaceId: row.id };
+          }, db),
+        ),
     },
     actionDependencies,
   );
@@ -177,12 +195,29 @@ export function createAdminActions(dependencies: AdminDependencies = {}) {
       input: restoreSpaceSchema,
       authorize: ({ session, input }) =>
         checkAdminSpace(session, input.spaceId, "space.manage", db),
-      handler: async ({ input }) => {
+      handler: async ({ session, input }) => {
+        const initial = await getSpaceForAccess(input.spaceId, db);
+        if (!initial) throw new ActionError("NOT_FOUND");
         const result = await withAdminConstraintErrors(() =>
           withTransaction(async (transaction) => {
-            const locked = await lockAdminSpace(input.spaceId, transaction);
-            if (!locked || locked.type === "desk")
+            if (!(await lockAdminFloor(initial.floorId, "share", transaction)))
               throw new ActionError("NOT_FOUND");
+            const locked = await lockAdminSpace(input.spaceId, transaction);
+            if (
+              !locked ||
+              locked.type === "desk" ||
+              locked.floorId !== initial.floorId
+            )
+              throw new ActionError("NOT_FOUND");
+            if (
+              !(await checkAdminSpace(
+                session,
+                locked.id,
+                "space.manage",
+                transaction,
+              ))
+            )
+              throw new ActionError("FORBIDDEN");
             if (!locked.archivedAt) return { row: locked, changed: false };
             const row = await restoreSpaceRecord(locked.id, transaction);
             if (!row) throw new ActionError("NOT_FOUND");

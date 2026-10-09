@@ -154,6 +154,11 @@ export function createAction<Input, Output>(
         error.details.fieldErrors
           ? { fieldErrors: error.details.fieldErrors }
           : {}),
+        ...(error instanceof ActionError &&
+        code === "PLAN_INVALID" &&
+        error.details.issues
+          ? { issues: error.details.issues }
+          : {}),
       };
     }
   };

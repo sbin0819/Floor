@@ -1,3 +1,5 @@
+import type { PlanIssue } from "@/lib/floor-plan/issues";
+
 export type ActionErrorCode =
   | "UNAUTHENTICATED"
   | "FORBIDDEN"
@@ -28,9 +30,11 @@ export type ActionResult<T> =
       code: ActionErrorCode;
       message?: string;
       fieldErrors?: Record<string, string[]>;
+      issues?: PlanIssue[];
     };
 
 export type ActionErrorDetails = {
+  issues?: PlanIssue[];
   message?:
     | "per_booking"
     | "per_day"

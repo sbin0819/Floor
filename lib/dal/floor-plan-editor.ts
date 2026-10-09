@@ -101,7 +101,7 @@ export function listPlanEditorSpaces(
         ? sql<number>`case when ${sameFloor} and ${spaces.type} = 'desk'
         and exists(select 1 from ${floorPlans} inner join ${floors} on ${floors}.published_plan_id = ${floorPlans}.id
           cross join lateral jsonb_array_elements(${floorPlans}.document -> 'seats') as published_seat(value)
-          where ${floorPlans}.floor_id = ${floorId} and ${floorPlans}.status = 'published'
+          where ${floors}.id = ${floorId} and ${floorPlans}.floor_id = ${floorId} and ${floorPlans}.status = 'published'
             and lower(published_seat.value ->> 'spaceId') = ${spaces}.id::text)
         then (select count(*)::int from ${bookings} where ${bookings}.space_id = ${spaces}.id
           and ${bookings}.status = 'confirmed' and upper(${bookings}.during) > ${now.toISOString()}::timestamptz)
