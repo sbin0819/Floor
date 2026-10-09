@@ -230,6 +230,36 @@ afterEach(() => {
 });
 
 describe("plan canvas lifecycle", () => {
+  it("waits for a real initial size before fitting or drawing", () => {
+    dimensions = { width: 0, height: 0 };
+    render(
+      <PlanCanvas
+        document={plan}
+        states={states}
+        onSelect={vi.fn()}
+        selectedSpaceId={first}
+      />,
+    );
+    flushFrames();
+    expect(painter.render).not.toHaveBeenCalled();
+    dimensions = { width: 800, height: 520 };
+    act(() => observers[0]!.resize());
+    flushFrames();
+    flushFrames();
+    expect(lastFrame().camera).toEqual(fit(plan.bounds, dimensions));
+  });
+  it("keeps accessible controls when Canvas 2D is unavailable", () => {
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(null);
+    const select = vi.fn();
+    render(<PlanCanvas document={plan} states={states} onSelect={select} />);
+    fireEvent.click(screen.getByRole("button", { name: "회의실 A" }));
+    flushFrames();
+    expect(select).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "room-a" }),
+    );
+    expect(painter.create).not.toHaveBeenCalled();
+    expect(painter.render).not.toHaveBeenCalled();
+  });
   it("draws and keeps the keyboard focus in view without repainting the base", () => {
     const accessible: PlanStates = new Map([
       [first, { kind: "free", name: "회의실 A" }],

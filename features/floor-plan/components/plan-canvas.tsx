@@ -53,7 +53,7 @@ export function PlanCanvas({
   const [paintEpoch, setPaintEpoch] = useState(0);
   const scene = useMemo(() => createScene(document), [document]);
   const index = useMemo(() => createSpatialIndex(scene.shapes), [scene]);
-  const [viewport, setViewport] = useState({ width: 800, height: 520 });
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const fitted = useMemo(() => fit(scene.bounds, viewport), [scene, viewport]);
   const [camera, setCamera] = useState<Camera | null>(null);
   const current = camera ?? fitted;
@@ -110,7 +110,7 @@ export function PlanCanvas({
     };
   }, [scene]);
   useEffect(() => {
-    if (!colors) return;
+    if (!colors || viewport.width === 0 || viewport.height === 0) return;
     const selected = scene.shapes.find(
       (shape) =>
         shape.kind === "space" &&
@@ -170,6 +170,7 @@ export function PlanCanvas({
     return () => element.removeEventListener("wheel", wheel);
   }, [fitted]);
   useEffect(() => {
+    if (viewport.width === 0 || viewport.height === 0) return;
     const id = selectedSpaceId ?? null;
     if (
       positionedSelection.current?.scene === scene &&
