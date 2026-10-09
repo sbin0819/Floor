@@ -138,11 +138,15 @@ export function createAction<Input, Output>(
             "storage_quota",
             "password_attempts",
             "admin_teams",
+            "announce_daily",
+            "announce_recipients",
           ].includes(error.details.message ?? "")) ||
           (code === "INVALID_INPUT" &&
-            ["not_cancellable", "maintenance_state"].includes(
-              error.details.message ?? "",
-            )) ||
+            [
+              "not_cancellable",
+              "maintenance_state",
+              "lounge_unavailable",
+            ].includes(error.details.message ?? "")) ||
           (code === "FORBIDDEN" &&
             error.details.message === "files_disabled") ||
           (code === "OVER_CAPACITY" &&

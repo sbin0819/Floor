@@ -129,11 +129,36 @@ export async function joinBranchLounge(
     .where(eq(branches.id, branchId));
   if (!branch) throw new ActionError("NOT_FOUND");
   const { spaceId } = await createBranchLounge(branchId, database);
-  await database
+  return joinExistingBranchLounge({ branchId, spaceId, userId, now }, database);
+}
+
+export async function joinExistingBranchLounge(
+  {
+    branchId,
+    spaceId,
+    userId,
+    now,
+  }: {
+    branchId: string;
+    spaceId: string;
+    userId: string;
+    now: Date;
+  },
+  database: DalDatabase,
+) {
+  const [space] = await database
     .select({ id: chatSpaces.id })
     .from(chatSpaces)
-    .where(eq(chatSpaces.id, spaceId))
+    .where(
+      and(
+        eq(chatSpaces.id, spaceId),
+        eq(chatSpaces.branchId, branchId),
+        eq(chatSpaces.kind, "branch"),
+        isNull(chatSpaces.deletedAt),
+      ),
+    )
     .for("update");
+  if (!space) throw new ActionError("NOT_FOUND");
   const [member] = await database
     .select()
     .from(chatSpaceMembers)

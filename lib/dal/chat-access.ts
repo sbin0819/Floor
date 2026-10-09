@@ -348,7 +348,10 @@ export function writableRoom(
     );
   return (
     room.archivedAt === null &&
-    (room.spaceKind !== "branch" || loungeAccessFrom(room).canWrite) &&
+    (room.spaceKind !== "branch" ||
+      (room.adminOnly
+        ? loungeAccessFrom(room).isAdmin
+        : loungeAccessFrom(room).canWrite)) &&
     (room.kind === "dm"
       ? room.directMembership !== null &&
         room.directMembership.peer !== "left" &&
