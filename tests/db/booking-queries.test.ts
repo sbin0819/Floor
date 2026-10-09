@@ -293,7 +293,9 @@ describe("booking query security and DTOs", () => {
         timezone: "Asia/Seoul",
         openHours: { sun: null },
       },
-      floors: [{ id: fixture.floorId, name: "7F", level: 7, sortOrder: 1 }],
+      floors: [
+        { id: fixture.floorId, name: "7F", level: 7, sortOrder: 1, plan: null },
+      ],
       branches: [
         { id: fixture.branchId, name: "강남점" },
         { id: fixture.otherBranchId, name: "서초점" },

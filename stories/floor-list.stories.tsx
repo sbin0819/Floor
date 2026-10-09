@@ -17,7 +17,7 @@ const branch = {
   openHours: { wed: { open: "08:00", close: "22:00" } },
   cover: null,
 };
-const floor = { id: "floor", name: "7F", level: 7, sortOrder: 1 };
+const floor = { id: "floor", name: "7F", level: 7, sortOrder: 1, plan: null };
 const base: FloorVisibleSpace = {
   kind: "accessible",
   id: "free",

@@ -107,6 +107,17 @@ export function buildAvailabilityIntervals(
   });
 }
 
+/** 평면도는 영업 구간 밖까지 이어지는 점검의 실제 종료 시각도 보여준다. */
+export function buildPlanIntervals(
+  input: AvailabilityInput,
+): AvailabilityInterval[] {
+  return mergeKinds(sourceIntervals(input)).map(({ start, end, kind }) => ({
+    start: new Date(start).toISOString(),
+    end: new Date(end).toISOString(),
+    kind,
+  }));
+}
+
 export function getAvailabilitySummary(
   input: AvailabilityInput & { now: Date },
 ): AvailabilitySummary {

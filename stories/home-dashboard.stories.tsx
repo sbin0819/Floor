@@ -92,7 +92,7 @@ const free: HomeFreeSpacesData = {
       photo: booking.photo,
       capacity: 6,
       amenities: ["monitor"],
-      floor: { id: "floor", name: "3F", level: 3, sortOrder: 0 },
+      floor: { id: "floor", name: "3F", level: 3, sortOrder: 0, plan: null },
       intervals: [],
       freeUntil: "2026-10-09T07:00:00Z",
     },

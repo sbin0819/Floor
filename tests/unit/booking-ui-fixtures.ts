@@ -12,7 +12,7 @@ export function spaceDayFixture(): SpaceDayData {
       openHours: { wed: { open: "09:00", close: "14:00" } },
       cover: null,
     },
-    floor: { id: "floor", name: "7F", level: 7, sortOrder: 1 },
+    floor: { id: "floor", name: "7F", level: 7, sortOrder: 1, plan: null },
     space: {
       kind: "accessible",
       id: "space",

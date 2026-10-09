@@ -15,6 +15,7 @@ import {
 import { availableBookingActors } from "@/features/bookings/access";
 import {
   buildAvailabilityIntervals,
+  buildPlanIntervals,
   getAvailabilitySummary,
 } from "@/features/bookings/availability";
 import {
@@ -135,6 +136,7 @@ const floorDto = (floor: FloorSummary): FloorSummary => ({
   name: floor.name,
   level: floor.level,
   sortOrder: floor.sortOrder,
+  plan: floor.plan,
 });
 const myBookingDto = (
   row: Awaited<ReturnType<typeof listMyBookings>>["upcoming"][number],
@@ -729,6 +731,7 @@ export function createBookingQueries(
           intervals: space.bookable
             ? buildAvailabilityIntervals(availability)
             : [],
+          planIntervals: space.bookable ? buildPlanIntervals(availability) : [],
           summary:
             space.bookable && isToday
               ? getAvailabilitySummary(availability)

@@ -24,7 +24,7 @@ export function FloorForm({
   onSaved,
 }: {
   branchId: string;
-  floor?: FloorSummary;
+  floor?: Omit<FloorSummary, "plan">;
   canManage?: boolean;
   onSaved?: () => void;
 }) {

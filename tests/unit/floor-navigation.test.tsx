@@ -89,7 +89,7 @@ function page(
           branch: list.branch,
           floors: [
             list.floor,
-            { id: "floor-8", name: "8F", level: 8, sortOrder: 2 },
+            { id: "floor-8", name: "8F", level: 8, sortOrder: 2, plan: null },
           ],
           branches: [],
           lounge: { spaceId: "lounge", joined: true },

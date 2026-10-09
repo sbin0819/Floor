@@ -37,7 +37,7 @@ const branch: FloorDayData["branch"] = {
   cover: null,
   openHours: { wed: { open: "08:00", close: "22:00" } },
 };
-const floor = { id: "floor", name: "7F", level: 7, sortOrder: 0 };
+const floor = { id: "floor", name: "7F", level: 7, sortOrder: 0, plan: null };
 function TimetableStory({
   anotherDate = false,
   restricted = false,

@@ -23,7 +23,10 @@ export type TeamOption = { id: string; name: string };
 export type AdminPermissions = { manageSpaces: boolean; editAccess: boolean };
 export type AdminBranchData = {
   branch: Omit<BranchDetails, "cover">;
-  floors: (FloorSummary & { access: AccessScope; spaceCount: number })[];
+  floors: (Omit<FloorSummary, "plan"> & {
+    access: AccessScope;
+    spaceCount: number;
+  })[];
   permissions: AdminPermissions;
 };
 export type AdminSpace = {
@@ -41,7 +44,10 @@ export type AdminSpace = {
 };
 export type AdminFloorData = {
   branch: Omit<BranchDetails, "cover">;
-  floor: FloorSummary & { access: AccessScope; allowedTeams: TeamOption[] };
+  floor: Omit<FloorSummary, "plan"> & {
+    access: AccessScope;
+    allowedTeams: TeamOption[];
+  };
   spaces: AdminSpace[];
   permissions: AdminPermissions;
   teamSearch: {

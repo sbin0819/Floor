@@ -5,7 +5,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { cache } from "react";
 import type { DalDatabase } from "@/lib/dal/database";
 import { getDb } from "@/lib/db/client";
-import { accessGrants, branches, branchStaff, floors } from "@/lib/db/schema";
+import {
+  accessGrants,
+  branches,
+  branchStaff,
+  floors,
+  floorPlans,
+} from "@/lib/db/schema";
 
 async function readBranchDetails(database: DalDatabase = getDb()) {
   return database
@@ -41,8 +47,20 @@ export function getBranch(branchId: string, database?: DalDatabase) {
 
 function floorAccessQuery(database: DalDatabase) {
   return database
-    .select({ floor: floors, teamId: accessGrants.teamId })
+    .select({
+      floor: floors,
+      teamId: accessGrants.teamId,
+      plan: { id: floorPlans.id, version: floorPlans.version },
+    })
     .from(floors)
+    .leftJoin(
+      floorPlans,
+      and(
+        eq(floorPlans.id, floors.publishedPlanId),
+        eq(floorPlans.floorId, floors.id),
+        eq(floorPlans.status, "published"),
+      ),
+    )
     .leftJoin(
       accessGrants,
       and(
@@ -56,16 +74,20 @@ function groupFloorAccess(
   rows: {
     floor: typeof floors.$inferSelect;
     teamId: string | null;
+    plan: { id: string; version: number } | null;
   }[],
 ) {
   const grouped = new Map<
     string,
-    typeof floors.$inferSelect & { allowedTeamIds: string[] }
+    typeof floors.$inferSelect & {
+      allowedTeamIds: string[];
+      plan: { id: string; version: number } | null;
+    }
   >();
-  for (const { floor, teamId } of rows) {
+  for (const { floor, teamId, plan } of rows) {
     let result = grouped.get(floor.id);
     if (!result) {
-      result = { ...floor, allowedTeamIds: [] };
+      result = { ...floor, allowedTeamIds: [], plan };
       grouped.set(floor.id, result);
     }
     if (teamId !== null) result.allowedTeamIds.push(teamId);

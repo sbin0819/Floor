@@ -57,6 +57,7 @@ export type FloorSummary = {
   name: string;
   level: number;
   sortOrder: number;
+  plan: { id: string; version: number } | null;
 };
 export type BranchListItem = BranchDetails & {
   lounge: BranchLounge;
@@ -104,6 +105,7 @@ export type RestrictedSpace = {
 };
 export type FloorVisibleSpace = VisibleSpace & {
   intervals: AvailabilityInterval[];
+  planIntervals?: AvailabilityInterval[];
   summary: AvailabilitySummary | null;
   deskParts?: DeskPartSummary[];
 };

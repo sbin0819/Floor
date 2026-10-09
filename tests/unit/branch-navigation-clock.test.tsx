@@ -33,7 +33,7 @@ function fixture(now: string): BranchNavigationData {
       openHours: { thu: { open: "09:00", close: "21:00" } },
       cover: null,
     },
-    floors: [{ id: "floor", name: "2F", level: 2, sortOrder: 0 }],
+    floors: [{ id: "floor", name: "2F", level: 2, sortOrder: 0, plan: null }],
     branches: [],
     today: "2026-10-08",
     bookingDates: [],
