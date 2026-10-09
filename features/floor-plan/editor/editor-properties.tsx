@@ -25,6 +25,7 @@ import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 import { SeatProperties } from "./seat-properties";
 import { NumberField } from "./editor-number-field";
 import { WallProperties } from "./wall-properties";
+import { VertexProperties } from "./vertex-properties";
 type Props = {
   branchId: string;
   floorId: string;
@@ -133,6 +134,14 @@ export function EditorProperties(props: Props) {
         </h2>
         {(wall || opening) && (
           <WallProperties
+            document={document}
+            shapeId={selectedIds[0]!}
+            disabled={disabled}
+            onCommand={apply}
+          />
+        )}
+        {(wall || shape) && (
+          <VertexProperties
             document={document}
             shapeId={selectedIds[0]!}
             disabled={disabled}

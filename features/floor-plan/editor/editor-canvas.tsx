@@ -28,7 +28,13 @@ import {
 import { useEditorStore, useEditorValue } from "./editor-context";
 import { useEditorCanvas } from "./use-editor-canvas";
 import { deleteShapesCommand, type Command } from "./commands";
-import { moveShapesCommand, resizeShapeCommand, snapPoint } from "./transforms";
+import { moveShapesCommand, resizeShapeCommand } from "./transforms";
+import { createVertexIndex, snapPoint, type SnapResult } from "./snapping";
+import {
+  setVertexCommand,
+  insertVertexCommand,
+  deleteVertexCommand,
+} from "./vertex-commands";
 import {
   duplicateEditableShapesCommand,
   rotateSeatsCommand,
@@ -39,6 +45,10 @@ import {
   rectanglePoints,
   resizedBox,
   selectionBox,
+  vertexPoints,
+  vertexShape,
+  nearestVertex,
+  nearestEdge,
   type Handle,
 } from "./canvas-geometry";
 
@@ -54,6 +64,7 @@ type Gesture = {
   | { kind: "pan"; camera: Camera }
   | { kind: "resize"; box: Box; handle: Handle }
   | { kind: "opening"; openingId: string; segmentIndex: number }
+  | { kind: "vertex"; shapeId: string; index: number }
 );
 
 export function EditorCanvas({
@@ -85,6 +96,19 @@ export function EditorCanvas({
   const [marquee, setMarquee] = useState<Box | null>(null);
   const [preview, setPreview] = useState<FloorPlanDocument | null>(null);
   const [notice, setNotice] = useState("");
+  const [vertex, setVertex] = useState<{
+    shapeId: string;
+    index: number | null;
+  } | null>(null);
+  const [snapMark, setSnapMark] = useState<SnapResult | null>(null);
+  const vertices = useMemo(() => createVertexIndex(document), [document]);
+  const editing =
+    vertex &&
+    selectedIds.length === 1 &&
+    selectedIds[0] === vertex.shapeId &&
+    vertexShape(document, vertex.shapeId)
+      ? vertex
+      : null;
   const overlay = useMemo(
     () => ({
       selectedIds,
@@ -95,6 +119,8 @@ export function EditorCanvas({
       snap,
       previewSeats,
       drawingClosed: tool === "rectangle",
+      vertex: editing,
+      snapMark,
     }),
     [
       selectedIds,
@@ -106,6 +132,8 @@ export function EditorCanvas({
       snap,
       previewSeats,
       tool,
+      editing,
+      snapMark,
     ],
   );
   const {
@@ -127,6 +155,8 @@ export function EditorCanvas({
       setMarquee(null);
       setDrawing([]);
       setPolygon([]);
+      setVertex(null);
+      setSnapMark(null);
     };
     const unsubscribe = store.subscribe((state, previous) => {
       if (
@@ -166,8 +196,23 @@ export function EditorCanvas({
     const rect = host.current!.getBoundingClientRect();
     return [event.clientX - rect.left, event.clientY - rect.top];
   };
-  const worldPoint = (point: Point, alt: boolean): PlanPoint => {
-    const value = snapPoint([...toWorld(point, current)], snap && !alt);
+  const worldPoint = (
+    point: Point,
+    alt: boolean,
+    shift = false,
+    origin?: Point,
+  ): PlanPoint => {
+    const result = snapPoint(toWorld(point, current), {
+      scale: current.scale,
+      grid: snap,
+      alt,
+      shift,
+      origin,
+      vertices,
+      excludeShapeIds: tool === "select" ? selectedIds : [],
+    });
+    setSnapMark(result);
+    const value = result.point;
     return [
       Math.max(0, Math.min(document.bounds.w, value[0])),
       Math.max(0, Math.min(document.bounds.h, value[1])),
@@ -242,11 +287,66 @@ export function EditorCanvas({
         setMarquee(null);
         setPolygon([]);
         setDrawing([]);
+        setVertex(null);
+        setSnapMark(null);
         state.select([]);
         return;
       }
       const modifier = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
+      const selectedVertex = editing?.index;
+      if (
+        editing &&
+        !modifier &&
+        (event.key === "Delete" || event.key === "Backspace")
+      ) {
+        event.preventDefault();
+        if (selectedVertex != null) {
+          if (
+            state.execute(
+              deleteVertexCommand(
+                state.document,
+                editing.shapeId,
+                selectedVertex,
+              ),
+            )
+          ) {
+            setVertex({ ...editing, index: null });
+            setNotice("");
+          } else setNotice("도형에 필요한 최소 꼭짓점은 지울 수 없어요");
+        }
+        return;
+      }
+      if (
+        editing &&
+        selectedVertex != null &&
+        !modifier &&
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+      ) {
+        event.preventDefault();
+        const point = vertexPoints(state.document, editing.shapeId)[
+          selectedVertex
+        ];
+        const step = event.shiftKey ? 1000 : 100;
+        if (point)
+          state.execute(
+            setVertexCommand(state.document, editing.shapeId, selectedVertex, [
+              point[0] +
+                (event.key === "ArrowLeft"
+                  ? -step
+                  : event.key === "ArrowRight"
+                    ? step
+                    : 0),
+              point[1] +
+                (event.key === "ArrowUp"
+                  ? -step
+                  : event.key === "ArrowDown"
+                    ? step
+                    : 0),
+            ]),
+          );
+        return;
+      }
       if (modifier && key === "z") {
         event.preventDefault();
         gesture.current = null;
@@ -334,24 +434,26 @@ export function EditorCanvas({
       window.removeEventListener("blur", blur);
       spaceHeld.current = false;
     };
-  }, [store, host, polygon, onPolygon, onSeatArray, finishWall]);
+  }, [store, host, polygon, onPolygon, onSeatArray, finishWall, editing]);
   const clearGesture = () => {
     gesture.current = null;
     setPreview(null);
     setMarquee(null);
     setDrawing([]);
+    setSnapMark(null);
   };
-  const advance = (point: Point, alt: boolean) => {
+  const advance = (point: Point, alt: boolean, shift = false) => {
     const active = gesture.current;
     if (!active || active.document !== store.getState().document) {
       clearGesture();
       return;
     }
-    const world = worldPoint(point, alt);
+    const world = worldPoint(point, alt, shift, active.start);
     if (
       (active.kind === "move" ||
         active.kind === "resize" ||
-        active.kind === "opening") &&
+        active.kind === "opening" ||
+        active.kind === "vertex") &&
       Math.hypot(point[0] - active.screen[0], point[1] - active.screen[1]) < 2
     ) {
       active.command = null;
@@ -374,26 +476,33 @@ export function EditorCanvas({
       setMarquee(boundsOf([active.start, world]));
     else {
       active.command =
-        active.kind === "opening"
-          ? moveOpeningCommand(
+        active.kind === "vertex"
+          ? setVertexCommand(
               active.document,
-              active.openingId,
-              [...toWorld(point, current)],
-              active.segmentIndex,
+              active.shapeId,
+              active.index,
+              world,
             )
-          : active.kind === "resize"
-            ? resizeShapeCommand(
+          : active.kind === "opening"
+            ? moveOpeningCommand(
                 active.document,
-                active.selectedIds[0]!,
-                resizedBox(active.box, active.handle, world),
-                { snap: snap && !alt },
+                active.openingId,
+                [...toWorld(point, current)],
+                active.segmentIndex,
               )
-            : moveShapesCommand(
-                active.document,
-                active.selectedIds,
-                [world[0] - active.start[0], world[1] - active.start[1]],
-                { snap: snap && !alt },
-              );
+            : active.kind === "resize"
+              ? resizeShapeCommand(
+                  active.document,
+                  active.selectedIds[0]!,
+                  resizedBox(active.box, active.handle, world),
+                  { snap: false },
+                )
+              : moveShapesCommand(
+                  active.document,
+                  active.selectedIds,
+                  [world[0] - active.start[0], world[1] - active.start[1]],
+                  { snap: snap && !alt },
+                );
       setPreview(active.command?.apply(active.document) ?? null);
     }
   };
@@ -408,11 +517,58 @@ export function EditorCanvas({
         aria-describedby="editor-canvas-help"
         tabIndex={0}
         className="relative h-full touch-none overflow-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+        onDoubleClick={(event) => {
+          if (stale || tool !== "select") return;
+          const point = position(event);
+          if (editing) {
+            if (
+              nearestVertex(
+                vertexPoints(document, editing.shapeId),
+                point,
+                current,
+              ) !== null
+            )
+              return;
+            const edge = nearestEdge(document, editing.shapeId, point, current);
+            if (
+              edge &&
+              store
+                .getState()
+                .execute(
+                  insertVertexCommand(
+                    document,
+                    editing.shapeId,
+                    edge.index,
+                    edge.point,
+                  ),
+                )
+            )
+              setVertex({ shapeId: editing.shapeId, index: edge.index + 1 });
+          } else {
+            const shape = hitEditorShape(index, current, point);
+            if (shape && vertexShape(document, shape.id)) {
+              store.getState().select([shape.id]);
+              setVertex({
+                shapeId: shape.id,
+                index: nearestVertex(
+                  vertexPoints(document, shape.id),
+                  point,
+                  current,
+                ),
+              });
+            }
+          }
+        }}
         onPointerDown={(event) => {
           if (stale || (event.button !== 0 && event.button !== 1)) return;
           event.currentTarget.focus();
           const point = position(event),
-            world = worldPoint(point, event.altKey);
+            world = worldPoint(
+              point,
+              event.altKey,
+              event.shiftKey,
+              polygon.at(-1),
+            );
           const base = {
             id: event.pointerId,
             start: world,
@@ -423,7 +579,27 @@ export function EditorCanvas({
           };
           if (spaceHeld.current || event.button === 1)
             gesture.current = { ...base, kind: "pan", camera: current };
-          else if (tool === "polygon" || tool === "wall") {
+          else if (editing && tool === "select") {
+            const vertexIndex = nearestVertex(
+              vertexPoints(document, editing.shapeId),
+              point,
+              current,
+            );
+            if (vertexIndex !== null) {
+              setVertex({ ...editing, index: vertexIndex });
+              gesture.current = {
+                ...base,
+                kind: "vertex",
+                shapeId: editing.shapeId,
+                index: vertexIndex,
+              };
+            } else if (nearestEdge(document, editing.shapeId, point, current))
+              return;
+            else {
+              setVertex(null);
+              return;
+            }
+          } else if (tool === "polygon" || tool === "wall") {
             const first = polygon[0] && toScreen(polygon[0], current);
             if (
               polygon.length >= 3 &&
@@ -541,9 +717,17 @@ export function EditorCanvas({
         onPointerMove={(event) => {
           if (stale) return;
           if (gesture.current?.id === event.pointerId)
-            advance(position(event), event.altKey);
+            advance(position(event), event.altKey, event.shiftKey);
           else if ((tool === "polygon" || tool === "wall") && polygon.length)
-            setDrawing([...polygon, worldPoint(position(event), event.altKey)]);
+            setDrawing([
+              ...polygon,
+              worldPoint(
+                position(event),
+                event.altKey,
+                event.shiftKey,
+                polygon.at(-1),
+              ),
+            ]);
         }}
         onPointerUp={(event) => {
           const active = gesture.current;
@@ -559,8 +743,13 @@ export function EditorCanvas({
             clearGesture();
             return;
           }
-          advance(position(event), event.altKey);
-          const world = worldPoint(position(event), event.altKey);
+          advance(position(event), event.altKey, event.shiftKey);
+          const world = worldPoint(
+            position(event),
+            event.altKey,
+            event.shiftKey,
+            active.start,
+          );
           if (
             active.kind === "rectangle" &&
             world[0] !== active.start[0] &&
@@ -606,7 +795,9 @@ export function EditorCanvas({
         V 선택, R 사각형 또는 좌석 회전, P 다각형, S 좌석 배열, W 벽, D 문, M
         배경 축척, G 스냅, 방향키 이동, Shift와 방향키로 크게 이동, Delete
         지우기, Escape 취소, Command 또는 Control Z 실행 취소. 공간 목록에서
-        도형을 골라 숫자로도 바꿀 수 있어요.
+        도형을 골라 숫자로도 바꿀 수 있어요. 도형을 두 번 누르면 꼭짓점을
+        편집해요. 꼭짓점 편집 중 변을 두 번 누르면 점을 추가해요. Shift는 45도
+        안내선, Alt는 스냅 해제예요.
       </p>
       {notice && (
         <p

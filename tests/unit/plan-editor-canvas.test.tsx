@@ -196,6 +196,7 @@ function harness(store = editorStore(), onPolygon = vi.fn()) {
     move,
     up,
     tap,
+    double: (world: Point) => fireEvent.doubleClick(host, point(world)),
     key: (key: string, extra: KeyboardEventInit = {}) =>
       fireEvent.keyDown(host, { key, ...extra }),
     visibility: (visible: boolean) => rendered.rerender(view(visible)),
@@ -245,6 +246,68 @@ afterEach(() => {
 });
 
 describe("editor canvas pointer and keyboard", () => {
+  it("edits a vertex with one drag command and restores it with undo", () => {
+    const h = harness();
+    const original = h.store.getState().document;
+    h.double([2000, 2000]);
+    h.down([1000, 1000]);
+    h.move([1200, 1300], { altKey: true });
+    expect(h.store.getState().document).toBe(original);
+    h.up([1300, 1400], { altKey: true });
+    expect(h.store.getState().document.spaces[0]!.polygon[0]).toEqual([
+      1300, 1400,
+    ]);
+    expect(h.store.getState().undoStack).toHaveLength(1);
+    h.key("z", { ctrlKey: true });
+    expect(h.store.getState().document).toEqual(original);
+  });
+  it("inserts a vertex at a double-clicked edge and enforces the polygon minimum", () => {
+    const h = harness();
+    h.double([2000, 2000]);
+    h.tap([2000, 1000]);
+    h.double([2000, 1000]);
+    expect(h.store.getState().document.spaces[0]!.polygon).toHaveLength(5);
+    h.key("Delete");
+    expect(h.store.getState().document.spaces[0]!.polygon).toHaveLength(4);
+    h.tap([1000, 1000]);
+    h.key("Delete");
+    expect(h.store.getState().document.spaces[0]!.polygon).toHaveLength(3);
+    h.tap([3000, 1000]);
+    h.key("Delete");
+    expect(h.store.getState().document.spaces).toHaveLength(1);
+    expect(h.store.getState().document.spaces[0]!.polygon).toHaveLength(3);
+    expect(screen.getByRole("alert")).toHaveTextContent("최소 꼭짓점");
+  });
+  it("moves a selected vertex by keyboard, not its entire shape", () => {
+    const h = harness();
+    h.double([2000, 2000]);
+    h.tap([1000, 1000]);
+    h.key("ArrowRight");
+    h.key("ArrowDown", { shiftKey: true });
+    expect(h.store.getState().document.spaces[0]!.polygon).toEqual([
+      [1100, 2000],
+      [3000, 1000],
+      [3000, 3000],
+      [1000, 3000],
+    ]);
+  });
+  it("does not commit a vertex drag after Activity hides or a write lock starts", () => {
+    const h = harness();
+    const original = h.store.getState().document;
+    h.double([2000, 2000]);
+    h.down([1000, 1000]);
+    h.move([1300, 1400]);
+    h.visibility(false);
+    h.visibility(true);
+    h.up([1300, 1400]);
+    expect(h.store.getState().document).toBe(original);
+    h.double([2000, 2000]);
+    h.down([1000, 1000]);
+    h.move([1300, 1400]);
+    act(() => h.store.getState().setWriteLocked(true));
+    h.up([1300, 1400]);
+    expect(h.store.getState().document).toBe(original);
+  });
   it("draws an open wall, places a door, moves both, and undoes their deletion together", () => {
     const h = harness();
     h.key("w");

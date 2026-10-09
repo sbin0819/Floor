@@ -1,6 +1,7 @@
 import type { PlanIssue } from "@/lib/floor-plan/issues";
 import { toScreen } from "@/lib/floor-plan/render/camera";
-import { handles, selectionBox } from "./canvas-geometry";
+import { handles, selectionBox, vertexPoints } from "./canvas-geometry";
+import type { SnapResult } from "./snapping";
 import type { Box, PlanFrame, Point } from "@/lib/floor-plan/render/types";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
 import { createScene, seatPolygon } from "@/lib/floor-plan/render/scene";
@@ -14,6 +15,8 @@ export type EditorOverlay = {
   snap: boolean;
   previewSeats?: readonly FloorPlanDocument["seats"][number][] | null;
   drawingClosed?: boolean;
+  vertex?: { shapeId: string; index: number | null } | null;
+  snapMark?: SnapResult | null;
 };
 export function drawEditorOverlay(
   ctx: CanvasRenderingContext2D,
@@ -92,6 +95,29 @@ export function drawEditorOverlay(
     ctx.setLineDash([]);
   }
   const box = selectionBox(overlay.preview ?? document, overlay.selectedIds);
+  if (overlay.snapMark?.kind) {
+    ctx.strokeStyle = colors.selection;
+    const guide = overlay.snapMark.guide;
+    if (guide) {
+      ctx.setLineDash([4, 4]);
+      outline([guide.from, guide.to], false);
+      ctx.setLineDash([]);
+    }
+    const [x, y] = toScreen(overlay.snapMark.point, camera);
+    ctx.strokeRect(x - 5, y - 5, 10, 10);
+  }
+  if (overlay.vertex) {
+    vertexPoints(overlay.preview ?? document, overlay.vertex.shapeId).forEach(
+      (point, i) => {
+        const [x, y] = toScreen(point, camera);
+        ctx.fillStyle =
+          i === overlay.vertex?.index ? colors.selection : colors.background;
+        ctx.fillRect(x - 4, y - 4, 8, 8);
+        ctx.strokeRect(x - 4, y - 4, 8, 8);
+      },
+    );
+    return;
+  }
   if (!box) return;
   const a = toScreen([box.minX, box.minY], camera),
     b = toScreen([box.maxX, box.maxY], camera);
