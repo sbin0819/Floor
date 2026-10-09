@@ -354,7 +354,7 @@ describe("space settings tabs and danger actions", () => {
       spaceSettingsTabs({ kind: "branch", role: "admin" }).map(
         ({ key }) => key,
       ),
-    ).toEqual(["overview", "members"]);
+    ).toEqual(["overview", "members", "banned"]);
     expect(
       spaceSettingsTabs({ kind: "community", role: "member" }).map(
         ({ key }) => key,
