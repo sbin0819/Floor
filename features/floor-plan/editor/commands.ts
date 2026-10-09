@@ -9,17 +9,28 @@ export type Command = {
 export type SpaceShape = FloorPlanDocument["spaces"][number];
 export type FixtureShape = FloorPlanDocument["fixtures"][number];
 export type SeatShape = FloorPlanDocument["seats"][number];
+export type WallShape = FloorPlanDocument["walls"][number];
+export type OpeningShape = FloorPlanDocument["openings"][number];
 export type EditableShape =
   | { collection: "spaces"; shape: SpaceShape }
   | { collection: "fixtures"; shape: FixtureShape }
-  | { collection: "seats"; shape: SeatShape };
+  | { collection: "seats"; shape: SeatShape }
+  | { collection: "walls"; shape: WallShape }
+  | { collection: "openings"; shape: OpeningShape };
+const collections = [
+  "spaces",
+  "fixtures",
+  "seats",
+  "walls",
+  "openings",
+] as const;
 
 type Change = {
   collection: EditableShape["collection"];
   index: number;
   nextIndex?: number;
-  before: SpaceShape | FixtureShape | SeatShape | null;
-  after: SpaceShape | FixtureShape | SeatShape | null;
+  before: EditableShape["shape"] | null;
+  after: EditableShape["shape"] | null;
 };
 
 function applyChanges(
@@ -28,14 +39,12 @@ function applyChanges(
   reverse: boolean,
 ): FloorPlanDocument {
   let result = document;
-  for (const collection of ["spaces", "fixtures", "seats"] as const) {
+  for (const collection of collections) {
     const patches = changes.filter(
       (change) => change.collection === collection,
     );
     if (!patches.length) continue;
-    const shapes: (SpaceShape | FixtureShape | SeatShape)[] = [
-      ...document[collection],
-    ];
+    const shapes: EditableShape["shape"][] = [...document[collection]];
     // 삭제를 모두 마친 뒤 원래 순서대로 삽입해야 다중 삭제의 인덱스가 어긋나지 않아요.
     const removing = new Set(
       patches.map((patch) => (reverse ? patch.after : patch.before)?.id),
@@ -94,15 +103,67 @@ export function deleteShapesCommand(
   document: FloorPlanDocument,
   ids: readonly string[],
 ): Command | null {
-  const selected = new Set(ids);
+  return patchShapesCommand(document, { removeIds: ids }, "도형 삭제");
+}
+
+export function patchShapesCommand(
+  document: FloorPlanDocument,
+  patch: {
+    add?: readonly EditableShape[];
+    replace?: readonly EditableShape[];
+    removeIds?: readonly string[];
+  },
+  label: string,
+): Command | null {
+  const selected = new Set(patch.removeIds ?? []);
+  for (const opening of document.openings)
+    if (selected.has(opening.wallId)) selected.add(opening.id);
   const changes: Change[] = [];
-  for (const collection of ["spaces", "fixtures", "seats"] as const) {
+  for (const collection of collections) {
     document[collection].forEach((shape, index) => {
       if (selected.has(shape.id))
         changes.push({ collection, index, before: shape, after: null });
     });
   }
-  return changedCommand(document, changes, "도형 삭제");
+  const seen = new Set<string>();
+  for (const value of patch.replace ?? []) {
+    if (seen.has(value.shape.id) || selected.has(value.shape.id)) return null;
+    seen.add(value.shape.id);
+    const index = document[value.collection].findIndex(
+      ({ id }) => id === value.shape.id,
+    );
+    const before = document[value.collection][index];
+    if (!before) return null;
+    if (JSON.stringify(before) !== JSON.stringify(value.shape))
+      changes.push({
+        collection: value.collection,
+        index,
+        nextIndex:
+          index -
+          document[value.collection]
+            .slice(0, index)
+            .filter(({ id }) => selected.has(id)).length,
+        before,
+        after: value.shape,
+      });
+  }
+  const added = new Map<EditableShape["collection"], number>();
+  for (const value of patch.add ?? []) {
+    if (seen.has(value.shape.id) || selected.has(value.shape.id)) return null;
+    seen.add(value.shape.id);
+    const count = added.get(value.collection) ?? 0;
+    const index =
+      document[value.collection].filter(({ id }) => !selected.has(id)).length +
+      count;
+    changes.push({
+      collection: value.collection,
+      index,
+      before: null,
+      after: value.shape,
+    });
+    added.set(value.collection, count + 1);
+  }
+  return changedCommand(document, changes, label);
 }
 
 export function replaceSeatsCommand(

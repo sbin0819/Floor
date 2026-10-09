@@ -245,6 +245,104 @@ afterEach(() => {
 });
 
 describe("editor canvas pointer and keyboard", () => {
+  it("draws an open wall, places a door, moves both, and undoes their deletion together", () => {
+    const h = harness();
+    h.key("w");
+    h.tap([8000, 3000]);
+    h.tap([14000, 3000]);
+    expect(h.store.getState().document.walls).toHaveLength(1);
+    h.key("Enter");
+    const wall = h.store.getState().document.walls[1]!;
+    expect(wall).toMatchObject({
+      points: [
+        [8000, 3000],
+        [14000, 3000],
+      ],
+      thickness: 100,
+      closed: false,
+    });
+    h.key("d");
+    h.tap([11000, 3000]);
+    const opening = h.store.getState().document.openings[0]!;
+    expect(opening).toMatchObject({
+      wallId: wall.id,
+      at: 0.5,
+      width: 900,
+      kind: "door",
+    });
+    h.down([9000, 3000]);
+    h.move([10000, 4000]);
+    h.up([10000, 4000]);
+    expect(h.store.getState().document.walls[1]!.points).toEqual([
+      [9000, 4000],
+      [15000, 4000],
+    ]);
+    expect(h.store.getState().document.openings[0]!.at).toBe(0.5);
+    h.key("Delete");
+    expect(h.store.getState().document.openings).toHaveLength(0);
+    h.key("z", { ctrlKey: true });
+    expect(h.store.getState().document.openings).toEqual([opening]);
+    expect(h.store.getState().document.walls).toHaveLength(2);
+  });
+  it("closes a three-point wall at its first point and Escape leaves no half wall", () => {
+    const h = harness();
+    h.key("w");
+    h.tap([8000, 3000]);
+    h.key("Enter");
+    expect(h.store.getState().document.walls).toHaveLength(1);
+    h.tap([14000, 3000]);
+    h.tap([14000, 7000]);
+    h.tap([8000, 3000]);
+    expect(h.store.getState().document.walls[1]!.closed).toBe(true);
+    h.key("w");
+    h.tap([18000, 3000]);
+    h.key("Escape");
+    h.key("Enter");
+    expect(h.store.getState().document.walls).toHaveLength(2);
+  });
+  it("keeps a dragged door on its original edge and commits one undo entry", () => {
+    const document = editorDocument();
+    document.walls.push({
+      id: "room-wall",
+      points: [
+        [8000, 3000],
+        [14000, 3000],
+        [14000, 9000],
+      ],
+      closed: false,
+      thickness: 100,
+    });
+    document.openings.push({
+      id: "door",
+      wallId: "room-wall",
+      at: 0.25,
+      width: 900,
+      kind: "door",
+    });
+    const h = harness(editorStore(document));
+    h.down([11000, 3000]);
+    h.move([14000, 7000]);
+    h.up([14000, 7000]);
+    const opening = h.store.getState().document.openings[0]!;
+    expect(opening.at).toBeLessThan(0.5);
+    expect(opening.at * 12000 + opening.width / 2).toBeLessThanOrEqual(6000);
+    expect(h.store.getState().undoStack).toHaveLength(1);
+    h.key("z", { ctrlKey: true });
+    expect(h.store.getState().document.openings[0]!.at).toBe(0.25);
+  });
+  it("does not place a door on a space or finish a wall after the editor becomes locked", () => {
+    const h = harness();
+    h.key("d");
+    h.tap([2000, 2000]);
+    expect(h.store.getState().document.openings).toHaveLength(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("벽 위");
+    h.key("w");
+    h.tap([8000, 3000]);
+    h.tap([14000, 3000]);
+    act(() => h.store.getState().setWriteLocked(true));
+    h.key("Enter");
+    expect(h.store.getState().document.walls).toHaveLength(1);
+  });
   it("draws a snapped rectangle without committing until the parent connects it", () => {
     const h = harness();
     h.key("r");
@@ -676,7 +774,7 @@ describe("editor canvas geometry", () => {
       ]),
     ).toBe(false);
   });
-  it("hit handles are 8 CSS pixels and marquee excludes unsupported shapes", () => {
+  it("hit handles are 8 CSS pixels and marquee includes a wall only when its full thickness fits", () => {
     const doc = editorDocument(),
       camera = { scale: 0.02, x: 0, y: 0 };
     const box = selectionBox(doc, ["a"])!;
@@ -690,6 +788,17 @@ describe("editor canvas geometry", () => {
         scene.shapes.find(({ id }) => id === "wall")!,
       ),
     ).toBe(false);
-    expect(selectionBox(doc, ["wall"])).toBeNull();
+    expect(selectionBox(doc, ["wall"])).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 30000,
+      maxY: 0,
+    });
+    expect(
+      insideSelection(
+        { minX: -100, minY: -100, maxX: 30100, maxY: 100 },
+        scene.shapes.find((shape) => shape.kind === "wall")!,
+      ),
+    ).toBe(true);
   });
 });

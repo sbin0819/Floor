@@ -3,7 +3,7 @@ import { toScreen } from "@/lib/floor-plan/render/camera";
 import { handles, selectionBox } from "./canvas-geometry";
 import type { Box, PlanFrame, Point } from "@/lib/floor-plan/render/types";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
-import { seatPolygon } from "@/lib/floor-plan/render/scene";
+import { createScene, seatPolygon } from "@/lib/floor-plan/render/scene";
 
 export type EditorOverlay = {
   selectedIds: readonly string[];
@@ -13,6 +13,7 @@ export type EditorOverlay = {
   preview: FloorPlanDocument | null;
   snap: boolean;
   previewSeats?: readonly FloorPlanDocument["seats"][number][] | null;
+  drawingClosed?: boolean;
 };
 export function drawEditorOverlay(
   ctx: CanvasRenderingContext2D,
@@ -57,13 +58,12 @@ export function drawEditorOverlay(
   ctx.strokeStyle = colors.selection;
   if (overlay.preview) {
     ctx.setLineDash([6, 4]);
-    for (const shape of [
-      ...overlay.preview.spaces,
-      ...overlay.preview.fixtures,
-      ...overlay.preview.seats,
-    ])
+    for (const shape of createScene(overlay.preview).shapes)
       if (overlay.selectedIds.includes(shape.id))
-        outline("at" in shape ? seatPolygon(shape) : shape.polygon);
+        outline(
+          shape.points,
+          shape.kind !== "wall" && shape.kind !== "opening",
+        );
     ctx.setLineDash([]);
   }
   if (overlay.previewSeats) {
@@ -73,7 +73,10 @@ export function drawEditorOverlay(
   }
   if (overlay.polygon.length) {
     ctx.setLineDash([6, 4]);
-    outline(overlay.polygon, overlay.polygon.length === 4);
+    outline(
+      overlay.polygon,
+      overlay.drawingClosed ?? overlay.polygon.length === 4,
+    );
     ctx.setLineDash([]);
     ctx.fillStyle = colors.selection;
     for (const point of overlay.polygon) {
@@ -95,7 +98,9 @@ export function drawEditorOverlay(
   ctx.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
   if (
     overlay.selectedIds.length === 1 &&
-    !document.seats.some(({ id }) => id === overlay.selectedIds[0])
+    [...document.spaces, ...document.fixtures].some(
+      ({ id }) => id === overlay.selectedIds[0],
+    )
   ) {
     ctx.fillStyle = colors.background;
     for (const { at } of handles(box)) {

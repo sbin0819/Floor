@@ -71,3 +71,65 @@ export function hitTest(
     candidates.find((shape) => pointInPolygon(point, shape.points)) ?? null
   );
 }
+
+function distanceToSegment(point: Point, a: Point, b: Point) {
+  const dx = b[0] - a[0],
+    dy = b[1] - a[1];
+  const length = dx * dx + dy * dy;
+  const t = length
+    ? Math.max(
+        0,
+        Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / length),
+      )
+    : 0;
+  return Math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy);
+}
+
+export function hitEditorShape(
+  index: PlanSpatialIndex,
+  camera: Camera,
+  screenPoint: Point,
+): PlanShape | null {
+  const point = toWorld(screenPoint, camera);
+  const tolerance = 4 / camera.scale;
+  const priority = { opening: 4, seat: 3, wall: 2, fixture: 1, space: 0 };
+  const candidates = index.search({
+    minX: point[0] - tolerance,
+    maxX: point[0] + tolerance,
+    minY: point[1] - tolerance,
+    maxY: point[1] + tolerance,
+  });
+  candidates.sort(
+    (a, b) => priority[b.kind] - priority[a.kind] || b.order - a.order,
+  );
+  return (
+    candidates.find((shape) => {
+      if (shape.kind === "wall")
+        return shape.segments.some(
+          ([a, b]) =>
+            distanceToSegment(point, a, b) <= shape.thickness / 2 + tolerance,
+        );
+      if (shape.kind !== "opening") return pointInPolygon(point, shape.points);
+      if (
+        distanceToSegment(point, shape.points[0]!, shape.points[1]!) <=
+        tolerance
+      )
+        return true;
+      if (!shape.door || !shape.radius) return false;
+      const leaf: Point = [
+        shape.hinge[0] + Math.cos(shape.angle - Math.PI / 2) * shape.radius,
+        shape.hinge[1] + Math.sin(shape.angle - Math.PI / 2) * shape.radius,
+      ];
+      if (distanceToSegment(point, shape.hinge, leaf) <= tolerance) return true;
+      const dx = point[0] - shape.hinge[0],
+        dy = point[1] - shape.hinge[1];
+      const localX = dx * Math.cos(shape.angle) + dy * Math.sin(shape.angle);
+      const localY = -dx * Math.sin(shape.angle) + dy * Math.cos(shape.angle);
+      return (
+        localX >= 0 &&
+        localY <= 0 &&
+        Math.abs(Math.hypot(dx, dy) - shape.radius) <= tolerance
+      );
+    }) ?? null
+  );
+}

@@ -10,6 +10,7 @@ import {
   rotatedRectanglesOverlap,
 } from "./geometry";
 import { createSeatAreaResolver, seatDisplayName } from "./seats";
+import { resolveOpening } from "./openings";
 import type { PlanIssue, PlanIssueCode } from "./issues";
 import type { FloorPlanDocument, PlanPoint } from "./types";
 
@@ -176,6 +177,16 @@ export function validatePlan(
     index.insert(item);
   });
   issues.push(...validateSeats(document, context));
+  const walls = new Map(document.walls.map((wall) => [wall.id, wall]));
+  for (const opening of document.openings) {
+    const wall = walls.get(opening.wallId);
+    if (!wall || !resolveOpening(wall, opening)?.contained)
+      add(
+        "OPENING_OFF_WALL",
+        "문의 양 끝을 벽의 같은 변 안에 놓아 주세요.",
+        opening.id,
+      );
+  }
   return issues;
 }
 

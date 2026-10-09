@@ -1,9 +1,8 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { polygonArea } from "@/lib/floor-plan/geometry";
@@ -24,53 +23,8 @@ import { isRectangle, rectanglePoints } from "./canvas-geometry";
 import { spaceTypeLabels } from "@/features/bookings/format";
 import { amenityLabels, type AmenityKey } from "@/lib/spaces/amenities";
 import { SeatProperties } from "./seat-properties";
-
-function NumberField({
-  label,
-  value,
-  onCommit,
-  disabled = false,
-}: {
-  label: string;
-  value: number;
-  onCommit: (value: number) => void;
-  disabled?: boolean;
-}) {
-  const id = useId();
-  const [draft, setDraft] = useState({ source: value, text: String(value) });
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        className="tabular-nums"
-        type="number"
-        step={1}
-        disabled={disabled}
-        value={draft.source === value ? draft.text : String(value)}
-        onChange={(event) =>
-          setDraft({ source: value, text: event.target.value })
-        }
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-        }}
-        onBlur={(event) => {
-          const next = Number(event.target.value);
-          if (
-            event.target.value.trim() &&
-            Number.isSafeInteger(next) &&
-            next !== value
-          )
-            onCommit(next);
-          setDraft({ source: value, text: String(value) });
-        }}
-      />
-    </div>
-  );
-}
+import { NumberField } from "./editor-number-field";
+import { WallProperties } from "./wall-properties";
 type Props = {
   branchId: string;
   floorId: string;
@@ -118,6 +72,14 @@ export function EditorProperties(props: Props) {
     selectedIds.length === 1
       ? document.seats.find(({ id }) => id === selectedIds[0])
       : undefined;
+  const wall =
+    selectedIds.length === 1
+      ? document.walls.find(({ id }) => id === selectedIds[0])
+      : undefined;
+  const opening =
+    selectedIds.length === 1
+      ? document.openings.find(({ id }) => id === selectedIds[0])
+      : undefined;
   const desk = seat
     ? spaces.find(({ id }) => id.toLowerCase() === seat.spaceId.toLowerCase())
     : undefined;
@@ -157,14 +119,26 @@ export function EditorProperties(props: Props) {
         <h2 className="text-base font-bold">
           {selectedIds.length > 1
             ? `도형 ${selectedIds.length}개`
-            : seat
-              ? "좌석"
-              : shape
-                ? "spaceId" in shape
-                  ? "공간 도형"
-                  : "고정물"
-                : "층 크기"}
+            : wall
+              ? "벽"
+              : opening
+                ? "문·뚫린 곳"
+                : seat
+                  ? "좌석"
+                  : shape
+                    ? "spaceId" in shape
+                      ? "공간 도형"
+                      : "고정물"
+                    : "층 크기"}
         </h2>
+        {(wall || opening) && (
+          <WallProperties
+            document={document}
+            shapeId={selectedIds[0]!}
+            disabled={disabled}
+            onCommand={apply}
+          />
+        )}
         {seat && (
           <SeatProperties
             document={document}

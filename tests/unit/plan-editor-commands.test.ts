@@ -40,9 +40,9 @@ describe("editor commands and transforms", () => {
     expect(restored.walls).toBe(doc.walls);
     expect(command.apply(restored)).toEqual(next);
   });
-  it("does not delete walls and treats empty edits as no-ops", () => {
+  it("treats missing and unchanged edits as no-ops", () => {
     const doc = editorDocument();
-    expect(deleteShapesCommand(doc, ["wall", "missing"])).toBeNull();
+    expect(deleteShapesCommand(doc, ["missing"])).toBeNull();
     expect(
       replaceShapesCommand(
         doc,
@@ -299,7 +299,7 @@ describe("per-screen editor store", () => {
       other = editorStore();
     let notifications = 0;
     store.subscribe(() => notifications++);
-    store.getState().select(["a", "a", "wall"]);
+    store.getState().select(["a", "a", "missing"]);
     store.getState().select(["a"]);
     store.getState().setTool("select");
     store.getState().setSnap(true);

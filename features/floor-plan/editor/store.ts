@@ -6,7 +6,14 @@ import type { Camera } from "@/lib/floor-plan/render/types";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
 import type { Command } from "./commands";
 
-export type EditorTool = "select" | "rectangle" | "polygon" | "seat-array";
+export type EditorTool =
+  | "select"
+  | "rectangle"
+  | "polygon"
+  | "seat-array"
+  | "wall"
+  | "opening"
+  | "background";
 export type PlanDraft = { planId: string; version: number; revision: number };
 export type PlanEditorSource = {
   floorId: string;
@@ -44,9 +51,13 @@ export type PlanEditorStore = StoreApi<PlanEditorState>;
 
 function selection(document: FloorPlanDocument, ids: readonly string[]) {
   const available = new Set(
-    [...document.spaces, ...document.fixtures, ...document.seats].map(
-      ({ id }) => id,
-    ),
+    [
+      ...document.spaces,
+      ...document.fixtures,
+      ...document.seats,
+      ...document.walls,
+      ...document.openings,
+    ].map(({ id }) => id),
   );
   return [...new Set(ids)].filter((id) => available.has(id));
 }

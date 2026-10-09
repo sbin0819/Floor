@@ -12,6 +12,8 @@ import {
   Eye,
   AlertTriangle,
   Armchair,
+  Spline,
+  DoorOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -432,6 +434,8 @@ function EditorWorkspace({
                 ["select", "선택 (V)", MousePointer2],
                 ["rectangle", "사각형 공간 (R)", Square],
                 ["polygon", "다각형 공간 (P)", Pentagon],
+                ["wall", "벽 (W)", Spline],
+                ["opening", "문 (D)", DoorOpen],
               ] as const
             ).map(([value, label, Icon]) => (
               <Button

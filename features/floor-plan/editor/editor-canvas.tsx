@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { FloorPlanDocument, PlanPoint } from "@/lib/floor-plan/types";
@@ -10,7 +10,13 @@ import type {
   PlanStates,
   Point,
 } from "@/lib/floor-plan/render/types";
-import { hitTest } from "@/lib/floor-plan/render/hit-test";
+import { hitEditorShape } from "@/lib/floor-plan/render/hit-test";
+import { resolveOpening } from "@/lib/floor-plan/openings";
+import {
+  createWallCommand,
+  createOpeningCommand,
+  moveOpeningCommand,
+} from "./wall-commands";
 import { boundsOf } from "@/lib/floor-plan/render/scene";
 import {
   ensureVisible,
@@ -47,6 +53,7 @@ type Gesture = {
   | { kind: "rectangle" | "marquee" | "move" }
   | { kind: "pan"; camera: Camera }
   | { kind: "resize"; box: Box; handle: Handle }
+  | { kind: "opening"; openingId: string; segmentIndex: number }
 );
 
 export function EditorCanvas({
@@ -77,6 +84,7 @@ export function EditorCanvas({
   const [drawing, setDrawing] = useState<readonly Point[]>([]);
   const [marquee, setMarquee] = useState<Box | null>(null);
   const [preview, setPreview] = useState<FloorPlanDocument | null>(null);
+  const [notice, setNotice] = useState("");
   const overlay = useMemo(
     () => ({
       selectedIds,
@@ -86,6 +94,7 @@ export function EditorCanvas({
       preview,
       snap,
       previewSeats,
+      drawingClosed: tool === "rectangle",
     }),
     [
       selectedIds,
@@ -96,6 +105,7 @@ export function EditorCanvas({
       preview,
       snap,
       previewSeats,
+      tool,
     ],
   );
   const {
@@ -110,16 +120,28 @@ export function EditorCanvas({
     viewport,
   } = useEditorCanvas(states, overlay);
   const focusedRequest = useRef<readonly string[] | null>(null);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const reset = () => {
       gesture.current = null;
       setPreview(null);
       setMarquee(null);
       setDrawing([]);
       setPolygon([]);
-    },
-    [],
-  );
+    };
+    const unsubscribe = store.subscribe((state, previous) => {
+      if (
+        state.epoch !== previous.epoch ||
+        state.tool !== previous.tool ||
+        (!previous.writeLocked && state.writeLocked) ||
+        (previous.saveState !== "stale" && state.saveState === "stale")
+      )
+        reset();
+    });
+    return () => {
+      unsubscribe();
+      reset();
+    };
+  }, [store]);
   useEffect(() => {
     if (
       !focusIds?.length ||
@@ -151,10 +173,35 @@ export function EditorCanvas({
       Math.max(0, Math.min(document.bounds.h, value[1])),
     ];
   };
+  const finishWall = useCallback(
+    (points: PlanPoint[], closed: boolean) => {
+      const state = store.getState();
+      const id = crypto.randomUUID();
+      if (
+        state.execute(
+          createWallCommand(state.document, {
+            id,
+            points,
+            closed,
+            thickness: 100,
+          }),
+        )
+      ) {
+        state.select([id]);
+        state.setTool("select");
+        setPolygon([]);
+        setDrawing([]);
+        setNotice("");
+      } else setNotice("벽의 점과 층 범위를 확인해 주세요");
+    },
+    [store],
+  );
   useEffect(() => {
     const root = host.current?.closest("main");
     const finishPolygon = () => {
-      if (polygon.length >= 3) {
+      if (store.getState().tool === "wall") {
+        if (polygon.length >= 2) finishWall(polygon, false);
+      } else if (polygon.length >= 3) {
         onPolygon(polygon);
         setPolygon([]);
         setDrawing([]);
@@ -220,13 +267,15 @@ export function EditorCanvas({
       } else if (
         !modifier &&
         !event.altKey &&
-        ["v", "r", "p", "g", "s"].includes(key)
+        ["v", "r", "p", "g", "s", "w", "d"].includes(key)
       ) {
         event.preventDefault();
         setPolygon([]);
         setDrawing([]);
         if (key === "g") state.setSnap(!state.snap);
         else if (key === "s") onSeatArray?.();
+        else if (key === "w" || key === "d")
+          state.setTool(key === "w" ? "wall" : "opening");
         else if (
           key === "r" &&
           state.document.seats.some(({ id }) => state.selectedIds.includes(id))
@@ -285,7 +334,7 @@ export function EditorCanvas({
       window.removeEventListener("blur", blur);
       spaceHeld.current = false;
     };
-  }, [store, host, polygon, onPolygon, onSeatArray]);
+  }, [store, host, polygon, onPolygon, onSeatArray, finishWall]);
   const clearGesture = () => {
     gesture.current = null;
     setPreview(null);
@@ -300,7 +349,9 @@ export function EditorCanvas({
     }
     const world = worldPoint(point, alt);
     if (
-      (active.kind === "move" || active.kind === "resize") &&
+      (active.kind === "move" ||
+        active.kind === "resize" ||
+        active.kind === "opening") &&
       Math.hypot(point[0] - active.screen[0], point[1] - active.screen[1]) < 2
     ) {
       active.command = null;
@@ -323,19 +374,26 @@ export function EditorCanvas({
       setMarquee(boundsOf([active.start, world]));
     else {
       active.command =
-        active.kind === "resize"
-          ? resizeShapeCommand(
+        active.kind === "opening"
+          ? moveOpeningCommand(
               active.document,
-              active.selectedIds[0]!,
-              resizedBox(active.box, active.handle, world),
-              { snap: snap && !alt },
+              active.openingId,
+              [...toWorld(point, current)],
+              active.segmentIndex,
             )
-          : moveShapesCommand(
-              active.document,
-              active.selectedIds,
-              [world[0] - active.start[0], world[1] - active.start[1]],
-              { snap: snap && !alt },
-            );
+          : active.kind === "resize"
+            ? resizeShapeCommand(
+                active.document,
+                active.selectedIds[0]!,
+                resizedBox(active.box, active.handle, world),
+                { snap: snap && !alt },
+              )
+            : moveShapesCommand(
+                active.document,
+                active.selectedIds,
+                [world[0] - active.start[0], world[1] - active.start[1]],
+                { snap: snap && !alt },
+              );
       setPreview(active.command?.apply(active.document) ?? null);
     }
   };
@@ -365,16 +423,19 @@ export function EditorCanvas({
           };
           if (spaceHeld.current || event.button === 1)
             gesture.current = { ...base, kind: "pan", camera: current };
-          else if (tool === "polygon") {
+          else if (tool === "polygon" || tool === "wall") {
             const first = polygon[0] && toScreen(polygon[0], current);
             if (
               polygon.length >= 3 &&
               first &&
               Math.hypot(point[0] - first[0], point[1] - first[1]) <= 8
             ) {
-              onPolygon(polygon);
-              setPolygon([]);
-              setDrawing([]);
+              if (tool === "wall") finishWall(polygon, true);
+              else {
+                onPolygon(polygon);
+                setPolygon([]);
+                setDrawing([]);
+              }
             } else if (
               polygon.length < 64 &&
               (!polygon.length ||
@@ -385,12 +446,41 @@ export function EditorCanvas({
               setDrawing([]);
             }
             return;
+          } else if (tool === "opening") {
+            const shape = hitEditorShape(index, current, point);
+            const wallId =
+              shape?.kind === "wall"
+                ? shape.id
+                : shape?.kind === "opening"
+                  ? document.openings.find(({ id }) => id === shape.id)?.wallId
+                  : null;
+            const id = crypto.randomUUID();
+            if (
+              wallId &&
+              store.getState().execute(
+                createOpeningCommand(document, {
+                  id,
+                  wallId,
+                  point: [...toWorld(point, current)],
+                  width: 900,
+                  kind: "door",
+                }),
+              )
+            ) {
+              store.getState().select([id]);
+              store.getState().setTool("select");
+              setNotice("");
+            } else
+              setNotice("폭 900mm의 문을 놓을 수 있는 벽 위를 눌러 주세요");
+            return;
           } else if (tool === "rectangle")
             gesture.current = { ...base, kind: "rectangle" };
           else {
             const selectedBox =
               selectedIds.length === 1 &&
-              !document.seats.some(({ id }) => id === selectedIds[0])
+              [...document.spaces, ...document.fixtures].some(
+                ({ id }) => id === selectedIds[0],
+              )
                 ? selectionBox(document, selectedIds)
                 : null;
             const handle =
@@ -403,9 +493,7 @@ export function EditorCanvas({
                 handle,
               };
             else {
-              const shape = hitTest(index, current, point, {
-                kinds: ["seat", "space", "fixture"],
-              });
+              const shape = hitEditorShape(index, current, point);
               if (shape) {
                 if (tool === "seat-array") store.getState().setTool("select");
                 const ids = event.shiftKey
@@ -416,8 +504,27 @@ export function EditorCanvas({
                     ? selectedIds
                     : [shape.id];
                 store.getState().select(ids);
-                if (ids.includes(shape.id))
-                  gesture.current = { ...base, selectedIds: ids, kind: "move" };
+                if (ids.includes(shape.id)) {
+                  const opening =
+                    shape.kind === "opening"
+                      ? document.openings.find(({ id }) => id === shape.id)
+                      : undefined;
+                  const wall =
+                    opening &&
+                    document.walls.find(({ id }) => id === opening.wallId);
+                  const resolved =
+                    wall && opening && resolveOpening(wall, opening);
+                  gesture.current =
+                    resolved && ids.length === 1
+                      ? {
+                          ...base,
+                          selectedIds: ids,
+                          kind: "opening",
+                          openingId: shape.id,
+                          segmentIndex: resolved.segmentIndex,
+                        }
+                      : { ...base, selectedIds: ids, kind: "move" };
+                }
               } else {
                 gesture.current = {
                   ...base,
@@ -435,7 +542,7 @@ export function EditorCanvas({
           if (stale) return;
           if (gesture.current?.id === event.pointerId)
             advance(position(event), event.altKey);
-          else if (tool === "polygon" && polygon.length)
+          else if ((tool === "polygon" || tool === "wall") && polygon.length)
             setDrawing([...polygon, worldPoint(position(event), event.altKey)]);
         }}
         onPointerUp={(event) => {
@@ -496,11 +603,19 @@ export function EditorCanvas({
         />
       </div>
       <p id="editor-canvas-help" className="sr-only">
-        V 선택, R 사각형 또는 좌석 회전, P 다각형, S 좌석 배열, G 스냅, 방향키
-        이동, Shift와 방향키로 크게 이동, Delete 지우기, Escape 취소, Command
-        또는 Control Z 실행 취소. 공간 목록에서 도형을 골라 숫자로도 바꿀 수
-        있어요.
+        V 선택, R 사각형 또는 좌석 회전, P 다각형, S 좌석 배열, W 벽, D 문, M
+        배경 축척, G 스냅, 방향키 이동, Shift와 방향키로 크게 이동, Delete
+        지우기, Escape 취소, Command 또는 Control Z 실행 취소. 공간 목록에서
+        도형을 골라 숫자로도 바꿀 수 있어요.
       </p>
+      {notice && (
+        <p
+          role="alert"
+          className="absolute top-3 left-3 max-w-sm rounded-lg border bg-background p-3 text-sm"
+        >
+          {notice}
+        </p>
+      )}
       <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border bg-background px-3 py-2 text-xs tabular-nums">
         격자 100mm · 스냅 {snap ? "켜짐" : "꺼짐"} · 층 크기{" "}
         {document.bounds.w.toLocaleString("ko-KR")} ×{" "}
@@ -571,44 +686,38 @@ export function EditorCanvas({
         aria-label="편집할 도형"
         className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:top-3 focus-within:left-3 focus-within:z-10 focus-within:max-h-80 focus-within:overflow-y-auto focus-within:rounded-lg focus-within:border focus-within:bg-background focus-within:p-2"
       >
-        {scene.shapes
-          .filter(
-            (shape) =>
-              shape.kind === "space" ||
-              shape.kind === "fixture" ||
-              shape.kind === "seat",
-          )
-          .map((shape) => (
-            <li key={shape.id}>
-              <button
-                type="button"
-                className="min-h-11 rounded-md px-3 focus-visible:outline-2 focus-visible:outline-ring"
-                aria-pressed={selectedIds.includes(shape.id)}
-                onClick={() => {
-                  store.getState().select([shape.id]);
-                  store.getState().setTool("select");
-                  store
-                    .getState()
-                    .setCamera(ensureVisible(current, shape.bounds, viewport));
-                }}
-              >
-                {shape.spaceId
-                  ? shape.kind === "seat"
-                    ? (document.seats.find(({ id }) => id === shape.id)
-                        ?.label ??
-                      states.get(shape.spaceId)?.name ??
-                      "이름 없는 좌석")
-                    : (states.get(shape.spaceId)?.name ?? "연결을 확인할 공간")
-                  : shape.kind === "fixture"
-                    ? (shape.label ?? "고정물")
-                    : "도형"}
-              </button>
-            </li>
-          ))}
+        {scene.shapes.map((shape) => (
+          <li key={shape.id}>
+            <button
+              type="button"
+              className="min-h-11 rounded-md px-3 focus-visible:outline-2 focus-visible:outline-ring"
+              aria-pressed={selectedIds.includes(shape.id)}
+              onClick={() => {
+                store.getState().select([shape.id]);
+                store.getState().setTool("select");
+                store
+                  .getState()
+                  .setCamera(ensureVisible(current, shape.bounds, viewport));
+              }}
+            >
+              {shape.spaceId
+                ? shape.kind === "seat"
+                  ? (document.seats.find(({ id }) => id === shape.id)?.label ??
+                    states.get(shape.spaceId)?.name ??
+                    "이름 없는 좌석")
+                  : (states.get(shape.spaceId)?.name ?? "연결을 확인할 공간")
+                : shape.kind === "fixture"
+                  ? (shape.label ?? "고정물")
+                  : shape.kind === "wall"
+                    ? "벽"
+                    : "문·뚫린 곳"}
+            </button>
+          </li>
+        ))}
       </ul>
       <span className="sr-only" role="status">
         {polygon.length
-          ? `다각형 꼭짓점 ${polygon.length}개. Enter로 완성해요`
+          ? `${tool === "wall" ? "벽" : "다각형"} 꼭짓점 ${polygon.length}개. Enter로 완성해요`
           : ""}
       </span>
     </>

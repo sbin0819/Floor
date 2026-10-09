@@ -4,6 +4,7 @@ import {
 } from "@/lib/floor-plan/geometry";
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
 import { seatPolygon } from "@/lib/floor-plan/render/scene";
+import { projectOpening, resolveOpening } from "@/lib/floor-plan/openings";
 import type { FloorPlanDocument, PlanPoint } from "@/lib/floor-plan/types";
 import {
   addShapeCommand,
@@ -60,15 +61,55 @@ function selected(
     ...document.seats
       .filter(({ id }) => wanted.has(id))
       .map((shape): EditableShape => ({ collection: "seats", shape })),
+    ...document.walls
+      .filter(({ id }) => wanted.has(id))
+      .map((shape): EditableShape => ({ collection: "walls", shape })),
+    ...document.openings
+      .filter(({ id, wallId }) => wanted.has(id) && !wanted.has(wallId))
+      .map((shape): EditableShape => ({ collection: "openings", shape })),
   ];
 }
-function shapePoints(value: EditableShape): PlanPoint[] {
+function shapePoints(
+  value: EditableShape,
+  document: FloorPlanDocument,
+): PlanPoint[] {
+  if (value.collection === "walls") return value.shape.points;
+  if (value.collection === "openings") {
+    const wall = document.walls.find(({ id }) => id === value.shape.wallId);
+    const opening = wall && resolveOpening(wall, value.shape);
+    return opening ? [[...opening.hinge], [...opening.end]] : [];
+  }
   return value.collection === "seats"
     ? seatPolygon(value.shape).map(([x, y]): PlanPoint => [x, y])
     : value.shape.polygon;
 }
-function translate(value: EditableShape, delta: PlanPoint): EditableShape {
+function translate(
+  value: EditableShape,
+  delta: PlanPoint,
+  document: FloorPlanDocument,
+): EditableShape {
   const point = ([x, y]: PlanPoint): PlanPoint => [x + delta[0], y + delta[1]];
+  if (value.collection === "walls")
+    return {
+      collection: "walls",
+      shape: { ...value.shape, points: value.shape.points.map(point) },
+    };
+  if (value.collection === "openings") {
+    const wall = document.walls.find(({ id }) => id === value.shape.wallId);
+    const before = wall && resolveOpening(wall, value.shape);
+    const next =
+      wall &&
+      before &&
+      projectOpening(
+        wall,
+        [before.center[0] + delta[0], before.center[1] + delta[1]],
+        value.shape.width,
+        before.segmentIndex,
+      );
+    return next
+      ? { collection: "openings", shape: { ...value.shape, at: next.at } }
+      : value;
+  }
   if (value.collection === "seats")
     return {
       collection: "seats",
@@ -138,14 +179,16 @@ export function moveShapesCommand(
 ): Command | null {
   const values = selected(document, ids);
   if (!values.length) return null;
-  const box = bounds(values.flatMap(shapePoints));
+  const points = values.flatMap((value) => shapePoints(value, document));
+  if (!points.length) return null;
+  const box = bounds(points);
   const target = snapPoint([box.x + delta[0], box.y + delta[1]], options.snap);
   const offset: PlanPoint = options.snap
     ? [Math.round(target[0] - box.x), Math.round(target[1] - box.y)]
     : snapPoint(delta, false);
   return replaceShapesCommand(
     document,
-    values.map((value) => translate(value, offset)),
+    values.map((value) => translate(value, offset, document)),
     "도형 이동",
   );
 }
@@ -156,7 +199,11 @@ export function resizeShapeCommand(
   options: { snap: boolean },
 ): Command | null {
   const value = selected(document, [id])[0];
-  if (!value || value.collection === "seats") return null;
+  if (
+    !value ||
+    (value.collection !== "spaces" && value.collection !== "fixtures")
+  )
+    return null;
   const before = bounds(value.shape.polygon);
   if (before.width <= 0 || before.height <= 0) return null;
   const start = snapPoint([box.x, box.y], options.snap);
@@ -189,7 +236,11 @@ export function setRectangleCommand(
   box: Rectangle,
 ): Command | null {
   const value = selected(document, [id])[0];
-  if (!value || value.collection === "seats") return null;
+  if (
+    !value ||
+    (value.collection !== "spaces" && value.collection !== "fixtures")
+  )
+    return null;
   const points = value.shape.polygon;
   const xs = new Set(points.map(([x]) => x)),
     ys = new Set(points.map(([, y]) => y));
@@ -253,7 +304,7 @@ export function duplicateFixturesCommand(
   for (const value of values) {
     const id = newIds.get(value.shape.id);
     if (!id) return null;
-    const moved = translate(value, delta);
+    const moved = translate(value, delta, document);
     if (moved.collection !== "fixtures") return null;
     const command = addShapeCommand(current, {
       collection: "fixtures",
@@ -272,11 +323,11 @@ export function alignShapesCommand(
 ): Command | null {
   const values = selected(document, ids);
   if (values.length < 2) return null;
-  const group = bounds(values.flatMap(shapePoints));
+  const group = bounds(values.flatMap((value) => shapePoints(value, document)));
   return replaceShapesCommand(
     document,
     values.map((value) => {
-      const box = bounds(shapePoints(value));
+      const box = bounds(shapePoints(value, document));
       let dx = 0,
         dy = 0;
       if (alignment === "left") dx = group.x - box.x;
@@ -288,7 +339,7 @@ export function alignShapesCommand(
         dy = group.y + group.height / 2 - box.y - box.height / 2;
       if (alignment === "bottom")
         dy = group.y + group.height - box.y - box.height;
-      return translate(value, [Math.round(dx), Math.round(dy)]);
+      return translate(value, [Math.round(dx), Math.round(dy)], document);
     }),
     "도형 정렬",
   );
