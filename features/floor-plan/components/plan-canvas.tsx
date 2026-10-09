@@ -11,34 +11,22 @@ import {
   zoomAt,
   ensureVisible,
 } from "@/lib/floor-plan/render/camera";
-import { createScene } from "@/lib/floor-plan/render/scene";
 import { createSpatialIndex } from "@/lib/floor-plan/render/spatial-index";
 import { hitTest } from "@/lib/floor-plan/render/hit-test";
 import { createPlanLayers } from "@/lib/floor-plan/render/layers";
 import type {
   Camera,
   PlanShape,
+  PlanScene,
   PlanStates,
   Point,
 } from "@/lib/floor-plan/render/types";
 import { usePlanColors } from "./use-plan-colors";
 import { PlanAccessibility } from "./plan-accessibility";
 import { isPlanTap, pinchCamera } from "@/lib/floor-plan/render/gestures";
+import { usePlanScene } from "./use-plan-scene";
 
-export function PlanCanvas({
-  document,
-  states,
-  selectedSpaceId,
-  selectedSeatId,
-  activeDeskAreaId,
-  flashSpaceIds,
-  interactive = true,
-  className,
-  onSelect,
-  onHover,
-  onClear,
-  timeLabel = "",
-}: {
+type PlanCanvasProps = {
   document: FloorPlanDocument;
   states: PlanStates;
   selectedSpaceId?: string | null;
@@ -51,7 +39,42 @@ export function PlanCanvas({
   onHover?: (shape: PlanShape | null) => void;
   onClear?: () => void;
   timeLabel?: string;
-}) {
+};
+
+export function PlanCanvas(props: PlanCanvasProps) {
+  const { scene } = usePlanScene(props.document);
+  if (!scene)
+    return (
+      <div
+        role="status"
+        aria-busy="true"
+        aria-hidden={props.interactive === false || undefined}
+        className={cn(
+          "bg-muted motion-safe:animate-pulse",
+          props.interactive !== false && "h-[min(60dvh,640px)] min-h-96",
+          props.className,
+        )}
+      >
+        <span className="sr-only">평면도를 준비하고 있어요</span>
+      </div>
+    );
+  return <ReadyPlanCanvas {...props} scene={scene} />;
+}
+
+function ReadyPlanCanvas({
+  scene,
+  states,
+  selectedSpaceId,
+  selectedSeatId,
+  activeDeskAreaId,
+  flashSpaceIds,
+  interactive = true,
+  className,
+  onSelect,
+  onHover,
+  onClear,
+  timeLabel = "",
+}: PlanCanvasProps & { scene: PlanScene }) {
   const host = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
   const status = useRef<HTMLCanvasElement>(null);
@@ -63,7 +86,6 @@ export function PlanCanvas({
     id: string | null;
   } | null>(null);
   const [paintEpoch, setPaintEpoch] = useState(0);
-  const scene = useMemo(() => createScene(document), [document]);
   const index = useMemo(() => createSpatialIndex(scene.shapes), [scene]);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const fitted = useMemo(() => fit(scene.bounds, viewport), [scene, viewport]);
