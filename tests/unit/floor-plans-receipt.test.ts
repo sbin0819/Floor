@@ -37,7 +37,12 @@ const receipt: FloorPlansReceipt = {
       createdBy: "00000000-0000-4000-8000-000000000003",
     },
   ],
-  skippedFloorIds: ["00000000-0000-4000-8000-000000000004"],
+  skipped: [
+    {
+      floorId: "00000000-0000-4000-8000-000000000004",
+      reason: "existing_plan",
+    },
+  ],
 };
 let directory: string;
 beforeEach(async () => {
@@ -85,16 +90,43 @@ describe("private floor plan completion receipts", () => {
       (await stat(join(directory, floorPlansReceiptFilename(targetHash))))
         .mode & 0o777,
     ).toBe(0o600);
-    await expect(
-      store.writeFloorPlansReceipt({
-        ...receipt,
-        manifestHash: "c".repeat(64),
-      }),
-    ).rejects.toThrow();
+    await expect(store.writeFloorPlansReceipt(receipt)).rejects.toThrow();
     expect(await store.readFloorPlansReceipt(targetHash)).toEqual(receipt);
     expect(await readdir(directory)).toEqual([
       floorPlansReceiptFilename(targetHash),
     ]);
+  });
+  it("preserves the first receipt and exclusively appends an audit file only for later additions", async () => {
+    const store = createFloorPlansReceiptStore(directory);
+    await store.writeFloorPlansReceipt(receipt);
+    const next: FloorPlansReceipt = {
+      ...receipt,
+      appliedAt: "2026-10-13T03:00:00.000Z",
+      added: [
+        {
+          ...receipt.added[0]!,
+          id: "00000000-0000-4000-8000-000000000005",
+          floorId: receipt.skipped[0]!.floorId,
+        },
+      ],
+      skipped: [
+        { floorId: receipt.added[0]!.floorId, reason: "existing_plan" },
+      ],
+    };
+    await store.writeFloorPlansReceipt(next);
+    const runFile = `${floorPlansReceiptFilename(targetHash)}.run-${hashFloorPlansValue(next)}.json`;
+    expect(
+      JSON.parse(await readFile(join(directory, runFile), "utf8")),
+    ).toEqual(next);
+    expect((await stat(join(directory, runFile))).mode & 0o777).toBe(0o600);
+    expect(await store.readFloorPlansReceipt(targetHash)).toEqual(receipt);
+    await expect(store.writeFloorPlansReceipt(next)).rejects.toThrow();
+    await expect(
+      store.writeFloorPlansReceipt({ ...next, added: [] }),
+    ).rejects.toThrow();
+    expect((await readdir(directory)).sort()).toEqual(
+      [floorPlansReceiptFilename(targetHash), runFile].sort(),
+    );
   });
   it("allows only one of two competing completion writes", async () => {
     const store = createFloorPlansReceiptStore(directory);
@@ -172,12 +204,51 @@ describe("private floor plan completion receipts", () => {
     expect(await store.readFloorPlansReceipt("c".repeat(64))).not.toBeNull();
     expect(await store.archiveFloorPlansReceipt(targetHash)).toBeNull();
   });
+  it("archives all follow-up records for only the reset target", async () => {
+    const store = createFloorPlansReceiptStore(directory);
+    const next = { ...receipt, appliedAt: "2026-10-13T03:00:00.000Z" };
+    await store.writeFloorPlansReceipt(receipt);
+    await store.writeFloorPlansReceipt(next);
+    await store.writeFloorPlansReceipt({
+      ...receipt,
+      targetHash: "c".repeat(64),
+    });
+    await store.writeFloorPlansReceipt({ ...next, targetHash: "c".repeat(64) });
+    const before = await readdir(directory);
+    const own = before.filter((name) =>
+      name.startsWith(floorPlansReceiptFilename(targetHash)),
+    );
+    const other = before.filter((name) => !own.includes(name));
+    expect(own).toHaveLength(2);
+    await store.archiveFloorPlansReceipt(targetHash);
+    const after = await readdir(directory);
+    expect(after.filter((name) => other.includes(name)).sort()).toEqual(
+      other.sort(),
+    );
+    expect(
+      after.filter((name) => name.endsWith(".reset-archive")),
+    ).toHaveLength(2);
+    for (const name of own) {
+      expect(after).not.toContain(name);
+      const archived = after.find(
+        (value) =>
+          value.startsWith(`${name}.`) && value.endsWith(".reset-archive"),
+      )!;
+      expect(
+        JSON.parse(await readFile(join(directory, archived), "utf8")),
+      ).toEqual(name.includes(".run-") ? next : receipt);
+    }
+    expect(await store.archiveFloorPlansReceipt(targetHash)).toBeNull();
+  });
   it.each(["duplicate floor", "duplicate id", "cross target", "bad hash"])(
     "rejects %s core options",
     (kind) => {
       const value = structuredClone(receipt);
       if (kind === "duplicate floor")
-        value.skippedFloorIds.push(value.added[0]!.floorId);
+        value.skipped.push({
+          floorId: value.added[0]!.floorId,
+          reason: "existing_plan",
+        });
       if (kind === "duplicate id")
         value.added.push({
           ...value.added[0]!,

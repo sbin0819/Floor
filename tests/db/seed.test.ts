@@ -32,7 +32,7 @@ import {
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import { canAccess, canAccessFloor } from "@/lib/permissions/can-access";
 import { loadSeedData } from "@/lib/seed/data";
-import { loadSeedPlans } from "@/lib/seed/plans";
+import { loadSeedPlans } from "@/lib/seed/seed-plans";
 import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
 import { runSeed } from "@/lib/seed/run-seed";
 import { getOpenHours } from "@/lib/time/open-hours";

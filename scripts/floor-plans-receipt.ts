@@ -1,9 +1,18 @@
 import { constants } from "node:fs";
-import { link, mkdir, mkdtemp, open, rmdir, unlink } from "node:fs/promises";
+import {
+  link,
+  mkdir,
+  mkdtemp,
+  open,
+  readdir,
+  rmdir,
+  unlink,
+} from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import {
   floorPlansReceiptSchema,
+  hashFloorPlansValue,
   type FloorPlansReceipt,
 } from "@/lib/seed/floor-plans-receipt";
 import { SeedError } from "@/lib/seed/errors";
@@ -34,7 +43,7 @@ async function syncDirectory(directory: string) {
 export function createFloorPlansReceiptStore(
   directory = resolve(process.cwd(), ".floor-local", "seed-receipts"),
 ) {
-  return {
+  const store = {
     async readFloorPlansReceipt(
       targetHash: string,
     ): Promise<FloorPlansReceipt | null> {
@@ -81,8 +90,31 @@ export function createFloorPlansReceiptStore(
         } finally {
           await file.close();
         }
-        // DB 커밋 뒤에만 배타적으로 공개하며, 기존 표식을 덮어쓰지 않는다.
-        await link(temporary, target);
+        // 첫 기록은 보존하고 이후 추가분은 별도 감사 파일로 배타 저장한다.
+        try {
+          await link(temporary, target);
+        } catch (error) {
+          if (
+            error === null ||
+            typeof error !== "object" ||
+            !("code" in error) ||
+            error.code !== "EEXIST"
+          )
+            throw error;
+          const previous = await store.readFloorPlansReceipt(
+            receipt.targetHash,
+          );
+          if (
+            !previous ||
+            !receipt.added.length ||
+            hashFloorPlansValue(previous) === hashFloorPlansValue(receipt)
+          )
+            throw error;
+          await link(
+            temporary,
+            `${target}.run-${hashFloorPlansValue(receipt)}.json`,
+          );
+        }
         await syncDirectory(directory);
       } finally {
         await unlink(temporary).catch(() => {});
@@ -91,31 +123,45 @@ export function createFloorPlansReceiptStore(
     },
     async archiveFloorPlansReceipt(targetHash: string): Promise<string | null> {
       const filename = floorPlansReceiptFilename(targetHash);
-      const target = join(directory, filename);
-      const file = await open(target, readFlags).catch((error: unknown) => {
-        if (missing(error)) return null;
+      const names = await readdir(directory).catch((error: unknown) => {
+        if (missing(error)) return [];
         throw error;
       });
-      if (!file) return null;
-      try {
-        const original = await file.stat();
-        if (!original.isFile()) throw new Error("Invalid receipt");
-        const archived = `${filename}.${randomUUID()}.reset-archive`;
-        await link(target, join(directory, archived));
-        const current = await open(target, readFlags);
+      const prefix = `${filename}.run-`;
+      const selected = names
+        .filter(
+          (name) =>
+            name === filename ||
+            (name.startsWith(prefix) &&
+              /^[a-f0-9]{64}\.json$/u.test(name.slice(prefix.length))),
+        )
+        .sort();
+      let firstArchive: string | null = null;
+      for (const name of selected) {
+        const target = join(directory, name);
+        const file = await open(target, readFlags);
         try {
-          const stat = await current.stat();
-          if (stat.ino !== original.ino || stat.dev !== original.dev)
-            throw new Error("Receipt changed");
+          const original = await file.stat();
+          if (!original.isFile()) throw new Error("Invalid receipt");
+          const archived = `${name}.${randomUUID()}.reset-archive`;
+          await link(target, join(directory, archived));
+          const current = await open(target, readFlags);
+          try {
+            const stat = await current.stat();
+            if (stat.ino !== original.ino || stat.dev !== original.dev)
+              throw new Error("Receipt changed");
+          } finally {
+            await current.close();
+          }
+          await unlink(target);
+          await syncDirectory(directory);
+          firstArchive ??= archived;
         } finally {
-          await current.close();
+          await file.close();
         }
-        await unlink(target);
-        await syncDirectory(directory);
-        return archived;
-      } finally {
-        await file.close();
       }
+      return firstArchive;
     },
   };
+  return store;
 }

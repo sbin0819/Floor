@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import {
   afterAll,
@@ -12,13 +12,13 @@ import {
 } from "vitest";
 import * as schema from "@/lib/db/schema";
 import * as authModule from "@/lib/auth/auth";
-import * as planDal from "@/lib/dal/seed-floor-plans";
+import * as seedDal from "@/lib/dal/seed";
 import {
   captureSeedRound2Audit,
   compareSeedRound2Audit,
 } from "@/lib/dal/seed-round2-audit";
 import { loadSeedData } from "@/lib/seed/data";
-import { loadSeedPlans } from "@/lib/seed/plans";
+import { loadSeedPlans } from "@/lib/seed/seed-plans";
 import {
   hashFloorPlansValue,
   type FloorPlansReceipt,
@@ -151,7 +151,7 @@ describe("append-only floor plan seed", () => {
     const result = await apply();
     expect(result.counts).toEqual({ floorPlans: 11 });
     expect(result.floorPlans?.receipt.added).toHaveLength(11);
-    expect(result.floorPlans?.receipt.skippedFloorIds).toEqual([]);
+    expect(result.floorPlans?.receipt.skipped).toEqual([]);
     const rows = await database.db.select().from(floorPlans);
     expect(rows).toHaveLength(11);
     for (const plan of plans) {
@@ -202,7 +202,9 @@ describe("append-only floor plan seed", () => {
     const before = await database.db.select().from(floorPlans);
     const result = await apply();
     expect(result.counts.floorPlans).toBe(8);
-    expect(result.floorPlans!.receipt.skippedFloorIds.sort()).toEqual(
+    expect(
+      result.floorPlans!.receipt.skipped.map(({ floorId }) => floorId).sort(),
+    ).toEqual(
       plans
         .slice(0, 3)
         .map(({ floorId }) => floorId)
@@ -239,10 +241,14 @@ describe("append-only floor plan seed", () => {
       .where(eq(floors.id, first.floorId));
     const before = await captureSeedRound2Audit({}, database.db);
     statements.length = 0;
-    expect((await apply(receipt)).floorPlans).toEqual({
-      applied: false,
-      receipt,
-    });
+    const repeated = await apply(receipt);
+    expect(repeated.floorPlans?.applied).toBe(false);
+    expect(repeated.floorPlans?.receipt.added).toEqual([]);
+    expect(
+      repeated.floorPlans?.receipt.skipped.every(
+        ({ reason }) => reason === "existing_plan",
+      ),
+    ).toBe(true);
     expect(writes()).toEqual([]);
     expect(
       compareSeedRound2Audit(
@@ -256,27 +262,17 @@ describe("append-only floor plan seed", () => {
     statements.length = 0;
     const result = await apply();
     expect(result.counts.floorPlans).toBe(0);
-    expect(result.floorPlans!.receipt.skippedFloorIds).toHaveLength(11);
+    expect(result.floorPlans!.receipt.skipped).toHaveLength(11);
     expect(writes()).toEqual([]);
   });
   it.each([
-    "missing floor",
     "wrong floor parent",
-    "missing space",
-    "wrong space parent",
     "missing author",
     "unverified author",
     "fixed ID collision",
     "foreign pointer",
   ])("rejects %s before changing data", async (kind) => {
     const first = plans[0]!;
-    if (kind === "missing floor")
-      await database.db
-        .delete(spaces)
-        .where(eq(spaces.floorId, first.floorId))
-        .then(() =>
-          database.db.delete(floors).where(eq(floors.id, first.floorId)),
-        );
     if (kind === "wrong floor parent")
       await database.db
         .update(floors)
@@ -288,20 +284,6 @@ describe("append-only floor plan seed", () => {
           )!.id,
         })
         .where(eq(floors.id, first.floorId));
-    if (kind === "missing space")
-      await database.db
-        .delete(spaces)
-        .where(
-          and(
-            eq(spaces.floorId, plans[1]!.floorId),
-            eq(spaces.id, plans[1]!.document.spaces[0]!.spaceId),
-          ),
-        );
-    if (kind === "wrong space parent")
-      await database.db
-        .update(spaces)
-        .set({ floorId: plans[1]!.floorId })
-        .where(eq(spaces.id, first.document.spaces[0]!.spaceId));
     if (kind === "missing author") await database.db.delete(users);
     if (kind === "unverified author")
       await database.db.update(users).set({ emailVerified: false });
@@ -326,14 +308,12 @@ describe("append-only floor plan seed", () => {
     ).toEqual({ ok: true, issues: [], added: [] });
   });
   it("rolls back all inserted plans and floor pointers after an intermediate failure", async () => {
-    const insert = planDal.insertSeedFloorPlan;
+    const insert = seedDal.putSeedPlan;
     let calls = 0;
-    vi.spyOn(planDal, "insertSeedFloorPlan").mockImplementation(
-      async (...args) => {
-        if (++calls === 3) throw new Error("fixture failure");
-        return insert(...args);
-      },
-    );
+    vi.spyOn(seedDal, "putSeedPlan").mockImplementation(async (...args) => {
+      if (++calls === 3) throw new Error("fixture failure");
+      return insert(...args);
+    });
     const before = await captureSeedRound2Audit({}, database.db);
     await expect(apply()).rejects.toThrow(SeedError);
     expect(
@@ -343,42 +323,158 @@ describe("append-only floor plan seed", () => {
       ),
     ).toEqual({ ok: true, issues: [], added: [] });
   });
-  it.each([
-    "manifest",
-    "future",
-    "coverage",
-    "creator",
-    "missing anchor",
-    "database",
-  ])("rejects %s drift without repair", async (kind) => {
+  it("treats an earlier receipt as an audit record, not authority to repair or reject existing plans", async () => {
     const receipt = (await apply()).floorPlans!.receipt;
-    if (kind === "manifest") receipt.manifestHash = "0".repeat(64);
-    if (kind === "future") receipt.appliedAt = "2099-01-01T00:00:00.000Z";
-    if (kind === "coverage") receipt.added.pop();
-    if (kind === "creator") receipt.added[0]!.createdBy = crypto.randomUUID();
-    if (kind === "missing anchor") {
-      const target = receipt.added[0]!;
-      await database.db
-        .update(floors)
-        .set({ publishedPlanId: null })
-        .where(eq(floors.id, target.floorId));
-      await database.db.delete(floorPlans).where(eq(floorPlans.id, target.id));
-    }
+    receipt.manifestHash = "0".repeat(64);
+    receipt.added.pop();
+    receipt.added[0]!.createdBy = crypto.randomUUID();
+    const before = await captureSeedRound2Audit({}, database.db);
+    statements.length = 0;
+    expect((await apply(receipt)).counts.floorPlans).toBe(0);
+    expect(writes()).toEqual([]);
+    expect(
+      compareSeedRound2Audit(
+        before,
+        await captureSeedRound2Audit({}, database.db),
+      ),
+    ).toEqual({ ok: true, issues: [], added: [] });
+  });
+  it("rejects a different database before changing data", async () => {
     statements.length = 0;
     await expect(
-      apply(
-        receipt,
-        kind === "database"
-          ? {
-              floorPlans: {
-                targetHash: receipt.targetHash,
-                receipt,
-                databaseName: "wrong-db",
-              },
-            }
-          : {},
-      ),
+      apply(null, {
+        floorPlans: {
+          targetHash: hashFloorPlansValue(["fake.seed.test", "wrong-db"]),
+          receipt: null,
+          databaseName: "wrong-db",
+        },
+      }),
     ).rejects.toThrow(SeedError);
+    expect(writes()).toEqual([]);
+  });
+  it.each([
+    "missing floor",
+    "missing space",
+    "archived space",
+    "extra active space",
+  ])(
+    "skips a %s with a reason and leaves that floor untouched",
+    async (kind) => {
+      const plan = plans.find(({ document }) => document.seats.length === 0)!;
+      const space = data.spaces.find(
+        ({ id }) => id === plan.document.spaces[0]!.spaceId,
+      )!;
+      if (kind === "missing floor") {
+        await database.db
+          .delete(spaces)
+          .where(eq(spaces.floorId, plan.floorId));
+        await database.db.delete(floors).where(eq(floors.id, plan.floorId));
+      }
+      if (kind === "missing space")
+        await database.db.delete(spaces).where(eq(spaces.id, space.id));
+      if (kind === "archived space")
+        await database.db
+          .update(spaces)
+          .set({ archivedAt: now })
+          .where(eq(spaces.id, space.id));
+      if (kind === "extra active space")
+        await database.db.insert(spaces).values({
+          ...space,
+          id: crypto.randomUUID(),
+          name: "운영자가 추가한 공간",
+        });
+      const floorBefore = await database.db
+        .select()
+        .from(floors)
+        .where(eq(floors.id, plan.floorId));
+      const spacesBefore = await database.db
+        .select()
+        .from(spaces)
+        .where(eq(spaces.floorId, plan.floorId));
+      const result = await apply();
+      expect(result.counts.floorPlans).toBe(10);
+      expect(result.floorPlans!.receipt.skipped).toEqual([
+        {
+          floorId: plan.floorId,
+          reason: kind === "missing floor" ? "missing_floor" : "changed_spaces",
+        },
+      ]);
+      expect(
+        await database.db
+          .select()
+          .from(floorPlans)
+          .where(eq(floorPlans.floorId, plan.floorId)),
+      ).toEqual([]);
+      expect(
+        await database.db
+          .select()
+          .from(floors)
+          .where(eq(floors.id, plan.floorId)),
+      ).toEqual(floorBefore);
+      expect(
+        await database.db
+          .select()
+          .from(spaces)
+          .where(eq(spaces.floorId, plan.floorId)),
+      ).toEqual(spacesBefore);
+    },
+  );
+  it("skips both changed floors when a non-desk space moves", async () => {
+    const source = plans.find(({ document }) => document.seats.length === 0)!;
+    const target = plans.find(({ floorId }) => floorId !== source.floorId)!;
+    await database.db
+      .update(spaces)
+      .set({ floorId: target.floorId })
+      .where(eq(spaces.id, source.document.spaces[0]!.spaceId));
+    const result = await apply();
+    expect(result.counts.floorPlans).toBe(9);
+    expect(result.floorPlans!.receipt.skipped).toEqual(
+      [source.floorId, target.floorId]
+        .sort()
+        .map((floorId) => ({ floorId, reason: "changed_spaces" })),
+    );
+  });
+  it("ignores extra archived spaces and changes to desk rows in the non-desk comparison", async () => {
+    const space = data.spaces.find(({ type }) => type !== "desk")!;
+    await database.db.insert(spaces).values({
+      ...space,
+      id: crypto.randomUUID(),
+      name: "보관된 추가 공간",
+      archivedAt: now,
+    });
+    await database.db
+      .update(spaces)
+      .set({ archivedAt: now })
+      .where(eq(spaces.type, "desk"));
+    expect((await apply()).counts.floorPlans).toBe(11);
+  });
+  it("adds a floor created after the first run without changing the earlier plans", async () => {
+    const plan = plans.find(({ document }) => document.seats.length === 0)!;
+    const floor = data.floors.find(({ id }) => id === plan.floorId)!;
+    const floorSpaces = data.spaces.filter(
+      ({ floorId }) => floorId === floor.id,
+    );
+    await database.db.delete(spaces).where(eq(spaces.floorId, floor.id));
+    await database.db.delete(floors).where(eq(floors.id, floor.id));
+    const first = (await apply()).floorPlans!.receipt;
+    expect(first.added).toHaveLength(10);
+    expect(first.skipped).toEqual([
+      { floorId: floor.id, reason: "missing_floor" },
+    ]);
+    await database.db.insert(floors).values(floor);
+    await database.db.insert(spaces).values(floorSpaces);
+    const before = await database.db.select().from(floorPlans);
+    statements.length = 0;
+    const result = await apply(first);
+    expect(result.counts.floorPlans).toBe(1);
+    expect(result.floorPlans!.receipt.added).toEqual([
+      { id: plan.id, floorId: floor.id, createdBy: admin },
+    ]);
+    const after = await database.db.select().from(floorPlans);
+    expect(after.filter(({ id }) => id !== plan.id)).toEqual(before);
+    expect(writes()).toHaveLength(2);
+    statements.length = 0;
+    expect((await apply(first)).counts.floorPlans).toBe(0);
     expect(writes()).toEqual([]);
   });
   it.each([

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { asc, inArray, or, sql } from "drizzle-orm";
 import { floorPlans, floors, spaces, users } from "@/lib/db/schema";
 import { SeedError } from "@/lib/seed/errors";
 import type { DalDatabase } from "./database";
@@ -47,11 +47,16 @@ export async function readSeedPlanRows(
       ),
     );
 }
-export async function lockSeedPlanSpaces(ids: string[], db: DalDatabase) {
+export async function lockSeedPlanSpaces(floorIds: string[], db: DalDatabase) {
   return db
-    .select({ id: spaces.id, floorId: spaces.floorId, type: spaces.type })
+    .select({
+      id: spaces.id,
+      floorId: spaces.floorId,
+      type: spaces.type,
+      archivedAt: spaces.archivedAt,
+    })
     .from(spaces)
-    .where(inArray(spaces.id, ids))
+    .where(inArray(spaces.floorId, floorIds))
     .orderBy(asc(spaces.id))
     .for("share");
 }
@@ -66,17 +71,4 @@ export async function lockSeedPlanAuthors(emails: string[], db: DalDatabase) {
     .where(inArray(users.email, emails))
     .orderBy(asc(users.id))
     .for("share");
-}
-export async function insertSeedFloorPlan(
-  input: typeof floorPlans.$inferInsert,
-  db: DalDatabase,
-) {
-  await db.insert(floorPlans).values(input);
-  const rows = await db
-    .update(floors)
-    .set({ publishedPlanId: input.id })
-    .where(and(eq(floors.id, input.floorId), isNull(floors.publishedPlanId)))
-    .returning({ id: floors.id });
-  if (rows.length !== 1)
-    throw new SeedError("평면도 연결이 바뀌었어요. 변경을 되돌렸어요.");
 }

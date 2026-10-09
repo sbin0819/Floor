@@ -45,7 +45,7 @@ import type { BookingRound2Receipt } from "@/lib/seed/booking-round2-receipt";
 import { resetSeedDatabase } from "@/lib/dal/seed-reset";
 import { seedMigrations } from "./migrations";
 import { applyChatSpacesSeed } from "./chat-spaces";
-import { loadSeedPlans } from "./plans";
+import { loadSeedPlans } from "./seed-plans";
 import { applyFloorPlansSeed } from "./floor-plans";
 import {
   validateFloorPlansOptions,
@@ -135,7 +135,15 @@ export async function runSeed({
   let current = "시드 데이터";
   try {
     const data = loadSeedData();
-    const plans = [...data.floorPlans, ...loadSeedPlans(data)];
+    // 지점·예약·채팅 추가는 별도 평면도 manifest의 범위를 요구하지 않는다.
+    const includePlans =
+      floorPlans !== undefined ||
+      (branchIds === undefined &&
+        bookingRound2 === undefined &&
+        chatSpaces === undefined);
+    const plans = includePlans
+      ? [...data.floorPlans, ...loadSeedPlans(data)]
+      : data.floorPlans;
     if (floorPlans !== undefined) {
       current = "평면도 추가 전용 데이터";
       return await withTransaction(

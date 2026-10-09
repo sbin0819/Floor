@@ -803,7 +803,12 @@ describe("floor-plans additions command", () => {
     manifestHash: "a".repeat(64),
     appliedAt: currentTime.toISOString(),
     added: [],
-    skippedFloorIds: [loadSeedData().floorPlans[0]!.floorId],
+    skipped: [
+      {
+        floorId: loadSeedData().floorPlans[0]!.floorId,
+        reason: "existing_plan",
+      },
+    ],
   };
   const applied = {
     counts: { floorPlans: 10 },
@@ -866,7 +871,7 @@ describe("floor-plans additions command", () => {
     expect(await command).toBe(0);
     expect(d.writeFloorPlansReceipt).toHaveBeenCalledExactlyOnceWith(receipt);
     expect(d.stdout).toHaveBeenCalledWith(
-      expect.stringContaining("평면도가 있어 건너뛴 층: 강남점"),
+      expect.stringMatching(/건너뛴 층: 강남점.*평면도가 이미 있어요/u),
     );
     const output = JSON.stringify([d.stdout.mock.calls, d.stderr.mock.calls]);
     for (const secret of [
@@ -890,7 +895,53 @@ describe("floor-plans additions command", () => {
     expect(await runSeedCommand(["--floor-plans"], d)).toBe(0);
     expect(d.writeFloorPlansReceipt).not.toHaveBeenCalled();
     expect(d.stdout).toHaveBeenCalledWith(
-      "평면도 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
+      "현재 DB의 평면도를 확인했어요. DB를 변경하지 않았어요.",
+    );
+  });
+  it("records later additions even when an earlier receipt exists", async () => {
+    const d = deps();
+    d.readFloorPlansReceipt.mockResolvedValue(receipt);
+    const next = {
+      ...receipt,
+      added: [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          floorId: "00000000-0000-4000-8000-000000000002",
+          createdBy: "00000000-0000-4000-8000-000000000003",
+        },
+      ],
+    };
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      counts: { floorPlans: 1 },
+      floorPlans: { applied: true, receipt: next },
+    });
+    expect(await runSeedCommand(["--floor-plans"], d)).toBe(0);
+    expect(d.writeFloorPlansReceipt).toHaveBeenCalledExactlyOnceWith(next);
+    expect(
+      d.writeFloorPlansReceipt.mock.invocationCallOrder[0],
+    ).toBeGreaterThan(d.runSeed.mock.invocationCallOrder[0]!);
+  });
+  it("records a first no-write audit and prints missing-floor and changed-space reasons", async () => {
+    const d = deps();
+    const seed = loadSeedData();
+    const skipped: FloorPlansReceipt["skipped"] = [
+      { floorId: seed.floors[0]!.id, reason: "missing_floor" },
+      { floorId: seed.floors[1]!.id, reason: "changed_spaces" },
+    ];
+    const next = { ...receipt, skipped };
+    d.runSeed.mockResolvedValue({
+      ...applied,
+      counts: { floorPlans: 0 },
+      floorPlans: { applied: false, receipt: next },
+    });
+    expect(await runSeedCommand(["--floor-plans"], d)).toBe(0);
+    expect(d.writeFloorPlansReceipt).toHaveBeenCalledExactlyOnceWith(next);
+    expect(d.stdout).toHaveBeenCalledWith(
+      expect.stringContaining("DB에 층이 없어요"),
+    );
+    expect(d.stdout).toHaveBeenCalledWith(
+      expect.stringContaining("보관되지 않은 공간 구성이 달라요"),
     );
   });
   it("rejects unreadable receipts before DB work", async () => {

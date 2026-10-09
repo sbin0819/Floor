@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 import manifest from "@/docs/spec/examples/seed-plans.json";
 import { loadSeedData } from "@/lib/seed/data";
-import { loadSeedPlans, parseSeedPlans } from "@/lib/seed/plans";
+import { loadSeedPlans, parseSeedPlans } from "@/lib/seed/seed-plans";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
 
 const seed = loadSeedData();

@@ -22,6 +22,7 @@ import { createMemoryEmailSender } from "@/lib/email/memory";
 import { preflightSeedBranches } from "@/lib/seed/add-branches";
 import * as dataLoader from "@/lib/seed/data";
 import * as photoLoader from "@/lib/seed/photos";
+import * as planLoader from "@/lib/seed/seed-plans";
 import { runSeed } from "@/lib/seed/run-seed";
 import { localDate, localTime } from "@/lib/time/zoned";
 import { createTestDatabase, type TestDatabase } from "./helper";
@@ -209,6 +210,9 @@ describe("transactional additive-only branch seed", () => {
     vi.spyOn(photoLoader, "loadSeedPhotos").mockReturnValue(
       structuredClone(fixtures.photos),
     );
+    vi.spyOn(planLoader, "loadSeedPlans").mockImplementation(() => {
+      throw new Error("Scoped seed must not load additional floor plans");
+    });
     vi.spyOn(authModule, "getAuth").mockImplementation(() => {
       throw new Error("Scoped seed must not initialize auth");
     });

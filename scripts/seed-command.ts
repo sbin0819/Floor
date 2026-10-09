@@ -356,7 +356,7 @@ export async function runSeedCommand(
         throw new SeedError(
           "평면도 적용 결과를 확인하지 못했어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.",
         );
-      if (result.floorPlans.applied) {
+      if (result.floorPlans.applied || floorPlans.receipt === null) {
         appliedWithoutReceipt = true;
         if (result.floorPlans.receipt.targetHash !== floorPlans.targetHash)
           throw new Error("Receipt target mismatch");
@@ -366,14 +366,19 @@ export async function runSeedCommand(
       dependencies.stdout(
         result.floorPlans.applied
           ? "평면도 추가분을 적용하고 완료 표식을 저장했어요."
-          : "평면도 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
+          : "현재 DB의 평면도를 확인했어요. DB를 변경하지 않았어요.",
       );
       const data = loadSeedData();
-      for (const id of result.floorPlans.receipt.skippedFloorIds) {
+      for (const { floorId: id, reason } of result.floorPlans.receipt.skipped) {
         const floor = data.floors.find((row) => row.id === id);
         const branch = data.branches.find((row) => row.id === floor?.branchId);
+        const explanation = {
+          missing_floor: "DB에 층이 없어요",
+          existing_plan: "평면도가 이미 있어요",
+          changed_spaces: "보관되지 않은 공간 구성이 달라요",
+        }[reason];
         dependencies.stdout(
-          `평면도가 있어 건너뛴 층: ${branch?.name ?? "시드 지점"} ${floor?.name ?? id}`,
+          `건너뛴 층: ${branch?.name ?? "시드 지점"} ${floor?.name ?? id} · ${explanation}`,
         );
       }
       dependencies.stdout(

@@ -17,7 +17,12 @@ export const floorPlansReceiptSchema = z.strictObject({
       createdBy: z.uuid(),
     }),
   ),
-  skippedFloorIds: z.array(z.uuid()),
+  skipped: z.array(
+    z.strictObject({
+      floorId: z.uuid(),
+      reason: z.enum(["missing_floor", "existing_plan", "changed_spaces"]),
+    }),
+  ),
 });
 export type FloorPlansReceipt = z.infer<typeof floorPlansReceiptSchema>;
 export type FloorPlansOptions = {
@@ -52,7 +57,7 @@ export function validateFloorPlansOptions(input: FloorPlansOptions) {
   const rows = result.data;
   const floors = [
     ...rows.added.map(({ floorId }) => floorId),
-    ...rows.skippedFloorIds,
+    ...rows.skipped.map(({ floorId }) => floorId),
   ];
   if (
     new Set(floors).size !== floors.length ||
