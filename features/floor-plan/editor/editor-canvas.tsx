@@ -28,7 +28,10 @@ import {
 import { useEditorStore, useEditorValue } from "./editor-context";
 import { useEditorCanvas } from "./use-editor-canvas";
 import { deleteShapesCommand, type Command } from "./commands";
-import { moveBackgroundCommand } from "./background-commands";
+import {
+  moveBackgroundCommand,
+  setBackgroundCommand,
+} from "./background-commands";
 import { BackgroundCanvas } from "./background-canvas";
 import { moveShapesCommand, resizeShapeCommand } from "./transforms";
 import { createVertexIndex, snapPoint, type SnapResult } from "./snapping";
@@ -313,6 +316,17 @@ export function EditorCanvas({
       }
       const modifier = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
+      if (
+        state.tool === "background" &&
+        (event.key === "Delete" ||
+          event.key === "Backspace" ||
+          (modifier && key === "d"))
+      ) {
+        event.preventDefault();
+        if (!modifier && !backgroundLocked && !scalePoints)
+          state.execute(setBackgroundCommand(state.document, null));
+        return;
+      }
       if (
         state.tool === "background" &&
         !modifier &&

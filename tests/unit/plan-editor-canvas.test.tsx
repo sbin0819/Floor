@@ -292,7 +292,22 @@ describe("editor canvas pointer and keyboard", () => {
     h.down([2000, 2000]);
     h.up([3000, 4000]);
     h.key("ArrowRight");
+    act(() => h.store.getState().select(["a"]));
+    h.key("Delete");
+    h.key("d", { ctrlKey: true });
     expect(h.store.getState().document).toBe(doc);
+  });
+  it("deletes an unlocked background without deleting the previously selected shape", () => {
+    const doc = editorDocument();
+    doc.background = { transform: [10, 0, 0, 10, 0, 0], opacity: 0.35 };
+    const h = harness(editorStore(doc), vi.fn(), { backgroundLocked: false });
+    act(() => h.store.getState().select(["a"]));
+    h.key("m");
+    h.key("Delete");
+    expect(h.store.getState().document.background).toBeUndefined();
+    expect(h.store.getState().document.spaces).toBe(doc.spaces);
+    h.key("z", { ctrlKey: true });
+    expect(h.store.getState().document.background).toEqual(doc.background);
   });
   it("selects unsnapped scale points without editing and cancels with Escape", () => {
     const doc = editorDocument();
