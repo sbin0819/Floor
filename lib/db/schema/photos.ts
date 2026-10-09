@@ -22,6 +22,7 @@ export const spacePhotos = pgTable(
     sortOrder: integer("sort_order").notNull(),
   },
   (table) => [
+    // DEFERRABLE INITIALLY IMMEDIATE는 0031 custom migration이 적용한다.
     unique("space_photos_space_order_unique").on(
       table.spaceId,
       table.sortOrder,

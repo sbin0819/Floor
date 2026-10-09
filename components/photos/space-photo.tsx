@@ -110,6 +110,7 @@ function PhotoImage({
     <>
       <Image
         src={photo.path}
+        unoptimized={photo.path.startsWith("/api/")}
         alt={decorative ? "" : photo.alt}
         fill
         sizes={sizes}

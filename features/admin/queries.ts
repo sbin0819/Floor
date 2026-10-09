@@ -7,11 +7,27 @@ import { createAdminQueries } from "./query-factory";
 import { createRoleSettingsQueries } from "./role-settings-query-factory";
 import { createAnnouncementQueries } from "./announcement-query-factory";
 import { createReportsQueries } from "./reports-query-factory";
+import { createAdminSpaceQueries } from "./space-detail-query-factory";
+import type { AdminSpaceDetailOptions } from "./space-detail-types";
 import type { GetBranchReportsInput } from "./reports-schema";
 import type {
   GetAnnouncementsInput,
   PreviewAnnouncementAudienceInput,
 } from "./announcement-schema";
+
+export async function getAdminSpace(
+  branchId: string,
+  floorId: string,
+  spaceId: string,
+  options?: AdminSpaceDetailOptions,
+) {
+  return createAdminSpaceQueries().getAdminSpace(
+    branchId,
+    floorId,
+    spaceId,
+    options,
+  );
+}
 
 export async function getAnnouncements(input: GetAnnouncementsInput) {
   return createAnnouncementQueries().getAnnouncements(input);

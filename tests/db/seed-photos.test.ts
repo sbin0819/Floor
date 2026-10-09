@@ -253,4 +253,100 @@ describe("transactional photo seeding", () => {
     expect(await database.db.select().from(branches)).toEqual([]);
     expect(await photos()).toEqual([]);
   });
+
+  it("preserves an uploaded photo and its contents when the full seed restores its occupied slot", async () => {
+    await seed();
+    const target = photoFile.spacePhotos[0]!;
+    const before = await photos();
+    const replaced = before.find(
+      (photo) => photo.spaceId === target.spaceId && photo.sortOrder === 0,
+    )!;
+    await database.db
+      .delete(spacePhotos)
+      .where(eq(spacePhotos.id, replaced.id));
+    const id = crypto.randomUUID();
+    const [uploaded] = await database.db
+      .insert(spacePhotos)
+      .values({
+        id,
+        spaceId: target.spaceId,
+        path: `/api/space-photos/${id}.webp`,
+        alt: "운영자가 올린 설명을 보존해요",
+        sortOrder: 0,
+      })
+      .returning();
+    expect((await seed()).counts).toMatchObject({
+      spacePhotos: 65,
+      branchCovers: 5,
+    });
+    const result = await photos();
+    expect(result).toHaveLength(66);
+    expect(result.find((photo) => photo.id === id)).toEqual({
+      ...uploaded,
+      sortOrder: target.photos.length,
+    });
+    expect(
+      result.filter(
+        (photo) =>
+          photo.spaceId === target.spaceId && photo.path.startsWith("/seed/"),
+      ),
+    ).toMatchObject(
+      target.photos.map((photo, sortOrder) => ({
+        ...photo,
+        spaceId: target.spaceId,
+        sortOrder,
+      })),
+    );
+    expect(result.filter((photo) => photo.spaceId !== target.spaceId)).toEqual(
+      before.filter((photo) => photo.spaceId !== target.spaceId),
+    );
+    await seed();
+    expect(await photos()).toEqual(result);
+  });
+
+  it("rolls back the entire full seed when preserved uploads plus restored seed photos exceed ten", async () => {
+    await seed();
+    const target = photoFile.spacePhotos.find(
+      (group) => group.photos.length >= 3,
+    )!;
+    expect(target).toBeDefined();
+    await database.db
+      .delete(spacePhotos)
+      .where(eq(spacePhotos.spaceId, target.spaceId));
+    await database.db.insert(spacePhotos).values(
+      Array.from({ length: 8 }, (_, sortOrder) => {
+        const id = crypto.randomUUID();
+        return {
+          id,
+          spaceId: target.spaceId,
+          path: `/api/space-photos/${id}.webp`,
+          alt: `업로드 사진 ${sortOrder}`,
+          sortOrder,
+        };
+      }),
+    );
+    await database.db
+      .update(branches)
+      .set({ name: "실패하면 유지할 지점명" })
+      .where(eq(branches.id, data.branches[0]!.id));
+    const beforePhotos = await photos();
+    const beforeBranches = await database.db
+      .select()
+      .from(branches)
+      .orderBy(branches.id);
+    const beforeUsers = await database.db
+      .select()
+      .from(users)
+      .orderBy(users.id);
+    await expect(seed()).rejects.toThrow(
+      "시드 사진과 보존할 사진이 10장을 넘어요.",
+    );
+    expect(await photos()).toEqual(beforePhotos);
+    expect(
+      await database.db.select().from(branches).orderBy(branches.id),
+    ).toEqual(beforeBranches);
+    expect(await database.db.select().from(users).orderBy(users.id)).toEqual(
+      beforeUsers,
+    );
+  });
 });
