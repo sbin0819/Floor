@@ -230,6 +230,47 @@ afterEach(() => {
 });
 
 describe("plan canvas lifecycle", () => {
+  it("draws and keeps the keyboard focus in view without repainting the base", () => {
+    const accessible: PlanStates = new Map([
+      [first, { kind: "free", name: "회의실 A" }],
+      [second, { kind: "free", name: "회의실 B" }],
+    ]);
+    const select = vi.fn();
+    const clear = vi.fn();
+    const { container } = render(
+      <PlanCanvas
+        document={plan}
+        states={accessible}
+        onSelect={select}
+        onClear={clear}
+        timeLabel="10시 기준"
+      />,
+    );
+    flushFrames();
+    wheel(host(container), { deltaX: 2000 });
+    flushFrames();
+    act(() =>
+      screen.getByRole("button", { name: "회의실 A, 10시 기준" }).focus(),
+    );
+    flushFrames();
+    expect(painter.render.mock.calls.at(-1)?.[1].focusedId).toBe("room-a");
+    const focused = toScreen([20, 20], lastFrame().camera);
+    expect(focused[0]).toBeGreaterThanOrEqual(24);
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    flushFrames();
+    const room = screen.getByRole("button", { name: "회의실 B, 10시 기준" });
+    expect(room).toHaveFocus();
+    expect(painter.render.mock.calls.at(-1)?.[1].focusedId).toBe("room-b");
+    fireEvent.click(room);
+    expect(select).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "room-b" }),
+    );
+    fireEvent.keyDown(room, { key: "Escape" });
+    expect(clear).toHaveBeenCalledOnce();
+    act(() => screen.getByRole("button", { name: "평면도 확대" }).focus());
+    flushFrames();
+    expect(painter.render.mock.calls.at(-1)?.[1].focusedId).toBeNull();
+  });
   it("creates three DPR-sized hidden layers and paints the initial fit once", () => {
     const { container } = render(
       <PlanCanvas document={plan} states={states} onSelect={vi.fn()} />,

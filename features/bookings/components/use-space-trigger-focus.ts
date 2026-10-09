@@ -40,13 +40,16 @@ export function useSpaceTriggerFocus(isCurrentRoute: () => boolean) {
     }
     if (lastSpace.current === null) return;
     const link = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>(
-        '[aria-label="공간 목록"] a[href], [data-floor-timetable] a[data-space-id]',
+      document.querySelectorAll<HTMLElement>(
+        '[aria-label="공간 목록"] a[href], [data-floor-timetable] a[data-space-id], [data-plan-accessibility] button[data-space-id]:not(:disabled)',
       ),
     ).find(
       (link) =>
         isVisibleLink(link) &&
-        new URL(link.href).searchParams.get("space") === lastSpace.current,
+        (link.dataset.spaceId === lastSpace.current ||
+          (link instanceof HTMLAnchorElement &&
+            new URL(link.href).searchParams.get("space") ===
+              lastSpace.current)),
     );
     link?.focus();
   }, [isCurrentRoute]);

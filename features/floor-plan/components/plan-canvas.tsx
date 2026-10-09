@@ -21,6 +21,7 @@ import type {
   Point,
 } from "@/lib/floor-plan/render/types";
 import { usePlanColors } from "./use-plan-colors";
+import { PlanAccessibility } from "./plan-accessibility";
 
 export function PlanCanvas({
   document,
@@ -28,12 +29,16 @@ export function PlanCanvas({
   selectedSpaceId,
   onSelect,
   onHover,
+  onClear,
+  timeLabel = "",
 }: {
   document: FloorPlanDocument;
   states: PlanStates;
   selectedSpaceId?: string | null;
   onSelect: (shape: PlanShape) => void;
   onHover?: (shape: PlanShape | null) => void;
+  onClear?: () => void;
+  timeLabel?: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
@@ -53,6 +58,8 @@ export function PlanCanvas({
   const [camera, setCamera] = useState<Camera | null>(null);
   const current = camera ?? fitted;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [lastFocusedId, setLastFocusedId] = useState<string | null>(null);
   const colors = usePlanColors();
   const gesture = useRef<{
     id: number;
@@ -120,7 +127,7 @@ export function PlanCanvas({
           colors,
           states,
         },
-        { hoveredId, selectedId: selected?.id },
+        { hoveredId, focusedId, selectedId: selected?.id },
         forceFrame.current,
       );
       forceFrame.current = false;
@@ -134,6 +141,7 @@ export function PlanCanvas({
     colors,
     states,
     hoveredId,
+    focusedId,
     selectedSpaceId,
     paintEpoch,
   ]);
@@ -277,6 +285,23 @@ export function PlanCanvas({
           className="pointer-events-none absolute inset-0 size-full"
         />
       </div>
+      <PlanAccessibility
+        scene={scene}
+        states={states}
+        lastFocusedId={lastFocusedId}
+        selectedSpaceId={selectedSpaceId}
+        timeLabel={timeLabel}
+        onFocus={(shape) => {
+          setFocusedId(shape?.id ?? null);
+          if (!shape) return;
+          setLastFocusedId(shape.id);
+          setCamera((value) =>
+            ensureVisible(value ?? fitted, shape.bounds, viewport),
+          );
+        }}
+        onSelect={choose}
+        onClear={() => onClear?.()}
+      />
       <div className="absolute right-3 bottom-3 flex flex-col rounded-xl border border-border bg-background shadow-sm">
         <Button
           size="icon"

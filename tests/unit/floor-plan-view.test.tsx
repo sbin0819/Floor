@@ -11,6 +11,8 @@ import { floorDayFixture } from "./booking-ui-fixtures";
 
 const navigation = vi.hoisted(() => ({
   change: vi.fn(),
+  rememberSpaceTrigger: vi.fn(),
+  restoreSpaceTrigger: vi.fn(),
   isCurrentRoute: vi.fn(() => true),
   location: {
     floorId: "floor",
@@ -28,12 +30,15 @@ vi.mock("@/features/floor-plan/components/plan-canvas", () => ({
     states,
     onSelect,
     onHover,
+    onClear,
   }: {
     states: PlanStates;
     onSelect: (shape: PlanShape) => void;
     onHover: (shape: PlanShape) => void;
+    onClear: () => void;
   }) => (
     <div>
+      <button onClick={onClear}>평면도 선택 해제</button>
       {createScene(floorPlanSchema.parse(planSource))
         .shapes.filter(
           (shape) => shape.kind === "space" && states.has(shape.spaceId!),
@@ -41,6 +46,8 @@ vi.mock("@/features/floor-plan/components/plan-canvas", () => ({
         .map((shape) => (
           <button
             key={shape.id}
+            data-plan-shape-id={shape.id}
+            data-space-id={shape.spaceId}
             onClick={() => onSelect(shape)}
             onMouseEnter={() => onHover(shape)}
           >
@@ -115,6 +122,7 @@ describe("floor plan view", () => {
     mount();
     const room = await screen.findByRole("button", { name: "회의실 B" });
     fireEvent.click(room);
+    expect(navigation.rememberSpaceTrigger).toHaveBeenCalledWith(room, first);
     expect(navigation.change).toHaveBeenCalledWith(
       expect.objectContaining({ spaceId: first, detail: false }),
       `/branches/branch/floors/floor?date=2026-10-07&space=${first}&view=plan&people=6`,
@@ -123,6 +131,26 @@ describe("floor plan view", () => {
     fireEvent.click(screen.getByRole("button", { name: "전용 공간" }));
     navigation.isCurrentRoute.mockReturnValue(false);
     fireEvent.click(room);
+    expect(navigation.change).not.toHaveBeenCalled();
+  });
+  it("clears selection and restores its trigger without dropping filters", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(document)),
+    );
+    mount();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "평면도 선택 해제" }),
+    );
+    expect(navigation.change).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: null, detail: false }),
+      "/branches/branch/floors/floor?date=2026-10-07&view=plan&people=6",
+      { replace: true },
+    );
+    expect(navigation.restoreSpaceTrigger).toHaveBeenCalledOnce();
+    navigation.change.mockClear();
+    navigation.isCurrentRoute.mockReturnValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "평면도 선택 해제" }));
     expect(navigation.change).not.toHaveBeenCalled();
   });
   it("only includes safe status text in hover and gives a retry on failure", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import type { FloorDayData } from "@/features/bookings/types";
@@ -9,7 +9,7 @@ import { carryFloorQuery } from "@/features/bookings/people-filter";
 import { useFloorSelection } from "@/features/bookings/components/branch-workspace";
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
 import type { PlanShape } from "@/lib/floor-plan/render/types";
-import { initialPlanTime } from "../time";
+import { initialPlanTime, planTimeValueText } from "../time";
 import { planStatesAt, planSummary } from "../states";
 import { PlanCanvas } from "./plan-canvas";
 import { PlanTimeBar } from "./plan-time-bar";
@@ -31,6 +31,7 @@ export function FloorPlanView({
   planId: string;
 }) {
   const selection = useFloorSelection();
+  const root = useRef<HTMLElement>(null);
   const [at, setAt] = useState(() => initialPlanTime(data));
   const [hover, setHover] = useState<PlanShape | null>(null);
   const query = useQuery({
@@ -49,6 +50,10 @@ export function FloorPlanView({
       (space) => space.id.toLowerCase() === shape.spaceId?.toLowerCase(),
     );
     if (!space || space.kind !== "accessible") return;
+    const trigger = root.current?.querySelector<HTMLElement>(
+      `[data-plan-shape-id][data-space-id="${space.id}"]`,
+    );
+    if (trigger) selection.rememberSpaceTrigger(trigger, space.id);
     selection.change(
       { ...selection.location, spaceId: space.id, detail: false },
       carryFloorQuery(
@@ -59,6 +64,7 @@ export function FloorPlanView({
   };
   return (
     <section
+      ref={root}
       aria-label="층 평면도"
       className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
     >
@@ -94,6 +100,23 @@ export function FloorPlanView({
             selectedSpaceId={selection?.location.spaceId}
             onSelect={choose}
             onHover={setHover}
+            timeLabel={
+              at === null
+                ? "쉬는 날"
+                : `${planTimeValueText(at, data.branch.timezone)} 기준`
+            }
+            onClear={() => {
+              if (!selection?.isCurrentRoute()) return;
+              selection.change(
+                { ...selection.location, spaceId: null, detail: false },
+                carryFloorQuery(
+                  floorHref(data.branch.id, data.floor.id, data.date),
+                  selection.search,
+                ),
+                { replace: true },
+              );
+              selection.restoreSpaceTrigger();
+            }}
           />
           {hovered && (
             <div
