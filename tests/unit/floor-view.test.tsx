@@ -40,6 +40,9 @@ vi.mock("@/features/bookings/components/floor-day", () => ({
 vi.mock("@/features/bookings/components/floor-timetable", () => ({
   FloorTimetable: () => <p>층 시간표 보기</p>,
 }));
+vi.mock("@/features/floor-plan/components/floor-plan-view", () => ({
+  FloorPlanView: () => <p>층 평면도 보기</p>,
+}));
 vi.mock("next/navigation", () => ({
   useSelectedLayoutSegments: () => ["floors", "floor"],
   usePathname: () => window.location.pathname,
@@ -166,16 +169,26 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 describe("floor view preference", () => {
-  it("server-renders both views with CSS visibility when there is no preference", () => {
+  it("defaults to the list when the floor has no published plan", () => {
     const html = renderToString(
       <FloorViews data={floorDayFixture()} initialView={null} />,
     );
-    expect(html).toContain('data-floor-view="list" class="lg:hidden"');
-    expect(html).toContain(
-      'data-floor-view="timeline" class="hidden lg:block"',
-    );
     expect(html).toContain("공간 목록 보기");
-    expect(html).toContain("층 시간표 보기");
+    expect(html).not.toContain("층 시간표 보기");
+    expect(html).not.toContain("층 평면도 보기");
+  });
+  it("defaults to the plan on wide screens only when a published plan exists", () => {
+    const data = floorDayFixture();
+    data.floor.plan = { id: first, version: 1 };
+    render(<FloorViews data={data} initialView={null} />);
+    expect(screen.getByText("층 평면도 보기")).toBeVisible();
+    expect(screen.queryByText("공간 목록 보기")).not.toBeInTheDocument();
+  });
+  it("falls back to the list when a stale plan preference has no published plan", () => {
+    window.history.replaceState(null, "", "?view=plan");
+    render(<FloorViews data={floorDayFixture()} initialView="plan" />);
+    expect(screen.getByText("공간 목록 보기")).toBeVisible();
+    expect(screen.queryByText("층 평면도 보기")).not.toBeInTheDocument();
   });
   it("renders only the explicit URL view even when the cookie differs", () => {
     window.history.replaceState(null, "", "?view=timeline");
@@ -190,6 +203,8 @@ describe("floor view preference", () => {
   it.each([
     ["list", "timeline", "list"],
     ["timeline", "list", "timeline"],
+    ["plan", "list", "plan"],
+    [undefined, "plan", "plan"],
     [undefined, "list", "list"],
     ["invalid", "timeline", "timeline"],
     [["list", "timeline"], "list", "list"],
@@ -206,7 +221,7 @@ describe("floor view preference", () => {
   });
   it("updates native history and the preference without a router request", () => {
     render(tree());
-    expect(screen.getByRole("link", { name: "시간표 보기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "목록 보기" })).toHaveAttribute(
       "aria-current",
       "page",
     );

@@ -16,14 +16,14 @@ export function spaceDetailMode({
   space,
 }: {
   wide: boolean;
-  view: "list" | "timeline";
+  view: "plan" | "list" | "timeline";
   detail: boolean;
   space?: Pick<FloorVisibleSpace, "type" | "bookable" | "deskCount"> | null;
 }) {
   const desk = hasDeskSeats(space);
   const mode = !wide
     ? "sheet"
-    : view === "list"
+    : view !== "timeline"
       ? "panel"
       : detail || desk
         ? "detail"

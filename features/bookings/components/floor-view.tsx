@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { List, Table2 } from "lucide-react";
+import { LayoutGrid, List, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shouldInterceptNavigation } from "@/components/optimistic-navigation";
 import { SegmentedLink, SegmentedLinks } from "@/components/segmented-links";
@@ -71,12 +71,16 @@ export function useFloorPeople() {
     setOverride: preference?.setPeopleOverride,
   };
 }
-export function useFloorView(initialView?: FloorView | null) {
+export function useFloorView(
+  initialView?: FloorView | null,
+  planAvailable?: boolean,
+) {
   const currentSearch = useSearchParams();
   const selection = useFloorSelection();
   const search = selection?.search ?? currentSearch;
   const preference = useContext(ViewPreference);
   const wide = useWideScreen();
+  const hasPlan = planAvailable ?? Boolean(selection?.floorData?.floor.plan);
   const view =
     preference?.override ??
     resolveFloorView(
@@ -85,7 +89,10 @@ export function useFloorView(initialView?: FloorView | null) {
     );
   return {
     view,
-    effectiveView: view ?? (wide ? "timeline" : "list"),
+    effectiveView:
+      (view === "plan" && (!hasPlan || !wide) ? "list" : view) ??
+      (wide && hasPlan ? "plan" : "list"),
+    hasPlan,
     setPreference: preference?.set,
     override: preference?.override ?? null,
     setOverride: preference?.setOverride,
@@ -104,7 +111,7 @@ export function FloorViewControl({ className }: { className?: string }) {
   const selection = useFloorSelection();
   const currentSearch = useSearchParams();
   const search = selection?.search ?? currentSearch;
-  const { effectiveView, setPreference, override, setOverride } =
+  const { effectiveView, hasPlan, setPreference, override, setOverride } =
     useFloorView();
   const queuedView = useRef<FloorView | null>(null);
   const pending = selection?.navigationPending ?? false;
@@ -144,49 +151,60 @@ export function FloorViewControl({ className }: { className?: string }) {
   if (!selection || !floorId) return null;
   return (
     <SegmentedLinks label="보기 선택" className={className}>
-      {(["list", "timeline"] as const).map((view) => {
-        const Icon = view === "list" ? List : Table2;
-        const label = view === "list" ? "목록" : "시간표";
-        const query = new URLSearchParams(search.toString());
-        query.set("view", view);
-        const href = `${floorHref(selection.branchId, floorId)}?${query}`;
-        return (
-          <SegmentedLink key={view} selected={view === effectiveView} asChild>
-            <a
-              href={href}
-              aria-label={`${label} 보기`}
-              aria-current={view === effectiveView ? "page" : undefined}
-              onClick={(event) => {
-                if (!shouldInterceptNavigation(event)) return;
-                event.preventDefault();
-                if (!selection.isCurrentRoute()) return;
-                document.cookie = `floor_view=${view}; Path=/; Max-Age=31536000; SameSite=Lax`;
-                setPreference?.(view);
-                setOverride?.(view);
-                if (pending) queuedView.current = view;
-                else {
-                  queuedView.current = null;
-                  pushViewHistory(view);
-                }
-              }}
+      {(["plan", "list", "timeline"] as const)
+        .filter((view) => view !== "plan" || hasPlan)
+        .map((view) => {
+          const Icon =
+            view === "plan" ? LayoutGrid : view === "list" ? List : Table2;
+          const label =
+            view === "plan" ? "평면도" : view === "list" ? "목록" : "시간표";
+          const query = new URLSearchParams(search.toString());
+          query.set("view", view);
+          const href = `${floorHref(selection.branchId, floorId)}?${query}`;
+          return (
+            <SegmentedLink
+              key={view}
+              selected={view === effectiveView}
+              className={view === "plan" ? "hidden lg:inline-flex" : undefined}
+              asChild
             >
-              <Icon className="size-4" aria-hidden="true" />
-              <span className="hidden lg:inline">{label}</span>
-            </a>
-          </SegmentedLink>
-        );
-      })}
+              <a
+                href={href}
+                aria-label={`${label} 보기`}
+                aria-current={view === effectiveView ? "page" : undefined}
+                onClick={(event) => {
+                  if (!shouldInterceptNavigation(event)) return;
+                  event.preventDefault();
+                  if (!selection.isCurrentRoute()) return;
+                  document.cookie = `floor_view=${view}; Path=/; Max-Age=31536000; SameSite=Lax`;
+                  setPreference?.(view);
+                  setOverride?.(view);
+                  if (pending) queuedView.current = view;
+                  else {
+                    queuedView.current = null;
+                    pushViewHistory(view);
+                  }
+                }}
+              >
+                <Icon className="size-4" aria-hidden="true" />
+                <span className="hidden lg:inline">{label}</span>
+              </a>
+            </SegmentedLink>
+          );
+        })}
     </SegmentedLinks>
   );
 }
 export function FloorScreenLayout({ children }: { children: ReactNode }) {
-  const { view } = useFloorView();
+  const { effectiveView } = useFloorView();
   const closed = useFloorSelection()?.floorData?.openHours === null;
   return (
     <div
       className={cn(
         "grid min-w-0 items-start gap-6",
-        view === "list" && !closed && "lg:grid-cols-[minmax(0,1fr)_420px]",
+        effectiveView !== "timeline" &&
+          !closed &&
+          "lg:grid-cols-[minmax(0,1fr)_420px]",
       )}
     >
       {children}

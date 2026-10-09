@@ -11,17 +11,20 @@ export function FloorViewsSkeleton({
 }: {
   initialView?: FloorView | null;
 }) {
-  const { view } = useFloorView(initialView);
+  const { effectiveView: view } = useFloorView(initialView);
   return (
     <SkeletonRegion>
       <div aria-hidden="true">
-        {view !== "timeline" && (
-          <div className={view === null ? "lg:hidden" : undefined}>
+        {view === "plan" && (
+          <div className="h-[32rem] rounded-xl border border-border bg-muted/40" />
+        )}
+        {view === "list" && (
+          <div>
             <FloorSpaceListShape />
           </div>
         )}
-        {view !== "list" && (
-          <div className={view === null ? "hidden lg:block" : undefined}>
+        {view === "timeline" && (
+          <div>
             <FloorTimetableShape />
           </div>
         )}

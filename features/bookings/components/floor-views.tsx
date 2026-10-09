@@ -12,6 +12,7 @@ import { useFloorView, useFloorPeople } from "./floor-view";
 import { useFloorSelection } from "./branch-workspace";
 import { ClosedFloorDay } from "./closed-floor-day";
 import { FloorPeopleLink, FloorPeopleNotice } from "./floor-people-filter";
+import { FloorPlanView } from "@/features/floor-plan/components/floor-plan-view";
 
 export function FloorViews({
   data,
@@ -20,7 +21,10 @@ export function FloorViews({
   data: FloorDayData;
   initialView: FloorView | null;
 }) {
-  const { view } = useFloorView(initialView);
+  const { effectiveView: view } = useFloorView(
+    initialView,
+    Boolean(data.floor.plan),
+  );
   const { people } = useFloorPeople();
   const selection = useFloorSelection();
   const currentSearch = useSearchParams();
@@ -46,19 +50,16 @@ export function FloorViews({
           모두 보기
         </FloorPeopleLink>
       </div>
+    ) : view === "plan" && data.floor.plan ? (
+      <FloorPlanView
+        key={`${data.floor.id}:${data.date}`}
+        data={filtered.data}
+        planId={data.floor.plan.id}
+      />
     ) : view === "list" ? (
       <FloorDay data={filtered.data} />
-    ) : view === "timeline" ? (
-      <FloorTimetable data={filtered.data} />
     ) : (
-      <>
-        <div data-floor-view="list" className="lg:hidden">
-          <FloorDay data={filtered.data} />
-        </div>
-        <div data-floor-view="timeline" className="hidden lg:block">
-          <FloorTimetable data={filtered.data} />
-        </div>
-      </>
+      <FloorTimetable data={filtered.data} />
     );
   return (
     <div className="min-w-0 space-y-4">
