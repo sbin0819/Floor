@@ -16,6 +16,7 @@ const sameState = (
   a?.kind === b?.kind &&
   a?.name === b?.name &&
   a?.label === b?.label &&
+  a?.utilization === b?.utilization &&
   a?.deskArea === b?.deskArea &&
   a?.selected === b?.selected &&
   a?.hidden === b?.hidden;
@@ -59,6 +60,7 @@ export function createPlanLayers(
         !previous ||
         previous.scene !== frame.scene ||
         previous.index !== frame.index ||
+        previous.mode !== frame.mode ||
         previous.colors !== frame.colors ||
         previous.camera.scale !== frame.camera.scale ||
         previous.camera.x !== frame.camera.x ||

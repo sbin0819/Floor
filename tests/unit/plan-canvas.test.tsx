@@ -230,6 +230,29 @@ afterEach(() => {
 });
 
 describe("plan canvas lifecycle", () => {
+  it("forwards utilization mode to the shared painter and excludes seat targets", () => {
+    const select = vi.fn();
+    const heat = new Map(states);
+    heat.set(first, { kind: "neutral", name: "구역", utilization: 0.68 });
+    const { container, rerender } = render(
+      <PlanCanvas
+        mode="utilization"
+        document={plan}
+        states={heat}
+        onSelect={select}
+      />,
+    );
+    flushFrames();
+    expect(lastFrame().mode).toBe("utilization");
+    expect(
+      screen.getByRole("button", { name: "구역, 이용률 68%" }),
+    ).toBeInTheDocument();
+    tap(host(container), toScreen([120, 120], lastFrame().camera));
+    expect(select.mock.lastCall?.[0].kind).toBe("space");
+    rerender(<PlanCanvas document={plan} states={states} onSelect={select} />);
+    flushFrames();
+    expect(lastFrame().mode).toBe("booking");
+  });
   it("fits a desk area to eighty percent, preserves user camera updates and restores the pre-area camera on exit", () => {
     const select = vi.fn();
     const { container, rerender } = render(

@@ -42,6 +42,7 @@ export type PlanShapeState = {
   hidden?: boolean;
   selected?: boolean;
   selectable?: boolean;
+  utilization?: number | null;
 };
 export type PlanStates = ReadonlyMap<string, PlanShapeState>;
 export type PlanPalette = { fill: string; stroke: string; text: string };
@@ -56,8 +57,11 @@ export type PlanColors = Record<PlanStateKind | "fixture", PlanPalette> & {
   maintenancePattern?: CanvasPattern;
   seatMine?: PlanPalette;
   seatBooked?: PlanPalette;
+  heat?: readonly [PlanPalette, PlanPalette, PlanPalette, PlanPalette];
 };
+export type PlanMode = "booking" | "utilization";
 export type PlanFrame = {
+  mode?: PlanMode;
   scene: PlanScene;
   index: PlanSpatialIndex;
   camera: Camera;

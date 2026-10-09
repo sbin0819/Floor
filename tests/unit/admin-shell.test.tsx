@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AdminShellFrame } from "@/features/admin/components/admin-shell-frame";
 import { AdminShellNavigation } from "@/features/admin/components/admin-shell-navigation";
@@ -152,8 +153,54 @@ describe("operator home", () => {
       "sticky",
       "top-0",
       "z-45",
+      "h-16",
+    );
+    expect(container.firstElementChild).toHaveClass(
+      "[--admin-mobile-header-height:4rem]",
+      "lg:[--admin-mobile-header-height:0px]",
     );
     expect(screen.getByRole("main")).toHaveTextContent("내용");
+  });
+  it("keeps the portal drawer's operator palette, 240px width and distinct close target", async () => {
+    const previous = window.location.href;
+    window.history.replaceState(null, "", "/admin/branches/branch");
+    const user = userEvent.setup();
+    try {
+      render(
+        <AdminShellNavigation
+          mobile
+          data={{
+            branchId: "branch",
+            branches: [
+              { ...branch, menus: ["dashboard", "bookings", "spaces"] },
+            ],
+            user: { name: "김도윤" },
+          }}
+        />,
+      );
+      const trigger = screen.getByRole("button", { name: "운영자 메뉴 열기" });
+      await user.click(trigger);
+      const dialog = screen.getByRole("dialog", { name: "운영자 메뉴" });
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+      expect(dialog).toHaveClass(
+        "admin-shell",
+        "data-[side=left]:w-60",
+        "data-[side=left]:sm:max-w-60",
+      );
+      expect(
+        within(dialog).getByRole("button", { name: "운영자 메뉴 닫기" }),
+      ).toBeVisible();
+      expect(
+        within(dialog).getByText("운영자", { exact: true }).parentElement
+          ?.parentElement,
+      ).toHaveClass("pr-11");
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    } finally {
+      window.history.replaceState(null, "", previous);
+    }
   });
 
   it.each([

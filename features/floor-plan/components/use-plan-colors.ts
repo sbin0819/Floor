@@ -53,6 +53,12 @@ export function readPlanColors(root: HTMLElement): PlanColors {
       "status-mine-border",
       "status-mine-foreground",
     ),
+    heat: [
+      palette("heat-1", "border", "status-mine-foreground"),
+      palette("heat-2", "border", "status-mine-foreground"),
+      palette("heat-3", "border", "status-mine-foreground"),
+      palette("heat-4", "border", "primary-foreground"),
+    ],
     maintenance: palette(
       "status-maintenance-hatch-a",
       "status-maintenance-border",

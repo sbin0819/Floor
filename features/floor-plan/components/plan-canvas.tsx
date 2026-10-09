@@ -19,6 +19,7 @@ import type {
   PlanShape,
   PlanScene,
   PlanStates,
+  PlanMode,
   Point,
 } from "@/lib/floor-plan/render/types";
 import { usePlanColors } from "./use-plan-colors";
@@ -27,6 +28,7 @@ import { isPlanTap, pinchCamera } from "@/lib/floor-plan/render/gestures";
 import { usePlanScene } from "./use-plan-scene";
 
 type PlanCanvasProps = {
+  mode?: PlanMode;
   document: FloorPlanDocument;
   states: PlanStates;
   selectedSpaceId?: string | null;
@@ -74,6 +76,7 @@ function ReadyPlanCanvas({
   onHover,
   onClear,
   timeLabel = "",
+  mode = "booking",
 }: PlanCanvasProps & { scene: PlanScene }) {
   const host = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
@@ -164,6 +167,7 @@ function ReadyPlanCanvas({
           dpr: window.devicePixelRatio || 1,
           colors,
           states,
+          mode,
         },
         {
           hoveredId,
@@ -191,6 +195,7 @@ function ReadyPlanCanvas({
     activeDeskAreaId,
     flashSpaceIds,
     paintEpoch,
+    mode,
   ]);
   useEffect(() => {
     const element = host.current;
@@ -298,7 +303,7 @@ function ReadyPlanCanvas({
     return [event.clientX - rect.left, event.clientY - rect.top];
   };
   const candidate = (point: Point) => {
-    if (activeDeskAreaId) {
+    if (mode !== "utilization" && activeDeskAreaId) {
       const seat = hitTest(index, current, point, { kinds: ["seat"] });
       if (
         seat?.spaceId &&
@@ -328,6 +333,7 @@ function ReadyPlanCanvas({
       <div
         ref={host}
         data-plan-canvas
+        data-plan-mode={mode}
         className={cn(
           "relative overflow-hidden",
           interactive && "h-[min(60dvh,640px)] min-h-96 touch-none",
@@ -434,6 +440,7 @@ function ReadyPlanCanvas({
           selectedSeatId={selectedSeatId}
           activeDeskAreaId={activeDeskAreaId}
           timeLabel={timeLabel}
+          mode={mode}
           onFocus={(shape) => {
             setFocusedId(shape?.id ?? null);
             if (!shape) return;

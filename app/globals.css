@@ -8,6 +8,10 @@
   --font-heading: var(--font-sans);
   --font-sans: var(--font-pretendard), system-ui, sans-serif;
   --color-rail: var(--rail);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
   --color-avatar-blue: var(--avatar-blue);
   --color-avatar-blue-foreground: var(--avatar-blue-foreground);
   --color-avatar-green: var(--avatar-green);
@@ -83,6 +87,10 @@
 }
 
 :root {
+  --heat-1: #eef1fc;
+  --heat-2: #c9d3f5;
+  --heat-3: #8fa3ea;
+  --heat-4: #3a5bd9;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -216,6 +224,10 @@
 }
 
 .dark {
+  --heat-1: #eef1fc;
+  --heat-2: #c9d3f5;
+  --heat-3: #8fa3ea;
+  --heat-4: #3a5bd9;
   /* TODO: 상태·예약 색은 다크 시안이 확정될 때 재정의해요. */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

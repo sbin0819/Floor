@@ -5,11 +5,17 @@ import { ActionError } from "@/lib/actions/result";
 import { getAdminShell } from "@/features/admin/admin-shell-queries";
 import { adminMenuHref } from "@/features/admin/admin-shell-navigation";
 import { AdminForbidden } from "@/features/admin/components/admin-forbidden";
-import { SkeletonRegion } from "@/components/skeleton-region";
-import { Skeleton } from "@/components/ui/skeleton";
+import { getAdminDashboard } from "@/features/admin/queries";
+import {
+  AdminDashboard,
+  AdminDashboardSkeleton,
+} from "@/features/admin/components/admin-dashboard";
 
-type Props = { params: Promise<{ branchId: string }> };
-async function DashboardEntry({ params }: Props) {
+type Props = {
+  params: Promise<{ branchId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+async function DashboardEntry({ params, searchParams }: Props) {
   await requireOperatorPage();
   const { branchId } = await params;
   const shell = await getAdminShell(branchId).catch((error: unknown) => {
@@ -22,25 +28,22 @@ async function DashboardEntry({ params }: Props) {
     if (first) redirect(adminMenuHref(branch.id, first));
     return <AdminForbidden />;
   }
-  return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6 lg:p-8">
-      <h1 className="text-2xl font-semibold">대시보드</h1>
-      <p className="text-muted-foreground">{branch.name}</p>
-    </main>
-  );
+  const search = (await searchParams) ?? {};
+  const data = await getAdminDashboard({
+    branchId,
+    date: search.date,
+    range: search.range,
+    floorId: typeof search.floor === "string" ? search.floor : null,
+  }).catch((error: unknown) => {
+    if (error instanceof ActionError && error.code === "NOT_FOUND") notFound();
+    if (error instanceof ActionError && error.code === "FORBIDDEN") return null;
+    throw error;
+  });
+  return data ? <AdminDashboard data={data} /> : <AdminForbidden />;
 }
 export default function AdminDashboardPage(props: Props) {
   return (
-    <Suspense
-      fallback={
-        <main className="mx-auto max-w-6xl space-y-6 p-6 lg:p-8">
-          <h1 className="text-2xl font-semibold">대시보드</h1>
-          <SkeletonRegion>
-            <Skeleton className="h-48 w-full" />
-          </SkeletonRegion>
-        </main>
-      }
-    >
+    <Suspense fallback={<AdminDashboardSkeleton />}>
       <DashboardEntry {...props} />
     </Suspense>
   );

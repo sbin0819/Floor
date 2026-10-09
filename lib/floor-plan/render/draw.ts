@@ -1,4 +1,5 @@
 import { screenBoxToWorld, worldViewport } from "./camera";
+import { utilizationBand, utilizationPercent } from "./utilization";
 import type {
   Box,
   PlanContext,
@@ -107,7 +108,11 @@ export function createPlanDrawer(options: PlanDrawOptions = {}) {
       : worldViewport(frame.camera, frame.viewport);
     return frame.index
       .search(bounds)
-      .filter((shape) => !shapeState(frame, shape)?.hidden);
+      .filter(
+        (shape) =>
+          !(frame.mode === "utilization" && shape.kind === "seat") &&
+          !shapeState(frame, shape)?.hidden,
+      );
   }
   function text(
     ctx: PlanContext,
@@ -203,6 +208,43 @@ export function createPlanDrawer(options: PlanDrawOptions = {}) {
     }
     ctx.restore();
   }
+  function utilizationLabels(
+    ctx: PlanContext,
+    frame: PlanFrame,
+    shape: PolygonShape,
+    state: PlanShapeState,
+  ) {
+    const scale = frame.camera.scale;
+    const width = (shape.bounds.maxX - shape.bounds.minX) * scale;
+    const height = (shape.bounds.maxY - shape.bounds.minY) * scale;
+    if (width < 54) return;
+    ctx.save();
+    pathAction(ctx, shape, "clip");
+    ctx.font = `600 ${12 / scale}px Pretendard, system-ui, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    text(
+      ctx,
+      state.name,
+      shape.bounds.minX + 8 / scale,
+      shape.bounds.minY + 8 / scale,
+      (width - 16) / scale,
+    );
+    if (height >= 46) {
+      const percent = utilizationPercent(state.utilization);
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.font = `600 ${13 / scale}px Pretendard, system-ui, sans-serif`;
+      text(
+        ctx,
+        percent === null ? "이용률 없음" : `${percent}%`,
+        shape.bounds.maxX - 8 / scale,
+        shape.bounds.maxY - 8 / scale,
+        (width - 16) / scale,
+      );
+    }
+    ctx.restore();
+  }
   function drawBase(ctx: PlanContext, frame: PlanFrame) {
     begin(ctx, frame);
     for (const shape of visible(frame)) {
@@ -216,7 +258,11 @@ export function createPlanDrawer(options: PlanDrawOptions = {}) {
             : frame.colors.neutral;
         ctx.fillStyle = palette.fill;
         ctx.strokeStyle = palette.stroke;
-        if (shape.kind === "space" && state?.deskArea)
+        if (
+          frame.mode !== "utilization" &&
+          shape.kind === "space" &&
+          state?.deskArea
+        )
           ctx.setLineDash([6 / frame.camera.scale, 4 / frame.camera.scale]);
         else pathAction(ctx, shape, "fill");
         pathAction(ctx, shape, "stroke");
@@ -268,6 +314,26 @@ export function createPlanDrawer(options: PlanDrawOptions = {}) {
       if (!polygon(shape) || shape.kind === "fixture") continue;
       const state = shapeState(frame, shape);
       if (!state) continue;
+      if (frame.mode === "utilization") {
+        const percent = utilizationPercent(state.utilization);
+        const palette =
+          percent === null
+            ? frame.colors.maintenance
+            : (frame.colors.heat?.[utilizationBand(state.utilization!)] ??
+              frame.colors.neutral);
+        ctx.lineWidth = 1 / frame.camera.scale;
+        ctx.setLineDash([]);
+        ctx.fillStyle =
+          percent === null
+            ? (frame.colors.maintenancePattern ?? palette.fill)
+            : palette.fill;
+        ctx.strokeStyle = palette.stroke;
+        pathAction(ctx, shape, "fill");
+        pathAction(ctx, shape, "stroke");
+        ctx.fillStyle = palette.text;
+        utilizationLabels(ctx, frame, shape, state);
+        continue;
+      }
       const palette =
         shape.kind === "seat" && state.selected
           ? frame.colors.mine
@@ -309,7 +375,12 @@ export function createPlanDrawer(options: PlanDrawOptions = {}) {
       const shape = frame.scene.shapes.find(
         (item) => item.id === id || item.spaceId === id.toLowerCase(),
       );
-      if (!shape || !polygon(shape) || shapeState(frame, shape)?.hidden)
+      if (
+        !shape ||
+        !polygon(shape) ||
+        shapeState(frame, shape)?.hidden ||
+        (frame.mode === "utilization" && shape.kind === "seat")
+      )
         continue;
       ctx.save();
       ctx.strokeStyle =

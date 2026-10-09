@@ -2,7 +2,14 @@ import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import { getOperatorBranches } from "@/lib/dal";
 import { createAdminQueries } from "./query-factory";
+import {
+  createAdminDashboardQueries,
+  type AdminDashboardInput,
+} from "./dashboard-query-factory";
 
+export async function getAdminDashboard(input: AdminDashboardInput) {
+  return createAdminDashboardQueries().getAdminDashboard(input);
+}
 export async function getAdminBranch(branchId: string) {
   return createAdminQueries().getAdminBranch(branchId);
 }

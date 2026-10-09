@@ -74,7 +74,7 @@ export function AdminShellFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="admin-shell min-h-screen lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+    <div className="admin-shell min-h-screen [--admin-mobile-header-height:4rem] lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:[--admin-mobile-header-height:0px]">
       <aside
         aria-label="운영자 사이드바"
         className="hidden flex-col gap-6 bg-sidebar p-5 text-sidebar-foreground lg:sticky lg:top-0 lg:flex lg:h-dvh lg:min-h-0 lg:self-start"
@@ -83,7 +83,7 @@ export function AdminShellFrame({
         {sidebar}
       </aside>
       <div className="min-w-0">
-        <header className="sticky top-0 z-45 border-b border-border bg-background lg:hidden">
+        <header className="sticky top-0 z-45 h-16 border-b border-border bg-background lg:hidden">
           {mobile}
         </header>
         {children}

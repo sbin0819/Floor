@@ -182,7 +182,8 @@ export function AdminShellNavigation({
       </div>
       <SheetContent
         side="left"
-        className="w-60 gap-6 bg-sidebar p-5 text-sidebar-foreground sm:max-w-60"
+        closeLabel="운영자 메뉴 닫기"
+        className="admin-shell gap-6 bg-sidebar p-5 text-sidebar-foreground data-[side=left]:w-60 data-[side=left]:sm:max-w-60"
         onCloseAutoFocus={(event) => {
           if (window.location.pathname !== openedAt.current)
             event.preventDefault();
@@ -192,7 +193,9 @@ export function AdminShellNavigation({
         <SheetDescription className="sr-only">
           운영 지점과 관리할 화면을 골라 주세요.
         </SheetDescription>
-        <AdminBrand />
+        <div className="pr-11">
+          <AdminBrand />
+        </div>
         {contents}
       </SheetContent>
     </Sheet>

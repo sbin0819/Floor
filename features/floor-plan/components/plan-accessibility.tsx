@@ -11,7 +11,9 @@ import type {
   PlanScene,
   PlanShape,
   PlanStates,
+  PlanMode,
 } from "@/lib/floor-plan/render/types";
+import { utilizationLabel } from "@/lib/floor-plan/render/utilization";
 
 const directions: Readonly<Record<string, PlanDirection>> = {
   ArrowLeft: "left",
@@ -28,6 +30,7 @@ export function PlanAccessibility({
   selectedSeatId,
   activeDeskAreaId,
   timeLabel,
+  mode = "booking",
   onFocus,
   onSelect,
   onClear,
@@ -39,6 +42,7 @@ export function PlanAccessibility({
   selectedSeatId?: string | null;
   activeDeskAreaId?: string | null;
   timeLabel: string;
+  mode?: PlanMode;
   onFocus: (shape: PlanShape | null) => void;
   onSelect: (shape: PlanShape) => void;
   onClear: () => void;
@@ -52,15 +56,23 @@ export function PlanAccessibility({
         scene.shapes.filter((shape) => {
           if (
             (shape.kind !== "space" &&
-              !(activeDeskAreaId && shape.kind === "seat")) ||
+              !(
+                mode !== "utilization" &&
+                activeDeskAreaId &&
+                shape.kind === "seat"
+              )) ||
             !shape.spaceId
           )
             return false;
           const state = states.get(shape.spaceId.toLowerCase());
-          return state !== undefined && !state.hidden;
+          return (
+            state !== undefined &&
+            !state.hidden &&
+            (mode !== "utilization" || Boolean(state.name))
+          );
         }),
       ),
-    [scene, states, activeDeskAreaId],
+    [scene, states, activeDeskAreaId, mode],
   );
   const available = shapes.filter(
     (shape) => states.get(shape.spaceId!.toLowerCase())?.kind !== "restricted",
@@ -106,9 +118,15 @@ export function PlanAccessibility({
         const unavailable = shape.kind === "seat" && state.selectable === false;
         const name = disabled
           ? "전용 공간, 고를 수 없음"
-          : [state.name, shape.kind === "seat" ? null : timeLabel, state.label]
-              .filter(Boolean)
-              .join(", ");
+          : mode === "utilization"
+            ? `${state.name}, ${utilizationLabel(state.utilization)}`
+            : [
+                state.name,
+                shape.kind === "seat" ? null : timeLabel,
+                state.label,
+              ]
+                .filter(Boolean)
+                .join(", ");
         return (
           <li key={shape.id}>
             <Button
