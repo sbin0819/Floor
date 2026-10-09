@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { SignOutButton } from "@/components/sign-out-button";
+import { AdminSignOutButton } from "./admin-sign-out-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonRegion } from "@/components/skeleton-region";
 
@@ -37,7 +37,7 @@ export function AdminShellFooter({
         멤버 화면으로
       </Link>
       {name !== undefined && <p className="truncate px-3 text-sm">{name}</p>}
-      <SignOutButton />
+      <AdminSignOutButton />
     </div>
   );
 }

@@ -45,6 +45,25 @@ beforeEach(() => {
 });
 
 describe("admin branch navigation", () => {
+  it("shows roles as the current menu and preserves it when changing branches", () => {
+    mocks.pathname = "/admin/branches/a/roles";
+    const current: AdminShellData = {
+      ...data,
+      branches: data.branches.map((branch) => ({
+        ...branch,
+        menus: ["roles"],
+      })),
+    };
+    render(<AdminShellNavigation data={current} />);
+    expect(screen.getByRole("link", { name: "역할과 권한" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(adminBranchHref(mocks.pathname, "a", current.branches[1]!)).toBe(
+      "/admin/branches/b/roles",
+    );
+    expect(adminMenuAt("/admin/branches/a/roles-other", "a")).toBeNull();
+  });
   it("shows the ongoing maintenance badge only with that menu and preserves maintenance when switching branches", () => {
     mocks.pathname = "/admin/branches/a/maintenance";
     const current: AdminShellData = {

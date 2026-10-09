@@ -13,6 +13,7 @@ import {
   Building2,
   CalendarDays,
   LayoutDashboard,
+  KeyRound,
   Menu,
   Wrench,
 } from "lucide-react";
@@ -39,12 +40,14 @@ import {
 } from "../admin-shell-navigation";
 import type { AdminMenu, AdminShellData } from "../admin-shell-types";
 import { AdminBrand, AdminShellFooter } from "./admin-shell-frame";
+import { requestAdminNavigation } from "../admin-navigation-guard";
 
 const icons = {
   dashboard: LayoutDashboard,
   bookings: CalendarDays,
   spaces: Building2,
   maintenance: Wrench,
+  roles: KeyRound,
 };
 
 export function AdminShellNavigation({
@@ -77,10 +80,13 @@ export function AdminShellNavigation({
       !actual.startsWith(`${adminMenuHref(data.branchId, "dashboard")}/`)
     )
       return;
-    setOpen(false);
-    startTransition(() => {
-      setSelectedPath(href);
-      router.push(href);
+    requestAdminNavigation(() => {
+      if (window.location.pathname !== actual) return;
+      setOpen(false);
+      startTransition(() => {
+        setSelectedPath(href);
+        router.push(href);
+      });
     });
   }
   const contents = (
@@ -130,6 +136,7 @@ export function AdminShellNavigation({
                   aria-current={selectedMenu === menu ? "page" : undefined}
                   onClick={(event) => {
                     if (
+                      event.defaultPrevented ||
                       event.button !== 0 ||
                       event.metaKey ||
                       event.ctrlKey ||

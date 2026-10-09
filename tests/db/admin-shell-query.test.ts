@@ -84,7 +84,7 @@ describe("operator shell projection and budget", () => {
         {
           id: actors.branchId,
           name: "강남점",
-          menus: ["dashboard", "bookings", "spaces", "maintenance"],
+          menus: ["dashboard", "bookings", "spaces", "maintenance", "roles"],
           maintenanceCount: 0,
         },
       ],
@@ -111,8 +111,8 @@ describe("operator shell projection and budget", () => {
     ]);
     const result = await query().getAdminShell(actors.branchId);
     expect(result.branches.map((row) => row.menus)).toEqual([
-      ["bookings"],
-      ["spaces"],
+      ["bookings", "roles"],
+      ["spaces", "roles"],
     ]);
     await database.db
       .update(roleSettings)
@@ -120,7 +120,7 @@ describe("operator shell projection and budget", () => {
       .where(eq(roleSettings.branchId, actors.branchId));
     expect(
       (await query().getAdminShell(actors.branchId)).branches[0]!.menus,
-    ).toEqual([]);
+    ).toEqual(["roles"]);
   });
   it("still honors a permission granted by another held role", async () => {
     await database.db.insert(roleSettings).values([
@@ -129,7 +129,7 @@ describe("operator shell projection and budget", () => {
     ]);
     expect(
       (await query().getAdminShell(actors.branchId)).branches[0]!.menus,
-    ).toEqual(["dashboard"]);
+    ).toEqual(["dashboard", "roles"]);
   });
   it("uses two stages [4,1] including authorized maintenance counts independent of the number of assigned branches", async () => {
     const meter = createQueryMeter(database.client);
@@ -186,13 +186,11 @@ describe("operator shell projection and budget", () => {
       (await query().getAdminShell(actors.branchId)).branches[0]
         ?.maintenanceCount,
     ).toBe(1);
-    await database.db
-      .insert(roleSettings)
-      .values({
-        branchId: actors.branchId,
-        role: "operator",
-        permissions: ["stats.view"],
-      });
+    await database.db.insert(roleSettings).values({
+      branchId: actors.branchId,
+      role: "operator",
+      permissions: ["stats.view"],
+    });
     const read = vi.spyOn(shellDal, "getOngoingMaintenanceCounts");
     const result = await query().getAdminShell(actors.branchId);
     expect(read).toHaveBeenCalledWith([], bookingNow, database.db);

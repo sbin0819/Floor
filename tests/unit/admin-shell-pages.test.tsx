@@ -89,6 +89,7 @@ it("requests its own layout branch and maps foreign branches to notFound", async
 it.each([
   [["bookings", "spaces"], "bookings"],
   [["spaces"], "spaces"],
+  [["roles"], "roles"],
 ] satisfies [AdminMenu[], string][])(
   "redirects a disabled dashboard to first authorized menu %j",
   async (menus, target) => {

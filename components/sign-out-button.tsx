@@ -6,12 +6,18 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth/client";
 import { redirectAfterSignOut } from "@/lib/auth/redirect-after-sign-out";
 
-export function SignOutButton({ menuItem = false }: { menuItem?: boolean }) {
+export function SignOutButton({
+  menuItem = false,
+  beforeSignOut,
+}: {
+  menuItem?: boolean;
+  beforeSignOut?: (proceed: () => Promise<boolean>) => void;
+}) {
   const submitting = useRef(false);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   async function signOut() {
-    if (submitting.current) return;
+    if (submitting.current) return false;
     submitting.current = true;
     setPending(true);
     setFailed(false);
@@ -19,11 +25,13 @@ export function SignOutButton({ menuItem = false }: { menuItem?: boolean }) {
       const result = await authClient.signOut();
       if (result.error) {
         setFailed(true);
-        return;
+        return false;
       }
       redirectAfterSignOut("/login");
+      return true;
     } catch {
       setFailed(true);
+      return false;
     } finally {
       submitting.current = false;
       setPending(false);
@@ -38,7 +46,10 @@ export function SignOutButton({ menuItem = false }: { menuItem?: boolean }) {
           : undefined
       }
       disabled={pending}
-      onClick={signOut}
+      onClick={() => {
+        if (beforeSignOut) beforeSignOut(signOut);
+        else void signOut();
+      }}
     >
       {pending ? "로그아웃하고 있어요." : "로그아웃"}
     </Button>
