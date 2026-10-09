@@ -6,6 +6,7 @@ import { createBookingQueries } from "@/features/bookings/query-factory";
 import { createTeamQueries } from "@/features/teams/query-factory";
 import { createChatQueries } from "@/features/chat/query-factory";
 import { createHomeQueries } from "@/features/home/query-factory";
+import { createPlanEditorQueries } from "@/features/floor-plan/editor-query-factory";
 import { createTeamSpace } from "@/lib/dal/chat-write";
 import type { Session } from "@/lib/auth/types";
 import { getOperatorBranches } from "@/lib/dal";
@@ -108,6 +109,11 @@ describe("authenticated query execution budgets", () => {
       database: database.db,
       requireSession: async () => actors.member,
       now: () => bookingNow,
+    });
+  const planEditor = () =>
+    createPlanEditorQueries({
+      database: database.db,
+      requireSession: async () => actors.operator,
     });
   const cases: [string, () => Promise<unknown>][] = [
     ["chat.getMyChatNav", () => chatQueries().getMyChatNav()],
@@ -220,6 +226,15 @@ describe("authenticated query execution budgets", () => {
         }).getAdminShell(actors.branchId),
     ],
     [
+      "floorPlan.getPlanEditor",
+      () =>
+        planEditor().getPlanEditor({
+          branchId: actors.branchId,
+          floorId: actors.floorId,
+        }),
+    ],
+    ["admin.getAdminPlans", () => planEditor().getAdminPlans(actors.branchId)],
+    [
       "admin.getAdminBranch.twoFloors",
       () => admin().getAdminBranch(actors.branchId),
     ],
@@ -261,6 +276,10 @@ describe("authenticated query execution budgets", () => {
       for (const count of result.perStage) expect(count).toBeLessThanOrEqual(6);
       if (name === "admin.getAdminShell")
         expect(result.perStage).toEqual([4, 1]);
+      if (name === "admin.getAdminPlans")
+        expect(result.perStage).toEqual([4, 1]);
+      if (name === "floorPlan.getPlanEditor")
+        expect(result.perStage).toEqual([4, 2]);
       if (name === "home.getHomeTodo" || name === "home.getHomeChecklist") {
         expect(result.stages).toBe(1);
         expect(result.statements).toBeLessThanOrEqual(
@@ -335,6 +354,8 @@ describe("authenticated query execution budgets", () => {
       "bookings.getHomeFreeSpaces",
       "bookings.getBranchList",
       "admin.getAdminBranch.twoFloors",
+      "admin.getAdminPlans",
+      "floorPlan.getPlanEditor",
       "home.getHomeTodo",
       "home.getHomeRecentChats",
     ] as const) {

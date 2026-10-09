@@ -1,8 +1,14 @@
 import { ActionError } from "@/lib/actions/result";
+import { cache } from "react";
+import { createPlanEditorQueries } from "@/features/floor-plan/editor-query-factory";
 import { requireSession } from "@/lib/auth/session";
 import { getOperatorBranches } from "@/lib/dal";
 import { createAdminQueries } from "./query-factory";
 import { createRoleSettingsQueries } from "./role-settings-query-factory";
+
+export const getAdminPlans = cache((branchId: string) =>
+  createPlanEditorQueries().getAdminPlans(branchId),
+);
 
 export async function getRoleSettingsEditor(branchId: string) {
   return createRoleSettingsQueries().getRoleSettingsEditor(branchId);

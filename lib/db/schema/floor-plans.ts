@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   jsonb,
+  check,
   pgTable,
   integer,
   text,
@@ -30,9 +31,15 @@ export const floorPlans = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    revision: integer("revision").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
+    updatedBy: uuid("updated_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
     createdAt: createdAt(),
   },
   (table) => [
+    check("floor_plans_revision_nonnegative", sql`${table.revision} >= 0`),
     unique("floor_plans_floor_id_version_unique").on(
       table.floorId,
       table.version,
