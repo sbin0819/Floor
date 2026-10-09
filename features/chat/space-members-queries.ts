@@ -47,9 +47,13 @@ export function createSpaceMemberQueries(
           dependencies.database,
         );
         if (!people) return null;
+        const members: SpaceMember[] = [],
+          banned: SpaceMember[] = [];
+        for (const { status, ...person } of people)
+          (status === "active" ? members : banned).push(person);
         return role === "member"
-          ? { ...base, view: "limited", admins: people }
-          : { ...base, view: "full", members: people, banned: [] };
+          ? { ...base, view: "limited", admins: members }
+          : { ...base, view: "full", members, banned };
       }
       const members: SpaceMember[] = [],
         banned: SpaceMember[] = [];

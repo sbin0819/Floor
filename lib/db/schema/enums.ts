@@ -77,6 +77,11 @@ export const reportReason = pgEnum("report_reason", [
   "inappropriate",
   "other",
 ]);
+export const reportResolution = pgEnum("report_resolution", [
+  "dismissed",
+  "message_deleted",
+  "member_banned",
+]);
 export const friendshipStatus = pgEnum("friendship_status", [
   "pending",
   "accepted",

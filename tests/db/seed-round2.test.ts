@@ -64,6 +64,7 @@ const protectedTables = [
   "space_photos",
   "floor_plans",
   "announcements",
+  "reports",
   "chat_rooms",
   "messages",
   "message_attachments",
@@ -210,6 +211,16 @@ describe("receipt-backed booking round 2 additions", () => {
         emailVerified: true,
       });
     const person = await user("member");
+    const operator = await user("admin");
+    await database.db.insert(schema.reports).values({
+      reporterId: person.id,
+      targetUserId: operator.id,
+      reason: "other",
+      detail: "보존할 처리 기록",
+      resolvedAt: previousSeedAt,
+      resolvedBy: operator.id,
+      resolution: "dismissed",
+    });
     const [room] = await database.db
       .select()
       .from(schema.chatRooms)

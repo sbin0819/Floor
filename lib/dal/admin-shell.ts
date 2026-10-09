@@ -2,16 +2,12 @@ import "server-only";
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import {
-  branchStaff,
-  floors,
-  roleSettings,
-  spaceBlocks,
-  spaces,
-} from "@/lib/db/schema";
+import { branchStaff, branches, roleSettings } from "@/lib/db/schema";
 import { isPermissionKey } from "@/lib/permissions/keys";
 import type { PermissionContext } from "@/lib/permissions/types";
 import type { DalDatabase } from "./database";
+import { openBranchReportSummary } from "./branch-report-scope";
+import type { ReportSummary } from "@/features/admin/reports-types";
 
 export async function getOperatorRoleSettings(
   userId: string,
@@ -38,26 +34,50 @@ export async function getOperatorRoleSettings(
   return settings;
 }
 
-export async function getOngoingMaintenanceCounts(
-  branchIds: readonly string[],
-  now: Date,
+export async function getAdminBranchBadgeCounts(
+  {
+    maintenanceBranchIds,
+    reportBranchIds,
+    userId,
+    now,
+  }: {
+    maintenanceBranchIds: readonly string[];
+    reportBranchIds: readonly string[];
+    userId: string;
+    now: Date;
+  },
   database: DalDatabase = getDb(),
 ) {
-  if (!branchIds.length) return new Map<string, number>();
+  const branchIds = [...new Set([...maintenanceBranchIds, ...reportBranchIds])];
+  if (!branchIds.length)
+    return new Map<
+      string,
+      { maintenanceCount: number | null; reportSummary: ReportSummary | null }
+    >();
   const rows = await database
     .select({
-      branchId: floors.branchId,
-      count: sql<number>`count(*)::integer`,
+      branchId: branches.id,
+      maintenanceCount: maintenanceBranchIds.length
+        ? sql<
+            number | null
+          >`case when ${inArray(branches.id, [...maintenanceBranchIds])} then
+        (select count(*)::int from space_blocks badge_block join spaces badge_space on badge_space.id = badge_block.space_id
+          join floors badge_floor on badge_floor.id = badge_space.floor_id where badge_floor.branch_id = ${branches.id}
+          and badge_block.during @> ${now.toISOString()}::timestamptz) else null end`
+        : sql<null>`null`,
+      reportSummary: reportBranchIds.length
+        ? sql<ReportSummary | null>`case when ${inArray(branches.id, [...reportBranchIds])}
+        then ${openBranchReportSummary(sql`${branches.id}`)} else null end`
+        : sql<null>`null`,
     })
-    .from(spaceBlocks)
-    .innerJoin(spaces, eq(spaces.id, spaceBlocks.spaceId))
-    .innerJoin(floors, eq(floors.id, spaces.floorId))
-    .where(
+    .from(branches)
+    .innerJoin(
+      branchStaff,
       and(
-        inArray(floors.branchId, [...branchIds]),
-        sql`${spaceBlocks.during} @> ${now.toISOString()}::timestamptz`,
+        eq(branchStaff.branchId, branches.id),
+        eq(branchStaff.userId, userId),
       ),
     )
-    .groupBy(floors.branchId);
-  return new Map(rows.map((row) => [row.branchId, row.count]));
+    .where(inArray(branches.id, branchIds));
+  return new Map(rows.map(({ branchId, ...row }) => [branchId, row]));
 }

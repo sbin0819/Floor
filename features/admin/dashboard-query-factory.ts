@@ -19,6 +19,7 @@ import { loadPermissionContext } from "@/lib/permissions/context";
 import { addDays, localDate, localTime, zonedDateTime } from "@/lib/time/zoned";
 import type { AdminQueryDependencies } from "./query-factory";
 import type { AdminDashboardData } from "./dashboard-types";
+import { serializeReportSummary } from "./report-text";
 import {
   combinedUtilization,
   dashboardOpenRanges,
@@ -104,7 +105,10 @@ export function createAdminDashboardQueries(
           db,
         ),
         readDashboardCards(
-          scope,
+          {
+            ...scope,
+            canReadReports: can(context, "branch.announce", { branchId }),
+          },
           {
             start: zonedDateTime(date, "00:00", branch.timezone).toISOString(),
             end: zonedDateTime(
@@ -123,6 +127,7 @@ export function createAdminDashboardQueries(
           : null,
       ]);
       const measurements = new Map(metrics.map((row) => [row.id, row]));
+      const { reportSummary, ...bookingCards } = cards;
       const metadata = new Map(spaces.map((space) => [space.id, space]));
       const parentsWithSeats = new Set(
         spaces
@@ -197,8 +202,9 @@ export function createAdminDashboardQueries(
         canManageMaintenance: can(context, "space.manage", {
           branchId: branch.id,
         }),
+        reportSummary: serializeReportSummary(reportSummary),
         cards: {
-          ...cards,
+          ...bookingCards,
           ongoingCount: date === today ? cards.ongoingCount : null,
           remainingCount: date === today ? cards.remainingCount : null,
           meetingUtilization: combinedUtilization(meetings),

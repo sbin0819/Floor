@@ -14,14 +14,17 @@ import {
   users,
 } from "@/lib/db/schema";
 import type { UtilizationRange } from "@/features/admin/utilization";
+import type { ReportSummary } from "@/features/admin/reports-types";
 import type { DalDatabase } from "./database";
 import { avatarColumns } from "./avatar";
 import { teamDisplayName } from "./team-name";
+import { openBranchReportSummary } from "./branch-report-scope";
 
 type DashboardScope = {
   branchId: string;
   userId: string;
   floorId?: string | null;
+  canReadReports?: boolean;
 };
 function assigned(scope: DashboardScope) {
   return sql`exists(select 1 from ${branchStaff} where ${branchStaff.userId} = ${scope.userId}::uuid and ${branchStaff.branchId} = ${scope.branchId}::uuid)`;
@@ -155,6 +158,9 @@ export async function readDashboardCards(
       maintenanceCount: sql<number>`(select count(*)::int from space_blocks bl inner join spaces s on s.id = bl.space_id inner join floors f on f.id = s.floor_id
       where f.branch_id = ${scope.branchId}::uuid and (${scope.floorId ?? null}::uuid is null or f.id = ${scope.floorId ?? null}::uuid)
         and bl.during @> ${current}::timestamptz and ${assigned(scope)})`,
+      reportSummary: scope.canReadReports
+        ? sql<ReportSummary | null>`case when ${assigned(scope)} then ${openBranchReportSummary(scope.branchId)} else null end`
+        : sql<null>`null`,
     })
     .from(bookings)
     .innerJoin(spaces, eq(spaces.id, bookings.spaceId))

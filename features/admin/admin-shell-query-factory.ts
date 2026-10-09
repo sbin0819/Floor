@@ -4,11 +4,12 @@ import { requireSession } from "@/lib/auth/session";
 import { getMemberships, getOperatorBranches } from "@/lib/dal";
 import {
   getOperatorRoleSettings,
-  getOngoingMaintenanceCounts,
+  getAdminBranchBadgeCounts,
 } from "@/lib/dal/admin-shell";
 import { can } from "@/lib/permissions/can";
 import type { AdminQueryDependencies } from "./query-factory";
 import type { AdminMenu, AdminShellData } from "./admin-shell-types";
+import { serializeReportSummary } from "./report-text";
 
 export function createAdminShellQueries(
   dependencies: AdminQueryDependencies = {},
@@ -36,9 +37,20 @@ export function createAdminShellQueries(
             can(context, "space.manage", { branchId: branch.id }),
         )
         .map((branch) => branch.id);
-      const counts = await getOngoingMaintenanceCounts(
-        maintenanceBranchIds,
-        dependencies.now?.() ?? new Date(),
+      const reportBranchIds = assigned
+        .filter(
+          (branch) =>
+            context.staffBranchIds.includes(branch.id) &&
+            can(context, "branch.announce", { branchId: branch.id }),
+        )
+        .map(({ id }) => id);
+      const counts = await getAdminBranchBadgeCounts(
+        {
+          maintenanceBranchIds,
+          reportBranchIds,
+          userId: session.userId,
+          now: dependencies.now?.() ?? new Date(),
+        },
         dependencies.database,
       );
       return {
@@ -60,14 +72,25 @@ export function createAdminShellQueries(
             if (can(context, "roles.manage", target)) menus.push("roles");
             if (can(context, "plan.edit", target)) menus.push("plans");
             if (can(context, "branch.announce", target))
-              menus.push("announcements");
+              menus.push("announcements", "reports");
             return {
               id: branch.id,
               name: branch.name,
               menus,
               ...(menus.includes("maintenance")
-                ? { maintenanceCount: counts.get(branch.id) ?? 0 }
+                ? {
+                    maintenanceCount:
+                      counts.get(branch.id)?.maintenanceCount ?? 0,
+                  }
                 : {}),
+              reportSummary: menus.includes("reports")
+                ? serializeReportSummary(
+                    counts.get(branch.id)?.reportSummary ?? {
+                      count: 0,
+                      oldestAt: null,
+                    },
+                  )
+                : null,
             };
           }),
         user: { name: session.name },

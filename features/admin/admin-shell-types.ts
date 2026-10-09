@@ -5,13 +5,15 @@ export type AdminMenu =
   | "maintenance"
   | "roles"
   | "plans"
-  | "announcements";
+  | "announcements"
+  | "reports";
 
 export type AdminShellBranch = {
   id: string;
   name: string;
   menus: AdminMenu[];
   maintenanceCount?: number;
+  reportSummary?: ReportSummary | null;
 };
 
 export type AdminShellData = {
@@ -19,3 +21,4 @@ export type AdminShellData = {
   branches: AdminShellBranch[];
   user: { name: string };
 };
+import type { ReportSummary } from "./reports-types";

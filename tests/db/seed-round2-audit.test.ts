@@ -33,6 +33,7 @@ import {
   messageAttachments,
   floors,
   notifications,
+  reports,
   roleSettings,
   teamMembers,
   teams,
@@ -65,6 +66,55 @@ describe("read-only booking round2 preservation audit", () => {
   });
   const capture = (allowSeedAttendeeCounts = false) =>
     captureSeedRound2Audit({ allowSeedAttendeeCounts }, database.db);
+
+  it.each(["resolvedAt", "resolvedBy", "resolution"] as const)(
+    "protects report %s without exposing the private report detail",
+    async (field) => {
+      const [report] = await database.db
+        .insert(reports)
+        .values({
+          reporterId: actors.person.userId,
+          targetUserId: actors.member.userId,
+          reason: "other",
+          detail: "private-report-detail",
+          resolvedAt: bookingNow,
+          resolvedBy: actors.operator.userId,
+          resolution: "dismissed",
+        })
+        .returning();
+      const before = await capture();
+      expect(before.tables).toHaveLength(37);
+      expect(JSON.stringify(before)).not.toContain("private-report-detail");
+      if (field === "resolvedAt")
+        await database.db.execute(
+          sql`update reports set resolved_at=resolved_at+interval '1 microsecond' where id=${report!.id}::uuid`,
+        );
+      else
+        await database.db
+          .update(reports)
+          .set(
+            field === "resolvedBy"
+              ? { resolvedBy: actors.otherOperator.userId }
+              : { resolution: "message_deleted" },
+          )
+          .where(eq(reports.id, report!.id));
+      expect(compareSeedRound2Audit(before, await capture()).issues).toEqual([
+        {
+          table: "reports",
+          key: JSON.stringify([report!.id]),
+          kind: "changed_row",
+        },
+      ]);
+      await database.db.delete(reports).where(eq(reports.id, report!.id));
+      expect(compareSeedRound2Audit(before, await capture()).issues).toEqual([
+        {
+          table: "reports",
+          key: JSON.stringify([report!.id]),
+          kind: "missing_row",
+        },
+      ]);
+    },
+  );
 
   it("detects changed and removed announcements without exposing snapshots", async () => {
     const [notice] = await database.db

@@ -25,6 +25,7 @@ import {
   chatSpaceInvites,
   messageAttachments,
   messages,
+  reports,
   users,
 } from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
@@ -192,7 +193,7 @@ describe("explicit full development reset", () => {
     expect(await snapshot()).toEqual(before);
   }, 60000);
 
-  it("explicitly resets calls, attachments and announcements and restores them on transaction failure", async () => {
+  it("explicitly resets calls, attachments, announcements and resolved reports and restores them on transaction failure", async () => {
     const [user] = await database.db.select().from(users).limit(1);
     const [room] = await database.db
       .select()
@@ -223,6 +224,16 @@ describe("explicit full development reset", () => {
       body: "실패하면 그대로 남아야 해요.",
       loungeMessageId: message!.id,
       createdAt: now,
+    });
+    await database.db.insert(reports).values({
+      reporterId: user!.id,
+      targetUserId: user!.id,
+      messageId: message!.id,
+      reason: "other",
+      detail: "실패하면 처리 기록도 남아야 해요.",
+      resolvedAt: now,
+      resolvedBy: user!.id,
+      resolution: "dismissed",
     });
     await database.db.insert(messageAttachments).values([
       {
@@ -259,11 +270,13 @@ describe("explicit full development reset", () => {
       call_participants: 1,
       message_attachments: 2,
       announcements: 1,
+      reports: 1,
     });
     expect(await database.db.select().from(callSessions)).toEqual([]);
     expect(await database.db.select().from(callParticipants)).toEqual([]);
     expect(await database.db.select().from(messageAttachments)).toEqual([]);
     expect(await database.db.select().from(announcements)).toEqual([]);
+    expect(await database.db.select().from(reports)).toEqual([]);
   }, 60000);
 
   it("repopulates public tables even when a temporary table shadows the user table", async () => {

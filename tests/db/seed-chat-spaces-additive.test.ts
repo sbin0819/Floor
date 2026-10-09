@@ -747,6 +747,15 @@ describe("append-only chat spaces seed with immutable completion receipt", () =>
       audience: { date: "2026-10-09", floorId: null, spaceId: null },
       createdAt: now,
     });
+    await database.db.insert(schema.reports).values({
+      reporterId: ids.get("member")!,
+      targetUserId: ids.get("designAdmin")!,
+      reason: "other",
+      detail: "추가 시드에서 보존할 처리 기록",
+      resolvedAt: now,
+      resolvedBy: ids.get("member")!,
+      resolution: "dismissed",
+    });
     const before = await snapshot();
     await apply();
     const after = await snapshot();

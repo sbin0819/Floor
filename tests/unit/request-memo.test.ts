@@ -12,6 +12,7 @@ import type { DalDatabase } from "@/lib/dal/database";
 import { listOperatorBranchSummaries } from "@/lib/dal/admin-home";
 import { getAllRoleSettings, getRoleSettings } from "@/lib/dal/role-settings";
 import { getMemberships } from "@/lib/dal/users";
+import { readReportBranch } from "@/lib/dal/reports-read";
 import {
   loungeAvailability,
   readAnnouncementBranch,
@@ -80,6 +81,12 @@ const settings = {
   limits: { maxDaysAhead: 3 },
 };
 const cases = [
+  {
+    name: "report branch metadata",
+    read: (db?: DalDatabase) => readReportBranch({ userId, branchId }, db),
+    rows: [[{ ...branch, timezone: "Asia/Seoul", loungeSpaceId: null }]],
+    keys: [userId, branchId],
+  },
   {
     name: "announcement lounge availability",
     read: (db?: DalDatabase) =>

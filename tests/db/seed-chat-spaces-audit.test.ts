@@ -197,6 +197,11 @@ describe("additive chat-space seed preservation audit", () => {
   it("preserves every old-column fingerprint across the actual six migrations and separately reports additions", async () =>
     withDatabase(async (database, client, apply) => {
       await existingBooking(client);
+      const reportId = crypto.randomUUID();
+      await client.query(
+        "insert into reports(id,reporter_id,target_user_id,reason,detail) values($1,$2,$2,'other','private-legacy-report-detail')",
+        [reportId, userId],
+      );
       expect(migrations.slice(historicalStart, historicalEnd)).toHaveLength(6);
       expect(await preflightChatSpacesMigrations(database)).toBe(
         migrations.length - historicalStart,
@@ -276,6 +281,28 @@ describe("additive chat-space seed preservation audit", () => {
       );
       const evolution = compareChatSpacesAudit(after, latest);
       expect(evolution.addedColumns).toContainEqual({
+        table: "reports",
+        columns: expect.arrayContaining([
+          "resolved_at",
+          "resolved_by",
+          "resolution",
+        ]),
+      });
+      expect(
+        (
+          await client.query(
+            "select resolved_at,resolved_by,resolution from reports where id=$1",
+            [reportId],
+          )
+        ).rows,
+      ).toEqual([
+        {
+          resolved_at: null,
+          resolved_by: null,
+          resolution: null,
+        },
+      ]);
+      expect(evolution.addedColumns).toContainEqual({
         table: "bookings",
         columns: ["cancel_kind", "cancel_reason"],
       });
@@ -284,11 +311,63 @@ describe("additive chat-space seed preservation audit", () => {
         "auth_accounts",
         "auth_sessions",
         "bookings",
+        "reports",
       ] as const)
         expect(latest.tables.find((row) => row.table === table)!.rows).toEqual(
           after.tables.find((row) => row.table === table)!.rows,
         );
     }, historicalStart));
+
+  it.each(["resolved_at", "resolved_by", "resolution"] as const)(
+    "includes report %s in a current-schema protection baseline",
+    async (field) =>
+      withDatabase(async (database, client) => {
+        const reportId = crypto.randomUUID();
+        const otherId = crypto.randomUUID();
+        await client.query(
+          "insert into users(id,name,email) values($1,'비공개 처리자','private-resolver@example.test')",
+          [otherId],
+        );
+        await client.query(
+          "insert into reports(id,reporter_id,target_user_id,reason,detail,resolved_at,resolved_by,resolution) values($1,$2,$2,'other','private-report-detail','2026-10-09T03:00:00.123456Z',$2,'dismissed')",
+          [reportId, userId],
+        );
+        const before = await captureChatSpacesAudit({}, database);
+        expect(before.tables).toHaveLength(37);
+        expect(
+          before.tables.find(({ table }) => table === "reports")!.hashColumns,
+        ).toEqual(
+          expect.arrayContaining(["resolved_at", "resolved_by", "resolution"]),
+        );
+        if (field === "resolved_at")
+          await client.query(
+            "update reports set resolved_at=resolved_at+interval '1 microsecond' where id=$1",
+            [reportId],
+          );
+        else if (field === "resolved_by")
+          await client.query("update reports set resolved_by=$2 where id=$1", [
+            reportId,
+            otherId,
+          ]);
+        else
+          await client.query(
+            "update reports set resolution='message_deleted' where id=$1",
+            [reportId],
+          );
+        const after = await captureChatSpacesAudit(
+          { baseline: before },
+          database,
+        );
+        expect(() => compareChatSpacesAudit(before, after)).toThrow(
+          "보호 데이터",
+        );
+        for (const value of [
+          "private-report-detail",
+          "private-resolver@example.test",
+        ])
+          expect(JSON.stringify(after)).not.toContain(value);
+      }),
+  );
 
   it("includes new cancellation columns in a current-schema protection baseline", async () =>
     withDatabase(async (database, client) => {

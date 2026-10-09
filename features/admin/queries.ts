@@ -6,6 +6,8 @@ import { getOperatorBranches } from "@/lib/dal";
 import { createAdminQueries } from "./query-factory";
 import { createRoleSettingsQueries } from "./role-settings-query-factory";
 import { createAnnouncementQueries } from "./announcement-query-factory";
+import { createReportsQueries } from "./reports-query-factory";
+import type { GetBranchReportsInput } from "./reports-schema";
 import type {
   GetAnnouncementsInput,
   PreviewAnnouncementAudienceInput,
@@ -13,6 +15,9 @@ import type {
 
 export async function getAnnouncements(input: GetAnnouncementsInput) {
   return createAnnouncementQueries().getAnnouncements(input);
+}
+export async function getBranchReports(input: GetBranchReportsInput) {
+  return createReportsQueries().getBranchReports(input);
 }
 export async function previewAnnouncementAudience(
   input: PreviewAnnouncementAudienceInput,

@@ -92,8 +92,10 @@ describe("operator shell projection and budget", () => {
             "roles",
             "plans",
             "announcements",
+            "reports",
           ],
           maintenanceCount: 0,
+          reportSummary: { count: 0, oldestAt: null },
         },
       ],
       user: { name: actors.operator.name },
@@ -199,9 +201,17 @@ describe("operator shell projection and budget", () => {
       role: "operator",
       permissions: ["stats.view"],
     });
-    const read = vi.spyOn(shellDal, "getOngoingMaintenanceCounts");
+    const read = vi.spyOn(shellDal, "getAdminBranchBadgeCounts");
     const result = await query().getAdminShell(actors.branchId);
-    expect(read).toHaveBeenCalledWith([], bookingNow, database.db);
+    expect(read).toHaveBeenCalledWith(
+      {
+        maintenanceBranchIds: [],
+        reportBranchIds: [],
+        userId: actors.operator.userId,
+        now: bookingNow,
+      },
+      database.db,
+    );
     expect(result.branches[0]).not.toHaveProperty("maintenanceCount");
     read.mockRestore();
   });

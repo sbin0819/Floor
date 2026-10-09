@@ -1,6 +1,7 @@
 import type { Avatar } from "@/lib/avatar";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
 import type { SpaceType } from "@/features/bookings/types";
+import type { ReportSummary } from "./reports-types";
 
 export type DashboardRange = "day" | "week" | "30days";
 export type DashboardPeriod = {
@@ -23,6 +24,7 @@ export type AdminDashboardData = {
   period: DashboardPeriod;
   isToday: boolean;
   canManageMaintenance: boolean;
+  reportSummary?: ReportSummary | null;
   cards: {
     bookingCount: number;
     ongoingCount: number | null;

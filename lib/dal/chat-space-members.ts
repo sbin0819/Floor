@@ -104,17 +104,18 @@ export async function readLoungeMembers(
   const [result] = await database
     .select({
       people: sql<
-        Omit<MemberRow, "status">[]
-      >`coalesce((select jsonb_agg(person) from (
+        MemberRow[]
+      >`coalesce((select jsonb_agg(to_jsonb(person) - 'position' order by person.status, person.position) from (
       select u.id as "userId", u.name, u.username,
         ${avatarJson(alias(users, "u"))} as avatar,
         case when ${admin} then 'admin' else 'member' end as role,
-        ${sharesChatSpace(userId, sql`u.id`)} as "sharesSpace"
+        member.status,
+        ${sharesChatSpace(userId, sql`u.id`)} as "sharesSpace",
+        row_number() over (partition by member.status order by ${admin} desc, u.name, u.id) as position
       from chat_space_members member join users u on u.id = member.user_id
-      where member.space_id = ${chatSpaces}.id and member.status = 'active'
-        and (${isSpaceAdmin(space.role)} or ${admin})
-      order by ${admin} desc, u.name, u.id limit 200
-    ) person), '[]'::jsonb)`,
+      where member.space_id = ${chatSpaces}.id
+        and (${isSpaceAdmin(space.role)} or (member.status = 'active' and ${admin}))
+    ) person where person.position <= 200), '[]'::jsonb)`,
     })
     .from(chatSpaces)
     .where(

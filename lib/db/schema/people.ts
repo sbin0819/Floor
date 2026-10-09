@@ -10,7 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id } from "./common";
-import { friendshipStatus, reportReason } from "./enums";
+import { friendshipStatus, reportReason, reportResolution } from "./enums";
 import { users } from "./users";
 import { messages } from "./chat";
 
@@ -81,6 +81,11 @@ export const reports = pgTable(
     }),
     reason: reportReason("reason").notNull(),
     detail: text("detail"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    resolution: reportResolution("resolution"),
     createdAt: createdAt(),
   },
   (table) => [
@@ -89,6 +94,15 @@ export const reports = pgTable(
       .where(sql`${table.messageId} IS NOT NULL`),
     index("reports_target_user_id_idx").on(table.targetUserId),
     index("reports_reporter_created_idx").on(table.reporterId, table.createdAt),
+    index("reports_open_message_idx")
+      .on(table.messageId)
+      .where(
+        sql`${table.resolvedAt} IS NULL AND ${table.messageId} IS NOT NULL`,
+      ),
+    check(
+      "reports_resolution_consistent",
+      sql`(${table.resolvedAt} IS NULL) = (${table.resolvedBy} IS NULL) AND (${table.resolvedAt} IS NULL) = (${table.resolution} IS NULL)`,
+    ),
     check(
       "reports_detail_length",
       sql`${table.detail} IS NULL OR char_length(${table.detail}) <= 500`,
