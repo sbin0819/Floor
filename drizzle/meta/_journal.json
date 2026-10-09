@@ -190,6 +190,13 @@
       "when": 1791519939930,
       "tag": "0026_space_blocks_no_overlap",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791521734608,
+      "tag": "0027_yellow_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

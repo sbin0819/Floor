@@ -2,6 +2,11 @@ import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import { getOperatorBranches } from "@/lib/dal";
 import { createAdminQueries } from "./query-factory";
+import { createRoleSettingsQueries } from "./role-settings-query-factory";
+
+export async function getRoleSettingsEditor(branchId: string) {
+  return createRoleSettingsQueries().getRoleSettingsEditor(branchId);
+}
 import { createMaintenanceQueries } from "./maintenance-query-factory";
 import type {
   MaintenanceListInput,

@@ -40,6 +40,7 @@ export const roleSettings = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    updatedBy: uuid("updated_by").references(() => users.id),
     createdAt: createdAt(),
   },
   (table) => [primaryKey({ columns: [table.branchId, table.role] })],
