@@ -9,6 +9,36 @@ const second = bookingDraftScope("branch", "floor", "2026-10-07", "space-b");
 const range = { start: "2026-10-07T01:00:00Z", end: "2026-10-07T02:00:00Z" };
 
 describe("scoped booking draft store", () => {
+  it("publishes only the current picker seats, avoids equivalent updates and protects replacement ownership", () => {
+    const store = createBookingDraftStore();
+    const seats = {
+      sourceId: "first",
+      part: "pm" as const,
+      disabled: false,
+      seats: [{ id: "seat", name: "A-01", state: "free" as const }],
+    };
+    store.getState().activate(first);
+    store.getState().publishDeskSeats(second, seats);
+    expect(store.getState().deskSeats).toBeNull();
+    store.getState().publishDeskSeats(first, seats);
+    const snapshot = store.getState();
+    store
+      .getState()
+      .publishDeskSeats(first, {
+        ...seats,
+        seats: seats.seats.map((seat) => ({ ...seat })),
+      });
+    expect(store.getState()).toBe(snapshot);
+    store
+      .getState()
+      .publishDeskSeats(first, { ...seats, sourceId: "replacement" });
+    store.getState().clearDeskSeats(first, "first");
+    expect(store.getState().deskSeats?.sourceId).toBe("replacement");
+    store.getState().activate(second);
+    expect(store.getState().deskSeats).toBeNull();
+    store.getState().publishDeskSeats(first, seats);
+    expect(store.getState().deskSeats).toBeNull();
+  });
   it("starts with a deterministic empty snapshot and canonicalizes IDs", () => {
     const store = createBookingDraftStore();
     expect(store.getState()).toMatchObject({

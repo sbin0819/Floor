@@ -109,6 +109,57 @@ function changedState(id: string, change: Partial<PlanShapeState>): PlanStates {
 }
 
 describe("floor plan screen-reader and keyboard controls", () => {
+  it("includes approved area seats, visits unavailable seats by arrow but never activates them", async () => {
+    const seats = [
+      shape("s1", 100, 100, 0, "seat"),
+      shape("s2", 500, 100, 1, "seat"),
+      shape("s3", 900, 100, 2, "seat"),
+    ];
+    const seatStates: PlanStates = new Map([
+      [
+        "space-s1",
+        { kind: "free", name: "A-01", label: "비어 있음", selectable: true },
+      ],
+      [
+        "space-s2",
+        { kind: "booked", name: "A-02", label: "예약됨", selectable: false },
+      ],
+      [
+        "space-s3",
+        { kind: "mine", name: "A-03", label: "내 자리", selectable: true },
+      ],
+    ]);
+    const select = vi.fn();
+    const clear = vi.fn();
+    render(
+      <Harness
+        scene={{
+          ...scene,
+          shapes: [...seats, shape("unapproved", 1200, 100, 3, "seat")],
+        }}
+        states={seatStates}
+        activeDeskAreaId={a.spaceId}
+        selectedSeatId="space-s3"
+        onSelect={select}
+        onClear={clear}
+      />,
+    );
+    const one = screen.getByRole("button", { name: "A-01, 비어 있음" });
+    const two = screen.getByRole("button", { name: "A-02, 예약됨" });
+    const three = screen.getByRole("button", { name: "A-03, 내 자리" });
+    expect(two).not.toBeDisabled();
+    expect(two).toHaveAttribute("aria-disabled", "true");
+    expect(three).toHaveAttribute("aria-pressed", "true");
+    expect(within(list()).getAllByRole("button")).toHaveLength(3);
+    act(() => one.focus());
+    await userEvent.keyboard("{Enter}{ArrowRight}{Enter} ");
+    expect(two).toHaveFocus();
+    expect(select).toHaveBeenCalledExactlyOnceWith(seats[0]);
+    await userEvent.keyboard("{ArrowRight} {Escape}");
+    expect(three).toHaveFocus();
+    expect(select).toHaveBeenLastCalledWith(seats[2]);
+    expect(clear).toHaveBeenCalledOnce();
+  });
   it("renders a visually hidden list in reading order with just one entry tab stop", () => {
     render(<Harness />);
     expect(list()).toHaveClass("sr-only");

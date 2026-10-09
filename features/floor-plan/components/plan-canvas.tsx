@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { FloorPlanDocument } from "@/lib/floor-plan/types";
 import {
   fit,
@@ -27,6 +28,11 @@ export function PlanCanvas({
   document,
   states,
   selectedSpaceId,
+  selectedSeatId,
+  activeDeskAreaId,
+  flashSpaceIds,
+  interactive = true,
+  className,
   onSelect,
   onHover,
   onClear,
@@ -35,6 +41,11 @@ export function PlanCanvas({
   document: FloorPlanDocument;
   states: PlanStates;
   selectedSpaceId?: string | null;
+  selectedSeatId?: string | null;
+  activeDeskAreaId?: string | null;
+  flashSpaceIds?: readonly string[];
+  interactive?: boolean;
+  className?: string;
   onSelect: (shape: PlanShape) => void;
   onHover?: (shape: PlanShape | null) => void;
   onClear?: () => void;
@@ -57,6 +68,13 @@ export function PlanCanvas({
   const fitted = useMemo(() => fit(scene.bounds, viewport), [scene, viewport]);
   const [camera, setCamera] = useState<Camera | null>(null);
   const current = camera ?? fitted;
+  const areaCamera = useRef<{
+    scene: typeof scene;
+    id: string;
+    previous: Camera;
+    width: number;
+    height: number;
+  } | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [lastFocusedId, setLastFocusedId] = useState<string | null>(null);
@@ -127,7 +145,13 @@ export function PlanCanvas({
           colors,
           states,
         },
-        { hoveredId, focusedId, selectedId: selected?.id },
+        {
+          hoveredId,
+          focusedId,
+          selectedId: selected?.id,
+          selectedSeatId: activeDeskAreaId ? selectedSeatId : null,
+          flashedIds: flashSpaceIds,
+        },
         forceFrame.current,
       );
       forceFrame.current = false;
@@ -143,11 +167,14 @@ export function PlanCanvas({
     hoveredId,
     focusedId,
     selectedSpaceId,
+    selectedSeatId,
+    activeDeskAreaId,
+    flashSpaceIds,
     paintEpoch,
   ]);
   useEffect(() => {
     const element = host.current;
-    if (!element) return;
+    if (!element || !interactive) return;
     const wheel = (event: WheelEvent) => {
       event.preventDefault();
       const rect = element.getBoundingClientRect();
@@ -168,10 +195,62 @@ export function PlanCanvas({
     };
     element.addEventListener("wheel", wheel, { passive: false });
     return () => element.removeEventListener("wheel", wheel);
-  }, [fitted]);
+  }, [fitted, interactive]);
   useEffect(() => {
     if (viewport.width === 0 || viewport.height === 0) return;
     const id = selectedSpaceId ?? null;
+    const area =
+      activeDeskAreaId &&
+      scene.shapes.find(
+        (shape) =>
+          shape.kind === "space" &&
+          shape.spaceId === activeDeskAreaId.toLowerCase(),
+      );
+    const previousArea =
+      areaCamera.current?.scene === scene ? areaCamera.current : null;
+    if (area) {
+      if (
+        previousArea?.id === area.id &&
+        previousArea.width === viewport.width &&
+        previousArea.height === viewport.height
+      )
+        return;
+      const frame = requestAnimationFrame(() => {
+        positionedSelection.current = { scene, id };
+        setCamera((value) => {
+          areaCamera.current = {
+            scene,
+            id: area.id,
+            previous: previousArea?.previous ?? value ?? fitted,
+            ...viewport,
+          };
+          const width = Math.max(1, area.bounds.maxX - area.bounds.minX);
+          const height = Math.max(1, area.bounds.maxY - area.bounds.minY);
+          const scale = Math.max(
+            fitted.scale * 0.5,
+            Math.min(
+              fitted.scale * 8,
+              (viewport.width * 0.8) / width,
+              (viewport.height * 0.8) / height,
+            ),
+          );
+          return {
+            scale,
+            x: viewport.width / 2 - (area.bounds.minX + width / 2) * scale,
+            y: viewport.height / 2 - (area.bounds.minY + height / 2) * scale,
+          };
+        });
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    if (previousArea) {
+      const frame = requestAnimationFrame(() => {
+        areaCamera.current = null;
+        positionedSelection.current = { scene, id };
+        setCamera(previousArea.previous);
+      });
+      return () => cancelAnimationFrame(frame);
+    }
     if (
       positionedSelection.current?.scene === scene &&
       positionedSelection.current.id === id
@@ -193,12 +272,21 @@ export function PlanCanvas({
       );
     });
     return () => cancelAnimationFrame(frame);
-  }, [selectedSpaceId, scene, fitted, viewport]);
+  }, [selectedSpaceId, activeDeskAreaId, scene, fitted, viewport]);
   const position = (event: { clientX: number; clientY: number }): Point => {
     const rect = host.current!.getBoundingClientRect();
     return [event.clientX - rect.left, event.clientY - rect.top];
   };
   const candidate = (point: Point) => {
+    if (activeDeskAreaId) {
+      const seat = hitTest(index, current, point, { kinds: ["seat"] });
+      if (
+        seat?.spaceId &&
+        states.has(seat.spaceId) &&
+        !states.get(seat.spaceId)?.hidden
+      )
+        return seat;
+    }
     const shape = hitTest(index, current, point, { kinds: ["space"] });
     return shape?.spaceId &&
       states.has(shape.spaceId.toLowerCase()) &&
@@ -209,18 +297,24 @@ export function PlanCanvas({
   const choose = (shape: PlanShape) => {
     if (
       shape.spaceId &&
+      states.has(shape.spaceId.toLowerCase()) &&
+      states.get(shape.spaceId.toLowerCase())?.selectable !== false &&
       states.get(shape.spaceId.toLowerCase())?.kind !== "restricted"
     )
       onSelect(shape);
   };
   return (
-    <div className="relative">
+    <div className="relative" aria-hidden={!interactive || undefined}>
       <div
         ref={host}
         data-plan-canvas
-        className="relative h-[min(60dvh,640px)] min-h-96 overflow-hidden"
+        className={cn(
+          "relative overflow-hidden",
+          interactive && "h-[min(60dvh,640px)] min-h-96",
+          className,
+        )}
         onPointerDown={(event) => {
-          if (event.button !== 0) return;
+          if (!interactive || event.button !== 0) return;
           const point = position(event);
           gesture.current = {
             id: event.pointerId,
@@ -231,6 +325,7 @@ export function PlanCanvas({
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
+          if (!interactive) return;
           const point = position(event);
           const active = gesture.current;
           if (active && active.id === event.pointerId) {
@@ -254,6 +349,7 @@ export function PlanCanvas({
           }
         }}
         onPointerUp={(event) => {
+          if (!interactive) return;
           const active = gesture.current;
           if (!active || active.id !== event.pointerId) return;
           gesture.current = null;
@@ -266,6 +362,7 @@ export function PlanCanvas({
           gesture.current = null;
         }}
         onPointerLeave={() => {
+          if (!interactive) return;
           setHoveredId(null);
           onHover?.(null);
         }}
@@ -286,68 +383,74 @@ export function PlanCanvas({
           className="pointer-events-none absolute inset-0 size-full"
         />
       </div>
-      <PlanAccessibility
-        scene={scene}
-        states={states}
-        lastFocusedId={lastFocusedId}
-        selectedSpaceId={selectedSpaceId}
-        timeLabel={timeLabel}
-        onFocus={(shape) => {
-          setFocusedId(shape?.id ?? null);
-          if (!shape) return;
-          setLastFocusedId(shape.id);
-          setCamera((value) =>
-            ensureVisible(value ?? fitted, shape.bounds, viewport),
-          );
-        }}
-        onSelect={choose}
-        onClear={() => onClear?.()}
-      />
-      <div className="absolute right-3 bottom-3 flex flex-col rounded-xl border border-border bg-background shadow-sm">
-        <Button
-          size="icon"
-          variant="ghost"
-          aria-label="평면도 확대"
-          onClick={() =>
-            setCamera(
-              zoomAt(
-                current,
-                [viewport.width / 2, viewport.height / 2],
-                1.25,
-                fitted.scale,
-              ),
-            )
-          }
-        >
-          <Plus />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          aria-label="평면도 축소"
-          onClick={() =>
-            setCamera(
-              zoomAt(
-                current,
-                [viewport.width / 2, viewport.height / 2],
-                0.8,
-                fitted.scale,
-              ),
-            )
-          }
-        >
-          <Minus />
-        </Button>
-        <Button variant="ghost" onClick={() => setCamera(null)}>
-          맞춤
-        </Button>
-        <output
-          className="pb-2 text-center text-xs tabular-nums"
-          aria-label="평면도 배율"
-        >
-          {Math.round((current.scale / fitted.scale) * 100)}%
-        </output>
-      </div>
+      {interactive && (
+        <PlanAccessibility
+          scene={scene}
+          states={states}
+          lastFocusedId={lastFocusedId}
+          selectedSpaceId={selectedSpaceId}
+          selectedSeatId={selectedSeatId}
+          activeDeskAreaId={activeDeskAreaId}
+          timeLabel={timeLabel}
+          onFocus={(shape) => {
+            setFocusedId(shape?.id ?? null);
+            if (!shape) return;
+            setLastFocusedId(shape.id);
+            setCamera((value) =>
+              ensureVisible(value ?? fitted, shape.bounds, viewport),
+            );
+          }}
+          onSelect={choose}
+          onClear={() => onClear?.()}
+        />
+      )}
+      {interactive && (
+        <div className="absolute right-3 bottom-3 flex flex-col rounded-xl border border-border bg-background shadow-sm">
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="평면도 확대"
+            onClick={() =>
+              setCamera(
+                zoomAt(
+                  current,
+                  [viewport.width / 2, viewport.height / 2],
+                  1.25,
+                  fitted.scale,
+                ),
+              )
+            }
+          >
+            <Plus />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="평면도 축소"
+            onClick={() =>
+              setCamera(
+                zoomAt(
+                  current,
+                  [viewport.width / 2, viewport.height / 2],
+                  0.8,
+                  fitted.scale,
+                ),
+              )
+            }
+          >
+            <Minus />
+          </Button>
+          <Button variant="ghost" onClick={() => setCamera(null)}>
+            맞춤
+          </Button>
+          <output
+            className="pb-2 text-center text-xs tabular-nums"
+            aria-label="평면도 배율"
+          >
+            {Math.round((current.scale / fitted.scale) * 100)}%
+          </output>
+        </div>
+      )}
     </div>
   );
 }

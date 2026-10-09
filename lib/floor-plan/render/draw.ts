@@ -268,7 +268,14 @@ export function createPlanDrawer(options: PlanDrawOptions = {}) {
       if (!polygon(shape) || shape.kind === "fixture") continue;
       const state = shapeState(frame, shape);
       if (!state) continue;
-      const palette = frame.colors[state.kind];
+      const palette =
+        shape.kind === "seat" && state.selected
+          ? frame.colors.mine
+          : shape.kind === "seat" && state.kind === "mine"
+            ? (frame.colors.seatMine ?? frame.colors.mine)
+            : shape.kind === "seat" && state.kind === "booked"
+              ? (frame.colors.seatBooked ?? frame.colors.booked)
+              : frame.colors[state.kind];
       ctx.lineWidth = 1 / frame.camera.scale;
       ctx.setLineDash(
         state.deskArea ? [6 / frame.camera.scale, 4 / frame.camera.scale] : [],
@@ -294,7 +301,9 @@ export function createPlanDrawer(options: PlanDrawOptions = {}) {
     for (const [id, kind] of [
       [overlay.hoveredId, "hover"],
       [overlay.selectedId, "selected"],
+      [overlay.selectedSeatId, "selected"],
       [overlay.focusedId, "focused"],
+      ...(overlay.flashedIds ?? []).map((id) => [id, "flash"] as const),
     ] as const) {
       if (!id) continue;
       const shape = frame.scene.shapes.find(

@@ -2,6 +2,14 @@ import { createStore } from "zustand/vanilla";
 import type { BookingSelection, FloorBookingSelection } from "./selection";
 import type { DeskPart } from "./desk-parts";
 import type { BookingParticipantDraft } from "./participants";
+import type { DeskState } from "./types";
+
+export type BookingDeskSeats = Readonly<{
+  sourceId: string;
+  part: DeskPart | null;
+  disabled: boolean;
+  seats: readonly { id: string; name: string; state: DeskState }[];
+}>;
 
 export type BookingDraft = Readonly<{
   title: string;
@@ -33,6 +41,7 @@ export type BookingDraftState = {
   range: FloorBookingSelection | null;
   deskPart: DeskPart | null;
   deskId: string | null;
+  deskSeats: BookingDeskSeats | null;
   activate: (scope: string) => void;
   changeDraft: (scope: string, patch: Partial<BookingDraft>) => void;
   changeRange: (
@@ -43,6 +52,8 @@ export type BookingDraftState = {
   clearBookingContent: (scope: string) => void;
   changeDeskPart: (scope: string, part: DeskPart | null) => void;
   changeDesk: (scope: string, deskId: string | null) => void;
+  publishDeskSeats: (scope: string, value: BookingDeskSeats) => void;
+  clearDeskSeats: (scope: string, sourceId: string) => void;
 };
 
 export function createBookingDraftStore() {
@@ -52,6 +63,7 @@ export function createBookingDraftStore() {
     range: null,
     deskPart: null,
     deskId: null,
+    deskSeats: null,
     activate: (scope) =>
       set((state) =>
         state.scope === scope
@@ -62,6 +74,7 @@ export function createBookingDraftStore() {
               range: null,
               deskPart: null,
               deskId: null,
+              deskSeats: null,
             },
       ),
     changeDraft: (scope, patch) =>
@@ -114,6 +127,31 @@ export function createBookingDraftStore() {
     changeDesk: (scope, deskId) =>
       set((state) =>
         state.scope === scope && state.deskId !== deskId ? { deskId } : state,
+      ),
+    publishDeskSeats: (scope, deskSeats) =>
+      set((state) => {
+        if (state.scope !== scope) return state;
+        const previous = state.deskSeats;
+        return previous?.sourceId === deskSeats.sourceId &&
+          previous.part === deskSeats.part &&
+          previous.disabled === deskSeats.disabled &&
+          previous.seats.length === deskSeats.seats.length &&
+          previous.seats.every((seat, index) => {
+            const next = deskSeats.seats[index];
+            return (
+              seat.id === next?.id &&
+              seat.name === next.name &&
+              seat.state === next.state
+            );
+          })
+          ? state
+          : { deskSeats };
+      }),
+    clearDeskSeats: (scope, sourceId) =>
+      set((state) =>
+        state.scope === scope && state.deskSeats?.sourceId === sourceId
+          ? { deskSeats: null }
+          : state,
       ),
   }));
 }

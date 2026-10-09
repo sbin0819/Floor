@@ -22,7 +22,7 @@ export function FloorViews({
   data: FloorDayData;
   initialView: FloorView | null;
 }) {
-  useFloorRealtime(data);
+  const { flashSpaceIds } = useFloorRealtime(data);
   const { effectiveView: view } = useFloorView(
     initialView,
     Boolean(data.floor.plan),
@@ -57,6 +57,7 @@ export function FloorViews({
         key={`${data.floor.id}:${data.date}`}
         data={filtered.data}
         planId={data.floor.plan.id}
+        flashSpaceIds={flashSpaceIds}
       />
     ) : view === "list" ? (
       <FloorDay data={filtered.data} />

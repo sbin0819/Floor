@@ -611,6 +611,71 @@ describe("three canvas layers and partial rendering", () => {
     drawer.drawStates(ctx.ctx, { ...current, states });
     expect(ctx.of("fill")).toEqual([]);
   });
+  it("uses pale own seats, strong selected seats and bounded flash-only redraws", () => {
+    const doc = document();
+    doc.seats = [
+      { id: "seat", spaceId: desk, at: [70, 70], size: [50, 50], rotation: 0 },
+    ];
+    const current = {
+      ...frame(doc),
+      colors: {
+        ...colors,
+        seatMine: palette("seat-mine"),
+        seatBooked: palette("seat-booked"),
+      },
+    };
+    const state = recordingContext(),
+      base = recordingContext(),
+      overlay = recordingContext();
+    const layers = createPlanLayers(
+      { base: base.ctx, state: state.ctx, overlay: overlay.ctx },
+      { createPath: () => null },
+    );
+    const mine = new Map<string, PlanShapeState>([
+      [desk, { kind: "mine", name: "A-01" }],
+    ]);
+    layers.render({ ...current, states: mine });
+    expect(state.of("fill").map((call) => call[0])).toEqual(["seat-mine-fill"]);
+    state.clear();
+    const selected = new Map<string, PlanShapeState>([
+      [desk, { kind: "mine", name: "A-01", selected: true }],
+    ]);
+    expect(
+      layers.render({ ...current, states: selected }, { selectedSeatId: desk }),
+    ).toMatchObject({ base: false, state: true, overlay: true });
+    expect(state.of("fill").map((call) => call[0])).toEqual(["mine-fill"]);
+    state.clear();
+    overlay.clear();
+    expect(
+      layers.render(
+        { ...current, states: selected },
+        { selectedSeatId: desk, flashedIds: [a] },
+      ),
+    ).toMatchObject({ base: false, state: false, overlay: true });
+    expect(overlay.of("stroke").map((call) => call[0])).toEqual([
+      "selection",
+      "selection",
+    ]);
+    expect(
+      layers.render(
+        { ...current, states: selected },
+        { selectedSeatId: desk, flashedIds: [a] },
+      ).overlay,
+    ).toBe(false);
+    expect(
+      layers.render(
+        { ...current, states: selected },
+        { selectedSeatId: desk, flashedIds: [] },
+      ).overlay,
+    ).toBe(true);
+    layers.render({
+      ...current,
+      states: new Map([[desk, { kind: "booked", name: "A-01" }]]),
+    });
+    expect(state.of("fill").map((call) => call[0])).toEqual([
+      "seat-booked-fill",
+    ]);
+  });
   it("hides labels below zoom thresholds and truncates long names inside shape clipping", () => {
     const current = frame(),
       ctx = recordingContext(),

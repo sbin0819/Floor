@@ -25,6 +25,8 @@ export function PlanAccessibility({
   states,
   lastFocusedId,
   selectedSpaceId,
+  selectedSeatId,
+  activeDeskAreaId,
   timeLabel,
   onFocus,
   onSelect,
@@ -34,6 +36,8 @@ export function PlanAccessibility({
   states: PlanStates;
   lastFocusedId: string | null;
   selectedSpaceId?: string | null;
+  selectedSeatId?: string | null;
+  activeDeskAreaId?: string | null;
   timeLabel: string;
   onFocus: (shape: PlanShape | null) => void;
   onSelect: (shape: PlanShape) => void;
@@ -46,12 +50,17 @@ export function PlanAccessibility({
     () =>
       readingOrder(
         scene.shapes.filter((shape) => {
-          if (shape.kind !== "space" || !shape.spaceId) return false;
+          if (
+            (shape.kind !== "space" &&
+              !(activeDeskAreaId && shape.kind === "seat")) ||
+            !shape.spaceId
+          )
+            return false;
           const state = states.get(shape.spaceId.toLowerCase());
           return state !== undefined && !state.hidden;
         }),
       ),
-    [scene, states],
+    [scene, states, activeDeskAreaId],
   );
   const available = shapes.filter(
     (shape) => states.get(shape.spaceId!.toLowerCase())?.kind !== "restricted",
@@ -94,9 +103,12 @@ export function PlanAccessibility({
       {shapes.map((shape) => {
         const state = states.get(shape.spaceId!.toLowerCase())!;
         const disabled = state.kind === "restricted";
+        const unavailable = shape.kind === "seat" && state.selectable === false;
         const name = disabled
           ? "전용 공간, 고를 수 없음"
-          : [state.name, timeLabel, state.label].filter(Boolean).join(", ");
+          : [state.name, shape.kind === "seat" ? null : timeLabel, state.label]
+              .filter(Boolean)
+              .join(", ");
         return (
           <li key={shape.id}>
             <Button
@@ -107,9 +119,15 @@ export function PlanAccessibility({
               type="button"
               variant="ghost"
               disabled={disabled}
+              aria-disabled={unavailable || undefined}
               tabIndex={!disabled && shape.id === tabStop ? 0 : -1}
               aria-pressed={
-                !disabled && shape.spaceId === selectedSpaceId?.toLowerCase()
+                !disabled &&
+                shape.spaceId ===
+                  (shape.kind === "seat"
+                    ? selectedSeatId
+                    : selectedSpaceId
+                  )?.toLowerCase()
               }
               data-plan-shape-id={shape.id}
               data-space-id={shape.spaceId}
@@ -117,7 +135,9 @@ export function PlanAccessibility({
                 ownsFocus.current = true;
                 onFocus(shape);
               }}
-              onClick={() => onSelect(shape)}
+              onClick={() => {
+                if (!unavailable) onSelect(shape);
+              }}
               onKeyDown={(event) => {
                 if (
                   event.altKey ||
@@ -136,7 +156,13 @@ export function PlanAccessibility({
                 if (!direction) return;
                 event.preventDefault();
                 event.stopPropagation();
-                const next = nearestInDirection(shape, available, direction);
+                const next = nearestInDirection(
+                  shape,
+                  shape.kind === "seat"
+                    ? available.filter((candidate) => candidate.kind === "seat")
+                    : available,
+                  direction,
+                );
                 if (next)
                   nodes.current.get(next.id)?.focus({ preventScroll: true });
               }}

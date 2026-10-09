@@ -7,42 +7,89 @@ import type { FloorDayData } from "@/features/bookings/types";
 import { floorHref } from "@/features/bookings/format";
 import { carryFloorQuery } from "@/features/bookings/people-filter";
 import { useFloorSelection } from "@/features/bookings/components/branch-workspace";
-import { floorPlanSchema } from "@/lib/floor-plan/schema";
+import { bookingDraftScope } from "@/features/bookings/booking-draft-store";
+import {
+  useBookingDeskSeats,
+  useBookingDeskSelection,
+} from "@/features/bookings/components/use-booking-draft";
 import type { PlanShape } from "@/lib/floor-plan/render/types";
+import { floorPlanQueryOptions } from "../client";
 import { initialPlanTime, planTimeValueText } from "../time";
 import { planStatesAt, planSummary, planTooltipText } from "../states";
 import { PlanCanvas } from "./plan-canvas";
 import { PlanTimeBar } from "./plan-time-bar";
 
-export async function fetchFloorPlan(planId: string, signal?: AbortSignal) {
-  const response = await fetch(
-    `/api/floor-plans/${encodeURIComponent(planId)}`,
-    { signal },
-  );
-  if (!response.ok) throw new Error("평면도를 불러오지 못했어요");
-  return floorPlanSchema.parse(await response.json());
-}
+export { fetchFloorPlan } from "../client";
 
 export function FloorPlanView({
   data,
   planId,
+  flashSpaceIds,
 }: {
   data: FloorDayData;
   planId: string;
+  flashSpaceIds?: readonly string[];
 }) {
   const selection = useFloorSelection();
   const root = useRef<HTMLElement>(null);
   const [at, setAt] = useState(() => initialPlanTime(data));
   const [hover, setHover] = useState<PlanShape | null>(null);
-  const query = useQuery({
-    queryKey: ["floor-plan", planId],
-    queryFn: ({ signal }) => fetchFloorPlan(planId, signal),
-    staleTime: Infinity,
-  });
-  const states = useMemo(
-    () => planStatesAt(data, new Date(at ?? data.now)),
-    [data, at],
+  const query = useQuery(floorPlanQueryOptions(planId));
+  const selectedSpaceId = selection?.location.spaceId ?? null;
+  const scope = bookingDraftScope(
+    data.branch.id,
+    data.floor.id,
+    data.date,
+    selectedSpaceId,
   );
+  const seatSelection = useBookingDeskSelection(selection?.draftStore, scope);
+  const deskSeats = useBookingDeskSeats(selection?.draftStore, scope);
+  const selectedSpace = data.spaces.find(
+    (space) => space.id.toLowerCase() === selectedSpaceId?.toLowerCase(),
+  );
+  const activeDeskAreaId =
+    selection?.location.detail &&
+    selectedSpace?.kind === "accessible" &&
+    !selectedSpace.bookable &&
+    selectedSpace.deskCount > 0
+      ? selectedSpace.id
+      : null;
+  const states = useMemo(() => {
+    const values = new Map(planStatesAt(data, new Date(at ?? data.now)));
+    if (
+      activeDeskAreaId &&
+      deskSeats &&
+      deskSeats.part === seatSelection.deskPart
+    ) {
+      for (const seat of deskSeats.seats)
+        values.set(seat.id.toLowerCase(), {
+          kind:
+            seat.state === "blocked" || seat.state === "unavailable"
+              ? "maintenance"
+              : seat.state,
+          name: seat.name,
+          label: {
+            free: "비어 있음",
+            booked: "예약됨",
+            mine: "내 자리",
+            blocked: "점검",
+            unavailable: "예약할 수 없는 자리",
+          }[seat.state],
+          selectable:
+            !deskSeats.disabled &&
+            (seat.state === "free" || seat.state === "mine"),
+          selected: seat.id === seatSelection.deskId,
+        });
+    }
+    return values;
+  }, [
+    data,
+    at,
+    activeDeskAreaId,
+    deskSeats,
+    seatSelection.deskPart,
+    seatSelection.deskId,
+  ]);
   const hovered = hover?.spaceId && states.get(hover.spaceId.toLowerCase());
   const hoveredSpace = data.spaces.find(
     (space) => space.id.toLowerCase() === hover?.spaceId?.toLowerCase(),
@@ -55,18 +102,46 @@ export function FloorPlanView({
     : null;
   const choose = (shape: PlanShape) => {
     if (!selection?.isCurrentRoute() || !shape.spaceId) return;
+    if (shape.kind === "seat") {
+      const state = selection.draftStore.getState();
+      const approved = state.scope === scope && state.deskSeats;
+      const seat =
+        approved &&
+        approved.seats.find(
+          (seat) => seat.id.toLowerCase() === shape.spaceId?.toLowerCase(),
+        );
+      if (
+        !activeDeskAreaId ||
+        !approved ||
+        approved.disabled ||
+        approved.part !== state.deskPart ||
+        !seat ||
+        (seat.state !== "free" && seat.state !== "mine")
+      )
+        return;
+      state.changeDesk(scope, state.deskId === seat.id ? null : seat.id);
+      return;
+    }
     const space = data.spaces.find(
       (space) => space.id.toLowerCase() === shape.spaceId?.toLowerCase(),
     );
     if (!space || space.kind !== "accessible") return;
+    const detail = !space.bookable && space.deskCount > 0;
     const trigger = root.current?.querySelector<HTMLElement>(
       `[data-plan-shape-id][data-space-id="${space.id}"]`,
     );
     if (trigger) selection.rememberSpaceTrigger(trigger, space.id);
     selection.change(
-      { ...selection.location, spaceId: space.id, detail: false },
+      { ...selection.location, spaceId: space.id, detail },
       carryFloorQuery(
-        floorHref(data.branch.id, data.floor.id, data.date, space.id),
+        floorHref(
+          data.branch.id,
+          data.floor.id,
+          data.date,
+          space.id,
+          undefined,
+          detail,
+        ),
         selection.search,
       ),
     );
@@ -108,6 +183,9 @@ export function FloorPlanView({
             document={query.data}
             states={states}
             selectedSpaceId={selection?.location.spaceId}
+            activeDeskAreaId={activeDeskAreaId}
+            selectedSeatId={seatSelection.deskId}
+            flashSpaceIds={flashSpaceIds}
             onSelect={choose}
             onHover={setHover}
             timeLabel={

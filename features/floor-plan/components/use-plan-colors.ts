@@ -42,10 +42,16 @@ export function readPlanColors(root: HTMLElement): PlanColors {
       "status-free-foreground",
     ),
     booked: palette("booked", "border", "foreground"),
+    seatBooked: palette("booked", "booked-border", "muted-foreground"),
     mine: palette(
       "status-mine-strong",
       "status-mine-strong",
       "primary-foreground",
+    ),
+    seatMine: palette(
+      "status-mine",
+      "status-mine-border",
+      "status-mine-foreground",
     ),
     maintenance: palette(
       "status-maintenance-hatch-a",

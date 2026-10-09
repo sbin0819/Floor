@@ -55,11 +55,18 @@ export function useBookingDeskSelection(
   scope?: string,
 ) {
   const draftStore = useDraftStore(store);
+  const active = useStore(draftStore, (state) => state.scope === scope);
   const deskPart = useStore(draftStore, (state) =>
     state.scope === scope ? state.deskPart : null,
   );
   const deskId = useStore(draftStore, (state) =>
     state.scope === scope ? state.deskId : null,
   );
-  return { deskPart, deskId };
+  return { deskPart, deskId, active };
+}
+
+export function useBookingDeskSeats(store?: BookingDraftStore, scope?: string) {
+  return useStore(useDraftStore(store), (state) =>
+    state.scope === scope ? state.deskSeats : null,
+  );
 }

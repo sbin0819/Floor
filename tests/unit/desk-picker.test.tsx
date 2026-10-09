@@ -16,8 +16,16 @@ import { spaceDayFixture } from "./booking-ui-fixtures";
 const runtime = vi.hoisted(() => ({
   refresh: vi.fn(),
   store: null as BookingDraftStore | null,
+  view: "list" as "list" | "timeline" | "plan",
+  hasPlan: false,
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => runtime }));
+vi.mock("@/features/bookings/components/floor-view", () => ({
+  useFloorView: () => ({
+    effectiveView: runtime.view,
+    hasPlan: runtime.hasPlan,
+  }),
+}));
 vi.mock("@/features/bookings/components/branch-workspace", () => ({
   useFloorSelection: () =>
     runtime.store ? { draftStore: runtime.store } : null,
@@ -36,6 +44,8 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   runtime.store = null;
+  runtime.view = "list";
+  runtime.hasPlan = false;
   vi.mocked(createDeskBooking).mockResolvedValue({
     ok: true,
     data: { bookingId: "created" },
@@ -127,6 +137,50 @@ function display(input = fixture()) {
   };
 }
 describe("DeskPicker", () => {
+  it.each(["list", "timeline", "plan"] as const)(
+    "keeps SeatMap in %s when a plan cannot be used",
+    (view) => {
+      runtime.view = view;
+      display();
+      expect(
+        screen.getByRole("group", { name: "좌석 배치도" }),
+      ).toBeInTheDocument();
+    },
+  );
+  it("publishes approved seats after scope activation and keeps all controls except SeatMap in a plan", async () => {
+    const input = fixture();
+    runtime.view = "plan";
+    runtime.hasPlan = true;
+    runtime.store = createBookingDraftStore();
+    const scope = bookingDraftScope(
+      input.data.branch.id,
+      input.data.floor.id,
+      input.data.date,
+      input.data.space.id,
+    );
+    const { unmount } = display(input);
+    expect(runtime.store.getState().deskSeats).toBeNull();
+    act(() => runtime.store!.getState().activate(scope));
+    expect(runtime.store.getState().deskSeats).toMatchObject({
+      part: "day",
+      disabled: false,
+      seats: [
+        { id: "seat-a", name: "A-01", state: "free" },
+        { id: "seat-b", name: "A-02", state: "booked" },
+        { id: "seat-c", name: "A-03", state: "blocked" },
+        { id: "seat-d", name: "A-04", state: "free" },
+      ],
+    });
+    expect(screen.queryByRole("group", { name: "좌석 배치도" })).toBeNull();
+    expect(screen.getAllByRole("radio")).toHaveLength(3);
+    act(() => runtime.store!.getState().changeDesk(scope, "seat-a"));
+    expect(screen.getByText("A-01 · 종일")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: /오후/ }));
+    expect(runtime.store.getState().deskSeats?.seats[1]?.state).toBe("free");
+    expect(screen.getByText("A-01 · 오후")).toBeInTheDocument();
+    unmount();
+    expect(runtime.store.getState().deskSeats).toBeNull();
+  });
   it("keeps a usable seat viewport and lets the outer detail scroll on short screens", () => {
     const { container } = display();
     const map = screen.getByRole("group", { name: "좌석 배치도" });

@@ -17,6 +17,7 @@ const sameState = (
   a?.name === b?.name &&
   a?.label === b?.label &&
   a?.deskArea === b?.deskArea &&
+  a?.selected === b?.selected &&
   a?.hidden === b?.hidden;
 const intersects = (a: Box, b: Box) =>
   a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
@@ -102,6 +103,9 @@ export function createPlanLayers(
         baseChanged ||
         overlay.hoveredId !== previousOverlay.hoveredId ||
         overlay.selectedId !== previousOverlay.selectedId ||
+        overlay.selectedSeatId !== previousOverlay.selectedSeatId ||
+        (overlay.flashedIds ?? []).join("|") !==
+          (previousOverlay.flashedIds ?? []).join("|") ||
         overlay.focusedId !== previousOverlay.focusedId;
       if (overlayChanged) drawer.drawOverlay(contexts.overlay, frame, overlay);
       // 호출자가 새 Map을 만들지 않더라도 다음 프레임과 비교할 값은 보존한다.
@@ -113,7 +117,7 @@ export function createPlanLayers(
           [...frame.states].map(([key, state]) => [key, { ...state }]),
         ),
       };
-      previousOverlay = { ...overlay };
+      previousOverlay = { ...overlay, flashedIds: overlay.flashedIds?.slice() };
       return {
         base: full || baseChanged,
         state: full || dirty.length > 0,

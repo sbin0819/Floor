@@ -230,6 +230,115 @@ afterEach(() => {
 });
 
 describe("plan canvas lifecycle", () => {
+  it("fits a desk area to eighty percent, preserves user camera updates and restores the pre-area camera on exit", () => {
+    const select = vi.fn();
+    const { container, rerender } = render(
+      <PlanCanvas document={plan} states={states} onSelect={select} />,
+    );
+    flushFrames();
+    wheel(host(container), { deltaX: 120, deltaY: 30 });
+    flushFrames();
+    const previous = lastFrame().camera;
+    rerender(
+      <PlanCanvas
+        document={plan}
+        states={states}
+        selectedSpaceId={first}
+        activeDeskAreaId={first}
+        onSelect={select}
+      />,
+    );
+    flushFrames();
+    flushFrames();
+    expect(lastFrame().camera.scale * 200).toBeCloseTo(dimensions.height * 0.8);
+    expect(toScreen([120, 120], lastFrame().camera)).toEqual([400, 260]);
+    wheel(host(container), { deltaX: 60 });
+    flushFrames();
+    const panned = lastFrame().camera;
+    rerender(
+      <PlanCanvas
+        document={plan}
+        states={new Map(states)}
+        selectedSpaceId={first}
+        activeDeskAreaId={first}
+        selectedSeatId={seat}
+        onSelect={select}
+      />,
+    );
+    flushFrames();
+    expect(lastFrame().camera).toEqual(panned);
+    rerender(<PlanCanvas document={plan} states={states} onSelect={select} />);
+    flushFrames();
+    flushFrames();
+    expect(lastFrame().camera).toEqual(previous);
+  });
+  it("prioritizes approved seats over their area and leaves unavailable seats unselectable", () => {
+    const select = vi.fn();
+    const seats: PlanStates = new Map([
+      ...states,
+      [seat, { kind: "free", name: "A-01", selectable: true }],
+    ]);
+    const { container, rerender } = render(
+      <PlanCanvas
+        document={plan}
+        states={seats}
+        activeDeskAreaId={first}
+        onSelect={select}
+      />,
+    );
+    flushFrames();
+    flushFrames();
+    tap(host(container), toScreen([120, 120], lastFrame().camera));
+    expect(select).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: "seat", spaceId: seat }),
+    );
+    const blocked: PlanStates = new Map([
+      ...seats,
+      [seat, { kind: "booked", name: "A-01", selectable: false }],
+    ]);
+    select.mockClear();
+    rerender(
+      <PlanCanvas
+        document={plan}
+        states={blocked}
+        activeDeskAreaId={first}
+        onSelect={select}
+      />,
+    );
+    flushFrames();
+    tap(host(container), toScreen([120, 120], lastFrame().camera));
+    expect(select).not.toHaveBeenCalled();
+  });
+  it("passes the bounded flash overlay and exposes no controls or gestures in a home mini canvas", () => {
+    const select = vi.fn();
+    const { container, rerender } = render(
+      <PlanCanvas
+        document={plan}
+        states={states}
+        onSelect={select}
+        flashSpaceIds={[first]}
+      />,
+    );
+    flushFrames();
+    expect(painter.render.mock.calls.at(-1)?.[1].flashedIds).toEqual([first]);
+    rerender(
+      <PlanCanvas
+        document={plan}
+        states={states}
+        onSelect={select}
+        interactive={false}
+        className="h-40 w-[240px]"
+      />,
+    );
+    flushFrames();
+    expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("button", { hidden: true })).toBeNull();
+    expect(host(container)).toHaveClass("h-40", "w-[240px]");
+    expect(host(container)).not.toHaveClass("min-h-96");
+    expect(wheel(host(container), { deltaY: 10 }).defaultPrevented).toBe(false);
+    tap(host(container), toScreen([120, 120], lastFrame().camera));
+    expect(select).not.toHaveBeenCalled();
+  });
   it("waits for a real initial size before fitting or drawing", () => {
     dimensions = { width: 0, height: 0 };
     render(

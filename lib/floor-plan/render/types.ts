@@ -40,6 +40,8 @@ export type PlanShapeState = {
   label?: string;
   deskArea?: boolean;
   hidden?: boolean;
+  selected?: boolean;
+  selectable?: boolean;
 };
 export type PlanStates = ReadonlyMap<string, PlanShapeState>;
 export type PlanPalette = { fill: string; stroke: string; text: string };
@@ -52,6 +54,8 @@ export type PlanColors = Record<PlanStateKind | "fixture", PlanPalette> & {
   focus: string;
   shadow: string;
   maintenancePattern?: CanvasPattern;
+  seatMine?: PlanPalette;
+  seatBooked?: PlanPalette;
 };
 export type PlanFrame = {
   scene: PlanScene;
@@ -66,6 +70,8 @@ export type PlanOverlay = {
   hoveredId?: string | null;
   selectedId?: string | null;
   focusedId?: string | null;
+  selectedSeatId?: string | null;
+  flashedIds?: readonly string[];
 };
 export type PlanContext = Pick<
   CanvasRenderingContext2D,

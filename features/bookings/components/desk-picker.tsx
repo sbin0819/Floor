@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LoaderCircle } from "lucide-react";
 import { SeatMap } from "@/components/seat-map";
 import { Button } from "@/components/ui/button";
@@ -22,6 +29,7 @@ import { BookingActorField } from "./booking-form-fields";
 import { CancelBookingButton } from "./cancel-booking-button";
 import { useBookingDeskSelection, useBookingDraft } from "./use-booking-draft";
 import { useBookingMutation } from "./use-booking-mutation";
+import { useFloorView } from "./floor-view";
 
 export function DeskPicker({
   data,
@@ -32,6 +40,7 @@ export function DeskPicker({
 }) {
   const id = useId();
   const workspace = useFloorSelection();
+  const { effectiveView, hasPlan } = useFloorView();
   const scope = bookingDraftScope(
     data.branch.id,
     data.floor.id,
@@ -53,12 +62,16 @@ export function DeskPicker({
   const actor =
     data.actors.find((actor) => (actor.teamId ?? "personal") === actorId) ??
     data.actors[0];
-  const seats = desk.seats.map((seat) => ({
-    ...seat,
-    state: part
-      ? (seat.states[part.part] ?? "unavailable")
-      : ("unavailable" as const),
-  }));
+  const seats = useMemo(
+    () =>
+      desk.seats.map((seat) => ({
+        ...seat,
+        state: part
+          ? (seat.states[part.part] ?? "unavailable")
+          : ("unavailable" as const),
+      })),
+    [desk.seats, part],
+  );
   const selectedSeat = seats.find(
     (seat) =>
       seat.id === selectedId &&
@@ -97,9 +110,15 @@ export function DeskPicker({
   };
   // 데이터 도착이나 행에서의 시간 선택도 현재 범위의 선택에만 반영한다.
   useEffect(() => {
-    if (!workspace || !part) return;
+    if (!workspace) return;
     const state = workspace.draftStore.getState();
     if (state.scope !== scope) return;
+    if (!part) {
+      state.changeDeskPart(scope, null);
+      state.changeDesk(scope, null);
+      previousPart.current = undefined;
+      return;
+    }
     state.changeDeskPart(scope, part.part);
     if (
       state.deskId &&
@@ -112,7 +131,7 @@ export function DeskPicker({
     )
       state.changeDesk(scope, null);
     previousPart.current = part.part;
-  }, [workspace, scope, part, seats]);
+  }, [workspace, scope, part, seats, shared.active]);
 
   const clearSubmittedSeat = () => {
     const completed = submitted.current;
@@ -137,6 +156,19 @@ export function DeskPicker({
       if (result.code === "BOOKING_CONFLICT") clearSubmittedSeat();
     },
   });
+  const store = workspace?.draftStore;
+  useEffect(() => {
+    store?.getState().publishDeskSeats(scope, {
+      sourceId: id,
+      part: part?.part ?? null,
+      disabled: mutation.pending,
+      seats: seats.map(({ id, name, state }) => ({ id, name, state })),
+    });
+  }, [store, scope, id, part, seats, mutation.pending, shared.active]);
+  useEffect(
+    () => () => store?.getState().clearDeskSeats(scope, id),
+    [store, scope, id],
+  );
   const setPart = (value: string) => {
     const next = desk.parts.find(
       (part) => part.part === value && part.selectable,
@@ -217,14 +249,16 @@ export function DeskPicker({
           </p>
         )}
       </div>
-      <div className="flex min-h-72 flex-1 flex-col overflow-hidden p-4">
-        <SeatMap
-          seats={seats}
-          selectedId={selectedSeat?.id ?? null}
-          disabled={mutation.pending}
-          onSelect={setSeat}
-        />
-      </div>
+      {!(hasPlan && effectiveView === "plan") && (
+        <div className="flex min-h-72 flex-1 flex-col overflow-hidden p-4">
+          <SeatMap
+            seats={seats}
+            selectedId={selectedSeat?.id ?? null}
+            disabled={mutation.pending}
+            onSelect={setSeat}
+          />
+        </div>
+      )}
       <form
         aria-label="좌석 예약 양식"
         className="shrink-0 space-y-3 border-t border-border p-4"
