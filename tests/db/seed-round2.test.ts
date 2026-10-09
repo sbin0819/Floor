@@ -63,6 +63,7 @@ const protectedTables = [
   "role_settings",
   "space_photos",
   "floor_plans",
+  "announcements",
   "chat_rooms",
   "messages",
   "message_attachments",

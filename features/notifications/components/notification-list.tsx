@@ -37,6 +37,7 @@ export function NotificationRow({
     item.type !== "team_removed" &&
     item.type !== "team_role_changed" &&
     item.type !== "team_deleted" &&
+    item.type !== "branch_announcement" &&
     item.type !== "message_request"
       ? item
       : null;
@@ -81,7 +82,11 @@ export function NotificationRow({
         </span>
       ) : (
         <UserAvatar
-          name={item.data.actorName ?? "회원"}
+          name={
+            item.type === "branch_announcement"
+              ? "공지"
+              : (item.data.actorName ?? "회원")
+          }
           avatar={item.actorAvatar ?? { color: "gray", photoUrl: null }}
           size={40}
         />

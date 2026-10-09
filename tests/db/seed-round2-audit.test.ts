@@ -16,6 +16,7 @@ import {
   validateSeedRound2Prerequisites,
 } from "@/lib/dal/seed-round2-audit";
 import {
+  announcements,
   authAccounts,
   authSessions,
   authVerifications,
@@ -64,6 +65,42 @@ describe("read-only booking round2 preservation audit", () => {
   });
   const capture = (allowSeedAttendeeCounts = false) =>
     captureSeedRound2Audit({ allowSeedAttendeeCounts }, database.db);
+
+  it("detects changed and removed announcements without exposing snapshots", async () => {
+    const [notice] = await database.db
+      .insert(announcements)
+      .values({
+        branchId: actors.branchId,
+        authorId: actors.operator.userId,
+        title: "private-announcement-title",
+        body: "private-announcement-body",
+        createdAt: bookingNow,
+      })
+      .returning({ id: announcements.id });
+    const before = await capture();
+    expect(JSON.stringify(before)).not.toContain("private-announcement");
+    await database.db
+      .update(announcements)
+      .set({ recipientCount: 3 })
+      .where(eq(announcements.id, notice!.id));
+    expect(compareSeedRound2Audit(before, await capture()).issues).toEqual([
+      {
+        table: "announcements",
+        key: JSON.stringify([notice!.id]),
+        kind: "changed_row",
+      },
+    ]);
+    await database.db
+      .delete(announcements)
+      .where(eq(announcements.id, notice!.id));
+    expect(compareSeedRound2Audit(before, await capture()).issues).toEqual([
+      {
+        table: "announcements",
+        key: JSON.stringify([notice!.id]),
+        kind: "missing_row",
+      },
+    ]);
+  });
 
   it("detects changed and removed attachments without exposing storage keys or filenames", async () => {
     const [space] = await database.db
@@ -267,7 +304,7 @@ describe("read-only booking round2 preservation audit", () => {
     });
     const before = await capture();
     expect(await capture()).toEqual(before);
-    expect(before.tables).toHaveLength(36);
+    expect(before.tables).toHaveLength(37);
     expect(before.tables.map(({ table }) => table)).toEqual(
       expect.arrayContaining([
         "chat_room_members",

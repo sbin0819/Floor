@@ -3,6 +3,7 @@ import { avatarSchema } from "@/lib/avatar";
 import {
   bookingNotificationDataSchema,
   bookingNotificationTypes,
+  branchAnnouncementNotificationDataSchema,
   personNotificationDataSchema,
   personNotificationTypes,
   spaceInviteNotificationDataSchema,
@@ -31,6 +32,13 @@ const itemFields = {
 };
 const itemSchema = z
   .discriminatedUnion("type", [
+    z.strictObject({
+      ...itemFields,
+      type: z.literal("branch_announcement"),
+      data: branchAnnouncementNotificationDataSchema,
+      bookingId: z.null(),
+      href: z.null(),
+    }),
     z.strictObject({
       ...itemFields,
       type: z.enum(bookingNotificationTypes),

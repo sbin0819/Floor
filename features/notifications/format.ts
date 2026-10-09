@@ -25,6 +25,7 @@ export function notificationHref({
   data,
   bookingId,
 }: NotificationContent) {
+  if (type === "branch_announcement") return null;
   if (type === "friend_request") return "/friends?tab=received";
   if (type === "friend_accepted") return "/friends";
   if (type === "message_request") return "/friends?tab=requests";
@@ -39,6 +40,18 @@ export function notificationHref({
 }
 
 export function notificationPresentation({ type, data }: NotificationSnapshot) {
+  if (type === "branch_announcement") {
+    const parts = [
+      { text: data.branchName, strong: true },
+      { text: " 공지 · ", strong: false },
+      { text: data.title, strong: true },
+    ];
+    return {
+      parts,
+      text: parts.map((part) => part.text).join(""),
+      dateTime: undefined,
+    };
+  }
   if (
     type === "team_removed" ||
     type === "team_role_changed" ||

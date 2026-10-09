@@ -30,6 +30,7 @@ export const seedAuditTableKeys = {
   space_photos: ["id"],
   floor_plans: ["id"],
   notifications: ["id"],
+  announcements: ["id"],
   chat_rooms: ["id"],
   chat_room_members: ["room_id", "user_id"],
   chat_room_reads: ["room_id", "user_id"],

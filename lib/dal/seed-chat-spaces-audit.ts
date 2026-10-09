@@ -33,6 +33,7 @@ const introducedAt: Partial<Record<AuditTable, number>> = {
   call_sessions: 20,
   call_participants: 20,
   message_attachments: 21,
+  announcements: 29,
 };
 const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");

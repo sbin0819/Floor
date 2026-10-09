@@ -13,6 +13,10 @@ import { listOperatorBranchSummaries } from "@/lib/dal/admin-home";
 import { getAllRoleSettings, getRoleSettings } from "@/lib/dal/role-settings";
 import { getMemberships } from "@/lib/dal/users";
 import {
+  loungeAvailability,
+  readAnnouncementBranch,
+} from "@/lib/dal/announcements-read";
+import {
   listAllSpaceAccess,
   listBranchSpaceAccess,
   listFloorSpaceAccess,
@@ -76,6 +80,38 @@ const settings = {
   limits: { maxDaysAhead: 3 },
 };
 const cases = [
+  {
+    name: "announcement lounge availability",
+    read: (db?: DalDatabase) =>
+      loungeAvailability({ operatorId: userId, branchId }, db),
+    rows: [
+      [
+        {
+          spaceId: "space-a",
+          roomId: "room-a",
+          status: "active",
+          memberCount: 3,
+          joinedCount: 100,
+        },
+      ],
+    ],
+    keys: [userId, branchId],
+  },
+  {
+    name: "announcement branch relationships",
+    read: (db?: DalDatabase) =>
+      readAnnouncementBranch({ operatorId: userId, branchId }, db),
+    rows: [
+      [
+        {
+          branch: { ...branch, timezone: "Asia/Seoul" },
+          floor: { id: floorId },
+          space: { id: "space-a" },
+        },
+      ],
+    ],
+    keys: [userId, branchId],
+  },
   {
     name: "operator branch summaries",
     read: (db?: DalDatabase) => listOperatorBranchSummaries(userId, db),

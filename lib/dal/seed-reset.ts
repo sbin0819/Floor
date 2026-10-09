@@ -5,6 +5,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db/client";
 import {
   accessGrants,
+  announcements,
   authAccounts,
   authSessions,
   authVerifications,
@@ -47,6 +48,7 @@ import type { DalDatabase } from "./database";
 // 개발용 전체 초기화의 허용 목록이다. 스키마에 테이블이 추가돼도 자동으로 삭제 범위를 넓히지 않는다.
 const resetTables = [
   accessGrants,
+  announcements,
   authAccounts,
   authSessions,
   authVerifications,

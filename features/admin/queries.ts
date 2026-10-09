@@ -5,6 +5,20 @@ import { requireSession } from "@/lib/auth/session";
 import { getOperatorBranches } from "@/lib/dal";
 import { createAdminQueries } from "./query-factory";
 import { createRoleSettingsQueries } from "./role-settings-query-factory";
+import { createAnnouncementQueries } from "./announcement-query-factory";
+import type {
+  GetAnnouncementsInput,
+  PreviewAnnouncementAudienceInput,
+} from "./announcement-schema";
+
+export async function getAnnouncements(input: GetAnnouncementsInput) {
+  return createAnnouncementQueries().getAnnouncements(input);
+}
+export async function previewAnnouncementAudience(
+  input: PreviewAnnouncementAudienceInput,
+) {
+  return createAnnouncementQueries().previewAnnouncementAudience(input);
+}
 
 export const getAdminPlans = cache((branchId: string) =>
   createPlanEditorQueries().getAdminPlans(branchId),

@@ -12,6 +12,7 @@ import { createAuth, type AuthInstance } from "@/lib/auth/auth";
 import * as seedDal from "@/lib/dal/seed";
 import { inspectSeedReset } from "@/lib/dal/seed-reset";
 import {
+  announcements,
   authAccounts,
   authSessions,
   authVerifications,
@@ -191,7 +192,7 @@ describe("explicit full development reset", () => {
     expect(await snapshot()).toEqual(before);
   }, 60000);
 
-  it("explicitly resets calls and attachments and restores them on transaction failure", async () => {
+  it("explicitly resets calls, attachments and announcements and restores them on transaction failure", async () => {
     const [user] = await database.db.select().from(users).limit(1);
     const [room] = await database.db
       .select()
@@ -214,6 +215,15 @@ describe("explicit full development reset", () => {
       lastSeenAt: now,
     });
     const [message] = await database.db.select().from(messages).limit(1);
+    const [branch] = await database.db.select().from(branches).limit(1);
+    await database.db.insert(announcements).values({
+      branchId: branch!.id,
+      authorId: user!.id,
+      title: "초기화할 공지",
+      body: "실패하면 그대로 남아야 해요.",
+      loungeMessageId: message!.id,
+      createdAt: now,
+    });
     await database.db.insert(messageAttachments).values([
       {
         roomId: message!.roomId,
@@ -243,15 +253,17 @@ describe("explicit full development reset", () => {
     expect(await snapshot()).toEqual(before);
     vi.restoreAllMocks();
     const result = await reset();
-    expect(Object.keys(result.reset!.counts)).toHaveLength(36);
+    expect(Object.keys(result.reset!.counts)).toHaveLength(37);
     expect(result.reset!.counts).toMatchObject({
       call_sessions: 1,
       call_participants: 1,
       message_attachments: 2,
+      announcements: 1,
     });
     expect(await database.db.select().from(callSessions)).toEqual([]);
     expect(await database.db.select().from(callParticipants)).toEqual([]);
     expect(await database.db.select().from(messageAttachments)).toEqual([]);
+    expect(await database.db.select().from(announcements)).toEqual([]);
   }, 60000);
 
   it("repopulates public tables even when a temporary table shadows the user table", async () => {

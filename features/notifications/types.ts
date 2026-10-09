@@ -29,6 +29,7 @@ export const notificationTypes = [
   ...personNotificationTypes,
   ...teamNotificationTypes,
   "space_invite",
+  "branch_announcement",
 ] as const;
 
 export type NotificationType = (typeof notificationTypes)[number];
@@ -79,13 +80,28 @@ export const teamRoleNotificationDataSchema = teamNotificationDataSchema.extend(
     role: z.enum(["admin", "member"]),
   },
 );
+const announcementText = (max: number) =>
+  z.string().refine((value) => {
+    const length = Array.from(value).length;
+    return length >= 1 && length <= max && !value.includes("\0");
+  });
+export const branchAnnouncementNotificationDataSchema = z.strictObject({
+  branchName: z.string().min(1),
+  title: announcementText(60),
+  body: announcementText(500),
+  announcementId: z.uuid(),
+});
 export const notificationDataSchema = z.union([
   bookingNotificationDataSchema,
   personNotificationDataSchema,
   spaceInviteNotificationDataSchema,
   teamNotificationDataSchema,
   teamRoleNotificationDataSchema,
+  branchAnnouncementNotificationDataSchema,
 ]);
+export type BranchAnnouncementNotificationData = z.infer<
+  typeof branchAnnouncementNotificationDataSchema
+>;
 export type BookingNotificationData = z.infer<
   typeof bookingNotificationDataSchema
 >;
@@ -104,7 +120,8 @@ export type NotificationData =
   | PersonNotificationData
   | SpaceInviteNotificationData
   | TeamNotificationData
-  | TeamRoleNotificationData;
+  | TeamRoleNotificationData
+  | BranchAnnouncementNotificationData;
 export type NotificationSnapshot =
   | {
       [Type in BookingNotificationType]: {
@@ -121,7 +138,8 @@ export type NotificationSnapshot =
   | { type: "space_invite"; data: SpaceInviteNotificationData }
   | { type: "team_removed"; data: TeamNotificationData }
   | { type: "team_deleted"; data: TeamNotificationData }
-  | { type: "team_role_changed"; data: TeamRoleNotificationData };
+  | { type: "team_role_changed"; data: TeamRoleNotificationData }
+  | { type: "branch_announcement"; data: BranchAnnouncementNotificationData };
 export type NotificationContent = NotificationSnapshot & {
   bookingId: string | null;
 };
@@ -157,6 +175,10 @@ export function parseNotificationData(
   input: unknown,
 ): TeamRoleNotificationData | null;
 export function parseNotificationData(
+  type: "branch_announcement",
+  input: unknown,
+): BranchAnnouncementNotificationData | null;
+export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null;
@@ -164,6 +186,10 @@ export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null {
+  if (type === "branch_announcement") {
+    const result = branchAnnouncementNotificationDataSchema.safeParse(input);
+    return result.success ? result.data : null;
+  }
   if (type === "team_removed" || type === "team_deleted") {
     const result = teamNotificationDataSchema.safeParse(input);
     return result.success ? result.data : null;
@@ -210,6 +236,10 @@ export function parseNotificationContent(
   input: unknown,
   bookingId: string | null,
 ): NotificationContent | null {
+  if (type === "branch_announcement") {
+    const data = parseNotificationData(type, input);
+    return data ? { type, data, bookingId: null } : null;
+  }
   if (type === "team_removed" || type === "team_deleted") {
     const data = parseNotificationData(type, input);
     return data ? { type, data, bookingId: null } : null;

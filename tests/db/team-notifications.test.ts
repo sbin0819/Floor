@@ -89,7 +89,13 @@ describe("team notification persistence", () => {
     summary = await queries().getNotificationSummary();
     expect(summary.items.every((item) => item.actorAvatar === null)).toBe(true);
     expect(
-      summary.items.every((item) => item.data.actorName === actor.name),
+      summary.items.every(
+        (item) =>
+          (item.type === "team_removed" ||
+            item.type === "team_role_changed" ||
+            item.type === "team_deleted") &&
+          item.data.actorName === actor.name,
+      ),
     ).toBe(true);
   });
 

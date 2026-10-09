@@ -3,6 +3,7 @@ import {
   parseNotificationContent,
   type BookingNotificationData,
   type BookingNotificationType,
+  type BranchAnnouncementNotificationData,
   type NotificationContent,
 } from "./types";
 import type { BookingCancellation } from "@/features/bookings/cancellation";
@@ -33,6 +34,31 @@ type BookingNotificationWrite = NotificationWrite & {
   data: BookingNotificationData;
   bookingId: string;
 };
+
+export function buildBranchAnnouncementNotifications(
+  input: BranchAnnouncementNotificationData & {
+    actorId: string;
+    userIds: readonly string[];
+    now: Date;
+  },
+): NotificationWrite[] {
+  const { branchName, title, body, announcementId } = input;
+  const content = parseNotificationContent(
+    "branch_announcement",
+    { branchName, title, body, announcementId },
+    null,
+  );
+  if (!content) throw new Error("Invalid branch announcement snapshot.");
+  return [...new Set(input.userIds)]
+    .filter((userId) => userId !== input.actorId)
+    .map((userId) => ({
+      ...content,
+      userId,
+      actorId: input.actorId,
+      scheduledFor: input.now,
+      expiresAt: null,
+    }));
+}
 
 export function buildTeamNotifications(
   input: {

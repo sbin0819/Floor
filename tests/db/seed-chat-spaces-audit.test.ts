@@ -138,10 +138,10 @@ describe("additive chat-space seed preservation audit", () => {
       expect(parsed).toEqual(["id", "user_id"]);
     }));
 
-  it("captures exactly 36 app tables with keys and hashes, never raw personal or authentication values", async () =>
+  it("captures exactly 37 app tables with keys and hashes, never raw personal or authentication values", async () =>
     withDatabase(async (database) => {
       const audit = await captureChatSpacesAudit({}, database);
-      expect(audit.tables).toHaveLength(36);
+      expect(audit.tables).toHaveLength(37);
       expect(audit.tables.every((table) => table.exists)).toBe(true);
       const serialized = JSON.stringify(audit);
       for (const sensitive of [
@@ -168,6 +168,32 @@ describe("additive chat-space seed preservation audit", () => {
       expect(await preflightChatSpacesMigrations(database)).toBe(0);
     }));
 
+  it("protects announcement snapshots without disclosing their contents", async () =>
+    withDatabase(async (database, client) => {
+      const noticeId = crypto.randomUUID();
+      await client.query(
+        "insert into announcements(id,branch_id,author_id,title,body) values($1,$2,$3,'private-title','private-body')",
+        [noticeId, branchId, userId],
+      );
+      const before = await captureChatSpacesAudit({}, database);
+      expect(JSON.stringify(before)).not.toContain("private-title");
+      expect(JSON.stringify(before)).not.toContain("private-body");
+      expect(
+        before.tables.find(({ table }) => table === "announcements")?.count,
+      ).toBe(1);
+      await client.query(
+        "update announcements set body='changed-body' where id=$1",
+        [noticeId],
+      );
+      const after = await captureChatSpacesAudit(
+        { baseline: before },
+        database,
+      );
+      expect(() => compareChatSpacesAudit(before, after)).toThrow(
+        "보호 데이터",
+      );
+    }));
+
   it("preserves every old-column fingerprint across the actual six migrations and separately reports additions", async () =>
     withDatabase(async (database, client, apply) => {
       await existingBooking(client);
@@ -182,6 +208,7 @@ describe("additive chat-space seed preservation audit", () => {
           .map(({ table }) => table)
           .sort(),
       ).toEqual([
+        "announcements",
         "call_participants",
         "call_sessions",
         "chat_space_invites",

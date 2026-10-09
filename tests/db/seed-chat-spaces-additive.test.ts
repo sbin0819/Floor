@@ -167,8 +167,8 @@ describe("append-only chat spaces seed with immutable completion receipt", () =>
     });
     expect(auth).not.toHaveBeenCalled();
     expect(provision).not.toHaveBeenCalled();
-    expect(before.tables).toHaveLength(36);
-    expect(after.tables).toHaveLength(36);
+    expect(before.tables).toHaveLength(37);
+    expect(after.tables).toHaveLength(37);
     const comparison = compareSeedRound2Audit(before, after);
     expect(comparison.issues).toEqual([
       {
@@ -688,7 +688,7 @@ describe("append-only chat spaces seed with immutable completion receipt", () =>
     }
   });
 
-  it("preserves every non-target row across all 36 tables in a populated full-seed database", async () => {
+  it("preserves every non-target row across all 37 tables in a populated full-seed database", async () => {
     const auth = authModule.createAuth({
       db: database.db,
       email: createMemoryEmailSender(),
@@ -739,6 +739,14 @@ describe("append-only chat spaces seed with immutable completion receipt", () =>
       .update(chatRooms)
       .set({ lastSeq: 0, lastMessageAt: null })
       .where(eq(chatRooms.spaceId, lounge.spaceId));
+    await database.db.insert(schema.announcements).values({
+      branchId: gangnam,
+      authorId: ids.get("member")!,
+      title: "보존할 공지",
+      body: "추가 시드에서 바뀌면 안 돼요.",
+      audience: { date: "2026-10-09", floorId: null, spaceId: null },
+      createdAt: now,
+    });
     const before = await snapshot();
     await apply();
     const after = await snapshot();
