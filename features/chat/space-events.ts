@@ -21,8 +21,12 @@ export async function publishSpaceEvents(
       events,
     );
   } catch {
-    (dependencies.logError ?? console.error)(
-      "Space realtime publication failed.",
-    );
+    try {
+      (dependencies.logError ?? console.error)(
+        "Space realtime publication failed.",
+      );
+    } catch {
+      // 발행이나 로그 실패로 이미 커밋한 변경을 재시도하게 하지 않는다.
+    }
   }
 }

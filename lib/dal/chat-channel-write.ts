@@ -6,6 +6,7 @@ import {
   chatRooms,
   chatSpaceInvites,
   chatSpaceMembers,
+  chatSpaces,
   notifications,
 } from "@/lib/db/schema";
 import type { DalDatabase } from "./database";
@@ -102,7 +103,15 @@ export async function banCommunityMember(
   userId: string,
   now: Date,
   database: DalDatabase,
+  mode: { kind: "branch" } | { kind: "community" } = { kind: "community" },
 ) {
+  if (mode.kind === "branch") {
+    const [space] = await database
+      .select({ id: chatSpaces.id })
+      .from(chatSpaces)
+      .where(and(eq(chatSpaces.id, spaceId), eq(chatSpaces.kind, "branch")));
+    if (!space) throw new ActionError("NOT_FOUND");
+  }
   const rows = await database
     .update(chatSpaceMembers)
     .set({ status: "banned", role: "member", statusChangedAt: now })
@@ -114,6 +123,24 @@ export async function banCommunityMember(
       ),
     )
     .returning({ userId: chatSpaceMembers.userId });
+  if (mode.kind === "branch") {
+    if (rows.length) return true;
+    // 공간 잠금 아래 탈퇴한 작성자도 재가입을 막는다. 라운지에는 초대가 없다.
+    const inserted = await database
+      .insert(chatSpaceMembers)
+      .values({
+        spaceId,
+        userId,
+        role: "member",
+        status: "banned",
+        joinedAt: now,
+        statusChangedAt: now,
+        createdAt: now,
+      })
+      .onConflictDoNothing()
+      .returning({ userId: chatSpaceMembers.userId });
+    return inserted.length > 0;
+  }
   if (!rows.length) throw new ActionError("NOT_FOUND");
   await database
     .update(chatSpaceInvites)
@@ -139,6 +166,7 @@ export async function banCommunityMember(
         sql`${notifications.data}->>'inviteCode' in (select code from ${chatSpaceInvites} where ${chatSpaceInvites.spaceId} = ${spaceId} and (${chatSpaceInvites.revokedAt} is not null or ${notifications.userId} = ${userId}::uuid))`,
       ),
     );
+  return true;
 }
 
 export async function unbanCommunityMember(

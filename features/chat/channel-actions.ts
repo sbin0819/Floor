@@ -170,10 +170,17 @@ export function createChannelActions(
         async handler({ session, input }) {
           await withTransaction(async (tx) => {
             await lockUsersForKeyShare([session.userId, input.userId], tx);
-            requireAdmin(
-              await lockChatSpace(input.spaceId, session.userId, tx),
-              true,
+            const state = await lockChatSpace(
+              input.spaceId,
+              session.userId,
+              tx,
             );
+            requireAdmin(state);
+            if (
+              state.space.kind !== "community" &&
+              state.space.kind !== "branch"
+            )
+              throw new ActionError("FORBIDDEN");
             await unbanCommunityMember(input.spaceId, input.userId, tx);
           }, dependencies.database);
           await publishSpaceEvents([spaceChanged(input.spaceId)], dependencies);
