@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { adminSpacePath } from "../space-detail-navigation";
+
 import {
   useId,
   useLayoutEffect,
@@ -231,7 +234,16 @@ export function SpaceTable({ data }: { data: AdminFloorData }) {
                       >
                         <TableCell className="font-medium">
                           <div className="flex flex-wrap items-center gap-2">
-                            {space.name}
+                            <Link
+                              href={adminSpacePath(
+                                data.branch.id,
+                                data.floor.id,
+                                space.id,
+                              )}
+                              className="inline-flex min-h-11 items-center rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                            >
+                              {space.name}
+                            </Link>
                             {space.archivedAt && (
                               <Badge variant="secondary">보관됨</Badge>
                             )}

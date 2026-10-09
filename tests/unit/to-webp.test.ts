@@ -88,12 +88,12 @@ describe("browser WebP conversion with injected browser APIs", () => {
       sourceHeight: 1000,
     },
     {
-      width: 1000,
-      height: 2000,
+      width: 1600,
+      height: 3200,
       left: 0,
-      top: 687.5,
-      sourceWidth: 1000,
-      sourceHeight: 625,
+      top: 1100,
+      sourceWidth: 1600,
+      sourceHeight: 1000,
     },
   ])("crops the exact center of a $width×$height image", async (item) => {
     const f = fixture(item.width, item.height);
@@ -121,6 +121,35 @@ describe("browser WebP conversion with injected browser APIs", () => {
     const result = await toWebp(file(), { maxBytes: 100 }, f.dependencies);
     expect(result.blob.size).toBe(100);
     expect(f.toBlob.mock.calls.map((call) => call[2])).toEqual([0.85, 0.75]);
+  });
+  it.each([
+    [1199, 900],
+    [1200, 749],
+    [1000, 2000],
+  ])(
+    "rejects undersized crop source %s×%s without allocating a canvas",
+    async (width, height) => {
+      const f = fixture(width, height);
+      await expect(
+        toWebp(
+          file(),
+          { crop: { width: 1200, height: 750 }, maxBytes: 100 },
+          f.dependencies,
+        ),
+      ).rejects.toMatchObject({ code: "too_small" });
+      expect(f.dependencies.createCanvas).not.toHaveBeenCalled();
+      expect(f.close).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("accepts the exact crop dimensions without upscaling", async () => {
+    const f = fixture(1200, 750);
+    await expect(
+      toWebp(
+        file(),
+        { crop: { width: 1200, height: 750 }, maxBytes: 100 },
+        f.dependencies,
+      ),
+    ).resolves.toMatchObject({ width: 1200, height: 750 });
   });
   it("returns a useful safe error when all three qualities exceed the byte limit", async () => {
     const f = fixture(800, 600, [output(103), output(102), output(101)]);

@@ -8,6 +8,11 @@ const readOnlyAction: (
 });
 
 export const resolveReports = readOnlyAction;
+export const createSpacePhotoUpload = readOnlyAction;
+export const confirmSpacePhotoUpload = readOnlyAction;
+export const reorderSpacePhotos = readOnlyAction;
+export const updateSpacePhotoAlt = readOnlyAction;
+export const deleteSpacePhoto = readOnlyAction;
 
 export const createBooking = readOnlyAction;
 export const joinLounge = readOnlyAction;

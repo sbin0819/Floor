@@ -31,10 +31,12 @@ export function AccessEditor({
   data,
   space,
   headingRef,
+  searchHref,
 }: {
   data: AdminFloorData;
   space?: AdminSpace;
   headingRef?: Ref<HTMLHeadingElement>;
+  searchHref?: (query: string) => string;
 }) {
   const id = useId();
   const router = useRouter();
@@ -90,9 +92,12 @@ export function AccessEditor({
   const search = () => {
     const params = new URLSearchParams();
     if (query) params.set("team", query);
-    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, {
-      scroll: false,
-    });
+    router.replace(
+      searchHref?.(query) ?? `${pathname}${params.size ? `?${params}` : ""}`,
+      {
+        scroll: false,
+      },
+    );
   };
   return (
     <form

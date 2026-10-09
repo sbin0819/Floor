@@ -11,13 +11,17 @@ export type ToWebpDependencies = {
 };
 
 export class WebpConversionError extends Error {
-  constructor(readonly code: "invalid_input" | "unsupported" | "too_large") {
+  constructor(
+    readonly code: "invalid_input" | "unsupported" | "too_large" | "too_small",
+  ) {
     super(
-      code === "unsupported"
-        ? "이 브라우저에서는 이미지를 올릴 수 없어요."
-        : code === "too_large"
-          ? "이미지가 너무 복잡해요. 다른 이미지를 골라 주세요."
-          : "10MB 이하의 JPG, PNG, WebP 이미지를 골라 주세요.",
+      code === "too_small"
+        ? "1200×750 이상인 사진을 골라 주세요."
+        : code === "unsupported"
+          ? "이 브라우저에서는 이미지를 올릴 수 없어요."
+          : code === "too_large"
+            ? "이미지가 너무 복잡해요. 다른 이미지를 골라 주세요."
+            : "10MB 이하의 JPG, PNG, WebP 이미지를 골라 주세요.",
     );
     this.name = "WebpConversionError";
   }
@@ -72,6 +76,8 @@ export async function toWebp(
     let height: number;
     if (options.crop) {
       ({ width, height } = options.crop);
+      if (bitmap.width < width || bitmap.height < height)
+        throw new WebpConversionError("too_small");
       const scale = Math.max(width / bitmap.width, height / bitmap.height);
       sourceWidth = width / scale;
       sourceHeight = height / scale;
