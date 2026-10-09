@@ -15,7 +15,6 @@ import {
 import { availableBookingActors } from "@/features/bookings/access";
 import {
   buildAvailabilityIntervals,
-  buildPlanIntervals,
   getAvailabilitySummary,
 } from "@/features/bookings/availability";
 import {
@@ -731,7 +730,6 @@ export function createBookingQueries(
           intervals: space.bookable
             ? buildAvailabilityIntervals(availability)
             : [],
-          planIntervals: space.bookable ? buildPlanIntervals(availability) : [],
           summary:
             space.bookable && isToday
               ? getAvailabilitySummary(availability)

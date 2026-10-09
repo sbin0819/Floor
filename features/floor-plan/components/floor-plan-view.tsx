@@ -10,7 +10,7 @@ import { useFloorSelection } from "@/features/bookings/components/branch-workspa
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
 import type { PlanShape } from "@/lib/floor-plan/render/types";
 import { initialPlanTime, planTimeValueText } from "../time";
-import { planStatesAt, planSummary } from "../states";
+import { planStatesAt, planSummary, planTooltipText } from "../states";
 import { PlanCanvas } from "./plan-canvas";
 import { PlanTimeBar } from "./plan-time-bar";
 
@@ -44,6 +44,15 @@ export function FloorPlanView({
     [data, at],
   );
   const hovered = hover?.spaceId && states.get(hover.spaceId.toLowerCase());
+  const hoveredSpace = data.spaces.find(
+    (space) => space.id.toLowerCase() === hover?.spaceId?.toLowerCase(),
+  );
+  const tooltip = hovered
+    ? planTooltipText(
+        hovered,
+        hoveredSpace?.kind === "accessible" ? hoveredSpace.capacity : null,
+      )
+    : null;
   const choose = (shape: PlanShape) => {
     if (!selection?.isCurrentRoute() || !shape.spaceId) return;
     const space = data.spaces.find(
@@ -81,7 +90,8 @@ export function FloorPlanView({
       {query.isPending ? (
         <div
           role="status"
-          className="m-4 h-96 animate-pulse rounded-xl border border-border bg-muted"
+          aria-busy="true"
+          className="m-4 h-96 animate-pulse rounded-xl border border-border bg-muted motion-reduce:animate-none"
         >
           <span className="sr-only">평면도를 불러오고 있어요</span>
         </div>
@@ -118,17 +128,13 @@ export function FloorPlanView({
               selection.restoreSpaceTrigger();
             }}
           />
-          {hovered && (
+          {tooltip && (
             <div
               role="tooltip"
               className="pointer-events-none absolute top-3 left-3 max-w-72 rounded-lg bg-foreground px-3 py-2 text-xs text-background shadow-sm"
             >
-              <p className="font-semibold">{hovered.name}</p>
-              <p>
-                {hovered.kind === "restricted"
-                  ? "다른 팀 전용이에요"
-                  : hovered.label}
-              </p>
+              <p className="font-semibold">{tooltip.title}</p>
+              <p>{tooltip.description}</p>
             </div>
           )}
         </div>

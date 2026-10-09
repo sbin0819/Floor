@@ -305,7 +305,7 @@ describe("floor-plan read authorization and budgets", () => {
       ).toBeNull();
     },
   );
-  it("preserves next-day maintenance boundaries only for authorized spaces with no identity fields", async () => {
+  it("reuses clipped maintenance intervals for authorized spaces without a second schedule DTO or identity fields", async () => {
     await database.db.insert(spaceBlocks).values({
       spaceId: actors.publicSpaceId,
       during: {
@@ -323,15 +323,15 @@ describe("floor-plan read authorization and budgets", () => {
     const space = data.spaces.find(({ id }) => id === actors.publicSpaceId);
     if (!space || space.kind !== "accessible")
       throw new Error("Expected the accessible space.");
-    expect(space.planIntervals).toEqual([
+    expect(space.intervals).toEqual([
       {
         start: "2026-10-07T11:00:00.000Z",
-        end: "2026-10-08T03:00:00.000Z",
+        end: "2026-10-07T13:00:00.000Z",
         kind: "maintenance",
       },
     ]);
-    expect(space.intervals[0]?.end).toBe("2026-10-07T13:00:00.000Z");
-    expect(JSON.stringify(space.planIntervals)).not.toMatch(
+    expect(space).not.toHaveProperty("planIntervals");
+    expect(JSON.stringify(space.intervals)).not.toMatch(
       /reason|createdBy|userId|teamId|점검 이유/,
     );
   });

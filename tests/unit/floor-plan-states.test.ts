@@ -28,7 +28,7 @@ describe("floor plan display states", () => {
     });
     expect(states.get("lounge")).toMatchObject({
       kind: "neutral",
-      label: "예약 없이 이용해요",
+      label: "예약 없이 쓰는 곳",
     });
     expect(planSummary(data, states)).toBe("빈 공간 1 · 예약됨 0 · 점검 0");
   });
@@ -63,19 +63,19 @@ describe("floor plan display states", () => {
     });
     expect(planStatesAt(data, at("11:00")).get(room.id)?.kind).toBe("free");
   });
-  it("uses the original maintenance ending and contains no identity fields", () => {
+  it("uses the clipped maintenance ending at the operating boundary", () => {
     const data = floorDayFixture();
     const room = data.spaces[0]!;
     if (room.kind !== "accessible") throw new Error("fixture");
-    room.planIntervals = [
+    room.intervals = [
       {
         start: at("12:00").toISOString(),
-        end: zonedDateTime("2026-10-08", "12:00", "Asia/Seoul").toISOString(),
+        end: at("14:00").toISOString(),
         kind: "maintenance",
       },
     ];
     expect(planStatesAt(data, at("13:00")).get(room.id)?.label).toBe(
-      "6인 · 점검 중 · 내일 12:00까지",
+      "점검 중 · 운영 종료까지",
     );
   });
   it("shows the selected desk part summary, and no free space claim on holidays", () => {

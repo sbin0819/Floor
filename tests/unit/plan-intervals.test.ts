@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAvailabilityIntervals,
-  buildPlanIntervals,
   type AvailabilityInput,
 } from "@/features/bookings/availability";
 
@@ -40,19 +39,16 @@ const input: AvailabilityInput = {
   ],
 };
 
-describe("minimal unclipped floor-plan intervals", () => {
-  it("preserves the original maintenance end without changing the clipped schedule", () => {
-    expect(buildAvailabilityIntervals(input).at(-1)?.end).toBe(
-      input.window?.end,
-    );
-    expect(buildPlanIntervals(input).at(-1)).toEqual({
+describe("shared minimal floor-plan intervals", () => {
+  it("uses the existing operating-hours-clipped maintenance schedule", () => {
+    expect(buildAvailabilityIntervals(input).at(-1)).toEqual({
       start: "2026-10-07T11:00:00.000Z",
-      end: "2026-10-08T03:00:00.000Z",
+      end: "2026-10-07T12:00:00.000Z",
       kind: "maintenance",
     });
   });
   it("merges adjacent own/team intervals and never returns user or team identity", () => {
-    const intervals = buildPlanIntervals(input);
+    const intervals = buildAvailabilityIntervals(input);
     expect(intervals[0]).toEqual({
       start: "2026-10-07T01:00:00.000Z",
       end: "2026-10-07T03:00:00.000Z",
@@ -62,14 +58,12 @@ describe("minimal unclipped floor-plan intervals", () => {
     for (const interval of intervals)
       expect(Object.keys(interval).sort()).toEqual(["end", "kind", "start"]);
   });
-  it("does not mutate inputs or require an operating window to describe source ranges", () => {
+  it("does not mutate inputs or expose schedule intervals on closed days", () => {
     const before = structuredClone(input);
-    expect(buildPlanIntervals({ ...input, window: null })).toEqual(
-      buildPlanIntervals(input),
-    );
+    expect(buildAvailabilityIntervals({ ...input, window: null })).toEqual([]);
     expect(input).toEqual(before);
-    expect(buildPlanIntervals({ ...input, bookings: [], blocks: [] })).toEqual(
-      [],
-    );
+    expect(
+      buildAvailabilityIntervals({ ...input, bookings: [], blocks: [] }),
+    ).toEqual([]);
   });
 });

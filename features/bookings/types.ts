@@ -105,7 +105,6 @@ export type RestrictedSpace = {
 };
 export type FloorVisibleSpace = VisibleSpace & {
   intervals: AvailabilityInterval[];
-  planIntervals?: AvailabilityInterval[];
   summary: AvailabilitySummary | null;
   deskParts?: DeskPartSummary[];
 };
