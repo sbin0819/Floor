@@ -30,6 +30,7 @@ export type PlanEditorData = {
   } | null;
   spaces: PlanEditorSpace[];
   canManageSpaces: boolean;
+  adminFilesEnabled: boolean;
 };
 export type AdminPlansData = {
   branch: PlanEditorData["branch"];

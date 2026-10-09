@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createFloorPlanQueries } from "./query-factory";
+import { createPlanBackgroundQueries } from "./background-query-factory";
 import { createPlanEditorQueries } from "./editor-query-factory";
 import type { PlanEditorInput } from "./editor-schema";
 import { createPlanPublishQueries } from "./publish-query-factory";
@@ -11,6 +12,11 @@ import type {
 export const getFloorPlanDocument = cache(async (planId: string) =>
   createFloorPlanQueries().getFloorPlanDocument(planId),
 );
+
+// Response 스트림은 소비되므로 요청 메모에도 보관하지 않는다.
+export function getPlanBackground(planId: string) {
+  return createPlanBackgroundQueries().getPlanBackground(planId);
+}
 
 const readPlanEditor = cache((branchId: string, floorId: string) =>
   createPlanEditorQueries().getPlanEditor({ branchId, floorId }),

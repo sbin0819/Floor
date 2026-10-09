@@ -14,6 +14,7 @@ export type FloorPlanQueryDependencies = {
   database?: DalDatabase;
   requireSession?: () => Promise<Session>;
   now?: () => Date;
+  adminFilesEnabled?: () => boolean;
 };
 
 export function createFloorPlanQueries(

@@ -37,6 +37,13 @@ export class AdminStoragePreconditionError extends Error {
   }
 }
 
+export class AdminStorageMissingError extends Error {
+  constructor() {
+    super("The stored object does not exist.");
+    this.name = "AdminStorageMissingError";
+  }
+}
+
 export class InvalidPendingWebpError extends Error {
   constructor() {
     super("The uploaded image is invalid.");

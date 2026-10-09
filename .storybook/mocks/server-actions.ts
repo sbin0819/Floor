@@ -104,5 +104,7 @@ export const dismissHomeChecklist = readOnlyAction;
 export const updateRoleSettings = readOnlyAction;
 export const resetRoleSettings = readOnlyAction;
 export const saveFloorPlanDraft = readOnlyAction;
+export const createPlanBackgroundUpload = readOnlyAction;
+export const confirmPlanBackgroundUpload = readOnlyAction;
 export const publishFloorPlan = readOnlyAction;
 export const restorePlanVersion = readOnlyAction;

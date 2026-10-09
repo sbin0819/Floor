@@ -14,7 +14,7 @@ import { moveShapesCommand } from "@/features/floor-plan/editor/transforms";
 import type { PlanEditorStore } from "@/features/floor-plan/editor/store";
 import type { SaveFloorPlanDraftResult } from "@/features/floor-plan/editor-types";
 import type { ActionResult } from "@/lib/actions/result";
-import type { PlanPoint } from "@/lib/floor-plan/types";
+import type { PlanPoint, FloorPlanDocument } from "@/lib/floor-plan/types";
 import { planEditorFixture, planEditorIds } from "@/tests/helpers/plan-editor";
 
 const mocks = vi.hoisted(() => ({
@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   wide: true,
   store: null as PlanEditorStore | null,
+  memberDocument: null as FloorPlanDocument | null,
+  backgroundSrc: null as string | null,
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
@@ -34,6 +36,8 @@ vi.mock("@/features/floor-plan/actions", () => ({
   saveFloorPlanDraft: vi.fn(),
   publishFloorPlan: vi.fn(),
   restorePlanVersion: vi.fn(),
+  createPlanBackgroundUpload: vi.fn(),
+  confirmPlanBackgroundUpload: vi.fn(),
 }));
 vi.mock("@/features/admin/actions", () => ({
   createSpace: vi.fn(),
@@ -43,16 +47,22 @@ vi.mock("@/features/bookings/components/use-wide-screen", () => ({
   useWideScreen: () => mocks.wide,
 }));
 vi.mock("@/features/floor-plan/components/plan-canvas", () => ({
-  PlanCanvas: () => <p>멤버 렌더러</p>,
+  PlanCanvas: ({ document }: { document: FloorPlanDocument }) => {
+    mocks.memberDocument = document;
+    return <p>멤버 렌더러</p>;
+  },
 }));
 vi.mock("@/features/floor-plan/editor/editor-canvas", () => ({
   EditorCanvas: ({
     onPolygon,
+    backgroundSrc = null,
   }: {
     onPolygon: (polygon: PlanPoint[]) => void;
+    backgroundSrc?: string | null;
   }) => {
     const store = useEditorStore();
     mocks.store = store;
+    mocks.backgroundSrc = backgroundSrc;
     const count = useEditorValue((state) => state.document.spaces.length);
     return (
       <div>
@@ -216,6 +226,36 @@ it("closing a connection dialog leaves the document and autosave untouched", asy
   await tick(2000);
   expect(screen.getByLabelText("공간 도형 수")).toHaveTextContent("0");
   expect(save).not.toHaveBeenCalled();
+});
+it("strips the private background from the member preview without changing the editor", () => {
+  const data = planEditorFixture();
+  data.published!.document.background = {
+    transform: [10, 0, 0, 10, 0, 0],
+    opacity: 0.35,
+  };
+  mount(data);
+  fireEvent.click(screen.getByRole("button", { name: "멤버 화면 미리보기" }));
+  expect(mocks.memberDocument).not.toHaveProperty("background");
+  expect(mocks.store!.getState().document).toHaveProperty("background");
+});
+it("keeps editing tools available when private image storage is disabled", () => {
+  mount();
+  fireEvent.click(screen.getByRole("button", { name: "배경 축척 (M)" }));
+  expect(screen.getByText("이 환경에서는 파일을 올릴 수 없어요")).toBeVisible();
+  expect(screen.getByRole("button", { name: "벽 (W)" })).toBeEnabled();
+});
+it("refreshes the background source when reloading the same draft generation", () => {
+  const data = planEditorFixture();
+  data.published!.document.background = {
+    transform: [10, 0, 0, 10, 0, 0],
+    opacity: 0.35,
+  };
+  mount(data);
+  const source = mocks.backgroundSrc;
+  expect(source).toContain(planEditorIds.plan);
+  act(() => mocks.store!.getState().replaceSource(editorSource(data)));
+  expect(mocks.backgroundSrc).toContain(planEditorIds.plan);
+  expect(mocks.backgroundSrc).not.toBe(source);
 });
 it("returns focus to the preview button without changing the document", async () => {
   const { save } = mount();

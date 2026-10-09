@@ -176,6 +176,281 @@ describe("plan autosave", () => {
     expect(save).not.toHaveBeenCalled();
     controller.dispose();
   });
+  it("creates one clean draft through the existing queue without a fake edit or undo entry", async () => {
+    const store = editorStore();
+    store.setState({ basePlanId: "published-id" });
+    store.getState().select(["a"]);
+    const before = store.getState();
+    const first = deferred<Result>();
+    const save = vi.fn().mockReturnValueOnce(first.promise);
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    const flush = controller.flush({ createDraft: true });
+    expect(controller.flush({ createDraft: true })).toBe(flush);
+    expect(controller.flush()).toBe(flush);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(save).toHaveBeenCalledExactlyOnceWith({
+      floorId: before.floorId,
+      basePlanId: "published-id",
+      revision: null,
+      document: before.document,
+    });
+    expect(store.getState()).toMatchObject({
+      changeId: 0,
+      ackChangeId: 0,
+      undoStack: [],
+      redoStack: [],
+      selectedIds: ["a"],
+    });
+    first.resolve(success());
+    expect(await flush).toEqual({
+      ok: true,
+      snapshot: {
+        document: before.document,
+        draft: {
+          planId: "30000000-0000-4000-8000-000000000001",
+          version: 2,
+          revision: 1,
+        },
+        epoch: 0,
+        changeId: 0,
+      },
+    });
+    expect(store.getState().document).toBe(before.document);
+    await controller.flush({ createDraft: true });
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(save).toHaveBeenCalledTimes(1);
+    controller.dispose();
+  });
+  it("does not write an existing clean draft for createDraft or change its revision", async () => {
+    const store = editorStore();
+    store.setState({ draft: { planId: "existing", version: 3, revision: 8 } });
+    const save = vi.fn();
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    expect(await controller.flush({ createDraft: true })).toMatchObject({
+      ok: true,
+      snapshot: { draft: { planId: "existing", revision: 8 } },
+    });
+    expect(save).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+  it("shares a running dirty first save and drains later edits using its revision", async () => {
+    const store = editorStore();
+    const first = deferred<Result>(),
+      second = deferred<Result>();
+    const save = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    edit(store);
+    await vi.advanceTimersByTimeAsync(1500);
+    const flush = controller.flush({ createDraft: true });
+    edit(store);
+    first.resolve(success());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save.mock.calls[1]![0].revision).toBe(1);
+    second.resolve(success(2));
+    expect(await flush).toMatchObject({
+      ok: true,
+      snapshot: { draft: { revision: 2 }, changeId: 2 },
+    });
+    expect(store.getState().undoStack).toHaveLength(2);
+    controller.dispose();
+  });
+  it("drains edits made during clean creation instead of resolving a stale document snapshot", async () => {
+    const store = editorStore();
+    const first = deferred<Result>(),
+      second = deferred<Result>();
+    const save = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    const flush = controller.flush({ createDraft: true });
+    await vi.advanceTimersByTimeAsync(0);
+    edit(store);
+    const changed = store.getState().document;
+    first.resolve(success());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(save.mock.calls[1]![0]).toMatchObject({
+      revision: 1,
+      document: changed,
+    });
+    second.resolve(success(2));
+    expect(await flush).toMatchObject({
+      ok: true,
+      snapshot: { document: changed, changeId: 1, draft: { revision: 2 } },
+    });
+    controller.dispose();
+  });
+  it.each([false, true])(
+    "permits explicit createDraft while writeLocked with dirty=%s without unlocking edits",
+    async (dirty) => {
+      const store = editorStore();
+      if (dirty) edit(store);
+      store.getState().setWriteLocked(true);
+      const save = vi.fn().mockResolvedValue(success());
+      const controller = createPlanAutosave(store, { save });
+      controller.start();
+      expect(await controller.flush({ createDraft: true })).toMatchObject({
+        ok: true,
+        snapshot: { draft: { revision: 1 }, changeId: dirty ? 1 : 0 },
+      });
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(store.getState().writeLocked).toBe(true);
+      edit(store);
+      expect(store.getState().changeId).toBe(dirty ? 1 : 0);
+      controller.dispose();
+    },
+  );
+  it("retries a failed clean creation only explicitly and never invents a changeId", async () => {
+    const store = editorStore();
+    const save = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, code: "INTERNAL" })
+      .mockResolvedValueOnce(success());
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    expect(await controller.flush({ createDraft: true })).toEqual({
+      ok: false,
+      reason: "error",
+    });
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(await controller.flush({ createDraft: true })).toEqual({
+      ok: false,
+      reason: "error",
+    });
+    controller.retry();
+    expect(await controller.flush({ createDraft: true })).toMatchObject({
+      ok: true,
+      snapshot: { draft: { revision: 1 }, changeId: 0 },
+    });
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(store.getState().undoStack).toEqual([]);
+    controller.dispose();
+  });
+  it("never retries stale clean creation until the source is replaced", async () => {
+    const store = editorStore();
+    const save = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, code: "STALE" })
+      .mockResolvedValueOnce(success());
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    expect(await controller.flush({ createDraft: true })).toEqual({
+      ok: false,
+      reason: "stale",
+    });
+    controller.retry();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(save).toHaveBeenCalledTimes(1);
+    store.getState().replaceSource(editorStore().getState());
+    expect(await controller.flush()).toMatchObject({
+      ok: true,
+      snapshot: { draft: null },
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(await controller.flush({ createDraft: true })).toMatchObject({
+      ok: true,
+      snapshot: { draft: { revision: 1 } },
+    });
+    controller.dispose();
+  });
+  it("cancels clean creation waiters while hidden but accepts its ACK before resuming", async () => {
+    const store = editorStore();
+    const first = deferred<Result>();
+    const save = vi.fn().mockReturnValueOnce(first.promise);
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    const flush = controller.flush({ createDraft: true });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.stop();
+    expect(await flush).toEqual({ ok: false, reason: "cancelled" });
+    expect(await controller.flush({ createDraft: true })).toEqual({
+      ok: false,
+      reason: "cancelled",
+    });
+    first.resolve(success());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getState()).toMatchObject({
+      draft: { revision: 1 },
+      changeId: 0,
+      ackChangeId: 0,
+    });
+    controller.start();
+    await controller.flush({ createDraft: true });
+    expect(save).toHaveBeenCalledTimes(1);
+    controller.dispose();
+  });
+  it("ignores the old clean-creation ACK and queues only one request for a new epoch", async () => {
+    const store = editorStore();
+    const first = deferred<Result>();
+    const save = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce(success(5));
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    const oldFlush = controller.flush({ createDraft: true });
+    await vi.advanceTimersByTimeAsync(0);
+    store.getState().replaceSource(editorStore().getState());
+    expect(await oldFlush).toEqual({ ok: false, reason: "cancelled" });
+    const newFlush = controller.flush({ createDraft: true });
+    expect(controller.flush({ createDraft: true })).toBe(newFlush);
+    first.resolve(success(99));
+    expect(await newFlush).toMatchObject({
+      ok: true,
+      snapshot: { epoch: 1, changeId: 0, draft: { revision: 5 } },
+    });
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save.mock.calls[1]![0].revision).toBeNull();
+    controller.dispose();
+  });
+  it("shares a still-running creation after Activity resumes before its ACK", async () => {
+    const store = editorStore();
+    const first = deferred<Result>();
+    const save = vi.fn().mockReturnValueOnce(first.promise);
+    const controller = createPlanAutosave(store, { save });
+    controller.start();
+    const oldFlush = controller.flush({ createDraft: true });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.stop();
+    expect(await oldFlush).toEqual({ ok: false, reason: "cancelled" });
+    controller.start();
+    const resumed = controller.flush({ createDraft: true });
+    expect(controller.flush()).toBe(resumed);
+    first.resolve(success());
+    expect(await resumed).toMatchObject({
+      ok: true,
+      snapshot: { draft: { revision: 1 }, changeId: 0 },
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+    controller.dispose();
+  });
+  it("disposal cancels clean creation and discards its late ACK", async () => {
+    const store = editorStore();
+    const first = deferred<Result>();
+    const controller = createPlanAutosave(store, { save: () => first.promise });
+    controller.start();
+    const flush = controller.flush({ createDraft: true });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.dispose();
+    expect(await flush).toEqual({ ok: false, reason: "cancelled" });
+    first.resolve(success());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getState()).toMatchObject({
+      draft: null,
+      changeId: 0,
+      ackChangeId: 0,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it.each(["FORBIDDEN", "INTERNAL", "INVALID_INPUT"] as const)(
     "pauses on %s without looping and allows explicit retry",
     async (code) => {

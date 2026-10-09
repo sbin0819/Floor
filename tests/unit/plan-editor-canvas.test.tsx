@@ -146,7 +146,16 @@ function flushFrames() {
     for (const [id, callback] of pending) callback(id * 16);
   });
 }
-function harness(store = editorStore(), onPolygon = vi.fn()) {
+function harness(
+  store = editorStore(),
+  onPolygon = vi.fn(),
+  background: {
+    backgroundLocked?: boolean;
+    scalePoints?: readonly Point[] | null;
+    onScalePoint?: (point: Point) => void;
+    onScaleCancel?: () => void;
+  } = {},
+) {
   let focusIds: readonly string[] = [];
   const view = (visible = true) => (
     <Activity mode={visible ? "visible" : "hidden"}>
@@ -154,6 +163,7 @@ function harness(store = editorStore(), onPolygon = vi.fn()) {
         <main>
           <input aria-label="숫자 입력" />
           <EditorCanvas
+            {...background}
             states={states}
             onPolygon={onPolygon}
             focusIds={focusIds}
@@ -246,6 +256,63 @@ afterEach(() => {
 });
 
 describe("editor canvas pointer and keyboard", () => {
+  it("keeps an off-grid vertex snap rather than rounding the completed movement again", () => {
+    const doc = editorDocument();
+    doc.fixtures[0]!.polygon[0] = [5050, 5050];
+    const h = harness(editorStore(doc));
+    h.down([2000, 2000]);
+    h.move([5030, 5040]);
+    h.up([5030, 5040]);
+    expect(h.store.getState().document.spaces[0]!.polygon[0]).toEqual([
+      4050, 4050,
+    ]);
+  });
+  it("moves only an unlocked background with a single undoable drag", () => {
+    const doc = editorDocument();
+    doc.background = { transform: [10, 0, 0, 10, 0, 0], opacity: 0.35 };
+    const h = harness(editorStore(doc), vi.fn(), { backgroundLocked: false });
+    h.key("m");
+    h.down([12000, 5000]);
+    h.move([12500, 5600]);
+    expect(h.store.getState().document).toBe(doc);
+    h.up([12500, 5600]);
+    expect(h.store.getState().document.background?.transform).toEqual([
+      10, 0, 0, 10, 500, 600,
+    ]);
+    expect(h.store.getState().document.spaces).toBe(doc.spaces);
+    expect(h.store.getState().undoStack).toHaveLength(1);
+    h.key("z", { ctrlKey: true });
+    expect(h.store.getState().document.background).toEqual(doc.background);
+  });
+  it("does not move locked backgrounds or underlying shapes", () => {
+    const doc = editorDocument();
+    doc.background = { transform: [10, 0, 0, 10, 0, 0], opacity: 0.35 };
+    const h = harness(editorStore(doc));
+    h.key("m");
+    h.down([2000, 2000]);
+    h.up([3000, 4000]);
+    h.key("ArrowRight");
+    expect(h.store.getState().document).toBe(doc);
+  });
+  it("selects unsnapped scale points without editing and cancels with Escape", () => {
+    const doc = editorDocument();
+    doc.background = { transform: [10, 0, 0, 10, 0, 0], opacity: 0.35 };
+    const onScalePoint = vi.fn(),
+      onScaleCancel = vi.fn();
+    const h = harness(editorStore(doc), vi.fn(), {
+      backgroundLocked: false,
+      scalePoints: [],
+      onScalePoint,
+      onScaleCancel,
+    });
+    h.key("m");
+    h.tap([12033, 5055]);
+    h.key("ArrowRight");
+    expect(onScalePoint.mock.calls[0]![0][0]).toBeCloseTo(12033);
+    expect(h.store.getState().document).toBe(doc);
+    h.key("Escape");
+    expect(onScaleCancel).toHaveBeenCalledTimes(1);
+  });
   it("edits a vertex with one drag command and restores it with undo", () => {
     const h = harness();
     const original = h.store.getState().document;

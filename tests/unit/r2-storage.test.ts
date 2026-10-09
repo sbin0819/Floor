@@ -2,7 +2,10 @@ import { Readable } from "node:stream";
 import type { S3Client } from "@aws-sdk/client-s3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { adminObjectKey } from "@/lib/storage/admin-keys";
-import { AdminStoragePreconditionError } from "@/lib/storage/admin-types";
+import {
+  AdminStorageMissingError,
+  AdminStoragePreconditionError,
+} from "@/lib/storage/admin-types";
 import {
   adminFilesEnabled,
   createR2ObjectStorage,
@@ -219,6 +222,18 @@ describe("R2 signed requests using the installed SDK without network", () => {
     await expect(
       storage.readRange(pending, 0, 1023, { ifMatch: '"old"' }),
     ).rejects.toBeInstanceOf(AdminStoragePreconditionError);
+  });
+  it("distinguishes a removed range source without leaking provider details", async () => {
+    const { storage, handle } = fixture([
+      {
+        statusCode: 404,
+        body: "<Error><Code>NoSuchKey</Code><Message>private-key-and-token</Message></Error>",
+      },
+    ]);
+    const result = storage.readRange(pending, 0, 1023, { ifMatch: '"old"' });
+    await expect(result).rejects.toBeInstanceOf(AdminStorageMissingError);
+    await expect(result).rejects.toThrow("The stored object does not exist.");
+    expect(handle).toHaveBeenCalledTimes(1);
   });
   it("signs both copy conditions on just the copy request and preserves metadata", async () => {
     const { storage, handle } = fixture([

@@ -28,6 +28,8 @@ import {
 import { useEditorStore, useEditorValue } from "./editor-context";
 import { useEditorCanvas } from "./use-editor-canvas";
 import { deleteShapesCommand, type Command } from "./commands";
+import { moveBackgroundCommand } from "./background-commands";
+import { BackgroundCanvas } from "./background-canvas";
 import { moveShapesCommand, resizeShapeCommand } from "./transforms";
 import { createVertexIndex, snapPoint, type SnapResult } from "./snapping";
 import {
@@ -60,7 +62,7 @@ type Gesture = {
   selectedIds: readonly string[];
   command: Command | null;
 } & (
-  | { kind: "rectangle" | "marquee" | "move" }
+  | { kind: "rectangle" | "marquee" | "move" | "background" }
   | { kind: "pan"; camera: Camera }
   | { kind: "resize"; box: Box; handle: Handle }
   | { kind: "opening"; openingId: string; segmentIndex: number }
@@ -73,12 +75,26 @@ export function EditorCanvas({
   focusIds,
   previewSeats,
   onSeatArray,
+  backgroundSrc = null,
+  backgroundLocked = true,
+  scalePoints,
+  onScalePoint,
+  onScaleCancel,
+  onImageSize,
+  onBackgroundError,
 }: {
   states: PlanStates;
   onPolygon: (polygon: PlanPoint[]) => void;
   focusIds?: readonly string[];
   previewSeats?: readonly FloorPlanDocument["seats"][number][] | null;
   onSeatArray?: () => void;
+  backgroundSrc?: string | null;
+  backgroundLocked?: boolean;
+  scalePoints?: readonly Point[] | null;
+  onScalePoint?: (point: Point) => void;
+  onScaleCancel?: () => void;
+  onImageSize?: (size: { width: number; height: number }) => void;
+  onBackgroundError?: (failed: boolean) => void;
 }) {
   const store = useEditorStore();
   const document = useEditorValue((state) => state.document);
@@ -121,6 +137,7 @@ export function EditorCanvas({
       drawingClosed: tool === "rectangle",
       vertex: editing,
       snapMark,
+      scalePoints,
     }),
     [
       selectedIds,
@@ -134,6 +151,7 @@ export function EditorCanvas({
       tool,
       editing,
       snapMark,
+      scalePoints,
     ],
   );
   const {
@@ -289,11 +307,36 @@ export function EditorCanvas({
         setDrawing([]);
         setVertex(null);
         setSnapMark(null);
+        onScaleCancel?.();
         state.select([]);
         return;
       }
       const modifier = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
+      if (
+        state.tool === "background" &&
+        !modifier &&
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+      ) {
+        event.preventDefault();
+        const step = event.shiftKey ? 1000 : 100;
+        if (!backgroundLocked && !scalePoints)
+          state.execute(
+            moveBackgroundCommand(state.document, [
+              event.key === "ArrowLeft"
+                ? -step
+                : event.key === "ArrowRight"
+                  ? step
+                  : 0,
+              event.key === "ArrowUp"
+                ? -step
+                : event.key === "ArrowDown"
+                  ? step
+                  : 0,
+            ]),
+          );
+        return;
+      }
       const selectedVertex = editing?.index;
       if (
         editing &&
@@ -367,13 +410,14 @@ export function EditorCanvas({
       } else if (
         !modifier &&
         !event.altKey &&
-        ["v", "r", "p", "g", "s", "w", "d"].includes(key)
+        ["v", "r", "p", "g", "s", "w", "d", "m"].includes(key)
       ) {
         event.preventDefault();
         setPolygon([]);
         setDrawing([]);
         if (key === "g") state.setSnap(!state.snap);
         else if (key === "s") onSeatArray?.();
+        else if (key === "m") state.setTool("background");
         else if (key === "w" || key === "d")
           state.setTool(key === "w" ? "wall" : "opening");
         else if (
@@ -434,7 +478,18 @@ export function EditorCanvas({
       window.removeEventListener("blur", blur);
       spaceHeld.current = false;
     };
-  }, [store, host, polygon, onPolygon, onSeatArray, finishWall, editing]);
+  }, [
+    store,
+    host,
+    polygon,
+    onPolygon,
+    onSeatArray,
+    finishWall,
+    editing,
+    backgroundLocked,
+    scalePoints,
+    onScaleCancel,
+  ]);
   const clearGesture = () => {
     gesture.current = null;
     setPreview(null);
@@ -453,7 +508,8 @@ export function EditorCanvas({
       (active.kind === "move" ||
         active.kind === "resize" ||
         active.kind === "opening" ||
-        active.kind === "vertex") &&
+        active.kind === "vertex" ||
+        active.kind === "background") &&
       Math.hypot(point[0] - active.screen[0], point[1] - active.screen[1]) < 2
     ) {
       active.command = null;
@@ -476,33 +532,38 @@ export function EditorCanvas({
       setMarquee(boundsOf([active.start, world]));
     else {
       active.command =
-        active.kind === "vertex"
-          ? setVertexCommand(
-              active.document,
-              active.shapeId,
-              active.index,
-              world,
-            )
-          : active.kind === "opening"
-            ? moveOpeningCommand(
+        active.kind === "background"
+          ? moveBackgroundCommand(active.document, [
+              world[0] - active.start[0],
+              world[1] - active.start[1],
+            ])
+          : active.kind === "vertex"
+            ? setVertexCommand(
                 active.document,
-                active.openingId,
-                [...toWorld(point, current)],
-                active.segmentIndex,
+                active.shapeId,
+                active.index,
+                world,
               )
-            : active.kind === "resize"
-              ? resizeShapeCommand(
+            : active.kind === "opening"
+              ? moveOpeningCommand(
                   active.document,
-                  active.selectedIds[0]!,
-                  resizedBox(active.box, active.handle, world),
-                  { snap: false },
+                  active.openingId,
+                  [...toWorld(point, current)],
+                  active.segmentIndex,
                 )
-              : moveShapesCommand(
-                  active.document,
-                  active.selectedIds,
-                  [world[0] - active.start[0], world[1] - active.start[1]],
-                  { snap: snap && !alt },
-                );
+              : active.kind === "resize"
+                ? resizeShapeCommand(
+                    active.document,
+                    active.selectedIds[0]!,
+                    resizedBox(active.box, active.handle, world),
+                    { snap: false },
+                  )
+                : moveShapesCommand(
+                    active.document,
+                    active.selectedIds,
+                    [world[0] - active.start[0], world[1] - active.start[1]],
+                    { snap: false },
+                  );
       setPreview(active.command?.apply(active.document) ?? null);
     }
   };
@@ -579,7 +640,14 @@ export function EditorCanvas({
           };
           if (spaceHeld.current || event.button === 1)
             gesture.current = { ...base, kind: "pan", camera: current };
-          else if (editing && tool === "select") {
+          else if (tool === "background") {
+            if (!document.background || backgroundLocked) return;
+            if (scalePoints) {
+              onScalePoint?.(toWorld(point, current));
+              return;
+            }
+            gesture.current = { ...base, kind: "background" };
+          } else if (editing && tool === "select") {
             const vertexIndex = nearestVertex(
               vertexPoints(document, editing.shapeId),
               point,
@@ -775,6 +843,14 @@ export function EditorCanvas({
         onPointerCancel={clearGesture}
         onLostPointerCapture={clearGesture}
       >
+        <BackgroundCanvas
+          background={(preview ?? document).background}
+          src={backgroundSrc}
+          camera={current}
+          viewport={viewport}
+          onImageSize={onImageSize}
+          onLoadError={onBackgroundError}
+        />
         <canvas
           ref={base}
           aria-hidden="true"

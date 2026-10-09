@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+test("배경 도면은 로그인 없이 읽을 수 없어요", async ({ request }) => {
+  const response = await request.get(
+    "/api/plan-backgrounds/10000000-0000-4000-8000-000000000001",
+  );
+  expect(response.status()).toBe(401);
+  expect(response.headers()["cache-control"]).toBe("private, no-store");
+  expect(response.headers()["x-content-type-options"]).toBe("nosniff");
+});
+
 test("프로덕션에서는 개발용 평면도 성능 측정 화면을 공개하지 않아요", async ({
   request,
 }) => {

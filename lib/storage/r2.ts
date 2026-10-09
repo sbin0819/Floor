@@ -11,6 +11,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getEnv } from "@/lib/env";
 import { assertAdminObjectKey } from "./admin-keys";
 import {
+  AdminStorageMissingError,
   AdminStoragePreconditionError,
   type AdminObjectStorage,
 } from "./admin-types";
@@ -186,6 +187,7 @@ export function createR2ObjectStorage(
         }
         return bytes;
       } catch (error) {
+        if (statusOf(error) === 404) throw new AdminStorageMissingError();
         if (statusOf(error) === 412) throw new AdminStoragePreconditionError();
         throw storageError();
       }

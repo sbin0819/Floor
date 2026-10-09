@@ -17,6 +17,7 @@ export type EditorOverlay = {
   drawingClosed?: boolean;
   vertex?: { shapeId: string; index: number | null } | null;
   snapMark?: SnapResult | null;
+  scalePoints?: readonly Point[] | null;
 };
 export function drawEditorOverlay(
   ctx: CanvasRenderingContext2D,
@@ -59,6 +60,16 @@ export function drawEditorOverlay(
   for (const shape of frame.scene.shapes)
     if (issues.has(shape.id)) outline(shape.points);
   ctx.strokeStyle = colors.selection;
+  if (overlay.scalePoints?.length) {
+    ctx.setLineDash([4, 4]);
+    outline(overlay.scalePoints, false);
+    ctx.setLineDash([]);
+    for (const point of overlay.scalePoints) {
+      const [x, y] = toScreen(point, camera);
+      ctx.fillStyle = colors.selection;
+      ctx.fillRect(x - 4, y - 4, 8, 8);
+    }
+  }
   if (overlay.preview) {
     ctx.setLineDash([6, 4]);
     for (const shape of createScene(overlay.preview).shapes)

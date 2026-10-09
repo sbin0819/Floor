@@ -41,6 +41,8 @@ export function createPlanAutosave(
   let unsubscribe: (() => void) | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let inFlight = false;
+  // 문서 변경 번호를 만들지 않고 같은 저장 큐에서 첫 초안만 요청한다.
+  let createDraftEpoch: number | null = null;
   let pendingFlush: {
     epoch: number;
     promise: Promise<PlanFlushResult>;
@@ -82,7 +84,10 @@ export function createPlanAutosave(
       finishFlush({ ok: false, reason: sent.saveState });
       return;
     }
-    if (sent.changeId === sent.ackChangeId) {
+    if (
+      sent.changeId === sent.ackChangeId &&
+      !(sent.draft === null && createDraftEpoch === sent.epoch)
+    ) {
       finishFlush(cleanResult());
       return;
     }
@@ -108,6 +113,7 @@ export function createPlanAutosave(
         if (disposed) return;
         const current = store.getState();
         if (current.epoch !== sent.epoch) {
+          if (createDraftEpoch !== current.epoch) createDraftEpoch = null;
           if (pendingFlush && pendingFlush.epoch !== current.epoch)
             finishFlush({ ok: false, reason: "cancelled" });
           run();
@@ -120,6 +126,7 @@ export function createPlanAutosave(
           return;
         }
         const { planId, version, revision, savedAt } = result.data;
+        if (createDraftEpoch === sent.epoch) createDraftEpoch = null;
         // Activity가 숨겨져도 첫 초안의 revision은 받아야 복귀 뒤 null로 다시 보내지 않아요.
         store.setState({
           draft: { planId, version, revision },
@@ -138,6 +145,7 @@ export function createPlanAutosave(
     active = true;
     unsubscribe = store.subscribe((state, previous) => {
       if (state.epoch !== previous.epoch) {
+        createDraftEpoch = null;
         finishFlush({ ok: false, reason: "cancelled" });
         schedule();
       } else if (state.changeId !== previous.changeId) {
@@ -156,14 +164,22 @@ export function createPlanAutosave(
     unsubscribe = null;
     finishFlush({ ok: false, reason: "cancelled" });
   }
-  function flush(): Promise<PlanFlushResult> {
+  function flush(
+    options: { createDraft?: boolean } = {},
+  ): Promise<PlanFlushResult> {
     if (disposed || !active)
       return Promise.resolve({ ok: false, reason: "cancelled" });
-    if (pendingFlush) return pendingFlush.promise;
     const state = store.getState();
+    if (options.createDraft && state.draft === null)
+      createDraftEpoch = state.epoch;
+    if (pendingFlush) return pendingFlush.promise;
     if (state.saveState === "stale" || state.saveState === "error")
       return Promise.resolve({ ok: false, reason: state.saveState });
-    if (state.changeId === state.ackChangeId)
+    if (
+      state.changeId === state.ackChangeId &&
+      !inFlight &&
+      !(state.draft === null && createDraftEpoch === state.epoch)
+    )
       return Promise.resolve(cleanResult());
     let resolve!: (result: PlanFlushResult) => void;
     const promise = new Promise<PlanFlushResult>((done) => {
@@ -187,6 +203,7 @@ export function createPlanAutosave(
     dispose() {
       stop();
       disposed = true;
+      createDraftEpoch = null;
     },
   };
 }

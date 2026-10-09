@@ -143,6 +143,8 @@ export function createAction<Input, Output>(
             ["not_cancellable", "maintenance_state"].includes(
               error.details.message ?? "",
             )) ||
+          (code === "FORBIDDEN" &&
+            error.details.message === "files_disabled") ||
           (code === "OVER_CAPACITY" &&
             ["attendee_count", "participants"].includes(
               error.details.message ?? "",

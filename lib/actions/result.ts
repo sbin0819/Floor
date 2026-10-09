@@ -54,6 +54,7 @@ export type ActionErrorDetails = {
     | "space_full"
     | "call_full"
     | "storage_quota"
+    | "files_disabled"
     | "password_attempts"
     | "admin_teams"
     | "desk_per_person"

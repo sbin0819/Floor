@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { adminObjectKey, assertAdminObjectKey } from "@/lib/storage/admin-keys";
 import { createMemoryAdminObjectStorage } from "@/lib/storage/admin-memory";
 import {
+  AdminStorageMissingError,
   AdminStoragePreconditionError,
   InvalidPendingWebpError,
 } from "@/lib/storage/admin-types";
@@ -98,6 +99,14 @@ describe("pending WebP verification", () => {
     await expect(
       verifyPendingWebp(pending, { maxBytes: 30, head }, storage),
     ).rejects.toBeInstanceOf(AdminStoragePreconditionError);
+  });
+  it("distinguishes removal after HEAD from a changed ETag", async () => {
+    const storage = createMemoryAdminObjectStorage();
+    const head = storage.put(pending, webp());
+    await storage.remove(pending);
+    await expect(
+      verifyPendingWebp(pending, { maxBytes: 30, head }, storage),
+    ).rejects.toBeInstanceOf(AdminStorageMissingError);
   });
   it.each([
     { name: "missing", bytes: null, contentType: "image/webp", maxBytes: 30 },

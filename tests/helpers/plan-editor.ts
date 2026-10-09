@@ -108,5 +108,6 @@ export function planEditorFixture(): PlanEditorData {
       },
     ],
     canManageSpaces: true,
+    adminFilesEnabled: false,
   };
 }

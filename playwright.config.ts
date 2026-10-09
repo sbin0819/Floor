@@ -26,6 +26,10 @@ export default defineConfig({
         LIVEKIT_API_SECRET: "",
         FILE_STORAGE: "disabled",
         FILE_STORAGE_DIR: "",
+        R2_ENDPOINT: "",
+        R2_BUCKET: "",
+        R2_ACCESS_KEY_ID: "",
+        R2_SECRET_ACCESS_KEY: "",
       },
     },
     {

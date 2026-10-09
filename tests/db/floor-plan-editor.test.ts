@@ -333,6 +333,7 @@ describe("floor-plan draft editor", () => {
       updatedByName: "바뀐 편집자 이름",
     });
     expect(Object.keys(result).sort()).toEqual([
+      "adminFilesEnabled",
       "branch",
       "canManageSpaces",
       "draft",

@@ -14,6 +14,7 @@ import {
   Armchair,
   Spline,
   DoorOpen,
+  Ruler,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +30,11 @@ import { saveFloorPlanDraft } from "@/features/floor-plan/actions";
 import type { PlanEditorData } from "../editor-types";
 import type { SaveFloorPlanDraftInput } from "../editor-schema";
 import type { FloorPlanDocument, PlanPoint } from "@/lib/floor-plan/types";
-import type { PlanStates, PlanShapeState } from "@/lib/floor-plan/render/types";
+import type {
+  PlanStates,
+  PlanShapeState,
+  Point,
+} from "@/lib/floor-plan/render/types";
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
 import { hydrateSeatLabels } from "@/lib/floor-plan/seats";
 import { createPlanEditorStore, type PlanEditorSource } from "./store";
@@ -43,6 +48,7 @@ import {
 import { PlanEditorFrame } from "./editor-frame";
 import { EditorCanvas } from "./editor-canvas";
 import { EditorProperties } from "./editor-properties";
+import { BackgroundPanel } from "./background-panel";
 import { EditorConnectDialog } from "./editor-connect-dialog";
 import { SeatArrayPanel } from "./seat-array-panel";
 import { EditorPublishing, type EditorPublishReads } from "./editor-publishing";
@@ -121,6 +127,10 @@ function EditorWorkspace({
   reads?: EditorPublishReads;
 }) {
   const store = useEditorStore();
+  const epoch = useEditorValue((state) => state.epoch);
+  const draftPlanId = useEditorValue(
+    (state) => state.draft?.planId ?? state.basePlanId,
+  );
   const document = useEditorValue((state) => state.document);
   const selectedIds = useEditorValue((state) => state.selectedIds);
   const tool = useEditorValue((state) => state.tool);
@@ -144,6 +154,33 @@ function EditorWorkspace({
     seats: readonly FloorPlanDocument["seats"][number][];
   } | null>(null);
   const [focusIds, setFocusIds] = useState<readonly string[]>([]);
+  const [backgroundLocked, setBackgroundLocked] = useState(true);
+  const [backgroundUpload, setBackgroundUpload] = useState<{
+    epoch: number;
+    planId: string;
+    uploadId: string;
+  } | null>(null);
+  const [backgroundSize, setBackgroundSize] = useState<{
+    src: string;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [backgroundError, setBackgroundError] = useState(false);
+  const [scale, setScale] = useState<{
+    epoch: number;
+    points: readonly Point[];
+  } | null>(null);
+  const scalePoints = scale?.epoch === epoch ? scale.points : null;
+  const backgroundSrc =
+    draftPlanId && document.background
+      ? `/api/plan-backgrounds/${draftPlanId}?epoch=${epoch}${backgroundUpload?.epoch === epoch && backgroundUpload.planId === draftPlanId ? `&upload=${backgroundUpload.uploadId}` : ""}`
+      : null;
+  const previewDocument = useMemo(() => {
+    if (!document.background) return document;
+    const memberDocument = { ...document };
+    delete memberDocument.background;
+    return memberDocument;
+  }, [document]);
   const connectionRef = useRef<Connection | null>(null);
   const [reloadKey, setReloadKey] = useState<string | null>(null);
   const appliedReload = useRef<string | null>(null);
@@ -152,6 +189,22 @@ function EditorWorkspace({
     search = useSearchParams();
   const ownPath = `/admin/branches/${data.branch.id}/floors/${data.floor.id}/plan`;
   const isCurrentPath = pathname.replace(/\/$/, "").toLowerCase() === ownPath;
+  useEffect(() => {
+    const reset = () => {
+      setScale(null);
+      setBackgroundLocked(true);
+    };
+    const unsubscribe = store.subscribe((state, previous) => {
+      if (state.epoch !== previous.epoch || state.tool !== previous.tool)
+        reset();
+      else if (state.document.background !== previous.document.background)
+        setScale(null);
+    });
+    return () => {
+      unsubscribe();
+      reset();
+    };
+  }, [store, isCurrentPath]);
   const selectedArea =
     selectedIds.length === 1
       ? document.spaces.find(
@@ -436,6 +489,7 @@ function EditorWorkspace({
                 ["polygon", "다각형 공간 (P)", Pentagon],
                 ["wall", "벽 (W)", Spline],
                 ["opening", "문 (D)", DoorOpen],
+                ["background", "배경 축척 (M)", Ruler],
               ] as const
             ).map(([value, label, Icon]) => (
               <Button
@@ -463,7 +517,38 @@ function EditorWorkspace({
           </>
         }
         panel={
-          tool === "seat-array" && selectedArea ? (
+          tool === "background" ? (
+            <BackgroundPanel
+              enabled={data.adminFilesEnabled}
+              active={wide && isCurrentPath}
+              autosave={autosave}
+              locked={backgroundLocked}
+              onLockedChange={setBackgroundLocked}
+              scalePoints={scalePoints ?? []}
+              onScaleStart={() => {
+                setBackgroundLocked(false);
+                setScale({ epoch, points: [] });
+              }}
+              onScaleEnd={() => setScale(null)}
+              onUploaded={(result) => {
+                setBackgroundUpload({
+                  epoch,
+                  planId: result.planId,
+                  uploadId: result.uploadId,
+                });
+                setBackgroundSize({
+                  src: `/api/plan-backgrounds/${result.planId}?epoch=${epoch}&upload=${result.uploadId}`,
+                  width: result.width,
+                  height: result.height,
+                });
+                setBackgroundLocked(true);
+                setScale(null);
+              }}
+              imageSize={
+                backgroundSize?.src === backgroundSrc ? backgroundSize : null
+              }
+            />
+          ) : tool === "seat-array" && selectedArea ? (
             <SeatArrayPanel
               key={selectedArea.id}
               document={document}
@@ -518,6 +603,28 @@ function EditorWorkspace({
             onPolygon={openPolygon}
             focusIds={focusIds}
             onSeatArray={openSeatArray}
+            backgroundSrc={backgroundSrc}
+            backgroundLocked={backgroundLocked}
+            scalePoints={tool === "background" ? scalePoints : null}
+            onScaleCancel={() => setScale(null)}
+            onScalePoint={(point) =>
+              setScale((value) =>
+                value?.epoch === epoch
+                  ? {
+                      epoch,
+                      points:
+                        value.points.length < 2
+                          ? [...value.points, point]
+                          : [point],
+                    }
+                  : value,
+              )
+            }
+            onImageSize={(size) => {
+              if (backgroundSrc)
+                setBackgroundSize({ src: backgroundSrc, ...size });
+            }}
+            onBackgroundError={setBackgroundError}
             previewSeats={
               tool === "seat-array" &&
               arrayPreview?.document === document &&
@@ -533,6 +640,14 @@ function EditorWorkspace({
             className="absolute top-3 left-3 max-w-md rounded-lg border bg-background p-3 text-sm text-destructive"
           >
             {inputError}
+          </p>
+        )}
+        {document.background && backgroundError && (
+          <p
+            role="status"
+            className="absolute top-3 left-3 rounded-lg border bg-background p-3 text-sm"
+          >
+            배경을 불러오지 못했어요. 다른 도형은 계속 편집할 수 있어요.
           </p>
         )}
       </PlanEditorFrame>
@@ -561,7 +676,11 @@ function EditorWorkspace({
               초안의 모양만 확인해요. 모든 공간 상태는 비어 있음으로 표시해요.
             </DialogDescription>
           </DialogHeader>
-          <PlanCanvas document={document} states={states} onSelect={() => {}} />
+          <PlanCanvas
+            document={previewDocument}
+            states={states}
+            onSelect={() => {}}
+          />
         </DialogContent>
       </Dialog>
       <Dialog open={wide && saveState === "stale"}>

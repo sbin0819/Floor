@@ -1,5 +1,6 @@
 import { assertAdminObjectKey } from "./admin-keys";
 import {
+  AdminStorageMissingError,
   AdminStoragePreconditionError,
   type AdminObjectHead,
   type AdminObjectStorage,
@@ -46,7 +47,8 @@ export function createMemoryAdminObjectStorage() {
     async readRange(key, start, end, options) {
       assertAdminObjectKey(key);
       const object = objects.get(key);
-      if (!object || object.head.etag !== options.ifMatch)
+      if (!object) throw new AdminStorageMissingError();
+      if (object.head.etag !== options.ifMatch)
         throw new AdminStoragePreconditionError();
       return object.bytes.slice(start, end + 1);
     },

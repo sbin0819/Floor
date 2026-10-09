@@ -12,6 +12,7 @@ import {
 import { can } from "@/lib/permissions/can";
 import { loadPermissionContext } from "@/lib/permissions/context";
 import type { PermissionContext } from "@/lib/permissions/types";
+import { adminFilesEnabled } from "@/lib/storage/r2";
 import type { FloorPlanQueryDependencies } from "./query-factory";
 import { planEditorSchema, type PlanEditorInput } from "./editor-schema";
 import type { AdminPlansData, PlanEditorData } from "./editor-types";
@@ -78,6 +79,9 @@ export function createPlanEditorQueries(
           : null,
         spaces,
         canManageSpaces: can(context, "space.manage", { branchId }),
+        adminFilesEnabled: (
+          dependencies.adminFilesEnabled ?? adminFilesEnabled
+        )(),
       };
     },
     async getAdminPlans(input: string): Promise<AdminPlansData> {
