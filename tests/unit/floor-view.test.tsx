@@ -34,6 +34,9 @@ import {
 } from "@/features/bookings/components/floor-view";
 
 const route = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("@/features/floor-plan/use-floor-realtime", () => ({
+  useFloorRealtime: () => ({ flashSpaceIds: [] }),
+}));
 vi.mock("@/features/bookings/components/floor-day", () => ({
   FloorDay: () => <p>공간 목록 보기</p>,
 }));

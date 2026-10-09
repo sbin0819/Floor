@@ -8,7 +8,7 @@ import { getSpaceForAccess } from "@/lib/dal/spaces";
 import { can } from "@/lib/permissions/can";
 import { loadPermissionContext } from "@/lib/permissions/context";
 import { floorChannel } from "@/lib/realtime/channels";
-import { noopRealtime } from "@/lib/realtime/noop";
+import { getRealtimePublisher } from "@/lib/realtime/server";
 import type { RealtimePublisher } from "@/lib/realtime/types";
 
 export type AdminDependencies = Partial<ActionDependencies> & {
@@ -85,7 +85,7 @@ export async function publishAdminSpaceChange(
   dependencies: AdminDependencies,
 ) {
   try {
-    await (dependencies.publisher ?? noopRealtime).publish(
+    await (dependencies.publisher ?? getRealtimePublisher()).publish(
       floorChannel(floorId),
       {
         type: "space.status_changed",

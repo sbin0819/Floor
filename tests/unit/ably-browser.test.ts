@@ -57,6 +57,50 @@ afterEach(() => {
 });
 
 describe("Ably browser connection ownership", () => {
+  it("subscribes only to granted floor channels, reuses the grant during navigation, and detaches a revoked floor", async () => {
+    const { realtime, requestToken, client } = setup();
+    requestToken.mockResolvedValue({
+      ...fakeTokenRequest,
+      capability: JSON.stringify({
+        "user:user-a": ["subscribe"],
+        "floor:a": ["subscribe"],
+        "floor:b": ["subscribe"],
+      }),
+    });
+    const first = vi.fn();
+    const stop = realtime.subscribe("floor:a", first);
+    realtime.subscribe("floor:denied", vi.fn());
+    const presence = realtime.observePresence("floor:a", vi.fn());
+    presence.update({ typing: true });
+    realtime.start();
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith({
+      rooms: [],
+      spaces: [],
+    });
+    expect(client.channel("floor:a").subscribe).toHaveBeenCalledTimes(1);
+    expect(client.channel("floor:denied").subscribe).not.toHaveBeenCalled();
+    expect(client.channel("floor:a").presence.enter).not.toHaveBeenCalled();
+    client
+      .channel("floor:a")
+      .emit({ type: "booking.changed", spaceId: "space-a" });
+    expect(first).toHaveBeenCalledExactlyOnceWith({
+      type: "booking.changed",
+      spaceId: "space-a",
+    });
+    stop();
+    presence.close();
+    realtime.subscribe("floor:b", vi.fn());
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenCalledTimes(1);
+    expect(client.channel("floor:a").detach).toHaveBeenCalledTimes(1);
+    expect(client.channel("floor:b").subscribe).toHaveBeenCalledTimes(1);
+    requestToken.mockResolvedValue(fakeTokenFor({ rooms: [] }));
+    realtime.reauthorize?.();
+    await vi.runAllTimersAsync();
+    expect(client.channel("floor:b").detach).toHaveBeenCalledTimes(1);
+    expect(realtime.getScopeSnapshot?.().channels).not.toContain("floor:b");
+  });
   it("discards a preflight token invalidated by reauthorization with unchanged room input", async () => {
     const { realtime, requestToken, client } = setup();
     const pending = Promise.withResolvers<typeof fakeTokenRequest>();

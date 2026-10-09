@@ -4,6 +4,9 @@ import { FloorViews } from "@/features/bookings/components/floor-views";
 import { SpaceDetailContainer } from "@/features/bookings/components/space-detail-container";
 import { floorDayFixture } from "./booking-ui-fixtures";
 
+vi.mock("@/features/floor-plan/use-floor-realtime", () => ({
+  useFloorRealtime: () => ({ flashSpaceIds: [] }),
+}));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams("view=timeline&space=secret"),
   useParams: () => ({ branchId: "branch", floorId: "floor" }),

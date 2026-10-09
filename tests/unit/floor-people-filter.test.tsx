@@ -21,6 +21,9 @@ import { floorDayFixture } from "./booking-ui-fixtures";
 import type { FloorDayData } from "@/features/bookings/types";
 
 const route = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+vi.mock("@/features/floor-plan/use-floor-realtime", () => ({
+  useFloorRealtime: () => ({ flashSpaceIds: [] }),
+}));
 vi.mock("next/navigation", () => ({
   useSelectedLayoutSegments: () => ["floors", "floor"],
   usePathname: () => window.location.pathname,

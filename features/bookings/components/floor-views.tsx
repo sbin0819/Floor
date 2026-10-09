@@ -13,6 +13,7 @@ import { useFloorSelection } from "./branch-workspace";
 import { ClosedFloorDay } from "./closed-floor-day";
 import { FloorPeopleLink, FloorPeopleNotice } from "./floor-people-filter";
 import { FloorPlanView } from "@/features/floor-plan/components/floor-plan-view";
+import { useFloorRealtime } from "@/features/floor-plan/use-floor-realtime";
 
 export function FloorViews({
   data,
@@ -21,6 +22,7 @@ export function FloorViews({
   data: FloorDayData;
   initialView: FloorView | null;
 }) {
+  useFloorRealtime(data);
   const { effectiveView: view } = useFloorView(
     initialView,
     Boolean(data.floor.plan),

@@ -5,7 +5,10 @@ import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
 import { canReadRoom } from "@/lib/dal/chat-access";
 import { listRealtimeSpaces } from "@/lib/dal/chat-presence";
+import { readRealtimeFloorAccess } from "@/lib/dal/realtime-floors";
 import type { DalDatabase } from "@/lib/dal/database";
+import { can } from "@/lib/permissions/can";
+import { canAccessFloor } from "@/lib/permissions/can-access";
 import { getEnv } from "@/lib/env";
 import {
   createMemoryRateLimiter,
@@ -14,6 +17,7 @@ import {
 } from "@/lib/rate-limit/memory";
 import { createAblyRestClient } from "@/lib/realtime/ably-server";
 import {
+  floorChannel,
   roomChannel,
   spaceChannel,
   userChannel,
@@ -71,6 +75,18 @@ export function createRealtimeToken(
           for (const { id, kind } of spaces)
             capability[spaceChannel(id)] =
               kind === "branch" ? ["subscribe"] : ["subscribe", "presence"];
+        },
+      ),
+      readRealtimeFloorAccess(session.userId, dependencies.database).then(
+        ({ context, floors }) => {
+          for (const floor of floors
+            .filter(
+              (floor) =>
+                can(context, "floor.view", { branchId: floor.branchId }) &&
+                canAccessFloor(context, floor),
+            )
+            .slice(0, 200))
+            capability[floorChannel(floor.id)] = ["subscribe"];
         },
       ),
     ]);

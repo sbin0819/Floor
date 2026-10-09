@@ -3,7 +3,6 @@ import type { LiveKitServer } from "@/lib/calls/types";
 import { evictCalls } from "@/lib/calls/evict";
 import type { DalDatabase, TransactionDatabase } from "@/lib/dal";
 import { floorChannel } from "@/lib/realtime/channels";
-import { noopRealtime } from "@/lib/realtime/noop";
 import { getRealtimePublisher } from "@/lib/realtime/server";
 import type { RealtimeItem, RealtimePublisher } from "@/lib/realtime/types";
 
@@ -60,7 +59,7 @@ export async function publishBookingChange(
   dependencies: BookingDependencies,
 ) {
   try {
-    await (dependencies.publisher ?? noopRealtime).publish(
+    await (dependencies.publisher ?? getRealtimePublisher()).publish(
       floorChannel(floorId),
       { type: "booking.changed", spaceId },
     );
