@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+test("프로덕션에서는 개발용 평면도 성능 측정 화면을 공개하지 않아요", async ({
+  request,
+}) => {
+  const response = await request.get("/dev/stress-render", {
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(404);
+});
+
 test("비로그인 팀 설정은 로그인 복귀 주소와 탭을 보존해요", async ({
   page,
 }) => {
