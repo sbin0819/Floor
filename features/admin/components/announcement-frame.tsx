@@ -26,7 +26,7 @@ export function AnnouncementColumns({
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
       <section
         aria-labelledby="announcement-compose-title"
-        className="min-w-0 rounded-xl border bg-card p-4 shadow-sm sm:p-6"
+        className="min-w-0 rounded-xl border bg-card p-4 shadow-card sm:p-6"
       >
         <h2 id="announcement-compose-title" className="mb-6 text-lg font-bold">
           공지 보내기
@@ -35,7 +35,7 @@ export function AnnouncementColumns({
       </section>
       <section
         aria-labelledby="announcement-history-title"
-        className="min-w-0 rounded-xl border bg-card p-4 shadow-sm sm:p-6"
+        className="min-w-0 rounded-xl border bg-card p-4 shadow-card sm:p-6"
       >
         <h2 id="announcement-history-title" className="mb-4 text-lg font-bold">
           보낸 공지

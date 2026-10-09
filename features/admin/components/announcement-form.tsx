@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MessageBody } from "@/features/chat/components/message-body";
-import { sendAnnouncement } from "../announcement-actions";
+import { sendAnnouncement } from "@/features/admin/announcement-actions";
 import {
   previewAnnouncementAudienceSchema,
   sendAnnouncementSchema,
