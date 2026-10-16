@@ -113,6 +113,7 @@ function QuickSwitcherSession({
     queryKey: ["people", "contacts", userId],
     queryFn: ({ signal }) => readContacts(signal),
     enabled: open,
+    subscribed: open,
     staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,

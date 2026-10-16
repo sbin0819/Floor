@@ -37,6 +37,7 @@ describe("one client call lifetime", () => {
     expect(dependencies.post).toHaveBeenCalledWith(
       "heartbeat",
       "participant-a",
+      expect.any(AbortSignal),
     );
     expect(room.disconnect).not.toHaveBeenCalled();
     await controller.leave();
@@ -187,6 +188,7 @@ describe("one client call lifetime", () => {
     expect(dependencies.post).toHaveBeenCalledExactlyOnceWith(
       "heartbeat",
       "participant-a",
+      expect.any(AbortSignal),
     );
     heartbeat.resolve(404);
     await vi.advanceTimersByTimeAsync(0);

@@ -94,7 +94,11 @@ export type CallSnapshot = {
 export type CallDependencies = {
   loadLiveKit: LoadLiveKit;
   join: (roomId: string) => Promise<ActionResult<JoinedCall>>;
-  post: (path: "leave" | "heartbeat", participantId: string) => Promise<number>;
+  post: (
+    path: "leave" | "heartbeat",
+    participantId: string,
+    signal?: AbortSignal,
+  ) => Promise<number>;
   beacon: (participantId: string) => void;
   readDevices: () => CallDevices | null;
   saveDevices: (devices: CallDevices) => void;

@@ -6,7 +6,11 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  QueryObserver,
+} from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   QuickSwitcher,
@@ -114,6 +118,47 @@ async function search(value: string) {
 }
 
 describe("quick switch command dialog", () => {
+  it("aborts its pending contacts read on close and starts a fresh read on reopen", async () => {
+    const signals: AbortSignal[] = [];
+    const read = vi.fn((signal: AbortSignal): Promise<MessageContact[]> => {
+      signals.push(signal);
+      return new Promise(() => {});
+    });
+    mount({ read });
+    await show();
+    await waitFor(() => expect(signals).toHaveLength(1));
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(signals[0]!.aborted).toBe(true));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await show();
+    await waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[1]!.aborted).toBe(false);
+  });
+
+  it("does not cancel a shared contacts request while another observer still needs it", async () => {
+    let signal: AbortSignal | undefined;
+    const read = vi.fn((nextSignal: AbortSignal): Promise<MessageContact[]> => {
+      signal = nextSignal;
+      return new Promise(() => {});
+    });
+    const { client } = mount({ read });
+    await show();
+    await waitFor(() => expect(read).toHaveBeenCalledOnce());
+    const observer = new QueryObserver(client, {
+      queryKey: ["people", "contacts", id(100)],
+      queryFn: ({ signal }) => read(signal),
+      retry: false,
+    });
+    const stop = observer.subscribe(() => {});
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(signal?.aborted).toBe(false);
+    expect(read).toHaveBeenCalledOnce();
+    stop();
+    expect(signal?.aborted).toBe(true);
+  });
   it("captures shortcuts inside textarea, prevents the browser action, toggles and restores focus", async () => {
     mount();
     const input = screen.getByRole("textbox", { name: "메시지 입력" });

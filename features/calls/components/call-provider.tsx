@@ -45,33 +45,9 @@ import type {
   MediaTrack,
 } from "../client/types";
 import { DeviceCheck } from "./device-check";
+import { beaconLeave, postCall } from "../client/transport";
 
 const CallContext = createContext<CallController | null>(null);
-async function postCall(path: "leave" | "heartbeat", participantId: string) {
-  return (
-    await fetch(`/api/calls/${path}`, {
-      method: "POST",
-      credentials: "same-origin",
-      keepalive: true,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ participantId }),
-    })
-  ).status;
-}
-function beaconLeave(participantId: string) {
-  try {
-    if (
-      navigator.sendBeacon?.(
-        "/api/calls/leave",
-        new Blob([JSON.stringify({ participantId })], {
-          type: "application/json",
-        }),
-      )
-    )
-      return;
-  } catch {}
-  void postCall("leave", participantId).catch(() => {});
-}
 export function CallProvider({
   children,
   loadLiveKit = defaultLoadLiveKit,

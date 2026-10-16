@@ -36,6 +36,7 @@ type Connection = {
   unsubscribe: () => void;
   heartbeat: ReturnType<typeof setInterval> | null;
   beating: boolean;
+  heartbeatRequest: AbortController | null;
 };
 
 export function createCallController(deps: CallDependencies) {
@@ -119,6 +120,8 @@ export function createCallController(deps: CallDependencies) {
     if (!prior) return;
     prior.unsubscribe();
     if (prior.heartbeat) clearInterval(prior.heartbeat);
+    prior.heartbeatRequest?.abort();
+    prior.heartbeatRequest = null;
     try {
       await prior.room.disconnect();
     } catch {}
@@ -315,6 +318,7 @@ export function createCallController(deps: CallDependencies) {
         unsubscribe: () => {},
         heartbeat: null,
         beating: false,
+        heartbeatRequest: null,
       };
       active = connection;
       connection.unsubscribe = room.subscribe((event) =>
@@ -342,15 +346,23 @@ export function createCallController(deps: CallDependencies) {
       connection.heartbeat = setInterval(async () => {
         if (!current(connection) || connection.beating) return;
         connection.beating = true;
+        const request = new AbortController();
+        connection.heartbeatRequest = request;
         try {
           if (
-            (await deps.post("heartbeat", connection.participantId)) === 404 &&
+            (await deps.post(
+              "heartbeat",
+              connection.participantId,
+              request.signal,
+            )) === 404 &&
             current(connection)
           )
             await endConnection(connection, "removed");
         } catch {
         } finally {
           connection.beating = false;
+          if (connection.heartbeatRequest === request)
+            connection.heartbeatRequest = null;
         }
       }, 30_000);
       armIdle(connection);
