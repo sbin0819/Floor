@@ -1,13 +1,23 @@
+import { UPLOAD_TIMEOUT_MS } from "@/lib/http/config";
+import { ApiError } from "@/lib/http/errors";
+
 export type UploadToR2Options = {
   onProgress?: (percent: number) => void;
   signal?: AbortSignal;
   createXhr?: () => XMLHttpRequest;
 };
 
-export class R2UploadError extends Error {
-  constructor(readonly status: number) {
-    super("이미지를 올리지 못했어요. 다시 시도해 주세요.");
+export class R2UploadError extends ApiError {
+  constructor(
+    readonly status: number,
+    kind: "http" | "network" | "timeout" = status === 0 ? "network" : "http",
+  ) {
+    super(kind, { status });
     this.name = "R2UploadError";
+    this.message =
+      kind === "timeout"
+        ? "이미지를 올리는 시간이 초과됐어요. 다시 시도해 주세요."
+        : "이미지를 올리지 못했어요. 다시 시도해 주세요.";
   }
 }
 
@@ -17,47 +27,70 @@ function attempt(url: string, blob: Blob, options: UploadToR2Options) {
       reject(new DOMException("Aborted", "AbortError"));
       return;
     }
-    const xhr = options.createXhr?.() ?? new XMLHttpRequest();
+    let xhr: XMLHttpRequest | undefined;
     let finished = false;
+    const stop = () => {
+      try {
+        xhr?.abort();
+      } catch {
+        // 이미 끝난 요청의 abort 실패가 확정한 결과를 바꾸면 안 된다.
+      }
+    };
     const abort = () => {
-      xhr.abort();
+      if (finished) return;
       finish(new DOMException("Aborted", "AbortError"));
+      stop();
     };
     const finish = (error?: Error) => {
       if (finished) return;
       finished = true;
       options.signal?.removeEventListener("abort", abort);
-      xhr.onload = xhr.onerror = xhr.onabort = xhr.ontimeout = null;
-      xhr.upload.onprogress = null;
+      if (xhr) {
+        xhr.onload = xhr.onerror = xhr.onabort = xhr.ontimeout = null;
+        xhr.upload.onprogress = null;
+      }
       if (error) reject(error);
       else resolve();
     };
+    const reportProgress = (percent: number) => {
+      if (finished) return;
+      try {
+        options.onProgress?.(percent);
+      } catch {
+        finish(new R2UploadError(0));
+        stop();
+      }
+    };
     try {
-      xhr.open("PUT", url);
-      xhr.timeout = 120_000;
-      xhr.setRequestHeader("Content-Type", "image/webp");
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && event.total > 0)
-          options.onProgress?.(
+      const request = (xhr = options.createXhr?.() ?? new XMLHttpRequest());
+      request.open("PUT", url);
+      request.timeout = UPLOAD_TIMEOUT_MS;
+      request.setRequestHeader("Content-Type", "image/webp");
+      request.upload.onprogress = (event) => {
+        if (!finished && event.lengthComputable && event.total > 0)
+          reportProgress(
             Math.max(
               0,
               Math.min(100, Math.round((event.loaded / event.total) * 100)),
             ),
           );
       };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          options.onProgress?.(100);
+      request.onload = () => {
+        if (finished) return;
+        if (request.status >= 200 && request.status < 300) {
+          reportProgress(100);
           finish();
-        } else finish(new R2UploadError(xhr.status));
+        } else finish(new R2UploadError(request.status));
       };
-      xhr.onerror = xhr.ontimeout = () => finish(new R2UploadError(0));
-      xhr.onabort = () => finish(new DOMException("Aborted", "AbortError"));
+      request.onerror = () => finish(new R2UploadError(0));
+      request.ontimeout = () => finish(new R2UploadError(0, "timeout"));
+      request.onabort = () => finish(new DOMException("Aborted", "AbortError"));
       options.signal?.addEventListener("abort", abort, { once: true });
       if (options.signal?.aborted) abort();
-      else xhr.send(blob);
+      else request.send(blob);
     } catch {
       finish(new R2UploadError(0));
+      stop();
     }
   });
 }

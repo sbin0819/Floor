@@ -25,7 +25,10 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
-function setup(upload: UploadFile = async () => undefined) {
+function setup(
+  upload: UploadFile = async () => undefined,
+  reportError?: (error: { code: "UNAUTHENTICATED" }) => boolean,
+) {
   const actions = {
     create: vi
       .fn<UploadActions["create"]>()
@@ -63,6 +66,7 @@ function setup(upload: UploadFile = async () => undefined) {
     actions,
     upload,
     notify,
+    reportError,
     objectUrls,
   });
   return { controller, actions, notify, objectUrls };
@@ -71,6 +75,51 @@ function setup(upload: UploadFile = async () => undefined) {
 describe("room-scoped upload workflow", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+  it("reports only a safe session code instead of duplicating the ordinary reservation toast", async () => {
+    const reportError = vi.fn(() => true);
+    const { controller, actions, notify } = setup(undefined, reportError);
+    actions.create.mockResolvedValue({
+      ok: false,
+      code: "UNAUTHENTICATED",
+      message: "private file or token details",
+    });
+    controller.add([file()]);
+    await flush();
+    expect(reportError).toHaveBeenCalledExactlyOnceWith({
+      code: "UNAUTHENTICATED",
+    });
+    expect(notify).not.toHaveBeenCalled();
+    expect(controller.getSnapshot()[0]).toMatchObject({
+      status: "failed",
+      error: "로그인이 필요해요. 다시 로그인해 주세요",
+    });
+    controller.dispose();
+  });
+  it.each(["reservation", "upload", "completion"] as const)(
+    "keeps intentional %s cancellation silent and retryable",
+    async (phase) => {
+      const reportError = vi.fn(() => true);
+      const upload = vi.fn<UploadFile>().mockResolvedValue();
+      const { controller, actions, notify } = setup(upload, reportError);
+      const error = new DOMException("Aborted", "AbortError");
+      if (phase === "reservation") actions.create.mockRejectedValueOnce(error);
+      else if (phase === "upload") upload.mockRejectedValueOnce(error);
+      else actions.complete.mockRejectedValueOnce(error);
+      controller.add([file()]);
+      await flush();
+      await vi.advanceTimersByTimeAsync(1000);
+      const item = controller.getSnapshot()[0]!;
+      expect(item.status).toBe("failed");
+      expect(item.error).toBeUndefined();
+      expect(reportError).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+      controller.retry(item.id);
+      await flush();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(controller.getSnapshot()[0]?.status).toBe("ready");
+      controller.dispose();
+    },
+  );
   it("reserves one batch, allows three PUTs at once and batches completions for one second", async () => {
     const waiting = Array.from({ length: 5 }, () => deferred<void>());
     let index = 0;
@@ -227,6 +276,30 @@ describe("room-scoped upload workflow", () => {
     expect(controller.getSnapshot()[0]?.status).toBe("ready");
     controller.dispose();
   });
+  it.each([
+    ["timeout", "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요"],
+    ["network", "연결을 확인한 뒤 다시 시도해 주세요"],
+  ] as const)(
+    "shows the common %s message without discarding the retryable target",
+    async (kind, message) => {
+      const upload = vi
+        .fn<UploadFile>()
+        .mockRejectedValue(new UploadHttpError(0, kind));
+      const { controller, actions, notify } = setup(upload);
+      controller.add([file()]);
+      await flush();
+      expect(controller.getSnapshot()[0]).toMatchObject({
+        status: "failed",
+        error: message,
+        target: { uploadUrl: "/upload" },
+      });
+      expect(actions.discard).not.toHaveBeenCalled();
+      expect(actions.complete).not.toHaveBeenCalled();
+      expect(upload).toHaveBeenCalledTimes(1);
+      expect(notify).not.toHaveBeenCalled();
+      controller.dispose();
+    },
+  );
   it("makes a new reservation after a retired target and after blocked completion", async () => {
     const upload = vi
       .fn<UploadFile>()

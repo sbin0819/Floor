@@ -1,7 +1,11 @@
 "use client";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useIsMutating, useMutation } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,6 +20,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import type { ActionResult } from "@/lib/actions/result";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 import { photoAltSchema } from "@/lib/photos/schema";
 import { toWebp, WebpConversionError } from "@/features/uploads/to-webp";
 import { uploadToR2 } from "@/features/uploads/upload-to-r2";
@@ -66,6 +73,7 @@ export function SpacePhotos({
 }) {
   const router = useRouter(),
     id = useId();
+  const client = useQueryClient();
   const [override, setOverride] = useState<{
     base: string;
     rows: AdminSpacePhoto[];
@@ -139,9 +147,9 @@ export function SpacePhotos({
       operation(),
   });
   const disabled = !canManage || pending || preparing;
-  function showError(text: string) {
+  function showError(text: string, failure?: unknown) {
     setError(text);
-    toast.error(text);
+    if (!notifySessionExpired(client, failure)) toast.error(text);
   }
   async function execute(
     operation: () => Promise<ActionResult<unknown>>,
@@ -159,7 +167,7 @@ export function SpacePhotos({
       if (!current(before)) return;
       if (!result.ok) {
         rollback?.();
-        showError(errorText(result));
+        showError(errorText(result), result);
         return;
       }
       success();
@@ -168,8 +176,14 @@ export function SpacePhotos({
     } catch (failure) {
       if (!current(before)) return;
       rollback?.();
-      if (!(failure instanceof DOMException && failure.name === "AbortError"))
-        showError("저장하지 못했어요. 잠시 뒤 다시 시도해 주세요");
+      if (!isRequestCanceled(failure))
+        showError(
+          errorMessage(
+            failure,
+            "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요",
+          ),
+          failure,
+        );
     } finally {
       if (lock.current === operationId) {
         lock.current = null;

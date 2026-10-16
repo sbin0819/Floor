@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
 import {
   createUploads,
   completeUploads,
@@ -28,6 +30,7 @@ const subscribeOnline = (listener: () => void) => {
 export const useUploadOnline = () =>
   useSyncExternalStore(subscribeOnline, online, onlineServer);
 export function useRoomUploads(roomId: string, unavailable: string | null) {
+  const client = useQueryClient();
   const uploads = useMemo(
     () =>
       createUploadController({
@@ -35,12 +38,13 @@ export function useRoomUploads(roomId: string, unavailable: string | null) {
         actions,
         upload: uploadFile,
         notify: (message) => toast.error(message),
+        reportError: (error) => notifySessionExpired(client, error),
         objectUrls: {
           create: (file) => URL.createObjectURL(file),
           revoke: (url) => URL.revokeObjectURL(url),
         },
       }),
-    [roomId],
+    [roomId, client],
   );
   useEffect(() => {
     uploads.activate();

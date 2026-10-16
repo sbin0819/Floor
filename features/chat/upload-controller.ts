@@ -1,4 +1,6 @@
 import type { ActionResult } from "@/lib/actions/result";
+import { errorMessage, isSessionExpired } from "@/lib/errors/messages";
+import { isRequestCanceled } from "@/lib/http/errors";
 import { isBlockedName, normalizeFileName } from "@/lib/storage/file-kind";
 import type { ChatAttachment } from "./types";
 import {
@@ -51,7 +53,7 @@ export function uploadActionError(
   if (result.message === "storage_quota") return uploadErrors.quota;
   if (result.code === "LIMIT_EXCEEDED") return uploadErrors.rate;
   if (result.code === "FORBIDDEN") return uploadErrors.request;
-  return uploadErrors.failed;
+  return errorMessage(result, uploadErrors.failed);
 }
 
 export function createUploadController(options: {
@@ -59,6 +61,7 @@ export function createUploadController(options: {
   actions: UploadActions;
   upload: UploadFile;
   notify: (message: string) => void;
+  reportError?: (error: { code: "UNAUTHENTICATED" }) => boolean;
   objectUrls: { create: (file: File) => string; revoke: (url: string) => void };
 }) {
   let items: UploadItem[] = [];
@@ -79,11 +82,22 @@ export function createUploadController(options: {
     );
     emit();
   };
+  const reportFailure = (error: unknown) =>
+    isSessionExpired(error)
+      ? (options.reportError?.({ code: "UNAUTHENTICATED" }) ?? false)
+      : false;
   const discard = (ids: string[]) => {
+    const version = generation;
     if (ids.length)
       void options.actions
         .discard({ attachmentIds: ids })
-        .catch(() => undefined);
+        .then((result) => {
+          if (active && version === generation && !result.ok)
+            reportFailure(result);
+        })
+        .catch((error: unknown) => {
+          if (active && version === generation) reportFailure(error);
+        });
   };
   const revoke = (item: UploadItem) => {
     if (item.previewUrl) options.objectUrls.revoke(item.previewUrl);
@@ -109,6 +123,7 @@ export function createUploadController(options: {
         attachmentIds: batch.map((item) => item.target!.attachmentId),
       });
       if (!active || version !== generation) return;
+      if (!result.ok) reportFailure(result);
       for (const item of batch) {
         if (!find(item.id)) continue;
         const value = result.ok
@@ -134,16 +149,20 @@ export function createUploadController(options: {
           change(item.id, { status: "failed", target: undefined, error });
         }
       }
-    } catch {
-      if (active && version === generation)
+    } catch (error) {
+      if (active && version === generation) {
+        reportFailure(error);
         for (const item of batch) {
           // 완료 응답이 끊겼다면 PUT을 덮어쓰지 않고 같은 ID로 완료부터 다시 확인한다.
           change(item.id, {
             status: "failed",
             progress: 100,
-            error: uploadErrors.failed,
+            error: isRequestCanceled(error)
+              ? undefined
+              : errorMessage(error, uploadErrors.failed),
           });
         }
+      }
     } finally {
       completing = false;
       scheduleComplete();
@@ -183,6 +202,11 @@ export function createUploadController(options: {
             controller.signal.aborted
           )
             return;
+          if (isRequestCanceled(error)) {
+            change(item.id, { status: "failed", error: undefined });
+            return;
+          }
+          reportFailure(error);
           if (error instanceof UploadHttpError && error.status === 409) {
             change(item.id, { status: "completing", progress: 100 });
             waiting.add(item.id);
@@ -194,7 +218,7 @@ export function createUploadController(options: {
             if (retired) discard([item.target!.attachmentId]);
             change(item.id, {
               status: "failed",
-              error: uploadErrors.failed,
+              error: errorMessage(error, uploadErrors.failed),
               ...(retired ? { target: undefined } : {}),
             });
           }
@@ -216,7 +240,7 @@ export function createUploadController(options: {
         if (active && version === generation) {
           const error = uploadActionError(result);
           batch.forEach((item) => change(item.id, { status: "failed", error }));
-          options.notify(error);
+          if (!reportFailure(result)) options.notify(error);
         }
         return;
       }
@@ -227,11 +251,18 @@ export function createUploadController(options: {
         else change(item.id, { target, status: "queued" });
       });
       pump();
-    } catch {
-      if (active && version === generation)
+    } catch (error) {
+      if (active && version === generation) {
+        reportFailure(error);
         batch.forEach((item) =>
-          change(item.id, { status: "failed", error: uploadErrors.failed }),
+          change(item.id, {
+            status: "failed",
+            error: isRequestCanceled(error)
+              ? undefined
+              : errorMessage(error, uploadErrors.failed),
+          }),
         );
+      }
     }
   }
   return {

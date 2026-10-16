@@ -15,6 +15,7 @@ import { toWebp, WebpConversionError } from "@/features/uploads/to-webp";
 import { uploadToR2 } from "@/features/uploads/upload-to-r2";
 import { toast } from "sonner";
 import type { ActionResult } from "@/lib/actions/result";
+import { ApiError } from "@/lib/http/errors";
 import {
   adminPhotosFixture,
   photoPath,
@@ -108,6 +109,26 @@ async function choose() {
   });
   await screen.findByRole("dialog", { name: "사진 설명" });
 }
+it.each([
+  ["timeout", "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요"],
+  ["network", "연결을 확인한 뒤 다시 시도해 주세요"],
+] as const)(
+  "shows a safe %s message after upload failure",
+  async (kind, message) => {
+    vi.mocked(uploadToR2).mockRejectedValueOnce(new ApiError(kind));
+    mount();
+    await choose();
+    fireEvent.change(screen.getByLabelText("설명"), {
+      target: { value: "사진 설명" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "사진 올리기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith(message);
+    expect(actions.confirmSpacePhotoUpload).not.toHaveBeenCalled();
+    expect(router.refresh).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("사진 고르기")).toBeEnabled();
+  },
+);
 it("shows labelled images and first cover without inventing stored file sizes", () => {
   mount();
   expect(screen.getAllByRole("article")).toHaveLength(3);
