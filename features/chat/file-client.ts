@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requestJson } from "@/lib/http/client";
 import { chatAttachmentSchema } from "./attachment-schema";
 import type { RoomFilesKind, RoomFilesPage } from "./file-types";
 
@@ -30,31 +31,17 @@ export type ReadRoomFiles = (
   query: { kind: RoomFilesKind; before?: string; signal?: AbortSignal },
 ) => Promise<RoomFilesPage>;
 
-export class RoomFilesReadError extends Error {
-  constructor(readonly status: number) {
-    super("파일을 불러오지 못했어요.");
-  }
-}
-
 export const fetchRoomFiles: ReadRoomFiles = async (
   roomId,
   { kind, before, signal },
 ) => {
   const search = new URLSearchParams({ kind });
   if (before) search.set("before", before);
-  const response = await fetch(
+  return requestJson(
     `/api/rooms/${encodeURIComponent(roomId)}/files?${search}`,
-    {
-      credentials: "same-origin",
-      cache: "no-store",
-      signal,
-    },
+    pageSchema,
+    { signal },
   );
-  if (!response.ok) throw new RoomFilesReadError(response.status);
-  const value: unknown = await response.json().catch(() => null);
-  const parsed = pageSchema.safeParse(value);
-  if (!parsed.success) throw new RoomFilesReadError(502);
-  return parsed.data;
 };
 
 export const roomFilesKey = (roomId: string) =>

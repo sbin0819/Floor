@@ -103,17 +103,15 @@ export async function requestJson<T>(
     fetchOptions: { cache: options.cache ?? "no-store" },
   });
   if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  let value: unknown;
   try {
-    value =
+    const value: unknown =
       typeof response.data === "string"
         ? JSON.parse(response.data)
         : response.data;
+    const result = schema.safeParse(value);
+    if (result.success) return result.data;
   } catch {
-    throw new ApiError("invalid_response", { status: response.status });
+    // 스키마 변환이 던진 오류에도 응답 내용이 들어갈 수 있어 밖으로 보내지 않는다.
   }
-  const result = schema.safeParse(value);
-  if (!result.success)
-    throw new ApiError("invalid_response", { status: response.status });
-  return result.data;
+  throw new ApiError("invalid_response", { status: response.status });
 }

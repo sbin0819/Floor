@@ -11,6 +11,12 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
+import {
+  notifySessionExpired,
+  sessionNoticeGeneration,
+} from "@/lib/errors/session-expired";
+import { fetchRealtimeToken } from "@/lib/realtime/ably-browser-client";
 
 import {
   createAblyBrowserRealtime,
@@ -39,12 +45,30 @@ const emptyScope = () => emptyScopeSnapshot;
 
 export function RealtimeProvider({
   children,
-  createRealtime = createAblyBrowserRealtime,
+  createRealtime,
 }: {
   children: ReactNode;
   createRealtime?: () => BrowserRealtime;
 }) {
-  const [realtime] = useState(createRealtime);
+  const queryClient = useContext(QueryClientContext);
+  const [realtime] = useState(
+    () =>
+      createRealtime?.() ??
+      createAblyBrowserRealtime({
+        requestToken: async (input, signal) => {
+          const generation = queryClient
+            ? sessionNoticeGeneration(queryClient)
+            : undefined;
+          try {
+            return await fetchRealtimeToken(input, signal);
+          } catch (error) {
+            if (!signal?.aborted && queryClient)
+              notifySessionExpired(queryClient, error, generation);
+            throw error;
+          }
+        },
+      }),
+  );
   useEffect(() => () => realtime.close(), [realtime]);
   return <RealtimeContext value={realtime}>{children}</RealtimeContext>;
 }

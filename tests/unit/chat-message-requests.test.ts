@@ -5,10 +5,10 @@ import {
   requestMessagePage,
 } from "@/features/chat/message-requests";
 import {
-  ChatReadError,
   type RoomMessagesPage,
   type fetchRoomMessagesPage,
 } from "@/features/chat/client";
+import { ApiError } from "@/lib/http/errors";
 
 const page: RoomMessagesPage = {
   messages: [],
@@ -74,6 +74,7 @@ describe("shared message request queue", () => {
     const first = requestMessagePage(client, "room", { before: 51 });
     const same = requestMessagePage(client, "room", { before: 51 });
     const another = requestMessagePage(other, "room", { before: 51 });
+    await flush();
     expect(fetcher).toHaveBeenCalledTimes(2);
     pending.resolve(page);
     await expect(Promise.all([first, same, another])).resolves.toEqual([
@@ -269,7 +270,9 @@ describe("shared message request queue", () => {
   it("routes a 429 retry through the same global cooldown and user-priority queue", async () => {
     const load = vi
       .fn<typeof fetchRoomMessagesPage>()
-      .mockRejectedValueOnce(new ChatReadError(429, 3_000))
+      .mockRejectedValueOnce(
+        new ApiError("http", { status: 429, retryAfterMs: 3_000 }),
+      )
       .mockResolvedValue(page);
     const queue = createMessageRequestQueue(load);
     const background = queue.request(
@@ -295,10 +298,12 @@ describe("shared message request queue", () => {
   });
 
   it("respects a second 429 cooldown for other entries even when the failing entry exhausts its retry", async () => {
-    const error = new ChatReadError(429, 4_000);
+    const error = new ApiError("http", { status: 429, retryAfterMs: 4_000 });
     const load = vi
       .fn<typeof fetchRoomMessagesPage>()
-      .mockRejectedValueOnce(new ChatReadError(429, 1_000))
+      .mockRejectedValueOnce(
+        new ApiError("http", { status: 429, retryAfterMs: 1_000 }),
+      )
       .mockRejectedValueOnce(error)
       .mockResolvedValue(page);
     const queue = createMessageRequestQueue(load);
@@ -324,7 +329,9 @@ describe("shared message request queue", () => {
         queue.request("room", { after }),
       ),
     );
-    load.mockRejectedValueOnce(new ChatReadError(429, 1_000));
+    load.mockRejectedValueOnce(
+      new ApiError("http", { status: 429, retryAfterMs: 1_000 }),
+    );
     const last = queue.request("room", { after: 49 });
     await flush();
     expect(load).toHaveBeenCalledTimes(50);

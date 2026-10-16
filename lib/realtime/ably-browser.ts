@@ -1,9 +1,9 @@
 import type { ConnectionState, TokenRequest } from "ably";
+import { ApiError, isRequestCanceled } from "@/lib/http/errors";
 
 import {
   fetchRealtimeToken,
   loadAblyBrowserClient,
-  RealtimeTokenError,
   type AblyBrowserClient,
   type BrowserAuthCallback,
   type BrowserChannel,
@@ -55,7 +55,7 @@ function grantedChannels(token: TokenRequest) {
     typeof capability !== "object" ||
     Array.isArray(capability)
   )
-    throw new RealtimeTokenError(502);
+    throw new ApiError("invalid_response");
   const channels = new Set<string>();
   const presenceChannels = new Set<string>();
   for (const [name, operations] of Object.entries(capability)) {
@@ -63,7 +63,7 @@ function grantedChannels(token: TokenRequest) {
       !Array.isArray(operations) ||
       !operations.every((operation) => typeof operation === "string")
     )
-      throw new RealtimeTokenError(502);
+      throw new ApiError("invalid_response");
     if (!name.includes("*") && operations.includes("subscribe"))
       channels.add(name);
     if (!name.includes("*") && operations.includes("presence"))
@@ -78,7 +78,10 @@ export function createAblyBrowserRealtime({
   debounceMs = 25,
 }: {
   loadClient?: (callback: BrowserAuthCallback) => Promise<AblyBrowserClient>;
-  requestToken?: (input: RealtimeTokenInput) => Promise<TokenRequest>;
+  requestToken?: (
+    input: RealtimeTokenInput,
+    signal?: AbortSignal,
+  ) => Promise<TokenRequest>;
   debounceMs?: number;
 } = {}): BrowserRealtime {
   const listeners = new Map<string, Set<(event: RealtimeEvent) => void>>();
@@ -103,6 +106,12 @@ export function createAblyBrowserRealtime({
   let failureScope: string | undefined;
   let recoveredFailure = false;
   const failedChannels = new Set<string>();
+  const pendingAuthentications = new Set<object>();
+  const tokenRequests = new Set<{
+    controller: AbortController;
+    scope: string;
+    revision: number;
+  }>();
 
   const setState = (next: RealtimeConnectionState) => {
     if (next === state) return;
@@ -122,8 +131,39 @@ export function createAblyBrowserRealtime({
     spaces: channelIds("space:"),
   });
 
+  async function requestScopedToken(
+    input: RealtimeTokenInput,
+    revision: number,
+  ) {
+    const request = {
+      controller: new AbortController(),
+      scope: JSON.stringify(input),
+      revision,
+    };
+    tokenRequests.add(request);
+    try {
+      return await requestToken(input, request.controller.signal);
+    } finally {
+      tokenRequests.delete(request);
+    }
+  }
+
+  function abortObsoleteTokens(all = false) {
+    const scope = JSON.stringify(currentChannels());
+    for (const request of tokenRequests) {
+      if (
+        all ||
+        request.scope !== scope ||
+        request.revision !== authorizationRevision
+      )
+        request.controller.abort();
+    }
+  }
+
   function resetClient() {
     generation += 1;
+    abortObsoleteTokens(true);
+    pendingAuthentications.clear();
     clearTimeout(timer);
     timer = undefined;
     stopConnection?.();
@@ -157,7 +197,8 @@ export function createAblyBrowserRealtime({
 
   function stopForAuth(error: unknown) {
     if (
-      error instanceof RealtimeTokenError &&
+      error instanceof ApiError &&
+      error.kind === "http" &&
       (error.status === 401 || error.status === 503)
     ) {
       close();
@@ -169,6 +210,7 @@ export function createAblyBrowserRealtime({
 
   function schedule() {
     dirty = true;
+    abortObsoleteTokens();
     if (!active || timer || running) return;
     timer = setTimeout(() => {
       timer = undefined;
@@ -184,17 +226,34 @@ export function createAblyBrowserRealtime({
     try {
       // 키가 없는 환경에서는 SDK를 불러오거나 Ably에 연결하지 않는다.
       firstToken = {
-        token: await requestToken(firstInput),
+        token: await requestScopedToken(firstInput, firstRevision),
         scope: JSON.stringify(firstInput),
         revision: firstRevision,
       };
     } catch (error) {
-      if (version !== generation || !active || stopForAuth(error)) return;
+      if (
+        version !== generation ||
+        !active ||
+        firstRevision !== authorizationRevision ||
+        JSON.stringify(firstInput) !== JSON.stringify(currentChannels()) ||
+        isRequestCanceled(error) ||
+        stopForAuth(error)
+      )
+        return;
     }
     if (version !== generation || !active) return;
     const nextClient = await loadClient((callback) => {
+      const authentication = {};
+      pendingAuthentications.add(authentication);
+      let replied = false;
+      const reply: typeof callback = (error, token) => {
+        if (replied) return;
+        replied = true;
+        pendingAuthentications.delete(authentication);
+        callback(error, token);
+      };
       if (!active || version !== generation) {
-        callback("실시간 연결이 종료되었어요.", null);
+        reply("실시간 연결이 종료되었어요.", null);
         return;
       }
       const provideToken = async () => {
@@ -205,10 +264,24 @@ export function createAblyBrowserRealtime({
           const cached = firstToken;
           firstToken = undefined;
           // SDK 로딩·연결을 기다리는 동안 바뀐 선택에 이전 토큰을 넘기지 않는다.
-          const token =
-            cached?.scope === scope && cached.revision === revision
-              ? cached.token
-              : await requestToken(input);
+          let token: TokenRequest;
+          try {
+            token =
+              cached?.scope === scope && cached.revision === revision
+                ? cached.token
+                : await requestScopedToken(input, revision);
+          } catch (error) {
+            if (
+              !active ||
+              version !== generation ||
+              JSON.stringify(currentChannels()) !== scope ||
+              revision !== authorizationRevision
+            )
+              continue;
+            if (!isRequestCanceled(error)) stopForAuth(error);
+            reply("실시간 인증을 완료하지 못했어요.", null);
+            return;
+          }
           if (!active || version !== generation) break;
           if (
             JSON.stringify(currentChannels()) !== scope ||
@@ -221,15 +294,14 @@ export function createAblyBrowserRealtime({
             authorization.presenceChannels,
             input.rooms,
           );
-          callback(null, token);
+          reply(null, token);
           schedule();
           return;
         }
-        callback("실시간 연결이 종료되었어요.", null);
+        reply("실시간 연결이 종료되었어요.", null);
       };
-      void provideToken().catch((error: unknown) => {
-        if (version === generation) stopForAuth(error);
-        callback("실시간 인증을 완료하지 못했어요.", null);
+      void provideToken().catch(() => {
+        reply("실시간 인증을 완료하지 못했어요.", null);
       });
     });
     if (version !== generation || !active) {
@@ -290,6 +362,8 @@ export function createAblyBrowserRealtime({
       }
       if (!active || version !== generation) return;
       if (authorization?.scope !== desiredChannels) {
+        // SDK의 최초 인증이 아직 진행 중이면 같은 범위의 토큰을 또 요청하지 않는다.
+        if (pendingAuthentications.size) return;
         await client.authorize();
       }
       if (!active || version !== generation) return;

@@ -341,9 +341,15 @@ describe("published plan selection validation", () => {
     expect(fetch).not.toHaveBeenCalled();
     rerender({ data: published(initial) });
     await commit();
-    expect(fetch).toHaveBeenCalledWith("/api/floor-plans/plan-2", {
-      signal: expect.any(AbortSignal),
-    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/floor-plans/plan-2",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        cache: "default",
+        credentials: "same-origin",
+        method: "GET",
+      }),
+    );
     expect(mocks.change).toHaveBeenCalledExactlyOnceWith(
       { floorId: "floor", date: initial.date, spaceId: null, detail: false },
       `/branches/branch/floors/floor?date=${initial.date}&view=timeline&people=6`,

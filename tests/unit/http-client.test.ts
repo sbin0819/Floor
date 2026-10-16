@@ -128,6 +128,25 @@ describe("browser JSON client", () => {
       expect(String(error) + JSON.stringify(error)).not.toContain(body);
     },
   );
+  it("sanitizes exceptions thrown inside a Zod response transform", async () => {
+    const privateValue = "private@ai.com signed-url-secret";
+    const transformed = z.object({
+      value: z.string().transform((value): unknown => JSON.parse(value)),
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ value: privateValue })),
+    );
+    const error: unknown = await requestJson("/api/example", transformed).catch(
+      (failure: unknown) => failure,
+    );
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ kind: "invalid_response", status: 200 });
+    expect(error).not.toHaveProperty("cause");
+    expect(String(error) + JSON.stringify(error)).not.toMatch(
+      /private@|signed-url/,
+    );
+  });
   it("normalizes network errors without keeping the original cause", async () => {
     vi.stubGlobal(
       "fetch",
@@ -205,6 +224,46 @@ describe("browser JSON client", () => {
     await requestJson("/api/example", schema, { signal: controller.signal });
     await vi.advanceTimersByTimeAsync(0);
     expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("keeps the deadline active while a successful response body is stalled", async () => {
+    vi.useFakeTimers();
+    let transportSignal: AbortSignal | null | undefined;
+    let response: Response | undefined;
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      transportSignal = init.signal;
+      response = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"value":'));
+            init.signal?.addEventListener(
+              "abort",
+              () => controller.error(init.signal?.reason),
+              { once: true },
+            );
+          },
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+      return response;
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const rejected = expect(
+      requestJson("/api/example", schema),
+    ).rejects.toMatchObject({
+      kind: "timeout",
+      status: undefined,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(response?.status).toBe(200);
+    expect(response?.bodyUsed).toBe(true);
+    await vi.advanceTimersByTimeAsync(HTTP_TIMEOUT_MS - 1);
+    expect(transportSignal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await rejected;
+    expect(transportSignal?.aborted).toBe(true);
+    expect(fetcher).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(0);
     expect(vi.getTimerCount()).toBe(0);
   });
   it("parses Retry-After seconds/date safely and recognizes only cancellation", () => {

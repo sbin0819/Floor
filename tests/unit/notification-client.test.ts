@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  fetchNotificationSummary,
-  NotificationFetchError,
-} from "@/features/notifications/client";
+import { fetchNotificationSummary } from "@/features/notifications/client";
+import { ApiError } from "@/lib/http/errors";
 
 const data = {
   items: [],
@@ -17,11 +15,15 @@ describe("notification summary transport", () => {
     vi.stubGlobal("fetch", fetch);
     const signal = new AbortController().signal;
     expect(await fetchNotificationSummary(signal)).toEqual(data);
-    expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/notifications", {
-      signal,
-      cache: "no-store",
-      credentials: "same-origin",
-    });
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      "/api/notifications",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+      }),
+    );
   });
   it.each([401, 500])("hides HTTP %s response contents", async (status) => {
     vi.stubGlobal(
@@ -33,7 +35,8 @@ describe("notification summary transport", () => {
     const error = await fetchNotificationSummary(
       new AbortController().signal,
     ).catch((error: unknown) => error);
-    expect(error).toEqual(new NotificationFetchError(status));
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ kind: "http", status });
     expect(String(error)).not.toContain("private@example.com");
   });
   it.each([
@@ -44,7 +47,11 @@ describe("notification summary transport", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
     await expect(
       fetchNotificationSummary(new AbortController().signal),
-    ).rejects.toEqual(new NotificationFetchError(500));
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
   });
   it("rejects an external link and any private extra fields in notification data", async () => {
     const item = {
@@ -82,9 +89,17 @@ describe("notification summary transport", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(
       fetchNotificationSummary(new AbortController().signal),
-    ).rejects.toEqual(new NotificationFetchError(500));
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
     await expect(
       fetchNotificationSummary(new AbortController().signal),
-    ).rejects.toEqual(new NotificationFetchError(500));
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
   });
 });

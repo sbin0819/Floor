@@ -102,17 +102,22 @@ it("fetches and validates contacts without caching HTTP responses", async () => 
   vi.stubGlobal("fetch", fetch);
   const signal = new AbortController().signal;
   expect(await fetchMessageContacts(signal)).toEqual(contacts);
-  expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/people/contacts", {
-    signal,
-    cache: "no-store",
-    credentials: "same-origin",
-  });
+  expect(fetch).toHaveBeenCalledExactlyOnceWith(
+    "/api/people/contacts",
+    expect.objectContaining({
+      signal: expect.any(AbortSignal),
+      cache: "no-store",
+      credentials: "same-origin",
+      method: "GET",
+    }),
+  );
   fetch.mockResolvedValue(
     Response.json([{ ...contacts[0], email: "private@example.test" }]),
   );
   await expect(fetchMessageContacts(signal)).rejects.toThrow();
   fetch.mockResolvedValue(new Response("secret error", { status: 503 }));
-  await expect(fetchMessageContacts(signal)).rejects.toThrow(
-    "사람 목록을 불러오지 못했어요",
-  );
+  await expect(fetchMessageContacts(signal)).rejects.toMatchObject({
+    kind: "http",
+    status: 503,
+  });
 });

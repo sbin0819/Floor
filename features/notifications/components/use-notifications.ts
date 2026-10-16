@@ -32,6 +32,10 @@ import {
   notificationReminderDelay,
 } from "../polling";
 import { useNotificationActivity } from "./use-notification-activity";
+import { ActionError } from "@/lib/actions/result";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 
 export const NOTIFICATION_SUMMARY_KEY = ["notifications", "summary"] as const;
 export const NOTIFICATION_LIST_KEY = ["notifications", "list"] as const;
@@ -156,7 +160,7 @@ export function useNotificationReads() {
         operation.kind === "all"
           ? await markAllNotificationsRead()
           : await markNotificationRead({ notificationId: operation.item.id });
-      if (!result.ok) throw new Error(readError);
+      if (!result.ok) throw new ActionError(result.code);
     },
     onMutate: async (operation) => {
       await client.cancelQueries({ queryKey: ["notifications"] });
@@ -173,13 +177,14 @@ export function useNotificationReads() {
             : undefined,
         }));
     },
-    onError: (_error, _operation, snapshots) => {
+    onError: (error, _operation, snapshots) => {
       for (const snapshot of snapshots ?? []) {
         // 더 늦은 서버 응답이 온 경우에는 과거 목록으로 되돌리지 않는다.
         if (client.getQueryData(snapshot.key) === snapshot.optimistic)
           client.setQueryData(snapshot.key, snapshot.previous);
       }
-      toast.error(readError);
+      if (!isRequestCanceled(error) && !notifySessionExpired(client, error))
+        toast.error(errorMessage(error, readError));
     },
     onSettled: (_data, error) => {
       // 이 시점에는 읽음 mutation이 아직 pending이므로 다음 관찰 주기에 최신 요약을 읽는다.
@@ -231,6 +236,6 @@ export function useNotificationReads() {
     pending,
     activate,
     markAll: () => submit({ kind: "all" }),
-    message: mutation.isError ? readError : "",
+    message: mutation.isError ? errorMessage(mutation.error, readError) : "",
   };
 }

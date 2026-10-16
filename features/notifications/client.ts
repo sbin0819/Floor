@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
 import {
   bookingNotificationDataSchema,
   bookingNotificationTypes,
@@ -73,29 +74,9 @@ const summarySchema = z.strictObject({
   nextAt: instant.nullable(),
 });
 
-export class NotificationFetchError extends Error {
-  constructor(public readonly status: number) {
-    super("Notifications could not be loaded");
-    this.name = "NotificationFetchError";
-  }
-}
 export type FetchNotificationSummary = (
   signal: AbortSignal,
 ) => Promise<NotificationSummary>;
 
-export const fetchNotificationSummary: FetchNotificationSummary = async (
-  signal,
-) => {
-  const response = await fetch("/api/notifications", {
-    signal,
-    cache: "no-store",
-    credentials: "same-origin",
-  });
-  if (!response.ok) throw new NotificationFetchError(response.status);
-  const body: unknown = await response.json().catch(() => {
-    throw new NotificationFetchError(500);
-  });
-  const parsed = summarySchema.safeParse(body);
-  if (!parsed.success) throw new NotificationFetchError(500);
-  return parsed.data;
-};
+export const fetchNotificationSummary: FetchNotificationSummary = (signal) =>
+  requestJson("/api/notifications", summarySchema, { signal });

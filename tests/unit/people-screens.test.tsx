@@ -17,10 +17,8 @@ import {
   PeopleShell,
   PeopleSkeleton,
 } from "@/features/people/components/people-shell";
-import {
-  PeopleSearchError,
-  searchPeople,
-} from "@/features/people/components/people-search";
+import { searchPeople } from "@/features/people/components/people-search";
+import { ApiError } from "@/lib/http/errors";
 import {
   MessagePersonButton,
   type FriendActions,
@@ -263,7 +261,7 @@ describe("friends search, tabs and actions", () => {
     const search = vi
       .fn()
       .mockReturnValueOnce(pending.promise)
-      .mockRejectedValueOnce(new PeopleSearchError(429));
+      .mockRejectedValueOnce(new ApiError("http", { status: 429 }));
     const { user } = setup(
       <FriendsScreen
         data={{ ...data, rows: [] }}
@@ -478,7 +476,12 @@ describe("fixed shell and safe search client", () => {
     ).resolves.toHaveLength(1);
     expect(fetcher).toHaveBeenCalledWith(
       "/api/people/search?q=name%2Btag%40example.test",
-      { signal: controller.signal, cache: "no-store" },
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+      }),
     );
     await expect(searchPeople("name", controller.signal)).rejects.toThrow();
     fetcher.mockRestore();

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
 import type { ParticipantSearchResult } from "./participants";
 
 const resultSchema = z.strictObject({
@@ -13,31 +14,16 @@ const responseSchema = z.strictObject({
   results: z.array(resultSchema).max(8),
 });
 
-export class ParticipantSearchError extends Error {
-  constructor(public readonly status: number) {
-    super("Participant search failed");
-    this.name = "ParticipantSearchError";
-  }
-}
 export type SearchParticipants = (
   query: string,
   signal: AbortSignal,
 ) => Promise<ParticipantSearchResult[]>;
 
 export const fetchParticipants: SearchParticipants = async (query, signal) => {
-  const response = await fetch(
+  const response = await requestJson(
     `/api/participants/search?${new URLSearchParams({ q: query })}`,
-    {
-      signal,
-      cache: "no-store",
-      credentials: "same-origin",
-    },
+    responseSchema,
+    { signal },
   );
-  if (!response.ok) throw new ParticipantSearchError(response.status);
-  const body: unknown = await response.json().catch(() => {
-    throw new ParticipantSearchError(500);
-  });
-  const parsed = responseSchema.safeParse(body);
-  if (!parsed.success) throw new ParticipantSearchError(500);
-  return parsed.data.results;
+  return response.results;
 };

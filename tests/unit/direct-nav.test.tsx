@@ -802,11 +802,15 @@ describe("direct activity toasts and navigation", () => {
     vi.stubGlobal("fetch", fetch);
     const signal = new AbortController().signal;
     expect(await fetchChatNav(signal)).toEqual(data);
-    expect(fetch).toHaveBeenCalledWith("/api/chat/nav", {
-      signal,
-      cache: "no-store",
-      credentials: "same-origin",
-    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/chat/nav",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+      }),
+    );
   });
 });
 

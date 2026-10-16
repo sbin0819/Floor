@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/http/errors";
+import { errorMessage } from "@/lib/errors/messages";
 import {
   MAX_GUEST_PARTICIPANTS,
   MAX_PARTICIPANTS,
@@ -17,7 +19,6 @@ import {
 } from "@/features/bookings/participants";
 import {
   fetchParticipants,
-  ParticipantSearchError,
   type SearchParticipants,
 } from "@/features/bookings/participant-search-client";
 
@@ -69,6 +70,7 @@ export function ParticipantInput({
       search(participantQuerySchema.parse(queryRef.current), signal),
     enabled:
       open && valid && !disabled && !full && settledRevision === input.revision,
+    subscribed: open && valid && !disabled && !full,
     gcTime: 0,
     staleTime: 0,
     retry: false,
@@ -114,13 +116,12 @@ export function ParticipantInput({
     setAnnouncement(`${person.name} 님을 뺐어요`);
   };
   const failure =
-    results.error instanceof ParticipantSearchError &&
-    results.error.status === 429
+    results.error instanceof ApiError && results.error.status === 429
       ? "잠시 뒤 다시 찾아 주세요"
-      : results.error instanceof ParticipantSearchError &&
-          results.error.status === 401
-        ? "로그인이 필요해요. 다시 로그인해 주세요"
-        : "사람을 찾지 못했어요. 잠시 뒤 다시 찾아 주세요";
+      : errorMessage(
+          results.error,
+          "사람을 찾지 못했어요. 잠시 뒤 다시 찾아 주세요",
+        );
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">

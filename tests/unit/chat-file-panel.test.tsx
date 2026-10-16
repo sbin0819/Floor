@@ -13,6 +13,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { FilePanel } from "@/features/chat/components/file-panel";
 import { roomFilesKey, type ReadRoomFiles } from "@/features/chat/file-client";
 import type { RoomFile, RoomFilesPage } from "@/features/chat/file-types";
+import { ApiError } from "@/lib/http/errors";
 
 const roomId = "10000000-0000-4000-8000-000000000001";
 beforeEach(() => {
@@ -178,32 +179,43 @@ describe("room file panel", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps loaded rows when another page fails and retries without displaying server details", async () => {
-    const read = vi
-      .fn<ReadRoomFiles>()
-      .mockResolvedValueOnce({
-        files: [file(1)],
-        hasMore: true,
-        nextCursor: "99_0",
-      })
-      .mockRejectedValueOnce(new Error("private-storage-path"))
-      .mockResolvedValueOnce(page(file(2)));
-    show(read);
-    await userEvent.click(
-      await screen.findByRole("button", { name: "더 보기" }),
-    );
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "다음 파일을 불러오지 못했어요",
-    );
-    expect(
-      screen.getByRole("link", { name: "자료 1.pdf 내려받기" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/private-storage-path/u)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "더 보기" }));
-    expect(
-      await screen.findByRole("link", { name: "자료 2.pdf 내려받기" }),
-    ).toBeInTheDocument();
-  });
+  it.each([
+    [new Error("private-storage-path"), "다음 파일을 불러오지 못했어요"],
+    [
+      new ApiError("timeout"),
+      "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요",
+    ],
+    [new ApiError("network"), "연결을 확인한 뒤 다시 시도해 주세요"],
+  ])(
+    "keeps loaded rows when another page fails with %s and permits retry",
+    async (error, message) => {
+      error.message = "private-storage-path";
+      const read = vi
+        .fn<ReadRoomFiles>()
+        .mockResolvedValueOnce({
+          files: [file(1)],
+          hasMore: true,
+          nextCursor: "99_0",
+        })
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce(page(file(2)));
+      show(read);
+      await userEvent.click(
+        await screen.findByRole("button", { name: "더 보기" }),
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(
+        screen.getByRole("link", { name: "자료 1.pdf 내려받기" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/private-storage-path/u),
+      ).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "더 보기" }));
+      expect(
+        await screen.findByRole("link", { name: "자료 2.pdf 내려받기" }),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("keeps existing inputs, rows and focus during a background refresh", async () => {
     const update = deferred<RoomFilesPage>();
@@ -303,23 +315,33 @@ describe("room file panel", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("does not show an empty-state message on an initial read failure and permits retry", async () => {
-    const read = vi
-      .fn<ReadRoomFiles>()
-      .mockRejectedValueOnce(new Error("private body"))
-      .mockResolvedValueOnce(page());
-    show(read);
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "파일을 불러오지 못했어요",
-    );
-    expect(
-      screen.queryByText("아직 올라온 파일이 없어요"),
-    ).not.toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole("button", { name: "다시 불러오기" }),
-    );
-    expect(
-      await screen.findByText("아직 올라온 파일이 없어요"),
-    ).toBeInTheDocument();
-  });
+  it.each([
+    [new Error("private body"), "파일을 불러오지 못했어요"],
+    [
+      new ApiError("timeout"),
+      "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요",
+    ],
+    [new ApiError("network"), "연결을 확인한 뒤 다시 시도해 주세요"],
+  ])(
+    "does not show an empty state on an initial %s and permits retry",
+    async (error, message) => {
+      error.message = "private body";
+      const read = vi
+        .fn<ReadRoomFiles>()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce(page());
+      show(read);
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(screen.queryByText("private body")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("아직 올라온 파일이 없어요"),
+      ).not.toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole("button", { name: "다시 불러오기" }),
+      );
+      expect(
+        await screen.findByText("아직 올라온 파일이 없어요"),
+      ).toBeInTheDocument();
+    },
+  );
 });

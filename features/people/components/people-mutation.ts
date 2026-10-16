@@ -5,6 +5,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ActionResult } from "@/lib/actions/result";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 
 export function peopleError(result: { code: string; message?: string }) {
   if (result.message === "friend_daily")
@@ -12,11 +15,9 @@ export function peopleError(result: { code: string; message?: string }) {
   if (result.message === "friend_cooldown")
     return "취소한 요청은 하루 뒤에 다시 보낼 수 있어요";
   if (result.code === "FORBIDDEN") return "친구 요청을 보낼 수 없어요";
-  if (result.code === "UNAUTHENTICATED")
-    return "로그인이 필요해요. 다시 로그인해 주세요";
   if (result.code === "NOT_FOUND")
     return "이미 처리됐거나 찾을 수 없는 항목이에요";
-  return "처리하지 못했어요. 다시 시도해 주세요";
+  return errorMessage(result, "처리하지 못했어요. 다시 시도해 주세요");
 }
 
 export function usePeopleMutation<T>(
@@ -51,7 +52,8 @@ export function usePeopleMutation<T>(
       const result = await mutation.mutateAsync(input);
       if (!scope.current) return;
       if (!result.ok) {
-        toast.error(errorText(result));
+        if (!notifySessionExpired(client, result))
+          toast.error(errorText(result));
         return;
       }
       const message =
@@ -61,8 +63,15 @@ export function usePeopleMutation<T>(
       void client.invalidateQueries({ queryKey: ["chat", "nav"] });
       router.refresh();
       return result;
-    } catch {
-      if (scope.current) toast.error("처리하지 못했어요. 다시 시도해 주세요");
+    } catch (error) {
+      if (
+        scope.current &&
+        !isRequestCanceled(error) &&
+        !notifySessionExpired(client, error)
+      )
+        toast.error(
+          errorMessage(error, "처리하지 못했어요. 다시 시도해 주세요"),
+        );
     } finally {
       locked.current = false;
     }

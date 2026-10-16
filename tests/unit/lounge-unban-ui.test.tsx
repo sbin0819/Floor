@@ -216,7 +216,7 @@ describe("lounge unban UI", () => {
       resolve({ ok: false, code: "FORBIDDEN", message: "private failure" }),
     );
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "이 작업을 할 수 없어요",
+      "이 작업을 할 권한이 없어요",
     );
     expect(screen.queryByText("private failure")).not.toBeInTheDocument();
     expect(screen.getByText(removed.name)).toBeVisible();

@@ -21,7 +21,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/features/chat/space-actions", () => ({ joinLounge: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const lounge = { spaceId: "lounge", joined: false };
 const frame = (children: React.ReactNode) => (
   <QueryClientProvider client={new QueryClient()}>
@@ -81,7 +81,10 @@ describe("branch lounge entry", () => {
   });
 
   it.each([
-    [{ ok: false, code: "UNAUTHENTICATED" }, "다시 로그인해 주세요"],
+    [
+      { ok: false, code: "UNAUTHENTICATED" },
+      "로그인이 필요해요. 다시 로그인해 주세요",
+    ],
     [
       { ok: false, code: "LIMIT_EXCEEDED", message: "space_join_count" },
       "스페이스에는 100개까지 들어갈 수 있어요",

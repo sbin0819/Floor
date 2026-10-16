@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchNotificationSummary } from "@/features/notifications/client";
 import { NotificationRow } from "@/features/notifications/components/notification-list";
 import { useNotificationToasts } from "@/features/notifications/components/use-notification-toasts";
+import { ApiError } from "@/lib/http/errors";
 import {
   notificationHref,
   notificationPresentation,
@@ -125,9 +126,14 @@ describe("person notification snapshots and presentation", () => {
         ),
       ),
     );
-    await expect(
-      fetchNotificationSummary(new AbortController().signal),
-    ).rejects.toMatchObject({ status: 500 });
+    const error: unknown = await fetchNotificationSummary(
+      new AbortController().signal,
+    ).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ kind: "invalid_response", status: 200 });
+    expect(String(error) + JSON.stringify(error)).not.toContain(
+      "private@example.test",
+    );
   });
 
   it("skips initial toasts and omits the description for newly published people alerts", () => {

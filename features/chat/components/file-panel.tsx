@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { errorMessage } from "@/lib/errors/messages";
 import {
   Tooltip,
   TooltipContent,
@@ -156,7 +157,7 @@ function FilePanelContent({
         ) : query.isError && !query.data ? (
           <div className="space-y-3">
             <p role="alert" className="text-sm text-muted-foreground">
-              파일을 불러오지 못했어요.
+              {errorMessage(query.error, "파일을 불러오지 못했어요.")}
             </p>
             <Button variant="outline" onClick={() => void query.refetch()}>
               다시 불러오기
@@ -185,7 +186,10 @@ function FilePanelContent({
         )}
         {query.isFetchNextPageError && (
           <p role="alert" className="mt-4 text-sm text-muted-foreground">
-            다음 파일을 불러오지 못했어요. 다시 시도해 주세요.
+            {errorMessage(
+              query.error,
+              "다음 파일을 불러오지 못했어요. 다시 시도해 주세요.",
+            )}
           </p>
         )}
         {query.hasNextPage && (

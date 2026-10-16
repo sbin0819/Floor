@@ -4,7 +4,7 @@ import {
   createAblyBrowserRealtime,
   type BrowserRealtime,
 } from "@/lib/realtime/ably-browser";
-import { RealtimeTokenError } from "@/lib/realtime/ably-browser-client";
+import { ApiError } from "@/lib/http/errors";
 import type { BrowserAuthCallback } from "@/lib/realtime/ably-browser-client";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
@@ -57,6 +57,163 @@ afterEach(() => {
 });
 
 describe("Ably browser connection ownership", () => {
+  it.each(
+    (["preflight", "renewal"] as const).flatMap((phase) =>
+      (["scope", "rights", "restart"] as const).flatMap((change) =>
+        [401, 503].map((status) => ({ phase, change, status })),
+      ),
+    ),
+  )(
+    "ignores late $status from obsolete $phase after $change even if abort is ignored",
+    async ({ phase, change, status }) => {
+      const { realtime, requestToken, client } = setup();
+      const pending = Promise.withResolvers<typeof fakeTokenRequest>();
+      const stop = realtime.subscribe("room:a", vi.fn());
+      if (phase === "renewal") {
+        realtime.start();
+        await vi.runAllTimersAsync();
+      }
+      requestToken.mockReturnValueOnce(pending.promise);
+      if (phase === "preflight") realtime.start();
+      else realtime.reauthorize?.();
+      await vi.advanceTimersByTimeAsync(25);
+      if (change === "scope") {
+        stop();
+        realtime.subscribe("room:b", vi.fn());
+      } else if (change === "rights") {
+        realtime.reauthorize?.();
+      } else {
+        realtime.close();
+        realtime.start();
+      }
+      pending.reject(new ApiError("http", { status }));
+      await vi.runAllTimersAsync();
+      expect(realtime.getSnapshot()).toBe("connected");
+      expect(requestToken).toHaveBeenCalledTimes(phase === "preflight" ? 2 : 3);
+      expect(
+        client.channel(change === "scope" ? "room:b" : "room:a").subscribe,
+      ).toHaveBeenCalled();
+      expect(client.close).toHaveBeenCalledTimes(
+        change === "restart" && phase === "renewal" ? 1 : 0,
+      );
+    },
+  );
+  it("aborts an obsolete preflight and starts only the latest scope without disabling auth", async () => {
+    const fake = createFakeAblyBrowser();
+    const signals: AbortSignal[] = [];
+    const requestToken = vi.fn(
+      async (
+        input: Parameters<typeof fakeTokenFor>[0],
+        signal?: AbortSignal,
+      ) => {
+        signals.push(signal!);
+        if (signals.length === 1)
+          return await new Promise<typeof fakeTokenRequest>(
+            (_resolve, reject) => {
+              signal!.addEventListener(
+                "abort",
+                () => reject(new DOMException("Cancelled", "AbortError")),
+                { once: true },
+              );
+            },
+          );
+        return fakeTokenFor(input);
+      },
+    );
+    const realtime = createAblyBrowserRealtime({
+      loadClient: fake.loadClient,
+      requestToken,
+    });
+    cleanup.push(realtime);
+    const stop = realtime.subscribe("room:a", vi.fn());
+    realtime.start();
+    await vi.advanceTimersByTimeAsync(25);
+    stop();
+    realtime.subscribe("room:b", vi.fn());
+    expect(signals[0]!.aborted).toBe(true);
+    await vi.runAllTimersAsync();
+    expect(requestToken).toHaveBeenCalledTimes(2);
+    expect(fake.client.channel("room:a").subscribe).not.toHaveBeenCalled();
+    expect(fake.client.channel("room:b").subscribe).toHaveBeenCalledTimes(1);
+    expect(realtime.getSnapshot()).toBe("connected");
+  });
+
+  it("cancels a pending renewal on close and calls the SDK callback once", async () => {
+    const fake = createFakeAblyBrowser();
+    let auth: BrowserAuthCallback | undefined;
+    let pendingSignal: AbortSignal | undefined;
+    const requestToken = vi.fn<
+      (
+        input: Parameters<typeof fakeTokenFor>[0],
+        signal?: AbortSignal,
+      ) => Promise<typeof fakeTokenRequest>
+    >(async (input) => fakeTokenFor(input));
+    const realtime = createAblyBrowserRealtime({
+      loadClient: async (callback) => {
+        auth = callback;
+        return fake.loadClient(callback);
+      },
+      requestToken,
+    });
+    cleanup.push(realtime);
+    realtime.subscribe("room:a", vi.fn());
+    realtime.start();
+    await vi.runAllTimersAsync();
+    requestToken.mockImplementationOnce(
+      (_input, signal) =>
+        new Promise((_resolve, reject) => {
+          pendingSignal = signal;
+          signal!.addEventListener(
+            "abort",
+            () => reject(new DOMException("Cancelled", "AbortError")),
+            { once: true },
+          );
+        }),
+    );
+    const callback = vi.fn();
+    auth!(callback);
+    expect(pendingSignal?.aborted).toBe(false);
+    realtime.close();
+    expect(pendingSignal?.aborted).toBe(true);
+    await vi.runAllTimersAsync();
+    expect(callback).toHaveBeenCalledExactlyOnceWith(
+      "실시간 연결이 종료되었어요.",
+      null,
+    );
+    expect(realtime.getSnapshot()).toBe("closed");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("retries a cancelled renewal with current rights instead of failing the SDK callback", async () => {
+    const { realtime, requestToken, client } = setup();
+    realtime.subscribe("room:a", vi.fn());
+    realtime.start();
+    await vi.runAllTimersAsync();
+    let signal: AbortSignal | undefined;
+    const pending = vi.fn(
+      (
+        _input: Parameters<typeof fakeTokenFor>[0],
+        requestSignal?: AbortSignal,
+      ) =>
+        new Promise<typeof fakeTokenRequest>((_resolve, reject) => {
+          signal = requestSignal;
+          signal!.addEventListener(
+            "abort",
+            () => reject(new DOMException("Cancelled", "AbortError")),
+            { once: true },
+          );
+        }),
+    );
+    requestToken.mockImplementationOnce(pending);
+    realtime.reauthorize?.();
+    await vi.advanceTimersByTimeAsync(25);
+    realtime.reauthorize?.();
+    expect(signal?.aborted).toBe(true);
+    await vi.runAllTimersAsync();
+    expect(realtime.getSnapshot()).toBe("connected");
+    expect(client.close).not.toHaveBeenCalled();
+    expect(requestToken).toHaveBeenCalledTimes(3);
+  });
   it("subscribes only to granted floor channels, reuses the grant during navigation, and detaches a revoked floor", async () => {
     const { realtime, requestToken, client } = setup();
     requestToken.mockResolvedValue({
@@ -74,10 +231,10 @@ describe("Ably browser connection ownership", () => {
     presence.update({ typing: true });
     realtime.start();
     await vi.runAllTimersAsync();
-    expect(requestToken).toHaveBeenCalledExactlyOnceWith({
-      rooms: [],
-      spaces: [],
-    });
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith(
+      { rooms: [], spaces: [] },
+      expect.any(AbortSignal),
+    );
     expect(client.channel("floor:a").subscribe).toHaveBeenCalledTimes(1);
     expect(client.channel("floor:denied").subscribe).not.toHaveBeenCalled();
     expect(client.channel("floor:a").presence.enter).not.toHaveBeenCalled();
@@ -153,10 +310,10 @@ describe("Ably browser connection ownership", () => {
     observer.update({ typing: true, name: "김서연" });
     realtime.start();
     await vi.runAllTimersAsync();
-    expect(requestToken).toHaveBeenCalledExactlyOnceWith({
-      rooms: ["a"],
-      spaces: [],
-    });
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith(
+      { rooms: ["a"], spaces: [] },
+      expect.any(AbortSignal),
+    );
     expect(presence.enter).toHaveBeenCalledExactlyOnceWith({
       typing: true,
       name: "김서연",
@@ -232,9 +389,9 @@ describe("Ably browser connection ownership", () => {
     realtime.subscribe("room:late", vi.fn());
     finishLoad?.();
     await vi.runAllTimersAsync();
-    expect(requestToken.mock.calls).toEqual([
-      [{ rooms: [], spaces: [] }],
-      [{ rooms: ["late"], spaces: [] }],
+    expect(requestToken.mock.calls.map(([input]) => input)).toEqual([
+      { rooms: [], spaces: [] },
+      { rooms: ["late"], spaces: [] },
     ]);
     expect(authorized).toEqual([fakeTokenFor({ rooms: ["late"] }).capability]);
     expect(client.channel("room:late").subscribe).toHaveBeenCalledTimes(1);
@@ -277,7 +434,10 @@ describe("Ably browser connection ownership", () => {
     expect(loadClient).toHaveBeenCalledTimes(2);
     expect(client.channel("room:a").detach).toHaveBeenCalledTimes(1);
     expect(client.channel("room:b").subscribe).toHaveBeenCalledTimes(1);
-    expect(requestToken).toHaveBeenLastCalledWith({ rooms: ["b"], spaces: [] });
+    expect(requestToken).toHaveBeenLastCalledWith(
+      { rooms: ["b"], spaces: [] },
+      expect.any(AbortSignal),
+    );
     client.channel("room:b").emit({ ...event, roomId: "b" });
     expect(receive).toHaveBeenCalledExactlyOnceWith({ ...event, roomId: "b" });
   });
@@ -323,10 +483,13 @@ describe("Ably browser connection ownership", () => {
     const stopRoom = realtime.subscribe("room:one", vi.fn());
     realtime.start();
     await vi.runAllTimersAsync();
-    expect(requestToken).toHaveBeenLastCalledWith({
-      rooms: ["one"],
-      spaces: ["a"],
-    });
+    expect(requestToken).toHaveBeenLastCalledWith(
+      {
+        rooms: ["one"],
+        spaces: ["a"],
+      },
+      expect.any(AbortSignal),
+    );
     calls.length = 0;
     stopSpace();
     stopRoom();
@@ -334,10 +497,13 @@ describe("Ably browser connection ownership", () => {
     realtime.subscribe("space:b", onEvent);
     realtime.subscribe("room:two", vi.fn());
     await vi.runAllTimersAsync();
-    expect(requestToken).toHaveBeenLastCalledWith({
-      rooms: ["two"],
-      spaces: ["b"],
-    });
+    expect(requestToken).toHaveBeenLastCalledWith(
+      {
+        rooms: ["two"],
+        spaces: ["b"],
+      },
+      expect.any(AbortSignal),
+    );
     expect(calls.indexOf("detach:space:a")).toBeLessThan(
       calls.indexOf("authorize"),
     );
@@ -376,10 +542,13 @@ describe("Ably browser connection ownership", () => {
     await vi.runAllTimersAsync();
     expect(loadClient).toHaveBeenCalledTimes(1);
     expect(client.connect).toHaveBeenCalledTimes(1);
-    expect(requestToken).toHaveBeenCalledExactlyOnceWith({
-      rooms: ["a"],
-      spaces: [],
-    });
+    expect(requestToken).toHaveBeenCalledExactlyOnceWith(
+      {
+        rooms: ["a"],
+        spaces: [],
+      },
+      expect.any(AbortSignal),
+    );
     expect(realtime.getSnapshot()).toBe("connected");
   });
 
@@ -404,7 +573,10 @@ describe("Ably browser connection ownership", () => {
     stopSecond();
     await vi.runAllTimersAsync();
     expect(channel.detach).toHaveBeenCalledTimes(1);
-    expect(requestToken).toHaveBeenLastCalledWith({ rooms: [], spaces: [] });
+    expect(requestToken).toHaveBeenLastCalledWith(
+      { rooms: [], spaces: [] },
+      expect.any(AbortSignal),
+    );
     channel.emit(event);
     expect(second).toHaveBeenCalledTimes(1);
   });
@@ -428,10 +600,13 @@ describe("Ably browser connection ownership", () => {
       calls.indexOf("subscribe:room:b"),
     );
     expect(client.authorize).toHaveBeenCalledTimes(1);
-    expect(requestToken).toHaveBeenLastCalledWith({
-      rooms: ["b", "c"],
-      spaces: [],
-    });
+    expect(requestToken).toHaveBeenLastCalledWith(
+      {
+        rooms: ["b", "c"],
+        spaces: [],
+      },
+      expect.any(AbortSignal),
+    );
     expect(client.channel("room:b").subscribe).toHaveBeenCalledTimes(1);
   });
 
@@ -439,7 +614,7 @@ describe("Ably browser connection ownership", () => {
     "quietly disables %s before loading or connecting the SDK",
     async (status) => {
       const { realtime, requestToken, loadClient } = setup();
-      requestToken.mockRejectedValue(new RealtimeTokenError(status));
+      requestToken.mockRejectedValue(new ApiError("http", { status }));
       realtime.start();
       await vi.runAllTimersAsync();
       expect(realtime.getSnapshot()).toBe("disabled");
@@ -456,7 +631,7 @@ describe("Ably browser connection ownership", () => {
       const { realtime, requestToken, client } = setup();
       realtime.start();
       await vi.runAllTimersAsync();
-      requestToken.mockRejectedValue(new RealtimeTokenError(status));
+      requestToken.mockRejectedValue(new ApiError("http", { status }));
       realtime.subscribe("room:a", vi.fn());
       await vi.runAllTimersAsync();
       expect(client.close).toHaveBeenCalledTimes(1);
@@ -466,7 +641,7 @@ describe("Ably browser connection ownership", () => {
 
   it("lets the SDK retry transient token failures instead of treating them as disabled", async () => {
     const { realtime, requestToken, client } = setup();
-    requestToken.mockRejectedValueOnce(new RealtimeTokenError(500));
+    requestToken.mockRejectedValueOnce(new ApiError("http", { status: 500 }));
     realtime.start();
     await vi.runAllTimersAsync();
     expect(client.connect).toHaveBeenCalledTimes(1);
@@ -553,17 +728,20 @@ describe("Ably browser connection ownership", () => {
     stopA();
     const stopB = realtime.subscribe("room:b", vi.fn());
     await vi.advanceTimersByTimeAsync(25);
-    expect(requestToken).toHaveBeenLastCalledWith({ rooms: ["b"], spaces: [] });
+    expect(requestToken).toHaveBeenLastCalledWith(
+      { rooms: ["b"], spaces: [] },
+      expect.any(AbortSignal),
+    );
     stopB();
     realtime.subscribe("room:c", vi.fn());
     finishB?.(fakeTokenFor({ rooms: ["b"], spaces: [] }));
     await vi.runAllTimersAsync();
     expect(calls).not.toContain("subscribe:room:b");
     expect(client.channel("room:c").subscribe).toHaveBeenCalledTimes(1);
-    expect(requestToken.mock.calls).toEqual([
-      [{ rooms: ["a"], spaces: [] }],
-      [{ rooms: ["b"], spaces: [] }],
-      [{ rooms: ["c"], spaces: [] }],
+    expect(requestToken.mock.calls.map(([input]) => input)).toEqual([
+      { rooms: ["a"], spaces: [] },
+      { rooms: ["b"], spaces: [] },
+      { rooms: ["c"], spaces: [] },
     ]);
     expect(calls.indexOf("detach:room:a")).toBeLessThan(
       calls.indexOf("authorize"),

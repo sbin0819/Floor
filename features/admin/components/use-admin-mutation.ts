@@ -11,6 +11,9 @@ import {
 import { toast } from "sonner";
 import type { z } from "zod";
 import type { ActionErrorCode, ActionResult } from "@/lib/actions/result";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 
 const mutationKey = ["admin-actions"];
 const locks = new WeakSet<QueryClient>();
@@ -18,16 +21,13 @@ export function adminErrorMessage(code: ActionErrorCode) {
   switch (code) {
     case "SPACE_IN_USE":
       return "예정된 예약이 있어서 바꿀 수 없어요. 예약이 끝나거나 취소된 뒤에 다시 해 주세요";
-    case "INVALID_INPUT":
-      return "입력한 내용을 확인해 주세요";
-    case "FORBIDDEN":
-      return "이 작업을 할 권한이 없어요";
     case "NOT_FOUND":
       return "찾을 수 없는 항목이에요. 새로고침해 주세요";
-    case "UNAUTHENTICATED":
-      return "다시 로그인해 주세요";
     default:
-      return "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요";
+      return errorMessage(
+        { code },
+        "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요",
+      );
   }
 }
 export function useAdminMutation<T>({
@@ -64,7 +64,7 @@ export function useAdminMutation<T>({
             ]),
           ),
         );
-        toast.error(text);
+        if (!notifySessionExpired(client, result)) toast.error(text);
         if (result.message === "not_cancellable") router.refresh();
         return;
       }
@@ -76,10 +76,11 @@ export function useAdminMutation<T>({
       onSuccess?.(result.data);
       router.refresh();
     },
-    onError() {
-      const text = adminErrorMessage("INTERNAL");
+    onError(error) {
+      if (isRequestCanceled(error)) return;
+      const text = errorMessage(error, adminErrorMessage("INTERNAL"));
       setMessage(text);
-      toast.error(text);
+      if (!notifySessionExpired(client, error)) toast.error(text);
     },
   });
   async function submit(schema: z.ZodType, input: unknown) {

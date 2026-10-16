@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  fetchRoomFiles,
-  RoomFilesReadError,
-} from "@/features/chat/file-client";
+import { fetchRoomFiles } from "@/features/chat/file-client";
+import { ApiError } from "@/lib/http/errors";
 
 const roomId = "10000000-0000-4000-8000-000000000001";
 const file = {
@@ -34,26 +32,34 @@ describe("file panel HTTP boundary", () => {
     ).toEqual(page);
     expect(fetch).toHaveBeenCalledExactlyOnceWith(
       `/api/rooms/${roomId}/files?kind=file&before=13_9`,
-      {
+      expect.objectContaining({
         credentials: "same-origin",
         cache: "no-store",
-        signal: controller.signal,
-      },
+        signal: expect.any(AbortSignal),
+        method: "GET",
+      }),
     );
   });
 
   it.each([401, 403, 404, 429, 500])(
     "hides arbitrary error response bodies for HTTP %i",
     async (status) => {
-      const json = vi.fn();
+      const body = "private@example.test private-object-key";
       vi.stubGlobal(
         "fetch",
-        vi.fn().mockResolvedValue({ ok: false, status, json }),
+        vi.fn(async () => new Response(body, { status })),
       );
-      await expect(fetchRoomFiles(roomId, { kind: "all" })).rejects.toEqual(
-        new RoomFilesReadError(status),
+      const error: unknown = await fetchRoomFiles(roomId, {
+        kind: "all",
+      }).catch((failure: unknown) => failure);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ kind: "http", status });
+      expect(String(error)).not.toContain(body);
+      expect(JSON.stringify(error)).not.toMatch(
+        /private@example|private-object/,
       );
-      expect(json).not.toHaveBeenCalled();
+      for (const field of ["config", "request", "response", "cause"])
+        expect(error).not.toHaveProperty(field);
     },
   );
 
@@ -90,9 +96,13 @@ describe("file panel HTTP boundary", () => {
     "rejects unsafe or inconsistent DTOs without retaining their contents",
     async (value) => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(value)));
-      await expect(fetchRoomFiles(roomId, { kind: "all" })).rejects.toEqual(
-        new RoomFilesReadError(502),
-      );
+      await expect(
+        fetchRoomFiles(roomId, { kind: "all" }),
+      ).rejects.toMatchObject({
+        name: "ApiError",
+        kind: "invalid_response",
+        status: 200,
+      });
     },
   );
 
@@ -101,8 +111,12 @@ describe("file panel HTTP boundary", () => {
       "fetch",
       vi.fn().mockResolvedValue(new Response("private invalid JSON")),
     );
-    await expect(fetchRoomFiles(roomId, { kind: "all" })).rejects.toEqual(
-      new RoomFilesReadError(502),
+    await expect(fetchRoomFiles(roomId, { kind: "all" })).rejects.toMatchObject(
+      {
+        name: "ApiError",
+        kind: "invalid_response",
+        status: 200,
+      },
     );
   });
 });

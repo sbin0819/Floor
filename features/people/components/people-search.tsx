@@ -3,6 +3,14 @@
 import { useId, useRef, useState, useEffect } from "react";
 import { z } from "zod";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
+import { ApiError } from "@/lib/http/errors";
+import { useQueryClient } from "@tanstack/react-query";
+import { errorMessage } from "@/lib/errors/messages";
+import {
+  notifySessionExpired,
+  sessionNoticeGeneration,
+} from "@/lib/errors/session-expired";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,22 +33,17 @@ const responseSchema = z.strictObject({
     }),
   ),
 });
-export class PeopleSearchError extends Error {
-  constructor(public readonly status: number) {
-    super("People search failed");
-  }
-}
 export type SearchPeople = (
   query: string,
   signal: AbortSignal,
 ) => Promise<PersonSearchResult[]>;
 export const searchPeople: SearchPeople = async (query, signal) => {
-  const response = await fetch(
+  const response = await requestJson(
     `/api/people/search?${new URLSearchParams({ q: query })}`,
-    { signal, cache: "no-store" },
+    responseSchema,
+    { signal },
   );
-  if (!response.ok) throw new PeopleSearchError(response.status);
-  return responseSchema.parse(await response.json()).results;
+  return response.results;
 };
 
 export function PeopleSearch({
@@ -51,6 +54,7 @@ export function PeopleSearch({
   search?: SearchPeople;
 }) {
   const id = useId();
+  const client = useQueryClient();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PersonSearchResult[] | null>(null);
   const [error, setError] = useState("");
@@ -82,6 +86,7 @@ export function PeopleSearch({
             return;
           }
           const controller = new AbortController();
+          const generation = sessionNoticeGeneration(client);
           request.current = controller;
           setPending(true);
           setError("");
@@ -91,12 +96,19 @@ export function PeopleSearch({
             if (!controller.signal.aborted && request.current === controller)
               setResults(found);
           } catch (cause) {
-            if (!controller.signal.aborted && request.current === controller)
+            if (!controller.signal.aborted && request.current === controller) {
+              notifySessionExpired(client, cause, generation);
               setError(
-                cause instanceof PeopleSearchError && cause.status === 429
+                cause instanceof ApiError &&
+                  cause.kind === "http" &&
+                  cause.status === 429
                   ? "찾기를 너무 많이 했어요. 잠시 뒤에 다시 해 주세요"
-                  : "찾지 못했어요. 잠시 뒤에 다시 해 주세요",
+                  : errorMessage(
+                      cause,
+                      "찾지 못했어요. 잠시 뒤에 다시 해 주세요",
+                    ),
               );
+            }
           } finally {
             if (request.current === controller) {
               request.current = null;

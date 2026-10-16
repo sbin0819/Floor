@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, useContext, type FormEvent } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
+import { resetSessionExpiredNotice } from "@/lib/errors/session-expired";
 import { Button } from "@/components/ui/button";
 import {
   AuthFeedback,
@@ -38,6 +40,7 @@ export function LoginForm({
   operator?: boolean;
 }) {
   const router = useRouter();
+  const client = useContext(QueryClientContext);
   const request = useAuthRequest();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const destination = operator ? "/admin" : safeNext(next);
@@ -60,6 +63,7 @@ export function LoginForm({
         else request.setMessage(authMessages.loginFailed);
         return;
       }
+      if (client) resetSessionExpiredNotice(client);
       router.replace(destination);
       router.refresh();
     }, authMessages.loginFailed);

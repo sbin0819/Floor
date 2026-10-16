@@ -5,6 +5,9 @@ import { useState, useSyncExternalStore, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
+import { ApiError } from "@/lib/http/errors";
+import { errorMessage } from "@/lib/errors/messages";
 import { UserAvatar } from "@/components/user-avatar";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,13 +47,21 @@ export type ReadPersonProfile = (
   signal: AbortSignal,
 ) => Promise<PersonProfile | null>;
 export const readPersonProfile: ReadPersonProfile = async (userId, signal) => {
-  const response = await fetch(`/api/people/${encodeURIComponent(userId)}`, {
-    signal,
-    cache: "no-store",
-  });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error("Profile unavailable");
-  return profileSchema.parse(await response.json());
+  try {
+    return await requestJson(
+      `/api/people/${encodeURIComponent(userId)}`,
+      profileSchema,
+      { signal },
+    );
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.kind === "http" &&
+      error.status === 404
+    )
+      return null;
+    throw error;
+  }
 };
 function subscribeNarrow(listener: () => void) {
   const media = window.matchMedia?.("(max-width: 767px)");
@@ -143,7 +154,14 @@ function ProfileContent({
     retry: false,
   });
   if (query.isError)
-    return <p role="alert">프로필을 불러오지 못했어요. 다시 열어 주세요</p>;
+    return (
+      <p role="alert">
+        {errorMessage(
+          query.error,
+          "프로필을 불러오지 못했어요. 다시 열어 주세요",
+        )}
+      </p>
+    );
   if (query.isPending)
     return (
       <div

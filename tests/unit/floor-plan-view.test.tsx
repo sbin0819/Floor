@@ -87,15 +87,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 describe("floor plan view", () => {
   it("shows time controls while the document is pending, without an empty claim", async () => {
-    let resolve!: (response: Response) => void;
+    const { promise, resolve } = Promise.withResolvers<Response>();
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        () =>
-          new Promise<Response>((done) => {
-            resolve = done;
-          }),
-      ),
+      vi.fn(() => promise),
     );
     mount();
     expect(

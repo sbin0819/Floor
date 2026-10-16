@@ -1,6 +1,7 @@
 import type { ConnectionState, TokenRequest } from "ably";
 import { z } from "zod";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
 
 import { reactionEmojis } from "@/features/chat/types";
 import { parseSystemMessageData } from "@/features/chat/system-messages";
@@ -15,12 +16,6 @@ export interface RealtimeTokenInput {
   spaces?: string[];
 }
 
-export class RealtimeTokenError extends Error {
-  constructor(readonly status: number) {
-    super("실시간 인증을 완료하지 못했어요.");
-  }
-}
-
 const tokenRequestSchema = z.object({
   capability: z.string(),
   clientId: z.string().optional(),
@@ -33,18 +28,13 @@ const tokenRequestSchema = z.object({
 
 export async function fetchRealtimeToken(
   input: RealtimeTokenInput,
+  signal?: AbortSignal,
 ): Promise<TokenRequest> {
-  const response = await fetch("/api/realtime/token", {
+  return requestJson("/api/realtime/token", tokenRequestSchema, {
     method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    data: input,
+    signal,
   });
-  if (!response.ok) throw new RealtimeTokenError(response.status);
-  const parsed = tokenRequestSchema.safeParse(await response.json());
-  if (!parsed.success) throw new RealtimeTokenError(502);
-  return parsed.data;
 }
 
 const mentionSchema = z.object({ userId: z.string(), name: z.string() });

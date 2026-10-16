@@ -20,6 +20,7 @@ import { MessageList } from "@/features/chat/components/message-list";
 import { emptyMessageDetails } from "@/features/chat/types";
 import type { PersonProfile } from "@/features/people/types";
 import type { FriendActions } from "@/features/people/components/friend-controls";
+import { ApiError } from "@/lib/http/errors";
 import { installChatViewport } from "../helpers/chat-viewport";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
@@ -95,6 +96,28 @@ afterEach(() => {
 });
 
 describe("PersonCard", () => {
+  it.each([
+    ["timeout", "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요"],
+    ["network", "연결을 확인한 뒤 다시 시도해 주세요"],
+  ] as const)(
+    "shows common %s guidance without exposing error details",
+    async (kind, message) => {
+      const error = new ApiError(kind);
+      error.message = "private@example.com";
+      const read = vi.fn().mockRejectedValue(error);
+      const { user } = setup(
+        <PersonCard userId={id} name={person.name} read={read}>
+          <button>프로필 열기</button>
+        </PersonCard>,
+      );
+      await user.click(screen.getByRole("button", { name: "프로필 열기" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(message);
+      expect(screen.queryByText("private@example.com")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("이 사용자를 볼 수 없어요"),
+      ).not.toBeInTheDocument();
+    },
+  );
   it("renders the profile preview with disabled actions and non-interactive shared spaces", async () => {
     const { user } = setup(
       <PersonProfileContent
@@ -370,16 +393,22 @@ describe("profile response boundary", () => {
     vi.stubGlobal("fetch", fetcher);
     const signal = new AbortController().signal;
     await expect(readPersonProfile(id, signal)).resolves.toEqual(person);
-    expect(fetcher).toHaveBeenCalledExactlyOnceWith(`/api/people/${id}`, {
-      signal,
-      cache: "no-store",
-    });
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(
+      `/api/people/${id}`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+      }),
+    );
     fetcher.mockResolvedValueOnce(new Response(null, { status: 404 }));
     await expect(readPersonProfile(id, signal)).resolves.toBeNull();
     fetcher.mockResolvedValueOnce(new Response(null, { status: 403 }));
-    await expect(readPersonProfile(id, signal)).rejects.toThrow(
-      "Profile unavailable",
-    );
+    await expect(readPersonProfile(id, signal)).rejects.toMatchObject({
+      kind: "http",
+      status: 403,
+    });
   });
   it("rejects a response carrying any extra private data", async () => {
     vi.stubGlobal(

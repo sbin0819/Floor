@@ -1,5 +1,6 @@
 import type { ActionErrorCode } from "@/lib/actions/result";
 import type { RoleLimits } from "@/lib/permissions/types";
+import { errorMessage } from "@/lib/errors/messages";
 
 export function bookingErrorMessage(
   result: { code: ActionErrorCode; message?: string },
@@ -46,16 +47,12 @@ export function bookingErrorMessage(
     case "FORBIDDEN":
       return options.restricted
         ? "이 공간은 지정된 팀만 예약할 수 있어요"
-        : "이 작업을 할 권한이 없어요";
+        : errorMessage(result);
     case "NOT_FOUND":
       return options.edit
         ? "이 예약은 더 바꿀 수 없어요"
         : "찾을 수 없어요. 화면을 새로 고쳐 주세요";
-    case "INVALID_INPUT":
-      return "입력한 내용을 확인해 주세요";
-    case "UNAUTHENTICATED":
-      return "로그인이 필요해요. 다시 로그인해 주세요";
     default:
-      return "문제가 생겼어요. 잠시 뒤 다시 시도해 주세요";
+      return errorMessage(result);
   }
 }

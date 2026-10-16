@@ -24,7 +24,12 @@ export class ApiError extends Error {
 }
 
 export function isRequestCanceled(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
 }
 
 const allowedCodes: Record<ActionErrorCode, true> = {

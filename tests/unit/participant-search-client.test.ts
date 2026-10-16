@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  fetchParticipants,
-  ParticipantSearchError,
-} from "@/features/bookings/participant-search-client";
+import { fetchParticipants } from "@/features/bookings/participant-search-client";
 
 const person = {
   userId: "first",
@@ -24,11 +21,16 @@ describe("participant search transport", () => {
     ]);
     expect(fetch).toHaveBeenCalledWith(
       "/api/participants/search?q=seoyeon%40floor.example",
-      { signal, cache: "no-store", credentials: "same-origin" },
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+      }),
     );
   });
   it.each([401, 429, 500])(
-    "converts HTTP %s to a safe error without reading the response body",
+    "converts HTTP %s to a safe error without exposing the response body",
     async (status) => {
       vi.stubGlobal(
         "fetch",
@@ -38,7 +40,7 @@ describe("participant search transport", () => {
       );
       await expect(
         fetchParticipants("이서", new AbortController().signal),
-      ).rejects.toEqual(new ParticipantSearchError(status));
+      ).rejects.toMatchObject({ kind: "http", status });
     },
   );
   it.each([
@@ -51,7 +53,11 @@ describe("participant search transport", () => {
     );
     await expect(
       fetchParticipants("이서", new AbortController().signal),
-    ).rejects.toEqual(new ParticipantSearchError(500));
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
   });
   it.each([
     { color: "blue", photoUrl: "https://unsafe.example.test/photo" },
@@ -66,7 +72,11 @@ describe("participant search transport", () => {
     );
     await expect(
       fetchParticipants("이서", new AbortController().signal),
-    ).rejects.toEqual(new ParticipantSearchError(500));
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
   });
   it("replaces malformed response details with a fixed safe error", async () => {
     vi.stubGlobal(
@@ -75,6 +85,10 @@ describe("participant search transport", () => {
     );
     await expect(
       fetchParticipants("이서", new AbortController().signal),
-    ).rejects.toEqual(new ParticipantSearchError(500));
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
   });
 });

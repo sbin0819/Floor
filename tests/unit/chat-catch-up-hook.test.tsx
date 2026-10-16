@@ -219,7 +219,7 @@ describe("channel reconnect integration", () => {
       });
     });
     expect(screen.getByLabelText("보정")).toHaveTextContent("true");
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
     await act(async () => pending.resolve(Response.json(page([2]))));
     await waitFor(() =>
       expect(screen.getByLabelText("목록")).toHaveTextContent("message-2"),
@@ -320,6 +320,8 @@ describe("channel reconnect integration", () => {
         resumed: true,
       }),
     );
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(false);
     result.update(view("room-b"));
     expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
     await act(async () => pending.resolve(Response.json(page([2]))));

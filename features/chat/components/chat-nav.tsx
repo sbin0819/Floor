@@ -36,6 +36,7 @@ import { callNavigationTargets } from "@/features/calls/nav-targets";
 import { CallRinging } from "@/features/calls/components/call-ringing";
 import { CallingStatus } from "@/features/calls/components/calling-status";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
 
 const spaceSchema = z.array(
   z.object({
@@ -154,13 +155,7 @@ const navSchema = z.object({
   ),
 });
 export async function fetchChatNav(signal: AbortSignal): Promise<ChatNav> {
-  const response = await fetch("/api/chat/nav", {
-    signal,
-    cache: "no-store",
-    credentials: "same-origin",
-  });
-  if (!response.ok) throw new Error("채팅 목록을 불러오지 못했어요.");
-  return navSchema.parse(await response.json());
+  return requestJson("/api/chat/nav", navSchema, { signal });
 }
 
 function useIncoming(initialData: ChatNav) {

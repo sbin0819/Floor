@@ -316,7 +316,7 @@ describe("space member settings", () => {
       resolve({ ok: false, code: "FORBIDDEN", message: "private reason" }),
     );
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "이 작업을 할 수 없어요",
+      "이 작업을 할 권한이 없어요",
     );
     expect(screen.queryByText("private reason")).not.toBeInTheDocument();
     expect(router.refresh).not.toHaveBeenCalled();
@@ -324,10 +324,8 @@ describe("space member settings", () => {
   });
 
   it("opens the existing profile lazily from the member row without a new endpoint", async () => {
-    const fetch = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
+    const fetch = vi.fn(async () =>
+      Response.json({
         userId: owner.userId,
         avatar: owner.avatar,
         name: owner.name,
@@ -338,7 +336,7 @@ describe("space member settings", () => {
         directRoomId: null,
         canDirectMessage: false,
       }),
-    }));
+    );
     vi.stubGlobal("fetch", fetch);
     mount();
     expect(fetch).not.toHaveBeenCalled();
@@ -348,7 +346,12 @@ describe("space member settings", () => {
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledExactlyOnceWith(
         `/api/people/${owner.userId}`,
-        { signal: expect.any(AbortSignal), cache: "no-store" },
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+          cache: "no-store",
+          credentials: "same-origin",
+          method: "GET",
+        }),
       ),
     );
     expect(

@@ -5,6 +5,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ActionResult } from "@/lib/actions/result";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 import { CHAT_NAV_KEY } from "../nav-state";
 
 export function spaceActionMessage(
@@ -33,14 +36,8 @@ export function spaceActionMessage(
       return "초대가 만료됐거나 올바르지 않아요";
     case "NOT_FOUND":
       return "이미 처리됐거나 더 볼 수 없는 항목이에요";
-    case "FORBIDDEN":
-      return "이 작업을 할 수 없어요";
-    case "INVALID_INPUT":
-      return "입력한 내용을 확인해 주세요";
-    case "UNAUTHENTICATED":
-      return "다시 로그인해 주세요";
     default:
-      return "처리하지 못했어요. 다시 시도해 주세요";
+      return errorMessage(result, "처리하지 못했어요. 다시 시도해 주세요");
   }
 }
 
@@ -78,6 +75,7 @@ export function useSpaceMutation<T>(
       if (!current.active) return;
       if (!result.ok) {
         setError(spaceActionMessage(result));
+        notifySessionExpired(client, result);
         return;
       }
       void client.invalidateQueries({ queryKey: CHAT_NAV_KEY });
@@ -85,8 +83,11 @@ export function useSpaceMutation<T>(
       if (message) toast.success(message);
       router.refresh();
       return result.data;
-    } catch {
-      if (current.active) setError("처리하지 못했어요. 다시 시도해 주세요");
+    } catch (error) {
+      if (current.active && !isRequestCanceled(error)) {
+        setError(errorMessage(error, "처리하지 못했어요. 다시 시도해 주세요"));
+        notifySessionExpired(client, error);
+      }
     } finally {
       locked.current = false;
     }

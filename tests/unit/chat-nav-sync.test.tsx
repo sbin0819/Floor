@@ -645,11 +645,15 @@ describe("chat unread navigation", () => {
     vi.stubGlobal("fetch", fetchMock);
     const signal = new AbortController().signal;
     expect(JSON.stringify(await fetchChatNav(signal))).not.toContain("@");
-    expect(fetchMock).toHaveBeenCalledWith("/api/chat/nav", {
-      signal,
-      cache: "no-store",
-      credentials: "same-origin",
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/chat/nav",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+      }),
+    );
   });
   it("keeps avatar and preference fields when parsing a real navigation response", async () => {
     const data = fixture();

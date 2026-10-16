@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Activity, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -10,10 +10,8 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ParticipantInput } from "@/components/participant-input";
-import {
-  ParticipantSearchError,
-  type SearchParticipants,
-} from "@/features/bookings/participant-search-client";
+import type { SearchParticipants } from "@/features/bookings/participant-search-client";
+import { ApiError } from "@/lib/http/errors";
 import type {
   BookingParticipantDraft,
   ParticipantSearchResult,
@@ -71,6 +69,86 @@ async function pause(ms = 251) {
   });
 }
 describe("ParticipantInput", () => {
+  it("releases a hidden Activity search and resumes with the same input but a fresh request", async () => {
+    const pending: {
+      signal: AbortSignal;
+      resolve: (value: ParticipantSearchResult[]) => void;
+    }[] = [];
+    const search: SearchParticipants = (_query, signal) =>
+      new Promise((resolve) => pending.push({ signal, resolve }));
+    const client = new QueryClient();
+    const tree = (mode: "hidden" | "visible") => (
+      <QueryClientProvider client={client}>
+        <Activity mode={mode}>
+          <ParticipantInput value={[]} onChange={() => {}} search={search} />
+        </Activity>
+      </QueryClientProvider>
+    );
+    const view = render(tree("visible"));
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "이서" } });
+    await pause();
+    expect(pending).toHaveLength(1);
+    view.rerender(tree("hidden"));
+    await waitFor(() => expect(pending[0]!.signal.aborted).toBe(true));
+    view.rerender(tree("visible"));
+    expect(screen.getByRole("combobox")).toBe(input);
+    expect(input).toHaveValue("이서");
+    await waitFor(() => expect(pending).toHaveLength(2));
+    await act(async () => pending[1]!.resolve([guest]));
+    await screen.findByRole("option", { name: /김하은/ });
+    await act(async () => pending[0]!.resolve([colleague]));
+    expect(
+      screen.queryByRole("option", { name: /이서연/ }),
+    ).not.toBeInTheDocument();
+    view.unmount();
+    client.clear();
+  });
+  it("cancels the owned search when Escape closes its list and keeps the input", async () => {
+    let signal: AbortSignal | undefined;
+    const { unmount } = display({
+      search: (_query, nextSignal) => {
+        signal = nextSignal;
+        return new Promise(() => {});
+      },
+    });
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "이서" } });
+    await pause();
+    expect(signal?.aborted).toBe(false);
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() => expect(signal?.aborted).toBe(true));
+    expect(input).toHaveValue("이서");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    unmount();
+  });
+
+  it("cancels a running search when the input is disabled", async () => {
+    let signal: AbortSignal | undefined;
+    const client = new QueryClient();
+    const tree = (disabled: boolean) => (
+      <QueryClientProvider client={client}>
+        <ParticipantInput
+          value={[]}
+          onChange={() => {}}
+          defaultQuery="이서"
+          disabled={disabled}
+          search={(_query, nextSignal) => {
+            signal = nextSignal;
+            return new Promise(() => {});
+          }}
+        />
+      </QueryClientProvider>
+    );
+    const view = render(tree(false));
+    await pause();
+    expect(signal?.aborted).toBe(false);
+    view.rerender(tree(true));
+    await waitFor(() => expect(signal?.aborted).toBe(true));
+    expect(screen.getByRole("combobox")).toBeDisabled();
+    view.unmount();
+    client.clear();
+  });
   it("debounces consecutive input and searches only normalized terms of 2–254 characters", async () => {
     vi.useFakeTimers();
     const { search } = display();
@@ -210,7 +288,7 @@ describe("ParticipantInput", () => {
   it.each([429, 500])(
     "shows a safe status for HTTP %s without echoing error details",
     async (status) => {
-      const error = new ParticipantSearchError(status);
+      const error = new ApiError("http", { status });
       error.message = "private@example.com";
       display({
         search: async () => {
@@ -225,6 +303,26 @@ describe("ParticipantInput", () => {
             : "사람을 찾지 못했어요. 잠시 뒤 다시 찾아 주세요",
         ),
       ).toBeInTheDocument();
+      expect(screen.queryByText("private@example.com")).not.toBeInTheDocument();
+    },
+  );
+  it.each([
+    ["timeout", "응답이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요"],
+    ["network", "연결을 확인한 뒤 다시 시도해 주세요"],
+  ] as const)(
+    "shows common %s guidance without clearing the search input",
+    async (kind, message) => {
+      const error = new ApiError(kind);
+      error.message = "private@example.com";
+      display({
+        search: async () => {
+          throw error;
+        },
+      });
+      const input = screen.getByRole("combobox");
+      await userEvent.type(input, "이서");
+      expect(await screen.findByText(message)).toBeVisible();
+      expect(input).toHaveValue("이서");
       expect(screen.queryByText("private@example.com")).not.toBeInTheDocument();
     },
   );

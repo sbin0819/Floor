@@ -11,6 +11,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { ActionResult } from "@/lib/actions/result";
 import { bookingErrorMessage } from "@/features/bookings/ui-errors";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 
 const mutationKey = ["booking-actions"];
 const lockedClients = new WeakSet<QueryClient>();
@@ -56,7 +59,7 @@ export function useBookingMutation<T>({
               }
             : (result.fieldErrors ?? {}),
         );
-        toast.error(text);
+        if (!notifySessionExpired(client, result)) toast.error(text);
         onFailure?.(result);
         if (
           result.code === "BOOKING_CONFLICT" ||
@@ -65,10 +68,14 @@ export function useBookingMutation<T>({
           router.refresh();
       }
     },
-    onError() {
-      const text = bookingErrorMessage({ code: "INTERNAL" });
+    onError(error) {
+      if (isRequestCanceled(error)) return;
+      const text = errorMessage(
+        error,
+        bookingErrorMessage({ code: "INTERNAL" }),
+      );
       setMessage(text);
-      toast.error(text);
+      if (!notifySessionExpired(client, error)) toast.error(text);
     },
   });
   async function submit(input: unknown) {

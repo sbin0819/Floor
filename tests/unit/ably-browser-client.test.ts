@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchRealtimeToken,
   loadAblyBrowserClient,
-  RealtimeTokenError,
 } from "@/lib/realtime/ably-browser-client";
 import type { RealtimeEvent } from "@/lib/realtime/types";
 
@@ -96,13 +95,18 @@ describe("Ably HTTP token request", () => {
     await expect(fetchRealtimeToken({ rooms: ["a"] })).resolves.toEqual(
       fakeTokenRequest,
     );
-    expect(fetcher).toHaveBeenCalledExactlyOnceWith("/api/realtime/token", {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      body: '{"rooms":["a"]}',
-    });
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(
+      "/api/realtime/token",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+        body: '{"rooms":["a"]}',
+      }),
+    );
   });
   it.each([401, 429, 500, 503])(
     "preserves HTTP %s without exposing the response body",
@@ -111,9 +115,10 @@ describe("Ably HTTP token request", () => {
         "fetch",
         vi.fn(async () => new Response("private diagnostic", { status })),
       );
-      await expect(fetchRealtimeToken({ rooms: [] })).rejects.toEqual(
-        new RealtimeTokenError(status),
-      );
+      await expect(fetchRealtimeToken({ rooms: [] })).rejects.toMatchObject({
+        kind: "http",
+        status,
+      });
       await expect(fetchRealtimeToken({ rooms: [] })).rejects.not.toThrow(
         "private diagnostic",
       );
@@ -124,9 +129,35 @@ describe("Ably HTTP token request", () => {
       "fetch",
       vi.fn(async () => Response.json({ token: "not-a-token-request" })),
     );
-    await expect(fetchRealtimeToken({ rooms: [] })).rejects.toEqual(
-      new RealtimeTokenError(502),
-    );
+    await expect(fetchRealtimeToken({ rooms: [] })).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
+  });
+  it("aborts an obsolete token request without converting cancellation to an HTTP failure", async () => {
+    let transportSignal: AbortSignal | null | undefined;
+    const fetcher = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      transportSignal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        transportSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("Aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const controller = new AbortController();
+    const rejected = expect(
+      fetchRealtimeToken({ rooms: ["old-room"] }, controller.signal),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+    expect(transportSignal?.aborted).toBe(false);
+    controller.abort();
+    await rejected;
+    expect(transportSignal?.aborted).toBe(true);
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 });
 

@@ -10,6 +10,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { ActionErrorCode, ActionResult } from "@/lib/actions/result";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 
 const mutationKey = ["team-actions"];
 const lockedClients = new WeakSet<QueryClient>();
@@ -32,16 +35,10 @@ export function teamErrorMessage(code: ActionErrorCode, limitMessage?: string) {
         limitMessage ??
         "대기 중인 항목이 너무 많아요. 기존 항목을 정리한 뒤 다시 시도해 주세요"
       );
-    case "FORBIDDEN":
-      return "이 작업을 할 권한이 없어요";
-    case "UNAUTHENTICATED":
-      return "로그인이 필요해요. 다시 로그인해 주세요";
-    case "INVALID_INPUT":
-      return "입력한 내용을 확인해 주세요";
     case "NOT_FOUND":
       return "이미 처리됐거나 찾을 수 없는 항목이에요";
     default:
-      return fallbackMessage;
+      return errorMessage({ code }, fallbackMessage);
   }
 }
 
@@ -90,16 +87,18 @@ export function useTeamMutation<T>({
             ]),
           ),
         );
-        toast.error(text);
+        if (!notifySessionExpired(client, result)) toast.error(text);
         return;
       }
       toast.success(successMessage);
       onSuccess?.(result.data);
       router.refresh();
       return result.data;
-    } catch {
-      setMessage(fallbackMessage);
-      toast.error(fallbackMessage);
+    } catch (error) {
+      if (isRequestCanceled(error)) return;
+      const text = errorMessage(error, fallbackMessage);
+      setMessage(text);
+      if (!notifySessionExpired(client, error)) toast.error(text);
     } finally {
       lockedClients.delete(client);
     }

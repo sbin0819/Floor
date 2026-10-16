@@ -453,7 +453,7 @@ describe("channel menu to archive dialog", () => {
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "보관" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-      "이 작업을 할 수 없어요",
+      "이 작업을 할 권한이 없어요",
     );
     expect(mocks.refresh).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole("button", { name: "보관" }));
@@ -518,7 +518,7 @@ describe("space invitation management", () => {
     const { invalidate } = mount(<SpaceInvitesList rows={[rows[0]!]} />);
     await user.click(screen.getByRole("button", { name: "끊기" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "이 작업을 할 수 없어요",
+      "이 작업을 할 권한이 없어요",
     );
     expect(screen.getByText(`/s/join/${ownCode}`)).toBeVisible();
     expect(mocks.refresh).not.toHaveBeenCalled();

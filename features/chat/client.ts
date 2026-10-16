@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
+import { ApiError } from "@/lib/http/errors";
 import type { RoomMessagesPage } from "./types";
 import { reactionEmojis } from "./types";
 import { parseSystemMessageData } from "./system-messages";
@@ -57,24 +59,6 @@ const pageSchema = z.object({
   peerReadSeq: sequence.nullable(),
 });
 
-export class ChatReadError extends Error {
-  constructor(
-    readonly status: number,
-    readonly retryAfterMs = 1_000,
-  ) {
-    super("메시지를 불러오지 못했어요.");
-  }
-}
-
-function retryDelay(response: Response) {
-  const value = response.headers.get("Retry-After");
-  if (!value) return 1_000;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
-  const date = Date.parse(value);
-  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : 1_000;
-}
-
 function waitForRetry(delay: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     const abort = () => {
@@ -99,22 +83,22 @@ export async function fetchRoomMessagesPage(
   const search =
     "before" in query ? `before=${query.before}` : `after=${query.after}`;
   const request = () =>
-    fetch(`/api/rooms/${encodeURIComponent(roomId)}/messages?${search}`, {
-      credentials: "same-origin",
-      cache: "no-store",
-      signal,
-    });
-  let response = await request();
-  if (response.status === 429 && retry) {
-    await waitForRetry(retryDelay(response), signal);
-    response = await request();
-  }
-  if (!response.ok)
-    throw new ChatReadError(
-      response.status,
-      response.status === 429 ? retryDelay(response) : 1_000,
+    requestJson(
+      `/api/rooms/${encodeURIComponent(roomId)}/messages?${search}`,
+      pageSchema,
+      { signal },
     );
-  const result = pageSchema.safeParse(await response.json());
-  if (!result.success) throw new ChatReadError(502);
-  return result.data;
+  try {
+    return await request();
+  } catch (error) {
+    if (
+      !retry ||
+      !(error instanceof ApiError) ||
+      error.kind !== "http" ||
+      error.status !== 429
+    )
+      throw error;
+    await waitForRetry(error.retryAfterMs ?? 1_000, signal);
+    return request();
+  }
 }

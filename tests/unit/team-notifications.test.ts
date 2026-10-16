@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildTeamNotifications } from "@/features/notifications/builders";
-import {
-  fetchNotificationSummary,
-  NotificationFetchError,
-} from "@/features/notifications/client";
+import { fetchNotificationSummary } from "@/features/notifications/client";
 import {
   notificationHref,
   notificationPresentation,
@@ -203,7 +200,11 @@ describe("team notification client response", () => {
     );
     await expect(
       fetchNotificationSummary(new AbortController().signal),
-    ).rejects.toEqual(new NotificationFetchError(500));
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
   });
 });
 

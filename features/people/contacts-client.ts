@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { avatarSchema } from "@/lib/avatar";
+import { requestJson } from "@/lib/http/client";
 import type { MessageContact } from "./types";
 
 const contactsSchema = z.array(
@@ -19,12 +20,5 @@ const contactsSchema = z.array(
 export async function fetchMessageContacts(
   signal: AbortSignal,
 ): Promise<MessageContact[]> {
-  const response = await fetch("/api/people/contacts", {
-    signal,
-    credentials: "same-origin",
-    cache: "no-store",
-  });
-  if (!response.ok)
-    throw new Error("사람 목록을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요");
-  return contactsSchema.parse(await response.json());
+  return requestJson("/api/people/contacts", contactsSchema, { signal });
 }

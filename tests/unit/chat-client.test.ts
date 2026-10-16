@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ChatReadError, fetchRoomMessagesPage } from "@/features/chat/client";
+import { fetchRoomMessagesPage } from "@/features/chat/client";
+import { ApiError } from "@/lib/http/errors";
 import { emptyMessageDetails } from "@/features/chat/types";
 
 const empty = {
@@ -80,7 +81,12 @@ describe("chat page client", () => {
     ).resolves.toEqual(empty);
     expect(fetcher).toHaveBeenCalledExactlyOnceWith(
       "/api/rooms/room-a/messages?before=51",
-      { credentials: "same-origin", cache: "no-store", signal },
+      expect.objectContaining({
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: expect.any(AbortSignal),
+        method: "GET",
+      }),
     );
   });
   it("waits for Retry-After and retries a 429 once", async () => {
@@ -108,10 +114,34 @@ describe("chat page client", () => {
     vi.stubGlobal("fetch", fetcher);
     const rejected = expect(
       fetchRoomMessagesPage("room", { after: 5 }),
-    ).rejects.toEqual(new ChatReadError(429));
+    ).rejects.toMatchObject({ kind: "http", status: 429, retryAfterMs: 1_000 });
     await vi.advanceTimersByTimeAsync(1_000);
     await rejected;
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it("leaves 429 retries to the shared queue when retries are disabled", async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response(null, { status: 429, headers: { "Retry-After": "3" } }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    await expect(
+      fetchRoomMessagesPage("room", { after: 5 }, { retry: false }),
+    ).rejects.toMatchObject({ kind: "http", status: 429, retryAfterMs: 3_000 });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it("preserves network failures without inventing an HTTP status or retrying", async () => {
+    const fetcher = vi
+      .fn()
+      .mockRejectedValue(new TypeError("private diagnostic"));
+    vi.stubGlobal("fetch", fetcher);
+    const error: unknown = await fetchRoomMessagesPage("room", {
+      after: 0,
+    }).catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ kind: "network", status: undefined });
+    expect(String(error)).not.toContain("private diagnostic");
+    expect(fetcher).toHaveBeenCalledOnce();
   });
   it("cancels waiting retries when the screen leaves", async () => {
     vi.useFakeTimers();
@@ -141,9 +171,13 @@ describe("chat page client", () => {
         "fetch",
         vi.fn(async () => new Response("private diagnostics", { status })),
       );
-      await expect(fetchRoomMessagesPage("room", { after: 0 })).rejects.toEqual(
-        new ChatReadError(status),
-      );
+      await expect(
+        fetchRoomMessagesPage("room", { after: 0 }),
+      ).rejects.toMatchObject({
+        name: "ApiError",
+        kind: "http",
+        status,
+      });
     },
   );
   it("rejects malformed responses and strips unrecognized fields", async () => {
@@ -157,8 +191,12 @@ describe("chat page client", () => {
     await expect(fetchRoomMessagesPage("room", { after: 0 })).resolves.toEqual(
       empty,
     );
-    await expect(fetchRoomMessagesPage("room", { after: 0 })).rejects.toEqual(
-      new ChatReadError(502),
-    );
+    await expect(
+      fetchRoomMessagesPage("room", { after: 0 }),
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      kind: "invalid_response",
+      status: 200,
+    });
   });
 });
