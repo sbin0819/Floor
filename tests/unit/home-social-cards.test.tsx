@@ -1,9 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Activity } from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { toast } from "sonner";
+import { makeQueryClient } from "@/app/providers";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/errors/messages";
+import { ApiError } from "@/lib/http/errors";
 import { HomeChecklist } from "@/features/home/components/home-checklist";
 import { HomeTodo } from "@/features/home/components/home-todo";
 import { HomeRecentChats } from "@/features/home/components/home-recent-chats";
@@ -90,9 +100,9 @@ it("does not fabricate a recent-chat empty card", () => {
   expect(screen.queryByRole("region")).not.toBeInTheDocument();
 });
 
-function checklist(data = homeChecklist) {
+function checklist(data = homeChecklist, client = new QueryClient()) {
   return render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <HomeChecklist data={data} />
     </QueryClientProvider>,
   );
@@ -182,6 +192,52 @@ it.each([false, true])(
     expect(refresh).not.toHaveBeenCalled();
   },
 );
+it.each([false, true])(
+  "restores the checklist with one shared login notice after auth failure (throws=%s)",
+  async (throws) => {
+    if (throws)
+      vi.mocked(dismissHomeChecklist).mockRejectedValue(
+        new ApiError("http", { status: 401 }),
+      );
+    else
+      vi.mocked(dismissHomeChecklist).mockResolvedValue({
+        ok: false,
+        code: "UNAUTHENTICATED",
+      });
+    checklist(homeChecklist, makeQueryClient());
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const button = await screen.findByRole("button", {
+        name: "시작 안내 닫기",
+      });
+      await waitFor(() => expect(button).toBeEnabled());
+      await userEvent.click(button);
+      expect(
+        await screen.findByRole("region", { name: "Floor 시작하기" }),
+      ).toBeVisible();
+    }
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+      SESSION_EXPIRED_MESSAGE,
+      expect.objectContaining({
+        action: { label: "로그인하기", onClick: expect.any(Function) },
+      }),
+    );
+    expect(dismissHomeChecklist).toHaveBeenCalledTimes(2);
+    expect(refresh).not.toHaveBeenCalled();
+  },
+);
+it("restores the optimistic checklist silently after cancellation", async () => {
+  vi.mocked(dismissHomeChecklist).mockRejectedValue(
+    new DOMException("Aborted", "AbortError"),
+  );
+  checklist(homeChecklist, makeQueryClient());
+  await userEvent.click(screen.getByRole("button", { name: "시작 안내 닫기" }));
+  expect(
+    await screen.findByRole("region", { name: "Floor 시작하기" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "시작 안내 닫기" })).toBeEnabled();
+  expect(toast.error).not.toHaveBeenCalled();
+  expect(refresh).not.toHaveBeenCalled();
+});
 it("does not refresh another route after a late successful dismissal", async () => {
   let finish!: (
     result: Awaited<ReturnType<typeof dismissHomeChecklist>>,

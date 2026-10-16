@@ -14,6 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { setRoomMuted, setSpaceMuted } from "@/features/chat/actions";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 import { CHAT_NAV_KEY } from "../nav-state";
 import { archiveChannel } from "@/features/chat/space-actions";
 import { useSpaceMutation } from "./use-space-mutation";
@@ -55,10 +58,13 @@ export function ChatMuteButton({
       if (result.ok) {
         void client.invalidateQueries({ queryKey: CHAT_NAV_KEY });
         router.refresh();
-      } else toast.error("알림 설정을 바꾸지 못했어요.");
+      } else if (!notifySessionExpired(client, result))
+        toast.error(errorMessage(result, "알림 설정을 바꾸지 못했어요."));
     },
-    onError() {
-      toast.error("알림 설정을 바꾸지 못했어요.");
+    onError(error) {
+      if (isRequestCanceled(error) || notifySessionExpired(client, error))
+        return;
+      toast.error(errorMessage(error, "알림 설정을 바꾸지 못했어요."));
     },
   });
   return (

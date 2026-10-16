@@ -1,5 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import {
+  notifySessionExpired,
+  sessionNoticeGeneration,
+} from "@/lib/errors/session-expired";
+import {
   fetchRoomMessagesPage,
   type MessagePageQuery,
   type RoomMessagesPage,
@@ -178,10 +182,15 @@ export function requestMessagePage(
   query: MessagePageQuery,
   options: { signal?: AbortSignal; background?: boolean } = {},
 ) {
+  const generation = sessionNoticeGeneration(client);
   let queue = queues.get(client);
   if (!queue) {
     queue = createMessageRequestQueue();
     queues.set(client, queue);
   }
-  return queue.request(roomId, query, options);
+  return queue.request(roomId, query, options).catch((error: unknown) => {
+    if (!options.signal?.aborted)
+      notifySessionExpired(client, error, generation);
+    throw error;
+  });
 }

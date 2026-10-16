@@ -11,7 +11,11 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { useIsMutating, useMutation } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +31,9 @@ import {
 } from "@/components/ui/dialog";
 import { MessageBody } from "@/features/chat/components/message-body";
 import { sendAnnouncement } from "@/features/admin/announcement-actions";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 import {
   previewAnnouncementAudienceSchema,
   sendAnnouncementSchema,
@@ -61,6 +68,7 @@ export function AnnouncementForm({
   children?: ReactNode;
 }) {
   const router = useRouter();
+  const client = useQueryClient();
   const [, startTransition] = useTransition();
   const [draft, setDraft] = useState<AnnouncementDestinationDraft>(() => ({
     lounge: (initialRequest?.input.lounge ?? true) && data.lounge.available,
@@ -188,7 +196,7 @@ export function AnnouncementForm({
                 ? "지금은 라운지에 공지를 쓸 수 없어요. 받는 곳을 다시 확인해 주세요"
                 : adminErrorMessage(response.code);
         setMessage(text);
-        toast.error(text);
+        if (!notifySessionExpired(client, response)) toast.error(text);
         setErrors(
           Object.fromEntries(
             Object.entries(response.fieldErrors ?? {}).map(([key, values]) => [
@@ -221,11 +229,12 @@ export function AnnouncementForm({
         router.replace(path, { scroll: false });
         router.refresh();
       });
-    } catch {
+    } catch (error) {
+      if (isRequestCanceled(error)) return;
       if (current() && generation === lifetime.current) {
-        const text = adminErrorMessage("INTERNAL");
+        const text = errorMessage(error, adminErrorMessage("INTERNAL"));
         setMessage(text);
-        toast.error(text);
+        if (!notifySessionExpired(client, error)) toast.error(text);
       }
     } finally {
       submitting.current = false;

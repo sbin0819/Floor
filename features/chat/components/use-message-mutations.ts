@@ -7,6 +7,9 @@ import {
   editMessage,
   setReaction,
 } from "@/features/chat/actions";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 import type { ChatMessage, ReactionEmoji } from "../types";
 import { applyMessageEvent, invalidateMessage } from "../message-sync";
 import { roomMessagesKey, type DisplayMessage } from "./message-state";
@@ -65,6 +68,10 @@ export function useMessageMutations({
       roomMessagesKey(roomId),
       (rows = []) => transform(rows),
     );
+  const reportFailure = (error: unknown, fallback: string) => {
+    if (isRequestCanceled(error) || notifySessionExpired(client, error)) return;
+    toast.error(errorMessage(error, fallback));
+  };
   return {
     async react(message: ChatMessage, emoji: ReactionEmoji, on: boolean) {
       const token = crypto.randomUUID();
@@ -83,6 +90,7 @@ export function useMessageMutations({
         ),
       );
       let success = false;
+      let failure: unknown;
       try {
         const result = await reactions.mutateAsync({
           messageId: message.id,
@@ -90,6 +98,7 @@ export function useMessageMutations({
           on,
         });
         success = result.ok;
+        if (!result.ok) failure = result;
         if (result.ok)
           update((rows) =>
             rows.map((row) => {
@@ -103,7 +112,8 @@ export function useMessageMutations({
               return { ...row, reactions: withReactionIntents(row).reactions };
             }),
           );
-      } catch {
+      } catch (error) {
+        failure = error;
         success = false;
       } finally {
         invalidateMessage(client, roomId, message.seq);
@@ -121,10 +131,11 @@ export function useMessageMutations({
         );
       }
       if (!success)
-        toast.error("리액션을 바꾸지 못했어요. 다시 시도해 주세요.");
+        reportFailure(failure, "리액션을 바꾸지 못했어요. 다시 시도해 주세요.");
       return success;
     },
     async edit(messageId: string, body: string) {
+      let failure: unknown;
       try {
         const result = await edits.mutateAsync({ messageId, body });
         if (result.ok) {
@@ -148,13 +159,15 @@ export function useMessageMutations({
           );
           return true;
         }
-      } catch {
-        /* 입력은 그대로 남겨 다시 시도할 수 있게 한다. */
+        failure = result;
+      } catch (error) {
+        failure = error;
       }
-      toast.error("메시지를 고치지 못했어요. 다시 시도해 주세요.");
+      reportFailure(failure, "메시지를 고치지 못했어요. 다시 시도해 주세요.");
       return false;
     },
     async remove(messageId: string) {
+      let failure: unknown;
       try {
         const result = await deletions.mutateAsync({ messageId });
         if (result.ok) {
@@ -175,10 +188,11 @@ export function useMessageMutations({
           );
           return true;
         }
-      } catch {
-        /* 확인 창에서 다시 시도할 수 있게 한다. */
+        failure = result;
+      } catch (error) {
+        failure = error;
       }
-      toast.error("메시지를 지우지 못했어요. 다시 시도해 주세요.");
+      reportFailure(failure, "메시지를 지우지 못했어요. 다시 시도해 주세요.");
       return false;
     },
   };

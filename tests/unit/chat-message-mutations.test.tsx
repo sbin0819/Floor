@@ -1,5 +1,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  MutationCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -17,6 +21,10 @@ import {
   withReactionIntents,
 } from "@/features/chat/components/use-message-mutations";
 import type { ActionResult } from "@/lib/actions/result";
+import { toast } from "sonner";
+import { ApiError } from "@/lib/http/errors";
+import { errorMessage, SESSION_EXPIRED_MESSAGE } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
 
 vi.mock("@/features/chat/actions", () => ({
   setReaction: vi.fn(),
@@ -49,7 +57,16 @@ function deferred<T>() {
   return { promise, resolve };
 }
 function setup() {
-  const client = new QueryClient();
+  const client = new QueryClient({
+    mutationCache: new MutationCache({
+      onSuccess: (result) => {
+        notifySessionExpired(client, result);
+      },
+      onError: (error) => {
+        notifySessionExpired(client, error);
+      },
+    }),
+  });
   client.setQueryData(roomMessagesKey("room"), [message()]);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -68,6 +85,96 @@ function setup() {
   return { ...hook, client, row };
 }
 beforeEach(() => vi.resetAllMocks());
+
+const operations = [
+  {
+    name: "reaction",
+    action: vi.mocked(setReaction),
+    run: (mutations: ReturnType<typeof useMessageMutations>) =>
+      mutations.react(message(), "heart", true),
+  },
+  {
+    name: "edit",
+    action: vi.mocked(editMessage),
+    run: (mutations: ReturnType<typeof useMessageMutations>) =>
+      mutations.edit("message", "아직 저장하지 않은 메시지"),
+  },
+  {
+    name: "remove",
+    action: vi.mocked(deleteMessage),
+    run: (mutations: ReturnType<typeof useMessageMutations>) =>
+      mutations.remove("message"),
+  },
+];
+
+describe.each(operations)("$name common mutation failures", (operation) => {
+  it.each(["result", "http"] as const)(
+    "shows only the shared login notice for repeated %s expiry and preserves the message",
+    async (source) => {
+      if (source === "result")
+        operation.action.mockResolvedValue({
+          ok: false,
+          code: "UNAUTHENTICATED",
+        });
+      else
+        operation.action.mockRejectedValue(
+          new ApiError("http", { status: 401 }),
+        );
+      const view = setup();
+      for (let attempt = 0; attempt < 2; attempt++)
+        await act(async () => {
+          expect(await operation.run(view.result.current)).toBe(false);
+        });
+      expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+        SESSION_EXPIRED_MESSAGE,
+        expect.objectContaining({ id: "session-expired" }),
+      );
+      expect(view.row().body).toBe("원문");
+      expect(view.row().deletedAt).toBeNull();
+      expect(withReactionIntents(view.row()).reactions).toEqual(
+        message().reactions,
+      );
+      expect(view.row().reactionIntents?.heart).toBeUndefined();
+      expect(operation.action).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.each(["network", "timeout"] as const)(
+    "uses the shared %s message without changing canonical state",
+    async (kind) => {
+      const error = new ApiError(kind);
+      operation.action.mockRejectedValue(error);
+      const view = setup();
+      await act(async () => {
+        expect(await operation.run(view.result.current)).toBe(false);
+      });
+      expect(toast.error).toHaveBeenCalledExactlyOnceWith(errorMessage(error));
+      expect(view.row().body).toBe("원문");
+      expect(withReactionIntents(view.row()).reactions).toEqual(
+        message().reactions,
+      );
+      expect(operation.action).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("silences cancellation while removing its optimistic intent", async () => {
+    operation.action.mockRejectedValue(
+      new DOMException("Aborted", "AbortError"),
+    );
+    const view = setup();
+    await act(async () => {
+      expect(await operation.run(view.result.current)).toBe(false);
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(view.row().body).toBe("원문");
+    expect(view.row().reactionIntents?.heart).toBeUndefined();
+    expect(withReactionIntents(view.row()).reactions).toEqual(
+      message().reactions,
+    );
+    expect(operation.action).toHaveBeenCalledOnce();
+  });
+});
+
 describe("message action optimistic state", () => {
   it("shows a reaction immediately and removes only its intent on failure, retaining incoming canonical changes", async () => {
     const pending = deferred<ActionResult<{ count: number; mine: boolean }>>();

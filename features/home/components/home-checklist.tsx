@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Circle, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { HomeCard } from "@/features/bookings/components/home-frame";
 import { dismissHomeChecklist } from "@/features/home/actions";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 import type { HomeChecklist as HomeChecklistData } from "../types";
 
 const steps = [
@@ -49,10 +52,11 @@ export function HomeChecklist({
   dismissAction?: typeof dismissHomeChecklist;
 }) {
   const router = useRouter();
+  const client = useQueryClient();
   const [hidden, setHidden] = useState(false);
   const locked = useRef(false);
   const mounted = useRef(false);
-  const deferredFailure = useRef(false);
+  const deferredFailure = useRef<{ message: string | null } | null>(null);
   const mutation = useMutation({
     mutationFn: (input: Record<string, never>) => dismissAction(input),
     retry: false,
@@ -63,9 +67,10 @@ export function HomeChecklist({
       // Activity가 숨긴 동안 끝난 실패는 복귀할 때만 화면과 토스트에 반영한다.
       queueMicrotask(() => {
         if (!mounted.current || !deferredFailure.current) return;
-        deferredFailure.current = false;
+        const { message } = deferredFailure.current;
+        deferredFailure.current = null;
         setHidden(false);
-        toast.error(failure);
+        if (message) toast.error(message);
       });
     }
     return () => {
@@ -74,13 +79,17 @@ export function HomeChecklist({
   }, []);
   const completed = steps.filter(({ key }) => data.steps[key]).length;
   const firstIncomplete = steps.find(({ key }) => !data.steps[key])?.key;
-  function restoreFailure() {
+  function restoreFailure(error: unknown) {
+    const message =
+      isRequestCanceled(error) || notifySessionExpired(client, error)
+        ? null
+        : errorMessage(error, failure);
     if (!mounted.current) {
-      deferredFailure.current = true;
+      deferredFailure.current = { message };
       return;
     }
     setHidden(false);
-    toast.error(failure);
+    if (message) toast.error(message);
   }
   async function dismiss() {
     if (locked.current) return;
@@ -89,12 +98,12 @@ export function HomeChecklist({
     try {
       const result = await mutation.mutateAsync({});
       if (!result.ok) {
-        restoreFailure();
+        restoreFailure(result);
       } else if (mounted.current && window.location.pathname === "/") {
         router.refresh();
       }
-    } catch {
-      restoreFailure();
+    } catch (error) {
+      restoreFailure(error);
     } finally {
       locked.current = false;
     }

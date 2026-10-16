@@ -10,6 +10,9 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
+import { makeQueryClient } from "@/app/providers";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/errors/messages";
+import { ApiError } from "@/lib/http/errors";
 import { AnnouncementForm } from "@/features/admin/components/announcement-form";
 import {
   AnnouncementColumns,
@@ -314,6 +317,72 @@ describe("announcement compose", () => {
     );
     expect(screen.getByText(/하루에 공지를 20개/)).toBeVisible();
     expect(screen.getByLabelText("제목")).toHaveValue("7층 전기 점검 안내");
+  });
+  it.each([false, true])(
+    "keeps drafts and shows only the shared actionable login notice (throws=%s)",
+    async (throws) => {
+      if (throws)
+        vi.mocked(sendAnnouncement).mockRejectedValue(
+          new ApiError("http", { status: 401 }),
+        );
+      else
+        vi.mocked(sendAnnouncement).mockResolvedValue({
+          ok: false,
+          code: "UNAUTHENTICATED",
+        });
+      render(
+        provide(
+          <AnnouncementForm
+            data={announcementsFixture()}
+            initialRequest={announcementRequest(true, false)}
+          />,
+          makeQueryClient(),
+        ),
+      );
+      fill();
+      const button = screen.getByRole("button", { name: "보내기 · 라운지" });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await waitFor(() => expect(button).toBeEnabled());
+        await userEvent.click(button);
+        await waitFor(() =>
+          expect(sendAnnouncement).toHaveBeenCalledTimes(attempt + 1),
+        );
+        expect(await screen.findByText(SESSION_EXPIRED_MESSAGE)).toBeVisible();
+      }
+      expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+        SESSION_EXPIRED_MESSAGE,
+        expect.objectContaining({
+          action: { label: "로그인하기", onClick: expect.any(Function) },
+        }),
+      );
+      expect(screen.getByLabelText("제목")).toHaveValue("7층 전기 점검 안내");
+      expect(screen.getByLabelText("내용")).toHaveValue(
+        "오전 8시까지 점검해요. https://example.com",
+      );
+      expect(navigation.refresh).not.toHaveBeenCalled();
+    },
+  );
+  it("keeps drafts and releases the submit lock silently after cancellation", async () => {
+    vi.mocked(sendAnnouncement).mockRejectedValue(
+      new DOMException("Aborted", "AbortError"),
+    );
+    render(
+      provide(
+        <AnnouncementForm
+          data={announcementsFixture()}
+          initialRequest={announcementRequest(true, false)}
+        />,
+        makeQueryClient(),
+      ),
+    );
+    fill();
+    const button = screen.getByRole("button", { name: "보내기 · 라운지" });
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("제목")).toHaveValue("7층 전기 점검 안내");
+    expect(navigation.refresh).not.toHaveBeenCalled();
   });
   it("does not navigate or clear a preserved form for a late success after leaving", async () => {
     let finish!: (value: Awaited<ReturnType<typeof sendAnnouncement>>) => void;

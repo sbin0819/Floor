@@ -9,6 +9,15 @@ import {
   type fetchRoomMessagesPage,
 } from "@/features/chat/client";
 import { ApiError } from "@/lib/http/errors";
+import { HTTP_TIMEOUT_MS } from "@/lib/http/config";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/errors/messages";
+import {
+  notifySessionExpired,
+  resetSessionExpiredNotice,
+} from "@/lib/errors/session-expired";
+
+const notices = vi.hoisted(() => ({ error: vi.fn(), dismiss: vi.fn() }));
+vi.mock("sonner", () => ({ toast: notices }));
 
 const page: RoomMessagesPage = {
   messages: [],
@@ -358,4 +367,140 @@ describe("shared message request queue", () => {
     await expect(second).resolves.toBe(page);
     expect(load).toHaveBeenCalledTimes(2);
   });
+});
+
+describe("message page session-expiry feedback", () => {
+  const assign = vi.fn();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("window", {
+      location: { pathname: "/s/space-a/room-a", search: "", assign },
+    });
+  });
+
+  it("deduplicates shared and repeated HTTP 401 without navigation or extra retries", async () => {
+    const fetcher = vi.fn(async () => Response.json({}, { status: 401 }));
+    vi.stubGlobal("fetch", fetcher);
+    const client = new QueryClient();
+    const first = requestMessagePage(client, "room", { after: 0 });
+    const duplicate = requestMessagePage(client, "room", { after: 0 });
+    const errors = await Promise.all(
+      [first, duplicate].map((request) =>
+        request.catch((error: unknown) => error),
+      ),
+    );
+    expect(errors[0]).toBeInstanceOf(ApiError);
+    expect(errors[0]).toMatchObject({ kind: "http", status: 401 });
+    expect(errors[1]).toBe(errors[0]);
+    expect(fetcher).toHaveBeenCalledOnce();
+    await expect(
+      requestMessagePage(client, "room", { before: 51 }),
+    ).rejects.toMatchObject({ kind: "http", status: 401 });
+    expect(notices.error).toHaveBeenCalledExactlyOnceWith(
+      SESSION_EXPIRED_MESSAGE,
+      expect.objectContaining({
+        id: "session-expired",
+        action: { label: "로그인하기", onClick: expect.any(Function) },
+      }),
+    );
+    expect(assign).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores a late HTTP 401 after its only caller cancels", async () => {
+    let resolve!: (value: Response) => void;
+    const fetcher = vi.fn(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done;
+        }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const controller = new AbortController();
+    const request = requestMessagePage(
+      new QueryClient(),
+      "room",
+      { after: 0 },
+      { signal: controller.signal, background: true },
+    );
+    const rejected = expect(request).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    await flush();
+    expect(fetcher).toHaveBeenCalledOnce();
+    controller.abort();
+    await rejected;
+    resolve(Response.json({}, { status: 401 }));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(notices.error).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("ignores a pre-login HTTP 401 even when a local handler sees the same error later", async () => {
+    let resolve!: (value: Response) => void;
+    const fetcher = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((done) => {
+            resolve = done;
+          }),
+      )
+      .mockImplementation(async () => Response.json({}, { status: 401 }));
+    vi.stubGlobal("fetch", fetcher);
+    const client = new QueryClient();
+    const request = requestMessagePage(client, "room", { after: 0 });
+    const rejected = request.catch((error: unknown) => error);
+    await flush();
+    resetSessionExpiredNotice(client);
+    resolve(Response.json({}, { status: 401 }));
+    const error: unknown = await rejected;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ kind: "http", status: 401 });
+    notifySessionExpired(client, error);
+    expect(notices.error).not.toHaveBeenCalled();
+    await expect(
+      requestMessagePage(client, "room", { after: 1 }),
+    ).rejects.toMatchObject({ kind: "http", status: 401 });
+    expect(notices.error).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([403, 500, "network", "timeout"] as const)(
+    "keeps ordinary background %s failures silent without retries",
+    async (failure) => {
+      const fetcher = vi.fn((_url: string, init: RequestInit) => {
+        if (typeof failure === "number")
+          return Promise.resolve(Response.json({}, { status: failure }));
+        if (failure === "network")
+          return Promise.reject(new TypeError("private network details"));
+        return new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener(
+            "abort",
+            () => reject(init.signal?.reason),
+            { once: true },
+          );
+        });
+      });
+      vi.stubGlobal("fetch", fetcher);
+      const request = requestMessagePage(
+        new QueryClient(),
+        "room",
+        { after: 0 },
+        { background: true },
+      );
+      const rejected = expect(request).rejects.toMatchObject(
+        typeof failure === "number"
+          ? { kind: "http", status: failure }
+          : { kind: failure, status: undefined },
+      );
+      if (failure === "timeout")
+        await vi.advanceTimersByTimeAsync(HTTP_TIMEOUT_MS);
+      await rejected;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(notices.error).not.toHaveBeenCalled();
+      expect(fetcher).toHaveBeenCalledOnce();
+    },
+  );
 });

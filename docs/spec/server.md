@@ -41,6 +41,18 @@
 - 액션 핸들러는 `lib/db`를 import할 수 없으므로, 여러 쓰기를 묶을 때는 `lib/dal`이 내보내는 `withTransaction(fn)`을 쓴다. `lib/dal` 함수는 드라이버마다 모양이 다른 `db.execute()`의 원시 결과에 기대지 않는다.
 - `lib/dal` 함수는 "누가 부르는지"를 인자로 받지 않는 순수한 데이터 함수다. 권한 판정은 그 위(액션, 쿼리)에서 한다. 단, 접근 범위에 따라 공간 이름·상태를 걸러 주는 조회는 `lib/dal`이 아니라 `features/*/queries.ts`에서 `canAccess()`를 거쳐 만든다.
 
+## 브라우저 HTTP와 오류 안내
+
+- 브라우저의 JSON 조회 9곳과 실시간 토큰 POST는 `lib/http`의 `requestJson(path, schema, options)`로 보낸다. Axios 1.20.0의 Fetch adapter를 사용하고 동일 출처의 `/api/` 경로만 허용한다. 쿠키는 `same-origin`, 일반 조회는 `no-store`로 보내며 게시된 평면도의 기존 캐시 정책은 유지한다. JSON과 전달받은 Zod 스키마를 검증한 값만 반환한다.
+- `ApiError`는 `http`, `network`, `timeout`, `invalid_response`를 구분한다. 실제 HTTP 상태·허용한 결과 코드·`retryAfterMs`만 담는다. 원본 Axios 오류·요청 설정·응답 본문·검색 이메일·서명 URL을 보관하거나 로그로 출력하지 않는다. 취소는 `AbortError`로 정규화하고 `isRequestCanceled()`로 판별한다.
+- 요청 인터셉터는 경로·공통 설정을 적용하고 응답 인터셉터는 오류 정규화만 한다. 인터셉터에서 토스트·이동·자동 재시도를 하지 않는다. 채팅 요청 큐의 429 대기와 제한된 재시도는 유지하며 취소된 요청을 재시도하지 않는다.
+- JSON 조회·실시간 토큰은 요청당 15초, 채팅 파일·R2 업로드는 시도당 120초로 제한한다. 업로드는 진행률·409 복구·제한된 재시도를 위해 기존 XHR을 유지한다. 통화 heartbeat와 일반 leave도 15초로 제한하되 기존 Fetch·HTTP 상태 처리를 유지하고, 종료용 beacon·keepalive는 heartbeat 취소와 분리한다.
+- Better Auth, Ably·LiveKit SDK 내부 통신, Server Component 조회, Server Actions, 이미지·다운로드 링크는 Axios로 바꾸지 않는다. 기존 세션 쿠키·서버 가드를 유지하며 Bearer 토큰 저장이나 refresh-token 인터셉터를 추가하지 않는다.
+- 요청 소유자가 `AbortSignal`을 전달하고 해제·닫기·불필요해진 검색이나 토큰 요청을 취소한다. 공유 조회는 TanStack Query의 구독 수명을 따른다. 한 소비자의 해제나 전역 경로 변경으로 다른 소비자가 쓰는 요청을 취소하지 않는다. 숨겨진 화면은 새 폴링을 멈추고 기존 데이터·입력은 유지한다. 타이머와 리스너는 요청 종료 시 해제한다.
+- HTTP 오류와 액션 실패는 `lib/errors`의 공통 한국어 안내를 사용하되 도메인별 문구·필드 오류·mutation의 검증과 성공 처리는 유지한다. 취소는 오류 안내를 만들지 않으며 일반 백그라운드 실패도 반복 토스트를 만들지 않는다.
+- HTTP `401` 또는 액션 `UNAUTHENTICATED`에는 입력을 유지하고 재로그인 안내만 표시한다. QueryClient 수명 안에서 중복을 억제하고 로그인 성공 시 초기화한다. 로그인 이전 요청의 늦은 실패는 새 안내를 만들지 않는다. 이 상태를 인증 여부의 캐시로 사용하지 않는다. 로그인 버튼을 누를 때만 이동하며 회원은 `safeNext`로 현재 주소를 보존하고 운영자는 기존 운영자 로그인 주소를 사용한다.
+- abort는 클라이언트의 대기 중단이며 서버 트랜잭션 롤백이 아니다. Server Action에 `Promise.race`로 임의 timeout을 붙이거나 실패로 간주해 자동 재전송하지 않는다.
+
 ## 액션 결과 타입
 
 액션은 예외를 던지지 않는다. 클라이언트가 분기할 수 있게 코드를 돌려준다.

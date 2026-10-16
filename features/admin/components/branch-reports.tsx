@@ -9,7 +9,11 @@ import {
   useState,
   useTransition,
 } from "react";
-import { useIsMutating, useMutation } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +25,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { resolveReports } from "@/features/admin/report-actions";
+import { errorMessage } from "@/lib/errors/messages";
+import { notifySessionExpired } from "@/lib/errors/session-expired";
+import { isRequestCanceled } from "@/lib/http/errors";
 import type { BranchReportGroup, BranchReportsData } from "../reports-types";
 import {
   reportsHref,
@@ -34,6 +41,7 @@ import { ReportCardsSkeleton } from "./reports-frame";
 
 export function BranchReports({ data }: { data: BranchReportsData }) {
   const router = useRouter();
+  const client = useQueryClient();
   const [navigating, startTransition] = useTransition();
   const [selected, setSelected] = useOptimistic<ReportTab>(data.tab);
   const [finished, setFinished] = useState<Set<string>>(() => new Set());
@@ -81,7 +89,7 @@ export function BranchReports({ data }: { data: BranchReportsData }) {
             ? "다른 운영자가 이미 처리했어요"
             : adminErrorMessage(result.code);
         setError(message);
-        toast.error(message);
+        if (!notifySessionExpired(client, result)) toast.error(message);
         if (result.code === "NOT_FOUND") {
           setConfirmation(null);
           router.refresh();
@@ -95,11 +103,12 @@ export function BranchReports({ data }: { data: BranchReportsData }) {
       tabs.current
         ?.querySelector<HTMLAnchorElement>('[aria-current="page"]')
         ?.focus();
-    } catch {
+    } catch (error) {
+      if (isRequestCanceled(error)) return;
       if (current() && before === generation.current) {
-        const message = adminErrorMessage("INTERNAL");
+        const message = errorMessage(error, adminErrorMessage("INTERNAL"));
         setError(message);
-        toast.error(message);
+        if (!notifySessionExpired(client, error)) toast.error(message);
       }
     } finally {
       lock.current = false;

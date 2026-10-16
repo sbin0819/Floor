@@ -11,6 +11,9 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
+import { makeQueryClient } from "@/app/providers";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/errors/messages";
+import { ApiError } from "@/lib/http/errors";
 import { BranchReports } from "@/features/admin/components/branch-reports";
 import { ReportCard } from "@/features/admin/components/report-card";
 import {
@@ -254,6 +257,65 @@ describe("신고 UI", () => {
     );
     expect(screen.queryByText(/private DB data/)).not.toBeInTheDocument();
     expect(screen.getAllByRole("article")).toHaveLength(2);
+  });
+  it.each([false, true])(
+    "인증 실패는 공통 로그인 안내 한 번만 표시하고 신고를 유지한다 (throws=%s)",
+    async (throws) => {
+      if (throws)
+        vi.mocked(resolveReports).mockRejectedValue(
+          new ApiError("http", { status: 401 }),
+        );
+      else
+        vi.mocked(resolveReports).mockResolvedValue({
+          ok: false,
+          code: "UNAUTHENTICATED",
+        });
+      render(
+        provider(
+          <BranchReports data={branchReportsFixture()} />,
+          makeQueryClient(),
+        ),
+      );
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const button = within(first()).getByRole("button", {
+          name: "문제 없음",
+        });
+        await waitFor(() => expect(button).toBeEnabled());
+        await userEvent.click(button);
+        await waitFor(() =>
+          expect(resolveReports).toHaveBeenCalledTimes(attempt + 1),
+        );
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+          SESSION_EXPIRED_MESSAGE,
+        );
+      }
+      expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+        SESSION_EXPIRED_MESSAGE,
+        expect.objectContaining({
+          action: { label: "로그인하기", onClick: expect.any(Function) },
+        }),
+      );
+      expect(screen.getAllByRole("article")).toHaveLength(2);
+      expect(nav.refresh).not.toHaveBeenCalled();
+    },
+  );
+  it("취소된 요청은 안내 없이 카드를 유지하고 제출 잠금을 푼다", async () => {
+    vi.mocked(resolveReports).mockRejectedValue(
+      new DOMException("Aborted", "AbortError"),
+    );
+    render(
+      provider(
+        <BranchReports data={branchReportsFixture()} />,
+        makeQueryClient(),
+      ),
+    );
+    const button = within(first()).getByRole("button", { name: "문제 없음" });
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(nav.refresh).not.toHaveBeenCalled();
   });
   it("이동한 뒤의 늦은 성공은 새 화면을 새로고침하지 않는다", async () => {
     const pending = deferred<ActionResult<{ messageId: string }>>();

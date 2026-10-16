@@ -71,6 +71,8 @@ features/bookings/       예약·취소·기본 지점 액션, 조회·시간·�
 lib/actions/             ActionResult, ActionError, createAction, 오류 변환
 lib/auth/                Better Auth, 세션 가드, safeNext, 운영자 생성
 lib/email/               EmailSender, 콘솔·메모리 구현, 인증·팀 초대 메일 문구
+lib/http/                브라우저 JSON 요청, 안전한 ApiError, timeout·abort
+lib/errors/              공통 한국어 오류 안내, 중복 없는 재로그인 안내
 lib/db/                  Neon 클라이언트, Drizzle 스키마, tstzrange 타입
 lib/dal/                 DB 접근 함수와 withTransaction
 lib/permissions/         권한 키·기본값, can(), canAccess(), 세션 기반 로더
@@ -119,6 +121,29 @@ Better Auth를 직접 부르는 곳은 `lib/auth/*`와 인증 Route Handler로 �
 로그인 뒤 목적지는 `safeNext()`를 통과한 같은 사이트의 경로만 사용해요. 외부 주소, 역슬래시·제어 문자, 인증 API, 로그인 화면으로 되돌아가는 목적지는 `/`로 바꿔요. 이메일 인증 후에는 목적지와 무관하게 `/login?verified=1`로 이동하며 자동 로그인하지 않아요. `<Suspense>` 안의 `redirect()`는 틀이 먼저 전송되면 HTTP 200으로 처리될 수 있어요.
 
 새 Next.js 코드를 작성하기 전에는 설치된 버전의 `node_modules/next/dist/docs/`를 확인해요. 특히 `01-app/02-guides/authentication-with-cache-components.md`에 이 규칙의 배경이 있어요.
+
+### 브라우저 HTTP와 오류 안내
+
+브라우저의 JSON 조회 9곳과 실시간 토큰 POST는 `lib/http`의 `requestJson(path, schema, options)`를 사용해요. Axios 1.20.0의 Fetch adapter로 같은 출처의 `/api/` 주소만 요청하고, 기존 세션 쿠키를 `same-origin`으로 보내요. 일반 조회는 `no-store`, 게시된 평면도는 기존 캐시 정책을 유지해요. JSON과 Zod 스키마를 검증한 값만 반환하고 Axios 응답 객체는 화면에 전달하지 않아요.
+
+`ApiError`는 HTTP 오류·연결 문제·시간 초과·잘못된 응답을 구분해요. 실제 HTTP 상태, 허용한 결과 코드와 재시도 대기 시간만 담고 원문 응답·요청 설정·검색 이메일·서명 URL은 보관하거나 출력하지 않아요. 취소는 `AbortError`로 통일하고 `isRequestCanceled()`로 구분해요. 인터셉터는 오류 정규화만 하고 토스트·이동·자동 재시도를 실행하지 않아요. 채팅 요청 큐의 429 대기와 제한된 재시도는 기존 위치에서 처리해요.
+
+| 요청 | 시간 제한과 전송 방식 |
+| --- | --- |
+| JSON 조회·실시간 토큰 | 요청당 15초, Axios Fetch adapter |
+| 통화 heartbeat·일반 leave | 요청당 15초, 기존 Fetch 유지. 탭 종료의 beacon·keepalive는 heartbeat 취소와 분리 |
+| 채팅 파일·R2 업로드 | 시도당 120초, 진행률을 위한 기존 XHR 유지 |
+| Server Action | 임의 timeout·자동 재전송을 추가하지 않음 |
+
+Better Auth와 Ably·LiveKit SDK 내부 통신, Server Component 조회, 이미지·다운로드 링크는 이 클라이언트로 바꾸지 않아요. Bearer 토큰이나 refresh-token 인터셉터도 추가하지 않아요. 요청의 소유자가 `AbortSignal`을 전달하며, 공유 조회는 TanStack Query의 구독 수명을 따라요. 한 화면을 닫거나 경로를 바꿨다고 다른 소비자의 요청까지 일괄 취소하지 않아요. 취소는 브라우저의 대기를 끝내는 것이지 서버 트랜잭션을 되돌리는 기능은 아니에요.
+
+공통 오류 문구는 `lib/errors`에서 제공하되 예약 충돌·정원·입력별 오류 같은 도메인 안내는 유지해요. `401` 또는 액션의 `UNAUTHENTICATED`에는 입력을 지우거나 즉시 이동하지 않고 QueryClient별로 재로그인 안내를 한 번 표시해요. 로그인 버튼을 눌러야 이동하며 회원은 `safeNext`로 현재 주소를, 운영자는 기존 운영자 로그인 경로를 사용해요. 로그인 성공 시 안내 상태를 초기화하며 로그인 이전 요청의 늦은 실패로 안내를 다시 띄우지 않아요. 이 상태는 인증 캐시가 아니에요. 일반 백그라운드 실패에는 기존 데이터를 유지하고 반복 토스트를 띄우지 않아요.
+
+기존 HTTP 테스트는 공통 오류 타입, 실제 HTTP 200 응답의 스키마 실패, Axios의 비동기 요청 시작 시점과 공통 안내 문구에 맞춰 갱신했어요. 민감 필드 거절·프로필 404·평면도 캐시·취소 신호·늦은 응답 보호 단언은 유지해요. 응답 본문을 읽는 중의 timeout, Zod 변환 예외의 원문 은닉, 여러 소비자의 취소 수명, 로그인 뒤 이전 요청 실패, 업로드 복구도 별도로 검사해요.
+
+Axios의 Fetch adapter가 지원하는 `Request: null`, `Response: null`은 1.20.0 배포 타입에서 빠져 있어 해당 두 줄에만 이유를 적은 `@ts-expect-error`를 사용해요. JSON 요청에는 스트림·진행률 래핑이 필요하지 않으며, 업로드의 진행률은 계속 XHR에서 처리해요.
+
+이번 정리의 최종 검증에서 `pnpm lint`, `pnpm typecheck`, 기본·LA 시간대의 `pnpm test --maxWorkers=2`가 통과했어요. 두 시간대 모두 541개 파일·8,962개 테스트를 실행했어요. 빌드와 테스트를 한꺼번에 실행했을 때 기존 UI 테스트의 5초 제한에 걸려 해당 실행은 중단했고, 테스트 제한이나 단언을 바꾸지 않고 워커 수만 줄여 전체를 다시 검사했어요. DB·Auth·Ably·LiveKit·R2 비밀 값을 비운 프로덕션 빌드, Storybook 빌드, Chromium E2E 29개도 통과했어요. Storybook의 기존 `use client`·큰 청크 경고는 남아 있어요. 실제 외부 서비스 통신·파일 업로드·DB 쓰기는 실행하지 않았어요.
 
 ### 조회 속도와 로딩
 
