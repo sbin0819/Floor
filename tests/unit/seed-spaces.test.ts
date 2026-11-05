@@ -23,13 +23,19 @@ describe("strict lounge and community seed", () => {
     expect(seedCommunityVoiceId(crypto.randomUUID())).not.toBe(voice);
     expect(() => seedCommunityVoiceId("not-a-uuid")).toThrow();
   });
-  it("loads six members and six messages without the documentation note", () => {
+  it("loads every lounge with the operator, the spam report and two communities without the documentation note", () => {
     const data = loadSeedSpaces(seed);
-    expect(data.loungeMembers[0]?.userKeys).toHaveLength(3);
-    expect(data.loungeMessages).toHaveLength(2);
-    expect(data.communities).toHaveLength(1);
+    expect(data.loungeMembers).toHaveLength(seed.branches.length);
+    for (const lounge of data.loungeMembers)
+      expect(lounge.userKeys).toContain("admin");
+    expect(data.loungeMembers[0]?.userKeys).toHaveLength(11);
+    expect(data.loungeMessages).toHaveLength(20);
+    expect(data.loungeReports).toEqual([
+      expect.objectContaining({ messageIndex: 4, reason: "spam" }),
+    ]);
+    expect(data.communities).toHaveLength(2);
     expect(data.communities[0]?.channels).toHaveLength(2);
-    expect(data.communities[0]?.messages).toHaveLength(4);
+    expect(data.communities[0]?.messages).toHaveLength(7);
     expect(data).not.toHaveProperty("note");
   });
   it("allows empty scenarios and an owner-only community without messages", () => {
@@ -38,7 +44,12 @@ describe("strict lounge and community seed", () => {
         { note: "", loungeMembers: [], loungeMessages: [], communities: [] },
         seed,
       ),
-    ).toEqual({ loungeMembers: [], loungeMessages: [], communities: [] });
+    ).toEqual({
+      loungeMembers: [],
+      loungeMessages: [],
+      loungeReports: [],
+      communities: [],
+    });
     const raw = structuredClone(file);
     Object.assign(raw.communities[0]!, {
       adminKeys: [],
@@ -58,13 +69,23 @@ describe("strict lounge and community seed", () => {
   });
   it("selects lounge data only and never includes communities", () => {
     const data = loadSeedSpaces(seed);
-    expect(selectSeedLounges(data, [file.loungeMembers[0]!.branchId])).toEqual({
-      ...data,
+    const gangnam = file.loungeMembers[0]!.branchId;
+    expect(selectSeedLounges(data, [gangnam])).toEqual({
+      loungeMembers: data.loungeMembers.filter(
+        ({ branchId }) => branchId === gangnam,
+      ),
+      loungeMessages: data.loungeMessages.filter(
+        ({ branchId }) => branchId === gangnam,
+      ),
+      loungeReports: data.loungeReports.filter(
+        ({ branchId }) => branchId === gangnam,
+      ),
       communities: [],
     });
     expect(selectSeedLounges(data, [])).toEqual({
       loungeMembers: [],
       loungeMessages: [],
+      loungeReports: [],
       communities: [],
     });
   });
@@ -153,7 +174,7 @@ describe("strict lounge and community seed", () => {
     {
       name: "nonmember lounge author",
       change: (raw) => {
-        raw.loungeMessages[0]!.authorKey = "admin";
+        raw.loungeMessages[0]!.authorKey = "test6";
       },
     },
     {

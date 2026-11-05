@@ -13,10 +13,6 @@ import {
 import * as schema from "@/lib/db/schema";
 import * as authModule from "@/lib/auth/auth";
 import * as seedDal from "@/lib/dal/seed";
-import {
-  captureSeedRound2Audit,
-  compareSeedRound2Audit,
-} from "@/lib/dal/seed-round2-audit";
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedPlans } from "@/lib/seed/seed-plans";
 import {
@@ -31,6 +27,43 @@ const { users, branches, floors, spaces, floorPlans } = schema;
 const data = loadSeedData();
 const plans = [...data.floorPlans, ...loadSeedPlans(data)];
 const now = new Date("2026-10-12T03:00:00Z");
+
+type TableSnapshot = Map<string, Map<string, string>>;
+// 공개 스키마의 모든 표를 행 단위로 찍어, 평면도 추가가 다른 행을 건드리지 않는지 확인한다.
+async function captureTables(db: TestDatabase["db"]): Promise<TableSnapshot> {
+  const tables = await db.execute<{ name: string }>(
+    sql`select table_name as name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by table_name`,
+  );
+  const snapshot: TableSnapshot = new Map();
+  for (const { name } of tables.rows) {
+    const rows = await db.execute<{ row: Record<string, unknown> }>(
+      sql`select to_jsonb(t) as row from ${sql.identifier(name)} t`,
+    );
+    const entries = rows.rows.map(({ row }) => {
+      const json = JSON.stringify(row);
+      return [typeof row.id === "string" ? row.id : json, json] as const;
+    });
+    snapshot.set(name, new Map(entries));
+  }
+  return snapshot;
+}
+function compareTables(before: TableSnapshot, after: TableSnapshot) {
+  const issues: { table: string; kind: "changed_row" | "removed_row" }[] = [];
+  const added: { table: string; count: number; keys: string[] }[] = [];
+  for (const [table, rows] of after) {
+    const previous = before.get(table) ?? new Map<string, string>();
+    const keys: string[] = [];
+    for (const [key, json] of rows) {
+      const old = previous.get(key);
+      if (old === undefined) keys.push(key);
+      else if (old !== json) issues.push({ table, kind: "changed_row" });
+    }
+    for (const key of previous.keys())
+      if (!rows.has(key)) issues.push({ table, kind: "removed_row" });
+    if (keys.length) added.push({ table, count: keys.length, keys });
+  }
+  return { ok: issues.length === 0 && added.length === 0, issues, added };
+}
 const admin = "00000000-0000-4000-8000-000000000001";
 
 describe("append-only floor plan seed", () => {
@@ -146,7 +179,7 @@ describe("append-only floor plan seed", () => {
       body: "기존 대화 그대로",
       createdAt: now,
     });
-    const before = await captureSeedRound2Audit({}, database.db);
+    const before = await captureTables(database.db);
     statements.length = 0;
     const result = await apply();
     expect(result.counts).toEqual({ floorPlans: 11 });
@@ -174,8 +207,8 @@ describe("append-only floor plan seed", () => {
         )[0]!.publishedPlanId,
       ).toBe(plan.id);
     }
-    const after = await captureSeedRound2Audit({}, database.db);
-    const changes = compareSeedRound2Audit(before, after);
+    const after = await captureTables(database.db);
+    const changes = compareTables(before, after);
     expect(changes.issues).toHaveLength(11);
     expect(
       changes.issues.every(
@@ -239,7 +272,7 @@ describe("append-only floor plan seed", () => {
       .update(floors)
       .set({ publishedPlanId: null })
       .where(eq(floors.id, first.floorId));
-    const before = await captureSeedRound2Audit({}, database.db);
+    const before = await captureTables(database.db);
     statements.length = 0;
     const repeated = await apply(receipt);
     expect(repeated.floorPlans?.applied).toBe(false);
@@ -250,12 +283,11 @@ describe("append-only floor plan seed", () => {
       ),
     ).toBe(true);
     expect(writes()).toEqual([]);
-    expect(
-      compareSeedRound2Audit(
-        before,
-        await captureSeedRound2Audit({}, database.db),
-      ),
-    ).toEqual({ ok: true, issues: [], added: [] });
+    expect(compareTables(before, await captureTables(database.db))).toEqual({
+      ok: true,
+      issues: [],
+      added: [],
+    });
   });
   it("also performs no writes without a receipt when every floor already has a plan", async () => {
     await apply();
@@ -296,16 +328,15 @@ describe("append-only floor plan seed", () => {
         .set({ publishedPlanId: id })
         .where(eq(floors.id, first.floorId));
     }
-    const before = await captureSeedRound2Audit({}, database.db);
+    const before = await captureTables(database.db);
     statements.length = 0;
     await expect(apply()).rejects.toThrow(SeedError);
     expect(writes()).toEqual([]);
-    expect(
-      compareSeedRound2Audit(
-        before,
-        await captureSeedRound2Audit({}, database.db),
-      ),
-    ).toEqual({ ok: true, issues: [], added: [] });
+    expect(compareTables(before, await captureTables(database.db))).toEqual({
+      ok: true,
+      issues: [],
+      added: [],
+    });
   });
   it("rolls back all inserted plans and floor pointers after an intermediate failure", async () => {
     const insert = seedDal.putSeedPlan;
@@ -314,30 +345,28 @@ describe("append-only floor plan seed", () => {
       if (++calls === 3) throw new Error("fixture failure");
       return insert(...args);
     });
-    const before = await captureSeedRound2Audit({}, database.db);
+    const before = await captureTables(database.db);
     await expect(apply()).rejects.toThrow(SeedError);
-    expect(
-      compareSeedRound2Audit(
-        before,
-        await captureSeedRound2Audit({}, database.db),
-      ),
-    ).toEqual({ ok: true, issues: [], added: [] });
+    expect(compareTables(before, await captureTables(database.db))).toEqual({
+      ok: true,
+      issues: [],
+      added: [],
+    });
   });
   it("treats an earlier receipt as an audit record, not authority to repair or reject existing plans", async () => {
     const receipt = (await apply()).floorPlans!.receipt;
     receipt.manifestHash = "0".repeat(64);
     receipt.added.pop();
     receipt.added[0]!.createdBy = crypto.randomUUID();
-    const before = await captureSeedRound2Audit({}, database.db);
+    const before = await captureTables(database.db);
     statements.length = 0;
     expect((await apply(receipt)).counts.floorPlans).toBe(0);
     expect(writes()).toEqual([]);
-    expect(
-      compareSeedRound2Audit(
-        before,
-        await captureSeedRound2Audit({}, database.db),
-      ),
-    ).toEqual({ ok: true, issues: [], added: [] });
+    expect(compareTables(before, await captureTables(database.db))).toEqual({
+      ok: true,
+      issues: [],
+      added: [],
+    });
   });
   it("rejects a different database before changing data", async () => {
     statements.length = 0;
@@ -481,14 +510,6 @@ describe("append-only floor plan seed", () => {
     { resetPasswords: true },
     { resetData: true },
     { branchIds: [data.branches[0]!.id] },
-    { bookingRound2: { hostHash: "a".repeat(64), receipt: null } },
-    {
-      chatSpaces: {
-        targetHash: "a".repeat(64),
-        databaseName: "postgres",
-        receipt: null,
-      },
-    },
   ])(
     "rejects exclusive mode %j before opening a transaction",
     async (extra) => {

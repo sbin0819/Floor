@@ -7,7 +7,7 @@ import { nameSchema, passwordSchema } from "@/features/auth/schema";
 import { floorPlanSchema } from "@/lib/floor-plan/schema";
 import { amenityKeys } from "@/lib/spaces/amenities";
 import { openHoursSchema } from "@/lib/time/open-hours";
-import { isValidTimeZone, SLOT_MINUTES, timeToMinutes } from "@/lib/time/zoned";
+import { isValidTimeZone } from "@/lib/time/zoned";
 
 const uuid = z.uuid().transform((value) => value.toLowerCase());
 const key = z.string().min(1);
@@ -16,21 +16,6 @@ const amenities = z.array(z.enum(amenityKeys));
 const timezone = z
   .string()
   .refine(isValidTimeZone, "올바른 시간대를 입력해 주세요.");
-function clockMinutes(value: string): number {
-  try {
-    return timeToMinutes(value);
-  } catch {
-    return Number.NaN;
-  }
-}
-const clock = z
-  .string()
-  .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/u, "시각은 HH:mm 형식이어야 해요.")
-  .refine(
-    (value) => clockMinutes(value) % SLOT_MINUTES === 0,
-    "시각은 30분 단위여야 해요.",
-  );
-const endClock = z.union([clock, z.literal("24:00")]);
 const floorFields = {
   id: uuid,
   branchId: uuid,
@@ -90,6 +75,7 @@ const seedSchema = z.strictObject({
       email: z.email().toLowerCase(),
       name: nameSchema,
       password: passwordSchema,
+      defaultBranchId: uuid.nullable().default(null),
     }),
   ),
   teams: z.array(
@@ -127,44 +113,6 @@ const seedSchema = z.strictObject({
       documentFile: z.literal("gangnam-7f.plan.json"),
       createdByKey: key,
     }),
-  ),
-  bookings: z.array(
-    z
-      .strictObject({
-        id: uuid,
-        spaceId: uuid,
-        dayOffset: z.int().nonnegative(),
-        start: clock,
-        end: endClock,
-        userKey: key,
-        teamId: uuid.nullable(),
-        title: z.string().nullable(),
-        status: z.enum(["confirmed", "cancelled"]),
-        cancelledByKey: key.nullable(),
-      })
-      .refine((row) => clockMinutes(row.start) < clockMinutes(row.end), {
-        path: ["end"],
-        message: "예약의 끝은 시작보다 뒤여야 해요.",
-      }),
-  ),
-  spaceBlocks: z.array(
-    z
-      .strictObject({
-        id: uuid,
-        spaceId: uuid,
-        startDayOffset: z.int().nonnegative(),
-        start: clock,
-        endDayOffset: z.int().nonnegative(),
-        end: endClock,
-        reason: z.string().nullable(),
-        createdByKey: key,
-      })
-      .refine(
-        (row) =>
-          row.endDayOffset * 1440 + clockMinutes(row.end) >
-          row.startDayOffset * 1440 + clockMinutes(row.start),
-        { path: ["end"], message: "점검의 끝은 시작보다 뒤여야 해요." },
-      ),
   ),
 });
 
@@ -206,8 +154,6 @@ const filesSchema = z
       "teams",
       "accessGrants",
       "floorPlans",
-      "bookings",
-      "spaceBlocks",
     ] as const)
       unique<{ id: string }>(seed[collection], (row) => row.id, [
         "seed",
@@ -358,6 +304,14 @@ const filesSchema = z
           "편의 시설이 가리키는 7층 공간이 없거나 이름이 달라요.",
         );
     });
+    seed.users.forEach((row, index) => {
+      if (row.defaultBranchId !== null)
+        check(
+          branches.has(row.defaultBranchId),
+          ["seed", "users", index, "defaultBranchId"],
+          "지점",
+        );
+    });
     seed.teams.forEach((row, index) => {
       check(
         users.has(row.createdByKey),
@@ -455,42 +409,6 @@ const filesSchema = z
             );
         });
     });
-    seed.bookings.forEach((row, index) => {
-      check(
-        spaceRows.has(row.spaceId),
-        ["seed", "bookings", index, "spaceId"],
-        "공간",
-      );
-      check(
-        users.has(row.userKey),
-        ["seed", "bookings", index, "userKey"],
-        "사용자",
-      );
-      if (row.teamId !== null)
-        check(
-          teams.has(row.teamId),
-          ["seed", "bookings", index, "teamId"],
-          "팀",
-        );
-      if (row.cancelledByKey !== null)
-        check(
-          users.has(row.cancelledByKey),
-          ["seed", "bookings", index, "cancelledByKey"],
-          "사용자",
-        );
-    });
-    seed.spaceBlocks.forEach((row, index) => {
-      check(
-        spaceRows.has(row.spaceId),
-        ["seed", "spaceBlocks", index, "spaceId"],
-        "공간",
-      );
-      check(
-        users.has(row.createdByKey),
-        ["seed", "spaceBlocks", index, "createdByKey"],
-        "사용자",
-      );
-    });
   });
 
 export function parseSeedData(files: {
@@ -541,8 +459,6 @@ export function parseSeedData(files: {
       createdByKey: row.createdByKey,
       document: plan,
     })),
-    bookings: seed.bookings,
-    spaceBlocks: seed.spaceBlocks,
   };
 }
 

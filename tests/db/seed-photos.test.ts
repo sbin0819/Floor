@@ -11,7 +11,7 @@ import {
 } from "vitest";
 import photoFile from "@/docs/spec/examples/seed-photos.json";
 import { createAuth, type AuthInstance } from "@/lib/auth/auth";
-import * as seedDal from "@/lib/dal/seed";
+import * as scheduleDal from "@/lib/dal/seed-schedule";
 import { branches, floors, spacePhotos, spaces, users } from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import { loadSeedData } from "@/lib/seed/data";
@@ -223,7 +223,7 @@ describe("transactional photo seeding", () => {
       .select()
       .from(users)
       .orderBy(users.id);
-    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+    vi.spyOn(scheduleDal, "insertSeedBookings").mockRejectedValueOnce(
       new Error("simulated late seed failure"),
     );
     await expect(seed()).rejects.toThrow("모든 시드 변경을 되돌렸어요.");

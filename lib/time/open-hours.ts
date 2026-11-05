@@ -55,27 +55,35 @@ export function getOpenHours(
     : { ...(hours ?? { open: "09:00", close: "22:00" }) };
 }
 
+function nearestOperatingDate(
+  date: string,
+  openHours: unknown,
+  step: 1 | -1,
+): string {
+  let current = date;
+  let closedDays = 0;
+  while (getOpenHours(openHours, current) === null) {
+    closedDays += 1;
+    if (closedDays >= dayKeys.length)
+      throw new RangeError("The branch has no operating days.");
+    current = addDays(current, step);
+  }
+  return current;
+}
+
+// 기준일은 지점 시간대의 오늘이고, 오늘이 쉬는 날이면 다음 운영일이다.
+// 오프셋은 기준일에서 쉬는 날을 건너뛰고 센 운영일 수이며, 음수면 거슬러 간다.
 export function getOperatingDate(
   now: Date,
   timeZone: string,
   openHours: unknown,
   dayOffset = 0,
 ): string {
-  if (!Number.isSafeInteger(dayOffset) || dayOffset < 0)
-    throw new RangeError("Operating day offset must be a nonnegative integer.");
-  let date = localDate(now, timeZone);
-  let remaining = dayOffset;
-  let closedDays = 0;
-  for (;;) {
-    if (getOpenHours(openHours, date) !== null) {
-      if (remaining === 0) return date;
-      remaining -= 1;
-      closedDays = 0;
-    } else {
-      closedDays += 1;
-      if (closedDays >= dayKeys.length)
-        throw new RangeError("The branch has no operating days.");
-    }
-    date = addDays(date, 1);
-  }
+  if (!Number.isSafeInteger(dayOffset))
+    throw new RangeError("Operating day offset must be an integer.");
+  let date = nearestOperatingDate(localDate(now, timeZone), openHours, 1);
+  const step = dayOffset < 0 ? -1 : 1;
+  for (let remaining = Math.abs(dayOffset); remaining > 0; remaining -= 1)
+    date = nearestOperatingDate(addDays(date, step), openHours, step);
+  return date;
 }

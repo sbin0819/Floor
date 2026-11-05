@@ -20,12 +20,12 @@ import {
 import type { SeedBranchScope } from "@/lib/seed/scope";
 
 export async function readSeedScopeRows(
-  { data }: SeedBranchScope,
+  { data, schedule }: SeedBranchScope,
   db: DalDatabase,
 ) {
   const teamIds = [
     ...new Set([
-      ...data.bookings.flatMap(({ teamId }) => (teamId ? [teamId] : [])),
+      ...schedule.bookings.flatMap(({ teamId }) => (teamId ? [teamId] : [])),
       ...data.accessGrants.map(({ teamId }) => teamId),
     ]),
   ];
@@ -89,27 +89,17 @@ export async function readSeedScopeRows(
             ),
           )
       : [],
-    data.bookings.length
+    schedule.bookingIds.length
       ? db
           .select({ id: bookings.id, spaceId: bookings.spaceId })
           .from(bookings)
-          .where(
-            inArray(
-              bookings.id,
-              data.bookings.map(({ id }) => id),
-            ),
-          )
+          .where(inArray(bookings.id, schedule.bookingIds))
       : [],
-    data.spaceBlocks.length
+    schedule.blockIds.length
       ? db
           .select({ id: spaceBlocks.id, spaceId: spaceBlocks.spaceId })
           .from(spaceBlocks)
-          .where(
-            inArray(
-              spaceBlocks.id,
-              data.spaceBlocks.map(({ id }) => id),
-            ),
-          )
+          .where(inArray(spaceBlocks.id, schedule.blockIds))
       : [],
     data.floorPlans.length
       ? db

@@ -10,6 +10,7 @@ import {
   chatSpaces,
   messages,
   notifications,
+  reports,
 } from "@/lib/db/schema";
 import { seedCommunityVoiceId, type SeedSpacesData } from "@/lib/seed/spaces";
 import { SeedError } from "@/lib/seed/errors";
@@ -65,11 +66,12 @@ export async function syncSeedChatSpaces(
 
   let chatMessages = 0;
   let spaceMembers = 0;
+  const loungeMessageIds = new Map<string, string[]>();
   async function writeMessages(
     roomId: string,
     entries: readonly SeedMessage[],
     baseSeq = 0,
-  ) {
+  ): Promise<string[]> {
     const rows = entries.map((entry, index) => ({
       roomId,
       authorId: userId(entry.authorKey),
@@ -78,7 +80,12 @@ export async function syncSeedChatSpaces(
       seq: baseSeq + index + 1,
       createdAt: instant(entry.minutesAgo),
     }));
-    if (rows.length) await database.insert(messages).values(rows);
+    const inserted = rows.length
+      ? await database
+          .insert(messages)
+          .values(rows)
+          .returning({ id: messages.id, seq: messages.seq })
+      : [];
     const [last] = await database
       .select({
         seq: sql<number>`coalesce(max(${messages.seq}), 0)::double precision`,
@@ -107,6 +114,7 @@ export async function syncSeedChatSpaces(
         })),
       );
     chatMessages += rows.length;
+    return [...inserted].sort((a, b) => a.seq - b.seq).map(({ id }) => id);
   }
 
   const seedUserIds = [...userIds.values()];
@@ -182,7 +190,8 @@ export async function syncSeedChatSpaces(
       )::double precision`,
         })
         .from(sql`(select 1) as seed_cursor`);
-      await writeMessages(room.id, roomEntries, base?.seq ?? 0);
+      const ids = await writeMessages(room.id, roomEntries, base?.seq ?? 0);
+      if (room.id === lounge?.id) loungeMessageIds.set(branchId, ids);
     }
   }
 
@@ -274,5 +283,32 @@ export async function syncSeedChatSpaces(
     communitySpaces: data.communities.length,
     spaceMembers,
     chatMessages,
+    loungeMessageIds,
   };
+}
+
+/** 라운지 메시지 신고. 같은 신고한 사람의 신고는 사람 2차 시드가 먼저 지운다. */
+export async function insertSeedReports(
+  rows: readonly {
+    messageId: string;
+    targetUserId: string;
+    reporterIds: readonly string[];
+    reason: "spam" | "harassment" | "inappropriate" | "other";
+    detail: string | null;
+    createdAt: Date;
+  }[],
+  database: DalDatabase,
+) {
+  const values = rows.flatMap((row) =>
+    row.reporterIds.map((reporterId, index) => ({
+      reporterId,
+      targetUserId: row.targetUserId,
+      messageId: row.messageId,
+      reason: row.reason,
+      detail: index === 0 ? row.detail : null,
+      createdAt: new Date(row.createdAt.getTime() + index * 60_000),
+    })),
+  );
+  if (values.length) await database.insert(reports).values(values);
+  return values.length;
 }

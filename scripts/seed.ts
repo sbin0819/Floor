@@ -2,16 +2,12 @@ import { closeDatabase } from "@/lib/dal";
 import { getEnv } from "@/lib/env";
 import { runSeed } from "@/lib/seed/run-seed";
 import { runSeedCommand } from "./seed-command";
-import { createSeedReceiptStore } from "./seed-receipt";
-import { createChatSpacesReceiptStore } from "./chat-spaces-receipt";
 import { createFloorPlansReceiptStore } from "./floor-plans-receipt";
 
 void runSeedCommand(process.argv.slice(2), {
   getEnvironment: getEnv,
   now: () => new Date(),
   runSeed,
-  ...createSeedReceiptStore(),
-  ...createChatSpacesReceiptStore(),
   ...createFloorPlansReceiptStore(),
   closeDatabase,
   stdout: (message) => console.log(message),

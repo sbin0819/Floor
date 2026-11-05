@@ -1,0 +1,1325 @@
+{
+  "note": "한 달치 일정 시드다. 시드를 돌린 날(지점 시간대의 오늘)을 기준으로 window.pastDays 전부터 futureDays 뒤까지 날마다 펼친다. recurring은 요일 패턴(그 요일이 쉬는 날이면 건너뜀), oneOff·maintenance의 dayOffset은 기준일에서 쉬는 날을 건너뛰고 센 운영일 수(음수는 과거), announcements의 daysAgo는 달력 날짜 수다. fill·deskFill은 패턴 키·공간·날짜 번호로 고정한 난수로 채우므로 같은 날 다시 돌리면 같은 결과가 나온다. 예약 id는 패턴 키와 날짜 번호에서 만든 고정 uuid라 다시 돌려도 자기 행만 지우고 다시 넣는다. 점검과 겹치는 recurring·oneOff 예약은 '점검으로 취소'가 되고, fill은 그 자리를 피한다. 한도(개인 하루 120분·7일 앞, 팀 1회 240분·하루 480분·14일 앞, 운영자 무제한)를 넘는 자리는 만들지 않는다. 공간 id는 seed.json·gangnam-7f.spaces.json, 사용자 키는 seed.json의 users[].key다.",
+  "window": {
+    "pastDays": 30,
+    "futureDays": 14
+  },
+  "recurring": [
+    {
+      "key": "design-weekly",
+      "spaceId": "bf9a611a-92eb-5825-9188-5ef9b191ca91",
+      "weekdays": [
+        "mon"
+      ],
+      "start": "10:00",
+      "end": "11:00",
+      "userKey": "designAdmin",
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "title": "디자인 위클리",
+      "attendeeCount": 5,
+      "participantKeys": [
+        "designMember",
+        "both",
+        "test13",
+        "test14"
+      ],
+      "messages": {
+        "next": [
+          {
+            "authorKey": "designAdmin",
+            "minutesFromStart": -1440,
+            "body": "이번 주 위클리 안건: 온보딩 개선안, 11월 릴리스 체크 ✅"
+          },
+          {
+            "authorKey": "designMember",
+            "minutesFromStart": -1380,
+            "body": "온보딩 시안 v4는 월요일 아침에 올려 둘게요."
+          }
+        ],
+        "previous": [
+          {
+            "authorKey": "both",
+            "minutesFromStart": -30,
+            "body": "5분 정도 늦어요 🙏"
+          },
+          {
+            "authorKey": "designAdmin",
+            "minutesFromStart": 40,
+            "body": "오늘 결정: 온보딩은 3단계로 줄이기. 노션에 정리했어요."
+          }
+        ]
+      }
+    },
+    {
+      "key": "design-review",
+      "spaceId": "a58589df-bc23-5f96-a0fd-6a8c3fa5fa8e",
+      "weekdays": [
+        "thu"
+      ],
+      "start": "14:00",
+      "end": "16:00",
+      "userKey": "designAdmin",
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "title": "디자인 리뷰",
+      "attendeeCount": 6,
+      "participantKeys": [
+        "designMember",
+        "both",
+        "test13",
+        "test14"
+      ],
+      "messages": {
+        "previous": [
+          {
+            "authorKey": "designAdmin",
+            "minutesFromStart": -120,
+            "body": "리뷰 자료는 피그마 링크로 올려 둘게요. 온보딩부터 볼게요."
+          },
+          {
+            "authorKey": "designMember",
+            "minutesFromStart": -100,
+            "body": "네! 저는 온보딩 화면 두 장 가져갈게요."
+          }
+        ]
+      }
+    },
+    {
+      "key": "ux-research-sync",
+      "spaceId": "d0c42806-0a15-5ddd-a426-fa21b935706b",
+      "weekdays": [
+        "tue"
+      ],
+      "start": "11:00",
+      "end": "12:00",
+      "userKey": "test13",
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "title": "UX 리서치 싱크",
+      "attendeeCount": 3,
+      "participantKeys": [
+        "designMember"
+      ]
+    },
+    {
+      "key": "growth-standup",
+      "spaceId": "400527fa-3c66-5cd4-a627-bf65ffb0dee2",
+      "weekdays": [
+        "mon",
+        "wed",
+        "fri"
+      ],
+      "start": "09:30",
+      "end": "10:00",
+      "userKey": "growthAdmin",
+      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
+      "title": "그로스 스탠드업",
+      "attendeeCount": 4,
+      "participantKeys": [
+        "both",
+        "test15",
+        "test16"
+      ]
+    },
+    {
+      "key": "sprint-planning",
+      "spaceId": "400527fa-3c66-5cd4-a627-bf65ffb0dee2",
+      "weekdays": [
+        "tue"
+      ],
+      "start": "10:00",
+      "end": "12:00",
+      "userKey": "growthAdmin",
+      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
+      "title": "스프린트 계획",
+      "attendeeCount": 5,
+      "participantKeys": [
+        "both",
+        "test15",
+        "test16"
+      ],
+      "messages": {
+        "next": [
+          {
+            "authorKey": "growthAdmin",
+            "minutesFromStart": -2880,
+            "body": "스프린트 계획 전에 백로그 한 번씩 봐 주세요."
+          },
+          {
+            "authorKey": "test15",
+            "minutesFromStart": -2800,
+            "body": "지난 실험 결과 대시보드 링크 공유해요 📊"
+          }
+        ]
+      }
+    },
+    {
+      "key": "experiment-review",
+      "spaceId": "0495a219-c757-56ae-abda-4e212be70e5c",
+      "weekdays": [
+        "thu"
+      ],
+      "start": "15:00",
+      "end": "16:00",
+      "userKey": "test16",
+      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
+      "title": "실험 리뷰",
+      "attendeeCount": 4,
+      "participantKeys": [
+        "growthAdmin",
+        "test15"
+      ]
+    },
+    {
+      "key": "dev-daily-scrum",
+      "spaceId": "2c084c31-af0c-5fc1-941b-550d3ddcfb47",
+      "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "start": "10:00",
+      "end": "10:30",
+      "userKey": "test6",
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "title": "데일리 스크럼",
+      "attendeeCount": 4,
+      "participantKeys": [
+        "test7",
+        "test8",
+        "test9"
+      ],
+      "messages": {
+        "previous": [
+          {
+            "authorKey": "test9",
+            "minutesFromStart": -5,
+            "body": "QA 서버 점검이 있어서 10분 정도 늦어요."
+          }
+        ]
+      }
+    },
+    {
+      "key": "dev-sprint-review",
+      "spaceId": "2c084c31-af0c-5fc1-941b-550d3ddcfb47",
+      "weekdays": [
+        "fri"
+      ],
+      "start": "15:00",
+      "end": "17:00",
+      "userKey": "test6",
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "title": "스프린트 리뷰",
+      "attendeeCount": 4,
+      "participantKeys": [
+        "test7",
+        "test8",
+        "test9"
+      ]
+    },
+    {
+      "key": "dev-code-review",
+      "spaceId": "ae77b7ea-029d-5547-8dba-b5c2b14e3297",
+      "weekdays": [
+        "wed"
+      ],
+      "start": "14:00",
+      "end": "15:00",
+      "userKey": "test8",
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "title": "코드 리뷰",
+      "attendeeCount": 2,
+      "participantKeys": [
+        "test7"
+      ]
+    },
+    {
+      "key": "marketing-weekly",
+      "spaceId": "b06c7ca6-133a-5d93-b1f6-5c9ff3d2d525",
+      "weekdays": [
+        "tue"
+      ],
+      "start": "14:00",
+      "end": "15:30",
+      "userKey": "test10",
+      "teamId": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "title": "마케팅 위클리",
+      "attendeeCount": 3,
+      "participantKeys": [
+        "test11",
+        "test12"
+      ]
+    },
+    {
+      "key": "content-planning",
+      "spaceId": "41db933b-b175-54f6-b22f-93acc0ad977a",
+      "weekdays": [
+        "thu"
+      ],
+      "start": "11:00",
+      "end": "12:00",
+      "userKey": "test11",
+      "teamId": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "title": "콘텐츠 기획",
+      "attendeeCount": 2,
+      "participantKeys": [
+        "test12"
+      ]
+    },
+    {
+      "key": "haeun-focus",
+      "spaceId": "b242f462-f1bf-5b6d-b1b0-8055297d9dd1",
+      "weekdays": [
+        "tue",
+        "thu"
+      ],
+      "start": "09:00",
+      "end": "10:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": "집중 작업",
+      "attendeeCount": null,
+      "participantKeys": []
+    },
+    {
+      "key": "woojin-client-call",
+      "spaceId": "c95de0cd-36a8-568c-97b9-433f40b18673",
+      "weekdays": [
+        "mon",
+        "wed"
+      ],
+      "start": "14:00",
+      "end": "14:30",
+      "userKey": "test17",
+      "teamId": null,
+      "title": "고객 콜",
+      "attendeeCount": null,
+      "participantKeys": []
+    },
+    {
+      "key": "yujin-lecture",
+      "spaceId": "37bb1db5-84d3-51b3-a8d9-d0894c1f5967",
+      "weekdays": [
+        "tue"
+      ],
+      "start": "19:00",
+      "end": "20:00",
+      "userKey": "test18",
+      "teamId": null,
+      "title": "온라인 강의",
+      "attendeeCount": 1,
+      "participantKeys": []
+    }
+  ],
+  "oneOff": [
+    {
+      "key": "community-seminar",
+      "spaceId": "11bdd550-2a39-52d2-874b-9b00599172ca",
+      "dayOffset": -9,
+      "start": "13:00",
+      "end": "17:00",
+      "userKey": "admin",
+      "teamId": null,
+      "title": "커뮤니티 세미나: 사이드 프로젝트 쇼케이스",
+      "attendeeCount": 18,
+      "participantKeys": [
+        "member",
+        "designMember",
+        "test17",
+        "test19"
+      ],
+      "createdDaysBefore": 14,
+      "messages": [
+        {
+          "authorKey": "admin",
+          "minutesFromStart": -2880,
+          "body": "발표 자료는 전날까지 보내 주세요. 순서는 당일 아침에 공유할게요."
+        },
+        {
+          "authorKey": "test17",
+          "minutesFromStart": -2000,
+          "body": "저는 15분 정도 발표할게요. 데모 포함이에요."
+        },
+        {
+          "authorKey": "admin",
+          "minutesFromStart": 60,
+          "body": "오늘 와 주신 분들 고마워요. 사진은 라운지 채널에 올릴게요 📷"
+        }
+      ]
+    },
+    {
+      "key": "marketing-kickoff",
+      "spaceId": "b5154fea-845e-542e-a3ea-8fa1f431a440",
+      "dayOffset": -3,
+      "start": "10:00",
+      "end": "12:00",
+      "userKey": "test10",
+      "teamId": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "title": "마케팅 캠페인 킥오프",
+      "attendeeCount": 12,
+      "participantKeys": [
+        "test11",
+        "test12"
+      ],
+      "createdDaysBefore": 7
+    },
+    {
+      "key": "haeun-one-on-one",
+      "spaceId": "0495a219-c757-56ae-abda-4e212be70e5c",
+      "dayOffset": 0,
+      "start": "13:00",
+      "end": "14:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": "1:1",
+      "attendeeCount": 2,
+      "participantKeys": [
+        "designMember"
+      ],
+      "createdDaysBefore": 2,
+      "messages": [
+        {
+          "authorKey": "designMember",
+          "minutesFromStart": -1500,
+          "body": "내일 1:1 때 포트폴리오 피드백도 같이 봐 줄 수 있어요?"
+        },
+        {
+          "authorKey": "member",
+          "minutesFromStart": -1490,
+          "body": "물론이죠! 링크 미리 보내 주세요."
+        }
+      ]
+    },
+    {
+      "key": "networking-prep",
+      "spaceId": "0a698faf-59df-5eca-898a-a0a942f5c086",
+      "dayOffset": 0,
+      "start": "16:00",
+      "end": "17:30",
+      "userKey": "admin",
+      "teamId": null,
+      "title": "입주사 네트워킹 준비",
+      "attendeeCount": 8,
+      "participantKeys": [],
+      "createdDaysBefore": 3
+    },
+    {
+      "key": "design-interview",
+      "spaceId": "62719efa-1f4a-5896-85ab-1dc1e1bbcfb8",
+      "dayOffset": 0,
+      "start": "11:00",
+      "end": "12:00",
+      "userKey": "designAdmin",
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "title": "채용 인터뷰",
+      "attendeeCount": 3,
+      "participantKeys": [
+        "test14"
+      ],
+      "createdDaysBefore": 5
+    },
+    {
+      "key": "orientation",
+      "spaceId": "11bdd550-2a39-52d2-874b-9b00599172ca",
+      "dayOffset": 1,
+      "start": "14:00",
+      "end": "17:00",
+      "userKey": "admin",
+      "teamId": null,
+      "title": "11월 입주사 오리엔테이션",
+      "attendeeCount": 20,
+      "participantKeys": [
+        "member",
+        "both",
+        "test13",
+        "test15",
+        "test18",
+        "test20"
+      ],
+      "createdDaysBefore": 10,
+      "messages": [
+        {
+          "authorKey": "admin",
+          "minutesFromStart": -1440,
+          "body": "오리엔테이션은 7층 세미나룸이에요. 10분 전에 와 주세요 🙌 간단한 간식이 있어요."
+        },
+        {
+          "authorKey": "member",
+          "minutesFromStart": -1300,
+          "body": "참석할게요!"
+        }
+      ]
+    },
+    {
+      "key": "pitch-rehearsal",
+      "spaceId": "b991f488-210c-58a1-be1c-3bef1273d07e",
+      "dayOffset": 2,
+      "start": "10:00",
+      "end": "11:30",
+      "userKey": "test17",
+      "teamId": null,
+      "title": "투자 설명회 리허설",
+      "attendeeCount": 6,
+      "participantKeys": [
+        "test18"
+      ],
+      "createdDaysBefore": 4
+    },
+    {
+      "key": "partner-meeting",
+      "spaceId": "f0ff16b7-1166-525c-b3ef-854f06825213",
+      "dayOffset": 5,
+      "start": "14:00",
+      "end": "15:00",
+      "userKey": "test18",
+      "teamId": null,
+      "title": "파트너 미팅",
+      "attendeeCount": 6,
+      "participantKeys": [],
+      "createdDaysBefore": 2
+    },
+    {
+      "key": "dev-meetup",
+      "spaceId": "bdfbdc4f-66ca-5ec1-8dab-a6bfa55e456b",
+      "dayOffset": 8,
+      "start": "11:00",
+      "end": "15:00",
+      "userKey": "test6",
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "title": "개발자 밋업",
+      "attendeeCount": 20,
+      "participantKeys": [
+        "test7",
+        "test8",
+        "test9"
+      ],
+      "createdDaysBefore": 12
+    },
+    {
+      "key": "design-system-workshop",
+      "spaceId": "a58589df-bc23-5f96-a0fd-6a8c3fa5fa8e",
+      "dayOffset": 9,
+      "start": "11:30",
+      "end": "14:00",
+      "userKey": "designAdmin",
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "title": "디자인 시스템 워크숍",
+      "attendeeCount": 7,
+      "participantKeys": [
+        "designMember",
+        "both",
+        "test13",
+        "test14"
+      ],
+      "createdDaysBefore": 14
+    },
+    {
+      "key": "haeun-cancelled-6a",
+      "spaceId": "9c200441-5d30-51ad-90df-85a14b7b40ab",
+      "dayOffset": -2,
+      "start": "10:00",
+      "end": "11:00",
+      "userKey": "member",
+      "teamId": null,
+      "title": null,
+      "attendeeCount": null,
+      "participantKeys": [],
+      "createdDaysBefore": 3,
+      "status": "cancelled",
+      "cancelledByKey": "member"
+    },
+    {
+      "key": "seoyeon-cancelled-c",
+      "spaceId": "0495a219-c757-56ae-abda-4e212be70e5c",
+      "dayOffset": -5,
+      "start": "15:00",
+      "end": "16:00",
+      "userKey": "designMember",
+      "teamId": null,
+      "title": "포트폴리오 리뷰",
+      "attendeeCount": 2,
+      "participantKeys": [
+        "member"
+      ],
+      "createdDaysBefore": 4,
+      "status": "cancelled",
+      "cancelledByKey": "designMember"
+    },
+    {
+      "key": "operator-cancelled-h2b",
+      "spaceId": "b06c7ca6-133a-5d93-b1f6-5c9ff3d2d525",
+      "dayOffset": 1,
+      "start": "16:00",
+      "end": "17:00",
+      "userKey": "test19",
+      "teamId": null,
+      "title": "스터디",
+      "attendeeCount": 4,
+      "participantKeys": [],
+      "createdDaysBefore": 4,
+      "status": "cancelled",
+      "cancelledByKey": "admin",
+      "cancelKind": "operator",
+      "cancelReason": "중복 예약 정리 요청"
+    },
+    {
+      "key": "team-admin-cancelled-s2",
+      "spaceId": "ae77b7ea-029d-5547-8dba-b5c2b14e3297",
+      "dayOffset": -1,
+      "start": "11:00",
+      "end": "12:00",
+      "userKey": "test7",
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "title": "배포 리허설",
+      "attendeeCount": 3,
+      "participantKeys": [
+        "test8"
+      ],
+      "createdDaysBefore": 3,
+      "status": "cancelled",
+      "cancelledByKey": "test6"
+    }
+  ],
+  "deskRegulars": [
+    {
+      "key": "desk-jihoon",
+      "deskId": "1847d48a-b886-5731-a3db-8d43a48bb745",
+      "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "part": "day",
+      "userKey": "designAdmin"
+    },
+    {
+      "key": "desk-seoyeon",
+      "deskId": "62324832-b7f1-55f1-892d-9541c0ddfb42",
+      "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "part": "day",
+      "userKey": "designMember"
+    },
+    {
+      "key": "desk-yejun",
+      "deskId": "c5a379bc-9278-57a7-b7ad-def988b95902",
+      "weekdays": [
+        "mon",
+        "wed",
+        "fri"
+      ],
+      "part": "day",
+      "userKey": "test13"
+    },
+    {
+      "key": "desk-chaewon",
+      "deskId": "7e53bd04-c6aa-5222-a339-0f2ea3ec0ba6",
+      "weekdays": [
+        "tue",
+        "thu"
+      ],
+      "part": "am",
+      "userKey": "test14"
+    },
+    {
+      "key": "desk-minjun",
+      "deskId": "8bdc2d1d-9ba5-5844-925c-672fe80ab7c9",
+      "weekdays": [
+        "mon",
+        "wed",
+        "fri"
+      ],
+      "part": "am",
+      "userKey": "growthAdmin"
+    },
+    {
+      "key": "desk-jiho",
+      "deskId": "cdbfac24-9a42-52ef-b2ad-24e319717ad4",
+      "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "part": "day",
+      "userKey": "test15"
+    },
+    {
+      "key": "desk-daeun",
+      "deskId": "18ef6794-5351-5e38-a5ec-04ae6a033d13",
+      "weekdays": [
+        "tue",
+        "wed",
+        "thu"
+      ],
+      "part": "day",
+      "userKey": "test16"
+    },
+    {
+      "key": "desk-yuna",
+      "deskId": "819a7e27-14a6-522f-8a83-ef79e1621207",
+      "weekdays": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "part": "pm",
+      "userKey": "both"
+    },
+    {
+      "key": "desk-haeun",
+      "deskId": "c71aa02b-d84e-5361-827e-7c800312baf0",
+      "weekdays": [
+        "tue",
+        "thu"
+      ],
+      "part": "day",
+      "userKey": "member"
+    }
+  ],
+  "fill": [
+    {
+      "key": "gangnam-rooms",
+      "spaceIds": [
+        "9c200441-5d30-51ad-90df-85a14b7b40ab",
+        "4ad8994c-0567-513d-945f-3e2de1984423",
+        "0a698faf-59df-5eca-898a-a0a942f5c086",
+        "bf9a611a-92eb-5825-9188-5ef9b191ca91",
+        "0495a219-c757-56ae-abda-4e212be70e5c",
+        "62719efa-1f4a-5896-85ab-1dc1e1bbcfb8"
+      ],
+      "userKeys": [
+        "member",
+        "designMember",
+        "both",
+        "test13",
+        "test14",
+        "test15",
+        "test16",
+        "growthAdmin",
+        "designAdmin",
+        "test17",
+        "test19",
+        "test20",
+        "admin"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        3
+      ],
+      "durations": [
+        60,
+        60,
+        90,
+        120
+      ],
+      "titles": [
+        "주간 동기화",
+        "고객 미팅",
+        "면접",
+        "온보딩 세션",
+        "기획 리뷰",
+        "데이터 리뷰",
+        "파트너 콜",
+        "1:1",
+        "브레인스토밍",
+        "사용자 인터뷰",
+        "스터디",
+        "릴리스 점검"
+      ]
+    },
+    {
+      "key": "gangnam-booths",
+      "spaceIds": [
+        "0f79dd53-fbf4-5b1d-838e-1be7cfcd73f5",
+        "c64cc409-ebf2-5ed1-90ab-e04f80237410",
+        "975b3531-6fdb-526d-b1ee-f364384b14db",
+        "b242f462-f1bf-5b6d-b1b0-8055297d9dd1"
+      ],
+      "userKeys": [
+        "member",
+        "designMember",
+        "both",
+        "test13",
+        "test14",
+        "test15",
+        "test16",
+        "test19",
+        "test20"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        3
+      ],
+      "durations": [
+        30,
+        30,
+        60
+      ],
+      "titles": [
+        "고객 콜",
+        "온라인 면접",
+        "집중 작업",
+        "화상 회의",
+        "전화 상담"
+      ],
+      "untitledRate": 0.5
+    },
+    {
+      "key": "gangnam-room-a-growth",
+      "spaceIds": [
+        "400527fa-3c66-5cd4-a627-bf65ffb0dee2"
+      ],
+      "userKeys": [
+        "growthAdmin",
+        "both",
+        "test15",
+        "test16"
+      ],
+      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
+      "perDay": [
+        0,
+        1
+      ],
+      "durations": [
+        60,
+        90
+      ],
+      "titles": [
+        "실험 설계",
+        "지표 점검",
+        "온보딩 퍼널 리뷰",
+        "A/B 결과 공유"
+      ]
+    },
+    {
+      "key": "gangnam-8f-design",
+      "spaceIds": [
+        "a58589df-bc23-5f96-a0fd-6a8c3fa5fa8e",
+        "d0c42806-0a15-5ddd-a426-fa21b935706b",
+        "af2366cf-0106-58d8-a3ee-aece36a41899"
+      ],
+      "userKeys": [
+        "designAdmin",
+        "designMember",
+        "both",
+        "test13",
+        "test14"
+      ],
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "perDay": [
+        0,
+        2
+      ],
+      "durations": [
+        60,
+        90,
+        120
+      ],
+      "titles": [
+        "디자인 QA",
+        "시안 리뷰",
+        "사용성 테스트",
+        "아이콘 작업",
+        "컴포넌트 정리"
+      ],
+      "untitledRate": 0.2
+    },
+    {
+      "key": "gangnam-seminar",
+      "spaceIds": [
+        "11bdd550-2a39-52d2-874b-9b00599172ca"
+      ],
+      "userKeys": [
+        "admin"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        1
+      ],
+      "durations": [
+        120,
+        180,
+        240
+      ],
+      "titles": [
+        "입주사 세미나",
+        "외부 강연",
+        "전사 공유회",
+        "교육"
+      ],
+      "untitledRate": 0,
+      "weekendFactor": 0
+    },
+    {
+      "key": "seongsu-rooms",
+      "spaceIds": [
+        "2c084c31-af0c-5fc1-941b-550d3ddcfb47",
+        "ae77b7ea-029d-5547-8dba-b5c2b14e3297",
+        "d315dc0a-d4f3-5b0c-9eb0-9d63d2a0821f"
+      ],
+      "userKeys": [
+        "test6",
+        "test7",
+        "test8",
+        "test9",
+        "test20",
+        "member"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        2
+      ],
+      "durations": [
+        30,
+        60,
+        60,
+        90
+      ],
+      "titles": [
+        "기술 면접",
+        "장애 회고",
+        "설계 논의",
+        "고객 콜",
+        "1:1",
+        "페어 프로그래밍"
+      ]
+    },
+    {
+      "key": "seongsu-dev-team",
+      "spaceIds": [
+        "2c084c31-af0c-5fc1-941b-550d3ddcfb47",
+        "ae77b7ea-029d-5547-8dba-b5c2b14e3297"
+      ],
+      "userKeys": [
+        "test6",
+        "test7",
+        "test8",
+        "test9"
+      ],
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "perDay": [
+        0,
+        1
+      ],
+      "durations": [
+        60,
+        90,
+        120
+      ],
+      "titles": [
+        "아키텍처 리뷰",
+        "릴리스 계획",
+        "온콜 인수인계",
+        "기술 부채 정리"
+      ]
+    },
+    {
+      "key": "hongdae-rooms",
+      "spaceIds": [
+        "41db933b-b175-54f6-b22f-93acc0ad977a",
+        "b06c7ca6-133a-5d93-b1f6-5c9ff3d2d525",
+        "44a6acee-5069-5f80-ac0d-ad2a263c352f",
+        "a9f2daf9-73f8-5816-9430-e2b631dc4aeb",
+        "09712979-f2b1-57b9-baaa-657091b74c71"
+      ],
+      "userKeys": [
+        "test10",
+        "test11",
+        "test12",
+        "test19",
+        "member",
+        "designMember"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        2
+      ],
+      "durations": [
+        30,
+        60,
+        90,
+        120
+      ],
+      "titles": [
+        "광고 소재 리뷰",
+        "인플루언서 콜",
+        "스터디",
+        "촬영 준비",
+        "고객 인터뷰",
+        "1:1"
+      ]
+    },
+    {
+      "key": "hongdae-seminar-marketing",
+      "spaceIds": [
+        "b5154fea-845e-542e-a3ea-8fa1f431a440"
+      ],
+      "userKeys": [
+        "test10",
+        "test11"
+      ],
+      "teamId": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "perDay": [
+        0,
+        1
+      ],
+      "durations": [
+        120,
+        180,
+        240
+      ],
+      "titles": [
+        "캠페인 리뷰",
+        "브랜드 워크숍",
+        "콘텐츠 촬영"
+      ],
+      "untitledRate": 0,
+      "weekendFactor": 0
+    },
+    {
+      "key": "yeouido-rooms",
+      "spaceIds": [
+        "045174e9-730c-5878-96d1-a8d29ec21903",
+        "7037dafb-cbc1-5802-9503-fd1afffcd6b9",
+        "c95de0cd-36a8-568c-97b9-433f40b18673",
+        "9d17ae4b-bdf2-58fd-97ff-33d6de242c97",
+        "ec2e25ff-20c1-5690-b361-34aea33d64be"
+      ],
+      "userKeys": [
+        "test17",
+        "test15",
+        "test16",
+        "both",
+        "test13",
+        "test18"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        2
+      ],
+      "durations": [
+        30,
+        60,
+        90,
+        120
+      ],
+      "titles": [
+        "투자자 미팅",
+        "회계 상담",
+        "고객 콜",
+        "온라인 면접",
+        "자문 미팅",
+        "1:1"
+      ]
+    },
+    {
+      "key": "yeouido-seminar",
+      "spaceIds": [
+        "b991f488-210c-58a1-be1c-3bef1273d07e"
+      ],
+      "userKeys": [
+        "admin"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        1
+      ],
+      "durations": [
+        120,
+        180
+      ],
+      "titles": [
+        "입주사 세미나",
+        "외부 강연",
+        "교육"
+      ],
+      "untitledRate": 0
+    },
+    {
+      "key": "pangyo-rooms",
+      "spaceIds": [
+        "37bb1db5-84d3-51b3-a8d9-d0894c1f5967",
+        "f0113f91-770f-59c2-a9e0-6f7d8555e77f",
+        "571ed453-7e37-5678-9ee4-26789fd992dd",
+        "f0ff16b7-1166-525c-b3ef-854f06825213",
+        "ab58f368-a20b-5ca5-913c-2c168cfa41c0"
+      ],
+      "userKeys": [
+        "test18",
+        "test8",
+        "test9",
+        "test14",
+        "test12",
+        "test20"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        2
+      ],
+      "durations": [
+        30,
+        60,
+        90,
+        120
+      ],
+      "titles": [
+        "제품 데모",
+        "고객 콜",
+        "채용 면접",
+        "스터디",
+        "파트너 미팅",
+        "1:1"
+      ]
+    },
+    {
+      "key": "pangyo-seminar",
+      "spaceIds": [
+        "bdfbdc4f-66ca-5ec1-8dab-a6bfa55e456b"
+      ],
+      "userKeys": [
+        "admin"
+      ],
+      "teamId": null,
+      "perDay": [
+        0,
+        1
+      ],
+      "durations": [
+        120,
+        180,
+        240
+      ],
+      "titles": [
+        "입주사 세미나",
+        "개발자 밋업",
+        "교육"
+      ],
+      "untitledRate": 0,
+      "weekendFactor": 0
+    }
+  ],
+  "deskFill": [
+    {
+      "key": "open-desk",
+      "areaId": "ba961bb1-c20a-57aa-a629-6061cddf3416",
+      "userKeys": [
+        "test17",
+        "test18",
+        "test19",
+        "test20",
+        "test7",
+        "test8",
+        "test11",
+        "test12",
+        "admin",
+        "test6",
+        "test10"
+      ],
+      "perDay": [
+        5,
+        10
+      ],
+      "parts": [
+        "am",
+        "pm",
+        "day",
+        "day"
+      ]
+    }
+  ],
+  "maintenance": [
+    {
+      "key": "6b-aircon",
+      "spaceId": "4ad8994c-0567-513d-945f-3e2de1984423",
+      "startDayOffset": -1,
+      "start": "09:00",
+      "endDayOffset": 1,
+      "end": "24:00",
+      "reason": "에어컨 수리",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "d-monitor",
+      "spaceId": "62719efa-1f4a-5896-85ab-1dc1e1bbcfb8",
+      "startDayOffset": 0,
+      "start": "15:00",
+      "endDayOffset": 1,
+      "end": "12:00",
+      "reason": "모니터 교체",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "a-electric",
+      "spaceId": "400527fa-3c66-5cd4-a627-bf65ffb0dee2",
+      "startDayOffset": 6,
+      "start": "08:00",
+      "endDayOffset": 6,
+      "end": "22:00",
+      "reason": "전기 안전 점검",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "h3-projector",
+      "spaceId": "b5154fea-845e-542e-a3ea-8fa1f431a440",
+      "startDayOffset": 3,
+      "start": "09:00",
+      "endDayOffset": 4,
+      "end": "22:00",
+      "reason": "프로젝터 교체",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "y10-1-soundproof",
+      "spaceId": "c95de0cd-36a8-568c-97b9-433f40b18673",
+      "startDayOffset": -6,
+      "start": "00:00",
+      "endDayOffset": -5,
+      "end": "24:00",
+      "reason": "방음 패널 보수",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "p4b-carpet",
+      "spaceId": "f0113f91-770f-59c2-a9e0-6f7d8555e77f",
+      "startDayOffset": 9,
+      "start": "08:00",
+      "endDayOffset": 9,
+      "end": "13:00",
+      "reason": "카펫 청소",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "s2-tv",
+      "spaceId": "ae77b7ea-029d-5547-8dba-b5c2b14e3297",
+      "startDayOffset": -12,
+      "start": "09:00",
+      "endDayOffset": -11,
+      "end": "21:00",
+      "reason": "TV 교체",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "6-1-handle",
+      "spaceId": "0f79dd53-fbf4-5b1d-838e-1be7cfcd73f5",
+      "startDayOffset": -20,
+      "start": "00:00",
+      "endDayOffset": -19,
+      "end": "24:00",
+      "reason": "문 손잡이 수리",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "p5-floor",
+      "spaceId": "bdfbdc4f-66ca-5ec1-8dab-a6bfa55e456b",
+      "startDayOffset": -3,
+      "start": "08:00",
+      "endDayOffset": -3,
+      "end": "22:00",
+      "reason": "바닥 공사",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "desk-a24-repair",
+      "spaceId": "db485e83-08b8-5fc5-95aa-1205a70d5a22",
+      "startDayOffset": -1,
+      "start": "00:00",
+      "endDayOffset": 2,
+      "end": "24:00",
+      "reason": "책상 수리",
+      "createdByKey": "admin"
+    },
+    {
+      "key": "desk-a20-arm",
+      "spaceId": "18c4004e-3976-5667-b555-42efd0a19f09",
+      "startDayOffset": -10,
+      "start": "00:00",
+      "endDayOffset": -9,
+      "end": "24:00",
+      "reason": "모니터 암 설치",
+      "createdByKey": "admin"
+    }
+  ],
+  "announcements": [
+    {
+      "key": "gangnam-coffee",
+      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+      "authorKey": "admin",
+      "daysAgo": 24,
+      "time": "09:30",
+      "title": "7층 라운지 커피 머신 교체 안내",
+      "body": "7층 라운지의 커피 머신을 새 기종으로 바꿨어요. 사용법은 머신 옆 안내문을 참고해 주세요. ☕",
+      "audience": null
+    },
+    {
+      "key": "seongsu-renovation",
+      "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709",
+      "authorKey": "admin",
+      "daysAgo": 15,
+      "time": "10:00",
+      "title": "3층 리노베이션 공사 안내",
+      "body": "성수점 3층은 이달 말까지 리노베이션 공사로 닫혀 있어요. 회의실 S3 예약은 공사가 끝난 뒤 다시 열어요. 소음이 있을 수 있으니 양해 부탁드려요.",
+      "audience": null
+    },
+    {
+      "key": "hongdae-projector",
+      "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "authorKey": "admin",
+      "daysAgo": 4,
+      "time": "11:00",
+      "title": "세미나룸 H3 프로젝터 교체",
+      "body": "다음 주 세미나룸 H3의 프로젝터를 교체해요. 교체하는 이틀 동안은 예약할 수 없고, 겹치는 예약은 취소돼요. 불편을 드려 죄송해요.",
+      "audience": {
+        "dayOffset": 3,
+        "floorId": "b17f572b-f5d5-53ad-b584-9632e443fb1f",
+        "spaceId": null
+      }
+    },
+    {
+      "key": "gangnam-6b-aircon",
+      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+      "authorKey": "admin",
+      "daysAgo": 2,
+      "time": "16:00",
+      "title": "회의실 6B 에어컨 수리 안내",
+      "body": "회의실 6B의 에어컨을 수리해요. 수리하는 동안 6B는 예약할 수 없고, 이미 잡힌 예약은 취소돼요. 6A·6C를 이용해 주세요.",
+      "audience": {
+        "dayOffset": -1,
+        "floorId": "c5a98b1a-cd93-541d-9dca-ebdc7cf4f925",
+        "spaceId": "4ad8994c-0567-513d-945f-3e2de1984423"
+      }
+    },
+    {
+      "key": "gangnam-orientation",
+      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
+      "authorKey": "admin",
+      "daysAgo": 1,
+      "time": "17:00",
+      "title": "11월 입주사 오리엔테이션 (내일 14시)",
+      "body": "내일 오후 2시 7층 세미나룸에서 11월 입주사 오리엔테이션이 있어요. 새로 오신 분들은 꼭 참석해 주세요. 간단한 간식이 준비돼 있어요.",
+      "audience": {
+        "dayOffset": 1,
+        "floorId": null,
+        "spaceId": null
+      }
+    }
+  ]
+}

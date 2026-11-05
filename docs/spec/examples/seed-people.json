@@ -1,87 +1,72 @@
 {
-  "note": "사람 시드(지시서 23): 사용자 이름, 친구 관계, 1:1 DM. userKey·authorKey·requestedBy·to는 seed.json의 users[].key다. 관리자(admin)는 사용자 이름을 비워 둔다(처음 정하기 화면을 보려고). friendships의 minutesAgo는 요청한 시각(대기면 알림 시각도 같다). DM의 users는 두 사람이고, 이 파일에서 accepted인 친구이거나 seed.json에서 같은 팀이어야 한다. DM 메시지의 minutesAgo는 DM마다 줄어드는 순서이고, 번호(seq)는 목록 순서대로 1부터다. 다시 돌려도 같아야 한다.",
+  "note": "사람 시드(지시서 23): 사용자 이름, 친구 관계, 1:1 DM. userKey·authorKey·requestedBy·to는 seed.json의 users[].key다. 운영자(admin)는 사용자 이름을 비워 둔다(처음 정하기 화면을 보려고). friendships의 minutesAgo는 요청한 시각(대기면 알림 시각도 같다). DM의 users는 두 사람이고, 이 파일에서 accepted인 친구이거나 seed.json에서 같은 팀이어야 한다. DM 메시지의 minutesAgo는 DM마다 줄어드는 순서이고, 번호(seq)는 목록 순서대로 1부터다. 다시 돌려도 같아야 한다.",
   "usernames": [
-    {
-      "userKey": "member",
-      "username": "haeun"
-    },
-    {
-      "userKey": "designAdmin",
-      "username": "jihoon.park"
-    },
-    {
-      "userKey": "designMember",
-      "username": "seoyeon"
-    },
-    {
-      "userKey": "growthAdmin",
-      "username": "minjun"
-    },
-    {
-      "userKey": "both",
-      "username": "yuna_j"
-    }
+    { "userKey": "member", "username": "haeun" },
+    { "userKey": "designAdmin", "username": "jihoon.park" },
+    { "userKey": "designMember", "username": "seoyeon" },
+    { "userKey": "growthAdmin", "username": "minjun" },
+    { "userKey": "both", "username": "yuna_j" },
+    { "userKey": "test6", "username": "junseo.lee" },
+    { "userKey": "test7", "username": "subin.park" },
+    { "userKey": "test8", "username": "hyunwoo" },
+    { "userKey": "test9", "username": "jia.jung" },
+    { "userKey": "test10", "username": "minseo.kang" },
+    { "userKey": "test11", "username": "seojun" },
+    { "userKey": "test12", "username": "soyoon" },
+    { "userKey": "test13", "username": "yejun" },
+    { "userKey": "test14", "username": "chaewon" },
+    { "userKey": "test15", "username": "jiho.han" },
+    { "userKey": "test16", "username": "daeun" },
+    { "userKey": "test17", "username": "woojin.shin" },
+    { "userKey": "test18", "username": "yujin.seo" },
+    { "userKey": "test20", "username": "seoa" }
   ],
   "friendships": [
-    {
-      "requestedBy": "member",
-      "to": "designMember",
-      "status": "accepted",
-      "minutesAgo": 4320
-    },
-    {
-      "requestedBy": "growthAdmin",
-      "to": "member",
-      "status": "pending",
-      "minutesAgo": 180
-    },
-    {
-      "requestedBy": "member",
-      "to": "both",
-      "status": "pending",
-      "minutesAgo": 60
-    }
+    { "requestedBy": "member", "to": "designMember", "status": "accepted", "minutesAgo": 43200 },
+    { "requestedBy": "member", "to": "test17", "status": "accepted", "minutesAgo": 12000 },
+    { "requestedBy": "test17", "to": "test18", "status": "accepted", "minutesAgo": 9000 },
+    { "requestedBy": "test7", "to": "test20", "status": "accepted", "minutesAgo": 8000 },
+    { "requestedBy": "test15", "to": "member", "status": "accepted", "minutesAgo": 6000 },
+    { "requestedBy": "growthAdmin", "to": "member", "status": "pending", "minutesAgo": 180 },
+    { "requestedBy": "member", "to": "both", "status": "pending", "minutesAgo": 60 },
+    { "requestedBy": "test13", "to": "member", "status": "pending", "minutesAgo": 30 }
   ],
   "directMessages": [
     {
-      "users": [
-        "member",
-        "designMember"
-      ],
+      "users": ["member", "designMember"],
       "messages": [
-        {
-          "authorKey": "designMember",
-          "minutesAgo": 2000,
-          "body": "하은 님, 지난번에 말한 강남점 라운지 자리 어땠어요?"
-        },
-        {
-          "authorKey": "member",
-          "minutesAgo": 1990,
-          "body": "창가 쪽이 조용해서 좋았어요. 다음에 같이 가요!"
-        },
-        {
-          "authorKey": "designMember",
-          "minutesAgo": 30,
-          "body": "이번 주 금요일 오후 어때요?"
-        }
+        { "authorKey": "designMember", "minutesAgo": 2000, "body": "하은 님, 지난번에 말한 강남점 라운지 자리 어땠어요?" },
+        { "authorKey": "member", "minutesAgo": 1990, "body": "창가 쪽이 조용해서 좋았어요. 다음에 같이 가요!" },
+        { "authorKey": "designMember", "minutesAgo": 30, "body": "오늘 1:1 때 포트폴리오도 같이 봐 주세요 🙏" }
       ]
     },
     {
-      "users": [
-        "designAdmin",
-        "designMember"
-      ],
+      "users": ["designAdmin", "designMember"],
       "messages": [
-        {
-          "authorKey": "designAdmin",
-          "minutesAgo": 400,
-          "body": "서연 님, 리뷰 자료 초안 먼저 봐 줄 수 있어요?"
-        },
-        {
-          "authorKey": "designMember",
-          "minutesAgo": 395,
-          "body": "네, 점심 먹고 바로 볼게요."
-        }
+        { "authorKey": "designAdmin", "minutesAgo": 400, "body": "서연 님, 리뷰 자료 초안 먼저 봐 줄 수 있어요?" },
+        { "authorKey": "designMember", "minutesAgo": 395, "body": "네, 점심 먹고 바로 볼게요." }
+      ]
+    },
+    {
+      "users": ["test17", "test18"],
+      "messages": [
+        { "authorKey": "test17", "minutesAgo": 5000, "body": "유진 님, 다음 주 리허설 때 피드백 부탁해도 될까요?" },
+        { "authorKey": "test18", "minutesAgo": 4980, "body": "물론이죠! 여의도점으로 갈게요." },
+        { "authorKey": "test17", "minutesAgo": 4970, "body": "고마워요. 끝나고 점심 사겠습니다 🍜" }
+      ]
+    },
+    {
+      "users": ["member", "test17"],
+      "messages": [
+        { "authorKey": "test17", "minutesAgo": 12900, "body": "하은 님 세미나 발표 잘 들었어요! 사이드 프로젝트 링크 공유해 주실 수 있나요?" },
+        { "authorKey": "member", "minutesAgo": 12800, "body": "감사해요 😊 깃허브 링크 보내 드릴게요." }
+      ]
+    },
+    {
+      "users": ["test6", "test7"],
+      "messages": [
+        { "authorKey": "test6", "minutesAgo": 1500, "body": "수빈 님, 어제 취소된 배포 리허설은 금요일 리뷰 때 같이 해요." },
+        { "authorKey": "test7", "minutesAgo": 1490, "body": "네, 리허설 자료는 미리 올려 둘게요." }
       ]
     }
   ]

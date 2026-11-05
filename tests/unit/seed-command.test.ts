@@ -7,14 +7,6 @@ import {
   type FloorPlansReceipt,
 } from "@/lib/seed/floor-plans-receipt";
 import {
-  chatSpacesTarget,
-  type ChatSpacesReceipt,
-} from "@/lib/seed/chat-spaces-receipt";
-import {
-  bookingRound2HostHash,
-  type BookingRound2Receipt,
-} from "@/lib/seed/booking-round2-receipt";
-import {
   runSeedCommand,
   seedUsage,
   type SeedCommandDependencies,
@@ -46,24 +38,6 @@ function dependencies(
     closeDatabase: vi
       .fn<SeedCommandDependencies["closeDatabase"]>()
       .mockResolvedValue(),
-    readReceipt: vi
-      .fn<SeedCommandDependencies["readReceipt"]>()
-      .mockResolvedValue(null),
-    writeReceipt: vi
-      .fn<SeedCommandDependencies["writeReceipt"]>()
-      .mockResolvedValue(),
-    archiveReceipt: vi
-      .fn<SeedCommandDependencies["archiveReceipt"]>()
-      .mockResolvedValue(null),
-    readChatSpacesReceipt: vi
-      .fn<SeedCommandDependencies["readChatSpacesReceipt"]>()
-      .mockResolvedValue(null),
-    writeChatSpacesReceipt: vi
-      .fn<SeedCommandDependencies["writeChatSpacesReceipt"]>()
-      .mockResolvedValue(),
-    archiveChatSpacesReceipt: vi
-      .fn<SeedCommandDependencies["archiveChatSpacesReceipt"]>()
-      .mockResolvedValue(null),
     readFloorPlansReceipt: vi
       .fn<SeedCommandDependencies["readFloorPlansReceipt"]>()
       .mockResolvedValue(null),
@@ -85,18 +59,6 @@ function expectNoDatabaseUse(deps: ReturnType<typeof dependencies>) {
 }
 
 describe("seed command safety and output", () => {
-  it("reports skipped meeting messages separately from skipped bookings", async () => {
-    const deps = dependencies();
-    deps.runSeed.mockResolvedValue({
-      counts: { meetingRooms: 20, chatMessages: 40 },
-      skippedBookings: 1,
-      skippedMeetingMessages: 3,
-      accounts: [],
-    });
-    expect(await runSeedCommand([], deps)).toBe(0);
-    expect(deps.stdout).toHaveBeenCalledWith("건너뛴 예약: 1개");
-    expect(deps.stdout).toHaveBeenCalledWith("건너뛴 회의 메시지: 3개");
-  });
   const branchIds = loadSeedData()
     .branches.slice(0, 2)
     .map(({ id }) => id);
@@ -423,7 +385,6 @@ describe("explicit full-data reset safety", () => {
     ["--confirm-reset"],
     ["--confirm-reset", "--reset-passwords"],
     [...args, "--reset-passwords"],
-    [...args, "--booking-round2"],
     [...args, "--branches", "invalid"],
     [...args, "--branches", ""],
   ])(
@@ -432,8 +393,7 @@ describe("explicit full-data reset safety", () => {
       const deps = dependencies();
       expect(await runSeedCommand(input, deps)).toBe(1);
       expect(deps.getEnvironment).not.toHaveBeenCalled();
-      expect(deps.readReceipt).not.toHaveBeenCalled();
-      expect(deps.archiveReceipt).not.toHaveBeenCalled();
+      expect(deps.archiveFloorPlansReceipt).not.toHaveBeenCalled();
       expectNoDatabaseUse(deps);
     },
   );
@@ -448,7 +408,7 @@ describe("explicit full-data reset safety", () => {
       expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
         `이 DB를 초기화하려면 SEED_ALLOW_HOST=${host}를 정확히 설정해 주세요. 로컬 DB도 예외가 아니에요.`,
       );
-      expect(deps.archiveReceipt).not.toHaveBeenCalled();
+      expect(deps.archiveFloorPlansReceipt).not.toHaveBeenCalled();
       expectNoDatabaseUse(deps);
     },
   );
@@ -471,7 +431,7 @@ describe("explicit full-data reset safety", () => {
     expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
       "배포 환경에서는 개발용 시드를 실행할 수 없어요.",
     );
-    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    expect(deps.archiveFloorPlansReceipt).not.toHaveBeenCalled();
     expectNoDatabaseUse(deps);
   });
 
@@ -490,7 +450,7 @@ describe("explicit full-data reset safety", () => {
   it("reports the host first and archives only its receipt after the successful reset", async () => {
     const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
     deps.runSeed.mockResolvedValue(resetResult);
-    deps.archiveReceipt.mockResolvedValue("receipt.reset-archive");
+    deps.archiveFloorPlansReceipt.mockResolvedValue("receipt.reset-archive");
     expect(await runSeedCommand(args, deps)).toBe(0);
     expect(deps.runSeed).toHaveBeenCalledExactlyOnceWith({
       now: currentTime,
@@ -504,16 +464,19 @@ describe("explicit full-data reset safety", () => {
     expect(deps.stdout.mock.invocationCallOrder[1]).toBeLessThan(
       deps.runSeed.mock.invocationCallOrder[0]!,
     );
-    expect(deps.archiveReceipt).toHaveBeenCalledExactlyOnceWith(
-      bookingRound2HostHash("localhost"),
+    expect(deps.archiveFloorPlansReceipt).toHaveBeenCalledExactlyOnceWith(
+      floorPlansTarget(connectionString).targetHash,
     );
     expect(deps.runSeed.mock.invocationCallOrder[0]).toBeLessThan(
-      deps.archiveReceipt.mock.invocationCallOrder[0]!,
+      deps.archiveFloorPlansReceipt.mock.invocationCallOrder[0]!,
     );
-    expect(deps.readReceipt).not.toHaveBeenCalled();
-    expect(deps.writeReceipt).not.toHaveBeenCalled();
+    expect(deps.readFloorPlansReceipt).not.toHaveBeenCalled();
+    expect(deps.writeFloorPlansReceipt).not.toHaveBeenCalled();
     expect(deps.stdout).toHaveBeenCalledWith(
       "기존 개발 데이터를 삭제하고 시드 데이터를 다시 만들었어요. 삭제한 데이터는 복구할 수 없어요.",
+    );
+    expect(deps.stdout).toHaveBeenCalledWith(
+      "이 DB의 이전 평면도 적용 표식을 같은 폴더에 보관했어요.",
     );
     expect(deps.stdout).toHaveBeenCalledWith(
       "삭제한 기존 행: 9개 · 확인한 마이그레이션: 25개",
@@ -532,12 +495,13 @@ describe("explicit full-data reset safety", () => {
       expect(output).not.toContain(secret);
   });
 
-  it("allows a successful reset when that host has no previous receipt", async () => {
+  it("allows a successful reset when that database has no previous receipt", async () => {
     const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
     deps.runSeed.mockResolvedValue(resetResult);
     expect(await runSeedCommand(args, deps)).toBe(0);
-    expect(deps.stdout).toHaveBeenCalledWith(
-      "이 호스트의 이전 예약 2차 적용 표식은 없어요.",
+    expect(deps.archiveFloorPlansReceipt).toHaveBeenCalledOnce();
+    expect(JSON.stringify(deps.stdout.mock.calls)).not.toContain(
+      "표식을 같은 폴더에",
     );
   });
 
@@ -545,7 +509,7 @@ describe("explicit full-data reset safety", () => {
     const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
     deps.runSeed.mockRejectedValue(new SeedError("초기화를 롤백했어요."));
     expect(await runSeedCommand(args, deps)).toBe(1);
-    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    expect(deps.archiveFloorPlansReceipt).not.toHaveBeenCalled();
     expect(deps.stderr).toHaveBeenCalledExactlyOnceWith("초기화를 롤백했어요.");
     expect(deps.closeDatabase).toHaveBeenCalledOnce();
   });
@@ -553,14 +517,14 @@ describe("explicit full-data reset safety", () => {
   it("distinguishes a committed reset from an archival failure without retrying or exposing errors", async () => {
     const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
     deps.runSeed.mockResolvedValue(resetResult);
-    deps.archiveReceipt.mockRejectedValue(
+    deps.archiveFloorPlansReceipt.mockRejectedValue(
       new Error("private-receipt-path private-token"),
     );
     expect(await runSeedCommand(args, deps)).toBe(1);
     expect(deps.runSeed).toHaveBeenCalledOnce();
-    expect(deps.archiveReceipt).toHaveBeenCalledOnce();
+    expect(deps.archiveFloorPlansReceipt).toHaveBeenCalledOnce();
     expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
-      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스·평면도 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
+      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 보관하지 못했어요. 자동으로 다시 실행하지 말고 평면도 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
     );
     expect(deps.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
     expect(deps.closeDatabase).toHaveBeenCalledOnce();
@@ -576,16 +540,16 @@ describe("explicit full-data reset safety", () => {
     );
     const command = runSeedCommand(args, deps);
     expect(deps.runSeed).toHaveBeenCalledOnce();
-    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    expect(deps.archiveFloorPlansReceipt).not.toHaveBeenCalled();
     commit(resetResult);
     expect(await command).toBe(0);
-    expect(deps.archiveReceipt).toHaveBeenCalledOnce();
+    expect(deps.archiveFloorPlansReceipt).toHaveBeenCalledOnce();
   });
 
   it("does not archive or claim reset success when the runner omits reset confirmation", async () => {
     const deps = dependencies({ SEED_ALLOW_HOST: "localhost" });
     expect(await runSeedCommand(args, deps)).toBe(1);
-    expect(deps.archiveReceipt).not.toHaveBeenCalled();
+    expect(deps.archiveFloorPlansReceipt).not.toHaveBeenCalled();
     expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
       "초기화 완료 여부를 확인하지 못했어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
     );
@@ -597,201 +561,11 @@ describe("explicit full-data reset safety", () => {
     async (...input) => {
       const deps = dependencies();
       expect(await runSeedCommand(input, deps)).toBe(0);
-      expect(deps.archiveReceipt).not.toHaveBeenCalled();
+      expect(deps.archiveFloorPlansReceipt).not.toHaveBeenCalled();
       for (const [options] of deps.runSeed.mock.calls)
         expect(options).not.toHaveProperty("resetData");
     },
   );
-});
-
-describe("chat-spaces additions command", () => {
-  const target = chatSpacesTarget(connectionString);
-  const receipt: ChatSpacesReceipt = {
-    version: 1,
-    mode: "chat-spaces",
-    targetHash: target.targetHash,
-    manifestHash: "a".repeat(64),
-    bundleHash: "b".repeat(64),
-    appliedAt: currentTime.toISOString(),
-    lounges: [
-      {
-        branchId: "15eeb72a-6e7f-57ca-a905-d8797f988992",
-        spaceId: "8ac46e85-57e5-55cf-aa23-1608a7664b1d",
-        roomId: "04b9ed91-94b2-5940-97bb-c67bca0132e7",
-      },
-    ],
-  };
-  const applied = {
-    counts: { communitySpaces: 1, spaceMembers: 6, chatMessages: 6 },
-    skippedBookings: 0,
-    accounts: ["test1@ai.com"],
-    chatSpaces: { applied: true, receipt },
-  };
-  const deps = () =>
-    dependencies({ AUTH_SECRET: undefined, SEED_ALLOW_HOST: "localhost" });
-  it.each([
-    ["--reset-passwords"],
-    ["--branches", "invalid"],
-    ["--booking-round2"],
-    ["--reset-data", "--confirm-reset"],
-    ["--confirm-reset"],
-  ])("rejects other modes %j before environment/DB reads", async (...other) => {
-    const d = deps();
-    expect(await runSeedCommand(["--chat-spaces", ...other], d)).toBe(1);
-    expect(d.getEnvironment).not.toHaveBeenCalled();
-    expect(d.readChatSpacesReceipt).not.toHaveBeenCalled();
-    expectNoDatabaseUse(d);
-  });
-  it("requires exact allowed host including localhost", async () => {
-    const d = dependencies({ AUTH_SECRET: undefined });
-    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
-    expectNoDatabaseUse(d);
-    expect(d.readChatSpacesReceipt).not.toHaveBeenCalled();
-  });
-  it("writes a private target receipt only after commit and never initializes auth", async () => {
-    const d = deps();
-    let commit!: (value: typeof applied) => void;
-    d.runSeed.mockReturnValue(
-      new Promise((resolve) => {
-        commit = resolve;
-      }),
-    );
-    const command = runSeedCommand(["--chat-spaces"], d);
-    await vi.waitFor(() => expect(d.runSeed).toHaveBeenCalledOnce());
-    expect(d.runSeed).toHaveBeenCalledWith({
-      now: currentTime,
-      resetPasswords: false,
-      chatSpaces: {
-        targetHash: target.targetHash,
-        databaseName: target.databaseName,
-        receipt: null,
-      },
-    });
-    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
-    commit(applied);
-    expect(await command).toBe(0);
-    expect(d.writeChatSpacesReceipt).toHaveBeenCalledExactlyOnceWith(receipt);
-    expect(d.writeReceipt).not.toHaveBeenCalled();
-    expect(d.closeDatabase).toHaveBeenCalledOnce();
-    const output = JSON.stringify([d.stdout.mock.calls, d.stderr.mock.calls]);
-    expect(output).toContain("참조한 기존 계정 (변경 없음)");
-    for (const value of [
-      connectionString,
-      target.databaseName,
-      target.targetHash,
-      "private-db-password",
-      "비밀번호는",
-    ])
-      expect(output).not.toContain(value);
-  });
-  it("reuses a valid receipt without rewriting it", async () => {
-    const d = deps();
-    d.readChatSpacesReceipt.mockResolvedValue(receipt);
-    d.runSeed.mockResolvedValue({
-      ...applied,
-      counts: {},
-      chatSpaces: { applied: false, receipt },
-    });
-    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(0);
-    expect(d.runSeed).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chatSpaces: {
-          targetHash: target.targetHash,
-          databaseName: target.databaseName,
-          receipt,
-        },
-      }),
-    );
-    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
-    expect(d.stdout).toHaveBeenCalledWith(
-      "스페이스 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
-    );
-  });
-  it("blocks unreadable receipts before any DB access", async () => {
-    const d = deps();
-    d.readChatSpacesReceipt.mockRejectedValue(new Error("private receipt"));
-    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
-    expectNoDatabaseUse(d);
-    expect(JSON.stringify(d.stderr.mock.calls)).not.toContain("private");
-  });
-  it("reports committed-but-unrecorded failure and never retries", async () => {
-    const d = deps();
-    d.runSeed.mockResolvedValue(applied);
-    d.writeChatSpacesReceipt.mockRejectedValue(new Error("private path"));
-    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
-    expect(d.runSeed).toHaveBeenCalledOnce();
-    expect(d.stderr).toHaveBeenCalledWith(
-      "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
-    );
-    expect(d.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
-  });
-  it("never records failed transactions or a mismatched committed result", async () => {
-    const d = deps();
-    d.runSeed.mockRejectedValue(new SeedError("부분 적용을 확인해 주세요."));
-    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
-    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
-    d.runSeed.mockResolvedValue({
-      ...applied,
-      chatSpaces: {
-        applied: true,
-        receipt: { ...receipt, targetHash: "f".repeat(64) },
-      },
-    });
-    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
-    expect(d.writeChatSpacesReceipt).not.toHaveBeenCalled();
-  });
-  it("archives both mode receipts only after successful reset", async () => {
-    const d = dependencies({ SEED_ALLOW_HOST: "localhost" });
-    d.runSeed.mockResolvedValue({
-      ...applied,
-      chatSpaces: undefined,
-      reset: { migrationCount: 27, counts: { users: 21 } },
-    });
-    expect(await runSeedCommand(["--reset-data", "--confirm-reset"], d)).toBe(
-      0,
-    );
-    expect(d.archiveChatSpacesReceipt).toHaveBeenCalledExactlyOnceWith(
-      target.targetHash,
-    );
-    expect(
-      d.archiveChatSpacesReceipt.mock.invocationCallOrder[0],
-    ).toBeGreaterThan(d.runSeed.mock.invocationCallOrder[0]!);
-  });
-  it("reports a failed chat receipt archive after the booking receipt was already archived", async () => {
-    const d = dependencies({ SEED_ALLOW_HOST: "localhost" });
-    d.runSeed.mockResolvedValue({
-      ...applied,
-      chatSpaces: undefined,
-      reset: { migrationCount: 27, counts: { users: 21 } },
-    });
-    d.archiveReceipt.mockResolvedValue("booking.reset-archive");
-    d.archiveChatSpacesReceipt.mockRejectedValue(
-      new Error("private receipt path"),
-    );
-    expect(await runSeedCommand(["--reset-data", "--confirm-reset"], d)).toBe(
-      1,
-    );
-    expect(d.runSeed).toHaveBeenCalledOnce();
-    expect(d.archiveReceipt).toHaveBeenCalledOnce();
-    expect(d.archiveChatSpacesReceipt).toHaveBeenCalledExactlyOnceWith(
-      target.targetHash,
-    );
-    expect(d.stderr).toHaveBeenCalledExactlyOnceWith(
-      "DB 초기화와 시드 재생성은 끝났지만 이전 적용 표식을 모두 보관하지 못했어요. 자동으로 다시 실행하지 말고 예약 2차·스페이스·평면도 표식을 직접 확인해 주세요. 삭제한 데이터는 복구할 수 없어요.",
-    );
-    expect(d.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
-    expect(d.closeDatabase).toHaveBeenCalledOnce();
-  });
-  it("rejects doubly encoded DB names before reading receipts or accessing the DB", async () => {
-    const d = dependencies({
-      DATABASE_URL: "postgres://localhost/%2546loor",
-      SEED_ALLOW_HOST: "localhost",
-    });
-    expect(await runSeedCommand(["--chat-spaces"], d)).toBe(1);
-    expect(d.readChatSpacesReceipt).not.toHaveBeenCalled();
-    expectNoDatabaseUse(d);
-    expect(JSON.stringify(d.stderr.mock.calls)).not.toContain("%2546loor");
-  });
 });
 
 describe("floor-plans additions command", () => {
@@ -821,8 +595,6 @@ describe("floor-plans additions command", () => {
   it.each([
     ["--reset-passwords"],
     ["--branches", "invalid"],
-    ["--booking-round2"],
-    ["--chat-spaces"],
     ["--reset-data", "--confirm-reset"],
     ["--confirm-reset"],
   ])(
@@ -986,149 +758,7 @@ describe("floor-plans additions command", () => {
       1,
     );
     expect(d.stderr).toHaveBeenLastCalledWith(
-      expect.stringContaining("예약 2차·스페이스·평면도 표식"),
+      expect.stringContaining("평면도 표식"),
     );
   });
-});
-
-describe("booking-round2 command and commit receipts", () => {
-  const hostHash = bookingRound2HostHash("localhost");
-  const receipt: BookingRound2Receipt = {
-    version: 1,
-    mode: "booking-round2",
-    hostHash,
-    manifestHash: "a".repeat(64),
-    appliedAt: currentTime.toISOString(),
-    bundleHash: "b".repeat(64),
-  };
-  const appliedResult = {
-    counts: {
-      attendeeCounts: 6,
-      bookingParticipants: 5,
-      bookings: 9,
-      spaceBlocks: 1,
-    },
-    skippedBookings: 0,
-    accounts: ["test1@ai.com"],
-    bookingRound2: { applied: true, receipt },
-  };
-
-  it.each([
-    { other: ["--branches", "invalid"] },
-    { other: ["--reset-passwords"] },
-    { other: ["--branches", "", "--reset-passwords"] },
-  ])(
-    "rejects mutually exclusive arguments %j before configuration or receipt reads",
-    async ({ other }) => {
-      const deps = dependencies();
-      expect(await runSeedCommand(["--booking-round2", ...other], deps)).toBe(
-        1,
-      );
-      expect(deps.getEnvironment).not.toHaveBeenCalled();
-      expect(deps.readReceipt).not.toHaveBeenCalled();
-      expect(deps.writeReceipt).not.toHaveBeenCalled();
-      expect(deps.stderr).toHaveBeenCalledWith(
-        "--booking-round2는 --branches나 --reset-passwords와 함께 쓸 수 없어요.",
-      );
-      expectNoDatabaseUse(deps);
-    },
-  );
-
-  it("does not require authentication configuration and only writes a receipt after the committed result", async () => {
-    const deps = dependencies({ AUTH_SECRET: undefined });
-    let commit!: (result: typeof appliedResult) => void;
-    deps.runSeed.mockReturnValue(
-      new Promise((resolve) => {
-        commit = resolve;
-      }),
-    );
-    const command = runSeedCommand(["--booking-round2"], deps);
-    await vi.waitFor(() => expect(deps.runSeed).toHaveBeenCalledOnce());
-    expect(deps.readReceipt).toHaveBeenCalledExactlyOnceWith(hostHash);
-    expect(deps.writeReceipt).not.toHaveBeenCalled();
-    expect(deps.runSeed).toHaveBeenCalledExactlyOnceWith({
-      now: currentTime,
-      resetPasswords: false,
-      bookingRound2: { hostHash, receipt: null },
-    });
-    commit(appliedResult);
-    expect(await command).toBe(0);
-    expect(deps.writeReceipt).toHaveBeenCalledExactlyOnceWith(receipt);
-    expect(deps.closeDatabase).toHaveBeenCalledOnce();
-    const output = JSON.stringify(deps.stdout.mock.calls);
-    expect(output).toContain("참조한 기존 계정 (변경 없음)");
-    expect(output).not.toContain("비밀번호는");
-    expect(output).not.toContain(receipt.bundleHash);
-    expect(output).not.toContain(connectionString);
-  });
-
-  it("passes an existing receipt to the core and leaves it untouched on a validated rerun", async () => {
-    const deps = dependencies({ AUTH_SECRET: undefined });
-    deps.readReceipt.mockResolvedValue(receipt);
-    deps.runSeed.mockResolvedValue({
-      ...appliedResult,
-      counts: {},
-      bookingRound2: { applied: false, receipt },
-    });
-    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(0);
-    expect(deps.runSeed).toHaveBeenCalledWith({
-      now: currentTime,
-      resetPasswords: false,
-      bookingRound2: { hostHash, receipt },
-    });
-    expect(deps.writeReceipt).not.toHaveBeenCalled();
-    expect(deps.stdout).toHaveBeenCalledWith(
-      "예약 2차 적용 표식을 확인했어요. DB를 변경하지 않았어요.",
-    );
-  });
-
-  it("blocks malformed or unreadable receipts before any database work without exposing contents", async () => {
-    const deps = dependencies();
-    deps.readReceipt.mockRejectedValue(
-      new Error("private token receipt contents"),
-    );
-    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
-    expectNoDatabaseUse(deps);
-    expect(deps.writeReceipt).not.toHaveBeenCalled();
-    expect(JSON.stringify(deps.stderr.mock.calls)).not.toContain("private");
-  });
-
-  it("fails closed after receipt persistence failure and never retries or claims a rollback", async () => {
-    const deps = dependencies();
-    deps.runSeed.mockResolvedValue(appliedResult);
-    deps.writeReceipt.mockRejectedValue(
-      new Error("private receipt path and token"),
-    );
-    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
-    expect(deps.runSeed).toHaveBeenCalledOnce();
-    expect(deps.writeReceipt).toHaveBeenCalledOnce();
-    expect(deps.stderr).toHaveBeenCalledExactlyOnceWith(
-      "DB 적용은 끝났지만 완료 표식을 저장하지 못했어요. 자동 재실행·복구하지 말고 DB와 적용 표식을 직접 확인해 주세요.",
-    );
-    expect(deps.stdout).not.toHaveBeenCalledWith("시드 데이터를 준비했어요.");
-    expect(deps.closeDatabase).toHaveBeenCalledOnce();
-  });
-
-  it("never writes a receipt when the transaction fails", async () => {
-    const deps = dependencies();
-    deps.runSeed.mockRejectedValue(
-      new SeedError("부분 적용 상태를 확인해 주세요."),
-    );
-    expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
-    expect(deps.writeReceipt).not.toHaveBeenCalled();
-    expect(deps.closeDatabase).toHaveBeenCalledOnce();
-  });
-
-  it.each([
-    { NODE_ENV: "production" as const },
-    { DATABASE_URL: "postgres://user:private@remote.example.test/floor" },
-  ])(
-    "keeps existing production and remote-host guards for %j",
-    async (environment) => {
-      const deps = dependencies(environment);
-      expect(await runSeedCommand(["--booking-round2"], deps)).toBe(1);
-      expect(deps.readReceipt).not.toHaveBeenCalled();
-      expectNoDatabaseUse(deps);
-    },
-  );
 });

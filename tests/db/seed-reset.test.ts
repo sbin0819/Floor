@@ -9,7 +9,7 @@ import {
   vi,
 } from "vitest";
 import { createAuth, type AuthInstance } from "@/lib/auth/auth";
-import * as seedDal from "@/lib/dal/seed";
+import * as scheduleDal from "@/lib/dal/seed-schedule";
 import { inspectSeedReset } from "@/lib/dal/seed-reset";
 import {
   announcements,
@@ -115,10 +115,13 @@ describe("explicit full development reset", () => {
       users: 21,
       branches: 5,
       spaces: 71,
-      bookings: 30,
-      meetingRooms: 21,
-      chatMessages: 50,
+      teams: 4,
+      announcements: 5,
+      reports: 2,
     });
+    expect(result.counts.bookings).toBeGreaterThan(1000);
+    expect(result.counts.meetingRooms).toBeGreaterThan(800);
+    expect(result.counts.notifications).toBeGreaterThan(1000);
     expect(
       await database.db.select().from(users).where(eq(users.id, legacy!.id)),
     ).toEqual([]);
@@ -186,7 +189,7 @@ describe("explicit full development reset", () => {
       .set({ name: "롤백 시 남아야 하는 지점" })
       .where(eq(branches.id, "15eeb72a-6e7f-57ca-a905-d8797f988992"));
     const before = await snapshot();
-    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+    vi.spyOn(scheduleDal, "insertSeedBookings").mockRejectedValueOnce(
       new Error("injected later failure"),
     );
     await expect(reset()).rejects.toThrow("완료 여부를 확인하지 못했어요");
@@ -257,7 +260,7 @@ describe("explicit full development reset", () => {
       },
     ]);
     const before = await snapshot();
-    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+    vi.spyOn(scheduleDal, "insertSeedBookings").mockRejectedValueOnce(
       new Error("injected later failure"),
     );
     await expect(reset()).rejects.toThrow("완료 여부를 확인하지 못했어요");
@@ -265,18 +268,20 @@ describe("explicit full development reset", () => {
     vi.restoreAllMocks();
     const result = await reset();
     expect(Object.keys(result.reset!.counts)).toHaveLength(37);
+    // 시드가 만든 공지 5개·신고 2개에 이 테스트가 더한 행이 같이 지워진다.
     expect(result.reset!.counts).toMatchObject({
       call_sessions: 1,
       call_participants: 1,
       message_attachments: 2,
-      announcements: 1,
-      reports: 1,
+      announcements: 6,
+      reports: 3,
     });
     expect(await database.db.select().from(callSessions)).toEqual([]);
     expect(await database.db.select().from(callParticipants)).toEqual([]);
     expect(await database.db.select().from(messageAttachments)).toEqual([]);
-    expect(await database.db.select().from(announcements)).toEqual([]);
-    expect(await database.db.select().from(reports)).toEqual([]);
+    // 초기화 뒤에는 시드가 만든 공지·신고만 다시 있다.
+    expect(await database.db.select().from(announcements)).toHaveLength(5);
+    expect(await database.db.select().from(reports)).toHaveLength(2);
   }, 60000);
 
   it("repopulates public tables even when a temporary table shadows the user table", async () => {
@@ -395,11 +400,7 @@ describe("explicit full development reset", () => {
     expect(await snapshot()).toEqual(before);
   });
 
-  it.each([
-    { resetPasswords: true },
-    { branchIds: [] },
-    { bookingRound2: { hostHash: "a".repeat(64), receipt: null } },
-  ])(
+  it.each([{ resetPasswords: true }, { branchIds: [] }])(
     "rejects mixed reset scopes before opening a transaction: %j",
     async (extra) => {
       const transaction = vi.fn();

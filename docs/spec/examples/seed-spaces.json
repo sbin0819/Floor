@@ -1,27 +1,56 @@
 {
-  "note": "스페이스 시드(지시서 26). 지점 라운지는 시드가 지점마다 만든다(이 파일에 적지 않는다). loungeMembers는 그 지점 라운지의 멤버(branchId는 seed.json의 branches[].id), loungeMessages는 라운지 채널(`라운지`)의 메시지다. communities는 커뮤니티 스페이스: 소유자 하나, 관리자와 멤버는 소유자와 겹치지 않는다. communities[].id와 channels[].id는 시드가 쓰는 고정 id다(다시 돌릴 때 이 id로 찾아 지운다). channels의 첫 번째는 기본 채널 `일반`이다. 메시지의 channel은 그 스페이스의 채널 이름이고, 작성자는 멤버(소유자·관리자 포함)여야 한다. 키는 seed.json의 users[].key다. minutesAgo는 채널마다 줄어드는 순서다. 멤버가 들어온 시각은 그 사람의 첫 메시지보다 앞이다. 시드는 초대 링크를 만들지 않는다. 다시 돌려도 같아야 한다.",
+  "note": "스페이스 시드(지시서 26). 지점 라운지는 시드가 지점마다 만든다(이 파일에 적지 않는다). loungeMembers는 그 지점 라운지의 멤버(branchId는 seed.json의 branches[].id)이고 공지를 쓰는 운영자(admin)가 모든 라운지에 들어가 있어야 한다. loungeMessages는 라운지 채널(`라운지`)의 메시지다. loungeReports는 라운지 메시지의 신고다: messageIndex는 그 지점 loungeMessages 안의 순서(0부터), reporterKeys는 작성자가 아닌 라운지 멤버다. communities는 커뮤니티 스페이스: 소유자 하나, 관리자와 멤버는 소유자와 겹치지 않는다. communities[].id와 channels[].id는 시드가 쓰는 고정 id다(다시 돌릴 때 이 id로 찾아 지운다). channels의 첫 번째는 기본 채널 `일반`이다. 메시지의 channel은 그 스페이스의 채널 이름이고, 작성자는 멤버(소유자·관리자 포함)여야 한다. 키는 seed.json의 users[].key다. minutesAgo는 채널마다 줄어드는 순서다. 멤버가 들어온 시각은 그 사람의 첫 메시지보다 앞이다. 시드는 초대 링크를 만들지 않는다. 다시 돌려도 같아야 한다.",
   "loungeMembers": [
     {
       "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
-      "userKeys": [
-        "member",
-        "designMember",
-        "both"
-      ]
+      "userKeys": ["admin", "member", "designAdmin", "designMember", "growthAdmin", "both", "test13", "test14", "test15", "test16", "test19"]
+    },
+    {
+      "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709",
+      "userKeys": ["admin", "test6", "test7", "test8", "test9", "test20"]
+    },
+    {
+      "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "userKeys": ["admin", "test10", "test11", "test12", "test19"]
+    },
+    {
+      "branchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4",
+      "userKeys": ["admin", "test17", "test15"]
+    },
+    {
+      "branchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e",
+      "userKeys": ["admin", "test18", "test8"]
     }
   ],
   "loungeMessages": [
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "both", "minutesAgo": 4320, "body": "강남점 7층 라운지 커피 머신 새로 들어왔어요 ☕ 라떼도 돼요!" },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "member", "minutesAgo": 4300, "body": "오 반가운 소식! 오후에 가 볼게요." },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "test15", "minutesAgo": 2900, "body": "6층 폰부스 6-1 문 손잡이 고쳐졌네요. 고마워요!" },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "admin", "minutesAgo": 2880, "body": "네, 어제 수리 끝났어요. 불편한 곳 있으면 여기 남겨 주세요 🙏" },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "test19", "minutesAgo": 1500, "body": "💰 주말 코인 리딩방 무료 초대! 선착순 30명, 수익 인증 多. 링크 클릭 👉 bit.ly/free-coin-room" },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "designMember", "minutesAgo": 1490, "body": "위 광고 글은 신고했어요. 운영자님 확인 부탁드려요." },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "test13", "minutesAgo": 600, "body": "내일 오리엔테이션 참석하시는 분 손 🙋 끝나고 같이 저녁 어때요?" },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "growthAdmin", "minutesAgo": 240, "body": "회의실 6B 에어컨 수리 중이라 6C 쓰고 있어요. 6C는 좀 춥네요 🥶" },
+    { "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992", "authorKey": "admin", "minutesAgo": 230, "body": "6B 수리는 내일까지예요. 담요를 라운지에 비치했어요!" },
+    { "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709", "authorKey": "test6", "minutesAgo": 5000, "body": "성수점 2층 S1 모니터, USB-C 케이블 지원되나요?" },
+    { "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709", "authorKey": "admin", "minutesAgo": 4980, "body": "네, S1·S2 둘 다 USB-C 케이블 있어요." },
+    { "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709", "authorKey": "test20", "minutesAgo": 1200, "body": "3층 공사 소음이 좀 크네요. 언제까지인가요?" },
+    { "branchId": "48d209a7-fccd-5e26-b95d-466afaf62709", "authorKey": "admin", "minutesAgo": 1180, "body": "이달 말까지예요. # 공지에 자세히 적어 뒀어요. 양해 부탁드려요 🙏" },
+    { "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd", "authorKey": "test10", "minutesAgo": 3000, "body": "홍대점 라운지 처음 왔는데 분위기 좋네요 ☀️" },
+    { "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd", "authorKey": "test19", "minutesAgo": 2990, "body": "저도 자주 와요. 2층 창가 자리 추천!" },
+    { "branchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd", "authorKey": "admin", "minutesAgo": 500, "body": "세미나룸 H3 프로젝터 교체 일정은 # 공지에 올렸어요." },
+    { "branchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4", "authorKey": "test17", "minutesAgo": 2000, "body": "여의도점 11층 세미나룸 빔 밝기 좋아요. 발표 연습하기 딱이네요." },
+    { "branchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4", "authorKey": "admin", "minutesAgo": 1990, "body": "리허설 예약 환영해요. 마이크도 빌려 드릴 수 있어요 🎤" },
+    { "branchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e", "authorKey": "test18", "minutesAgo": 700, "body": "판교점 5층 라운지에 스탠딩 데스크 생겼어요!" },
+    { "branchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e", "authorKey": "test8", "minutesAgo": 690, "body": "오 다음 주 밋업 때 써 봐야겠네요." }
+  ],
+  "loungeReports": [
     {
       "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
-      "authorKey": "both",
-      "minutesAgo": 240,
-      "body": "강남점 7층 라운지 커피 머신 새로 들어왔어요 ☕"
-    },
-    {
-      "branchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
-      "authorKey": "member",
-      "minutesAgo": 230,
-      "body": "오 반가운 소식! 오후에 가 볼게요."
+      "messageIndex": 4,
+      "reporterKeys": ["designMember", "member"],
+      "reason": "spam",
+      "detail": "코인 리딩방 광고 링크예요."
     }
   ],
   "communities": [
@@ -30,47 +59,39 @@
       "name": "주말 러닝 크루",
       "iconColor": "green",
       "ownerKey": "member",
-      "adminKeys": [
-        "designMember"
-      ],
-      "memberKeys": [
-        "both"
-      ],
+      "adminKeys": ["designMember"],
+      "memberKeys": ["both", "test15", "test18"],
       "channels": [
-        {
-          "id": "04b9ed91-94b2-5940-97bb-c67bca0132e7",
-          "name": "일반"
-        },
-        {
-          "id": "1a3bc036-5ce1-5510-8c14-46142682ba14",
-          "name": "코스-공유"
-        }
+        { "id": "04b9ed91-94b2-5940-97bb-c67bca0132e7", "name": "일반" },
+        { "id": "1a3bc036-5ce1-5510-8c14-46142682ba14", "name": "코스-공유" }
       ],
       "messages": [
-        {
-          "channel": "일반",
-          "authorKey": "member",
-          "minutesAgo": 2880,
-          "body": "주말마다 한강에서 같이 뛰어요. 처음 오시는 분 환영해요!"
-        },
-        {
-          "channel": "일반",
-          "authorKey": "designMember",
-          "minutesAgo": 2870,
-          "body": "이번 토요일 아침 7시 반포에서 볼까요?"
-        },
-        {
-          "channel": "일반",
-          "authorKey": "both",
-          "minutesAgo": 45,
-          "body": "저도 이번 주부터 합류할게요 🏃"
-        },
-        {
-          "channel": "코스-공유",
-          "authorKey": "designMember",
-          "minutesAgo": 1500,
-          "body": "반포 → 잠수교 → 이촌 왕복 8km 코스 추천해요."
-        }
+        { "channel": "일반", "authorKey": "member", "minutesAgo": 20160, "body": "주말마다 한강에서 같이 뛰어요. 처음 오시는 분 환영해요!" },
+        { "channel": "일반", "authorKey": "designMember", "minutesAgo": 20100, "body": "이번 토요일 아침 7시 반포에서 볼까요?" },
+        { "channel": "일반", "authorKey": "test15", "minutesAgo": 8000, "body": "저 지난주에 10km 완주했어요 🎉" },
+        { "channel": "일반", "authorKey": "both", "minutesAgo": 2880, "body": "저도 이번 주부터 합류할게요 🏃" },
+        { "channel": "일반", "authorKey": "test18", "minutesAgo": 45, "body": "판교에서도 번개 러닝 한 번 하죠!" },
+        { "channel": "코스-공유", "authorKey": "designMember", "minutesAgo": 15000, "body": "반포 → 잠수교 → 이촌 왕복 8km 코스 추천해요." },
+        { "channel": "코스-공유", "authorKey": "test15", "minutesAgo": 7000, "body": "성수대교 북단 코스도 야경이 좋아요 🌃" }
+      ]
+    },
+    {
+      "id": "d10646c8-59be-5ed0-8cf5-9455cfe819b3",
+      "name": "보드게임 모임",
+      "iconColor": "purple",
+      "ownerKey": "test8",
+      "adminKeys": ["test7"],
+      "memberKeys": ["test9", "test20", "test13"],
+      "channels": [
+        { "id": "c58bd4a0-8b60-58ac-b531-bb421ec37bfc", "name": "일반" },
+        { "id": "021c06ce-81a8-5aa3-b134-42553683b539", "name": "모임-일정" }
+      ],
+      "messages": [
+        { "channel": "일반", "authorKey": "test8", "minutesAgo": 12000, "body": "매주 목요일 저녁 성수점 라운지에서 보드게임 해요 🎲" },
+        { "channel": "일반", "authorKey": "test7", "minutesAgo": 11900, "body": "이번 주는 카탄 어때요?" },
+        { "channel": "일반", "authorKey": "test20", "minutesAgo": 3000, "body": "저 처음인데 끼어도 될까요?" },
+        { "channel": "일반", "authorKey": "test8", "minutesAgo": 2990, "body": "물론이죠! 환영해요 🙌" },
+        { "channel": "모임-일정", "authorKey": "test7", "minutesAgo": 1400, "body": "다음 주 목요일은 밋업이 있어서 한 주 쉬어요." }
       ]
     }
   ]

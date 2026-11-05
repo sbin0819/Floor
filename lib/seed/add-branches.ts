@@ -1,33 +1,22 @@
 import type { DalDatabase } from "@/lib/dal";
-import { insertSeedBlock, insertSeedBooking } from "@/lib/dal/seed";
-import { insertSeedMeeting } from "@/lib/dal/seed-meeting";
 import { syncSeedChatSpaces } from "@/lib/dal/seed-chat-spaces";
 import {
   insertSeedBranchStructure,
   readSeedScopeRows,
 } from "@/lib/dal/seed-scope";
-import { getOperatingDate } from "@/lib/time/open-hours";
-import { zonedDateTime } from "@/lib/time/zoned";
+import { applySeedSchedule } from "./apply-schedule";
 import { loadSeedData } from "./data";
-import { loadSeedBookings2, type SeedBookings2Data } from "./bookings-2";
-import { insertSeedDeskSchedule, scopedDeskSchedule } from "./desk-schedule";
-import { insertSeedParticipants } from "./participants";
-import { insertSeedReminders } from "./reminders";
 import { SeedError } from "./errors";
 import { loadSeedPhotos } from "./photos";
-import { loadSeedSpaces } from "./spaces";
-import {
-  loadSeedMeeting,
-  seedMeetingCreatedAt,
-  type SeedMeetingData,
-} from "./meeting";
-import type { SeedResult } from "./run-seed";
+import { loungeMembersByBranch, type SeedResult } from "./run-seed";
+import { expandSeedSchedule, loadSeedSchedule } from "./schedule";
 import {
   seedBranchCounts,
   selectSeedBranches,
   validateSeedBranchIds,
   type SeedBranchScope,
 } from "./scope";
+import { loadSeedSpaces } from "./spaces";
 
 function verifyRows<E extends { id: string }, A extends { id: string }>(
   expected: readonly E[],
@@ -45,11 +34,7 @@ function verifyRows<E extends { id: string }, A extends { id: string }>(
   }
 }
 
-async function prepareAddition(
-  scope: SeedBranchScope,
-  db: DalDatabase,
-  bookingExtras?: SeedBookings2Data,
-) {
+async function prepareAddition(scope: SeedBranchScope, db: DalDatabase) {
   const rows = await readSeedScopeRows(scope, db);
   const userIds = new Map<string, string>();
   for (const account of scope.data.users) {
@@ -69,9 +54,12 @@ async function prepareAddition(
   for (const branch of scope.data.branches) {
     const existingBranch = rows.branchRows.find(({ id }) => id === branch.id);
     const exists = existingBranch !== undefined;
-    const { data, photos } = selectSeedBranches(scope.data, scope.photos, [
-      branch.id,
-    ]);
+    const { data, photos, schedule } = selectSeedBranches(
+      scope.data,
+      scope.photos,
+      [branch.id],
+      scope.schedule,
+    );
     if (
       !exists &&
       rows.branchRows.some(
@@ -93,18 +81,11 @@ async function prepareAddition(
       exists,
       (a, b) => a.floorId === b.floorId && a.parentId === b.parentId,
     );
-    verifyRows(
-      data.bookings,
-      rows.bookingRows,
-      exists,
-      (a, b) => a.spaceId === b.spaceId,
-    );
-    verifyRows(
-      data.spaceBlocks,
-      rows.blockRows,
-      exists,
-      (a, b) => a.spaceId === b.spaceId,
-    );
+    // 이미 있는 지점의 예약·점검은 날짜가 달라도 그대로 둔다. 새 지점의 id는 아직 없어야 한다.
+    if (!exists) {
+      verifyRows(schedule.bookings, rows.bookingRows, false, () => true);
+      verifyRows(schedule.blocks, rows.blockRows, false, () => true);
+    }
     verifyRows(
       data.floorPlans,
       rows.planRows,
@@ -159,7 +140,7 @@ async function prepareAddition(
       scope.data,
       scope.photos,
       addedBranchIds,
-      bookingExtras,
+      scope.schedule,
       scope.spaceChat,
     ),
     userIds,
@@ -172,37 +153,42 @@ async function prepareAddition(
 export async function preflightSeedBranches({
   branchIds,
   db,
+  now,
 }: {
   branchIds: readonly string[];
   db: DalDatabase;
+  now: Date;
 }) {
   const data = loadSeedData();
   const photos = loadSeedPhotos(data);
-  const extras = loadSeedBookings2(data);
-  const meeting = loadSeedMeeting(data, extras);
   const spaceChat = loadSeedSpaces(data);
+  const schedule = expandSeedSchedule(loadSeedSchedule(data), data, now);
   const ids = validateSeedBranchIds(branchIds, data);
   const plan = await prepareAddition(
-    selectSeedBranches(data, photos, ids, extras, spaceChat),
+    selectSeedBranches(data, photos, ids, schedule, spaceChat),
     db,
-    extras,
   );
-  const selected = scopedDeskSchedule(plan.addition.data, extras);
   const counts = seedBranchCounts(plan.addition);
-  const bookingIds = new Set(plan.addition.data.bookings.map(({ id }) => id));
+  const timeBookings = plan.addition.schedule.bookings.filter(
+    (booking) => !booking.isDesk,
+  );
   return {
     addedBranchIds: plan.addedBranchIds,
     skippedBranchIds: plan.skippedBranchIds,
     expectedCounts: {
       ...counts,
-      bookings: counts.bookings + selected.bookings.length,
-      spaceBlocks: counts.spaceBlocks + selected.blocks.length,
-      meetingRooms: counts.bookings,
+      meetingRooms: timeBookings.length,
       chatMessages:
-        counts.bookings +
+        timeBookings.reduce(
+          (count, booking) =>
+            count +
+            1 +
+            booking.messages.length +
+            (booking.status === "cancelled" ? 1 : 0),
+          0,
+        ) +
         plan.addition.spaceChat.loungeMessages.length +
-        meeting.messages.filter(({ bookingId }) => bookingIds.has(bookingId))
-          .length,
+        plan.addition.schedule.announcements.length,
     },
   };
 }
@@ -211,18 +197,10 @@ export async function addSeedBranches(
   scope: SeedBranchScope,
   db: DalDatabase,
   now: Date,
-  bookingExtras?: SeedBookings2Data,
-  meeting: SeedMeetingData = { messages: [] },
 ): Promise<SeedResult> {
   const { addition, userIds, addedBranchIds, skippedBranchIds } =
-    await prepareAddition(scope, db, bookingExtras);
+    await prepareAddition(scope, db);
   const { data } = addition;
-  const attendeeCounts = new Map(
-    bookingExtras?.attendeeCounts.map(({ bookingId, attendeeCount }) => [
-      bookingId,
-      attendeeCount,
-    ]),
-  );
   // 존재 여부를 먼저 읽었어도 다른 실행과 경합할 수 있으므로 INSERT 충돌을 숨기지 않는다.
   await insertSeedBranchStructure(addition, userIds, db);
   const spaceChatCounts = await syncSeedChatSpaces(
@@ -233,121 +211,28 @@ export async function addSeedBranches(
     db,
     { newLoungesOnly: true },
   );
-  const branches = new Map(data.branches.map((branch) => [branch.id, branch]));
-  const floors = new Map(data.floors.map((floor) => [floor.id, floor]));
-  const spaces = new Map(data.spaces.map((space) => [space.id, space]));
-  const instant = (spaceId: string, offset: number, time: string) => {
-    const branch = branches.get(
-      floors.get(spaces.get(spaceId)!.floorId)!.branchId,
-    )!;
-    return zonedDateTime(
-      getOperatingDate(now, branch.timezone, branch.openHours, offset),
-      time,
-      branch.timezone,
-    );
-  };
-  for (const {
-    startDayOffset,
-    endDayOffset,
-    start,
-    end,
-    createdByKey,
-    ...block
-  } of data.spaceBlocks)
-    await insertSeedBlock(
-      {
-        ...block,
-        createdBy: userIds.get(createdByKey)!,
-        during: {
-          start: instant(block.spaceId, startDayOffset, start),
-          end: instant(block.spaceId, endDayOffset, end),
-        },
-      },
-      db,
-    );
-  for (const {
-    dayOffset,
-    start,
-    end,
-    userKey,
-    cancelledByKey,
-    ...booking
-  } of data.bookings) {
-    const meetingMessages = meeting.messages.filter(
-      ({ bookingId }) => bookingId === booking.id,
-    );
-    const createdAt = seedMeetingCreatedAt(meetingMessages, now);
-    const during = {
-      start: instant(booking.spaceId, dayOffset, start),
-      end: instant(booking.spaceId, dayOffset, end),
-    };
-    await insertSeedBooking(
-      {
-        ...booking,
-        createdAt,
-        attendeeCount: attendeeCounts.get(booking.id) ?? null,
-        userId: userIds.get(userKey)!,
-        during,
-        cancelledAt: booking.status === "cancelled" ? now : null,
-        cancelledBy:
-          booking.status === "cancelled" && cancelledByKey
-            ? userIds.get(cancelledByKey)!
-            : null,
-      },
-      db,
-    );
-    await insertSeedParticipants(
-      booking.id,
-      bookingExtras,
-      userIds,
-      createdAt,
-      db,
-    );
-    await insertSeedMeeting(
-      {
-        bookingId: booking.id,
-        bookerId: userIds.get(userKey)!,
-        messages: meetingMessages,
-        userIds,
-        createdAt,
-        now,
-      },
-      db,
-    );
-    await insertSeedReminders({
-      booking: { ...booking, during, userId: userIds.get(userKey)! },
+  const applied = await applySeedSchedule(
+    {
+      schedule: addition.schedule,
       data,
-      extras: bookingExtras,
       userIds,
       now,
-      database: db,
-    });
-  }
+      loungeMemberKeys: loungeMembersByBranch(addition.spaceChat),
+    },
+    db,
+  );
   const counts = seedBranchCounts(addition);
-  const bookingIds = new Set(data.bookings.map(({ id }) => id));
-  const deskResult = bookingExtras
-    ? await insertSeedDeskSchedule({
-        data,
-        extras: bookingExtras,
-        userIds,
-        now,
-        database: db,
-      })
-    : { bookings: 0, spaceBlocks: 0, skippedBookings: 0 };
   return {
     counts: {
       ...counts,
-      bookings: counts.bookings + deskResult.bookings,
-      spaceBlocks: counts.spaceBlocks + deskResult.spaceBlocks,
-      meetingRooms: counts.bookings,
-      chatMessages:
-        counts.bookings +
-        spaceChatCounts.chatMessages +
-        meeting.messages.filter(({ bookingId }) => bookingIds.has(bookingId))
-          .length,
+      bookings: applied.bookings,
+      spaceBlocks: applied.spaceBlocks,
+      announcements: applied.announcements,
+      notifications: applied.notifications,
+      meetingRooms: applied.meetingRooms,
+      chatMessages: spaceChatCounts.chatMessages + applied.chatMessages,
     },
-    skippedBookings: deskResult.skippedBookings,
-    skippedMeetingMessages: 0,
+    skippedBookings: applied.skippedBookings,
     accounts: data.users.map(({ email }) => email),
     branchScope: { addedBranchIds, skippedBranchIds },
   };

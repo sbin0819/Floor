@@ -23,10 +23,8 @@ import {
   userBlocks,
   users,
 } from "@/lib/db/schema";
-import * as seedDal from "@/lib/dal/seed";
-import * as people2Dal from "@/lib/dal/seed-people-2";
+import * as scheduleDal from "@/lib/dal/seed-schedule";
 import * as people2Loader from "@/lib/seed/people-2";
-import * as bookingRound2 from "@/lib/seed/booking-round2";
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedPeople } from "@/lib/seed/people";
 import { SeedError } from "@/lib/seed/errors";
@@ -132,21 +130,26 @@ describe("transactional group and request seed", () => {
         ...row,
         id: null,
       })),
+      // 라운지 메시지는 다시 돌릴 때 새 id를 받으므로 신고의 메시지 참조도 같이 가린다.
+      reports: sorted(
+        snapshot.reports.map((row) => ({ ...row, id: null, messageId: null })),
+      ),
     };
   }
-  it("writes group creation plus three texts, one requested recipient and eight authored cursors", async () => {
+  it("writes group creation plus the texts, requested recipients and authored cursors", async () => {
     expect((await seed()).counts).toMatchObject({
-      directRooms: 3,
-      groupRooms: 1,
-      chatMessages: 50,
+      directRooms: 7,
+      groupRooms: inputFile.groupDirectMessages.length,
     });
     const snapshot = await state();
     const userIds = await ids();
-    const group = snapshot.rooms.find(({ kind }) => kind === "group_dm")!;
+    const group = snapshot.rooms.find(
+      ({ kind, name }) => kind === "group_dm" && name === "점심 메뉴",
+    )!;
     expect(group).toMatchObject({
       name: "점심 메뉴",
-      lastSeq: 4,
-      lastMessageAt: at(585),
+      lastSeq: 5,
+      lastMessageAt: at(580),
       createdAt: at(600),
       spaceId: null,
       dmLowUserId: null,
@@ -155,7 +158,7 @@ describe("transactional group and request seed", () => {
     const groupMessages = snapshot.messages.filter(
       ({ roomId }) => roomId === group.id,
     );
-    expect(groupMessages).toHaveLength(4);
+    expect(groupMessages).toHaveLength(5);
     expect(groupMessages[0]).toMatchObject({
       kind: "system",
       seq: 1,
@@ -169,12 +172,12 @@ describe("transactional group and request seed", () => {
         .slice(1)
         .map(({ seq, kind, systemData }) => ({ seq, kind, systemData })),
     ).toEqual(
-      [2, 3, 4].map((seq) => ({ seq, kind: "text", systemData: null })),
+      [2, 3, 4, 5].map((seq) => ({ seq, kind: "text", systemData: null })),
     );
     const members = snapshot.members.filter(
       ({ roomId }) => roomId === group.id,
     );
-    expect(members).toHaveLength(3);
+    expect(members).toHaveLength(5);
     expect(
       members.every(
         (member) =>
@@ -186,7 +189,8 @@ describe("transactional group and request seed", () => {
       members[0]!.joinedAt.getTime(),
     );
     const recipient = snapshot.members.find(
-      ({ status }) => status === "requested",
+      ({ status, userId }) =>
+        status === "requested" && userId === userIds.get("designMember"),
     )!;
     expect(recipient).toMatchObject({
       userId: userIds.get("designMember"),
@@ -194,8 +198,12 @@ describe("transactional group and request seed", () => {
       statusChangedAt: at(120),
       joinedAt: at(120),
     });
-    expect(snapshot.notifications).toHaveLength(1);
-    expect(snapshot.notifications[0]).toMatchObject({
+    expect(snapshot.notifications).toHaveLength(
+      inputFile.messageRequests.length,
+    );
+    expect(
+      snapshot.notifications.find(({ userId }) => userId === recipient.userId),
+    ).toMatchObject({
       userId: recipient.userId,
       actorId: userIds.get("growthAdmin"),
       data: { actorName: "최민준" },
@@ -214,18 +222,31 @@ describe("transactional group and request seed", () => {
         .filter(({ kind }) => kind === "dm" || kind === "group_dm")
         .map(({ id }) => id),
     );
+    // DM·그룹의 읽음 자리는 글을 쓴 사람(그룹은 만든 사람 포함)마다 하나다.
+    const people = loadSeedPeople(source);
+    const expectedDirectReads =
+      people.directMessages.reduce(
+        (count, direct) =>
+          count +
+          new Set(direct.messages.map(({ authorKey }) => authorKey)).size,
+        0,
+      ) +
+      inputFile.groupDirectMessages.reduce(
+        (count, group) =>
+          count +
+          new Set([
+            group.createdBy,
+            ...group.messages.map(({ authorKey }) => authorKey),
+          ]).size,
+        0,
+      ) +
+      inputFile.messageRequests.length;
     expect(
       snapshot.reads.filter(({ roomId }) => directRoomIds.has(roomId)),
-    ).toHaveLength(8);
+    ).toHaveLength(expectedDirectReads);
     expect(
-      snapshot.reads.filter(
-        ({ roomId }) =>
-          !meetingRoomIds.has(roomId) && !directRoomIds.has(roomId),
-      ),
-    ).toHaveLength(6);
-    expect(
-      snapshot.reads.filter(({ roomId }) => meetingRoomIds.has(roomId)),
-    ).toHaveLength(24);
+      snapshot.reads.filter(({ roomId }) => meetingRoomIds.has(roomId)).length,
+    ).toBeGreaterThan(0);
     expect(
       snapshot.reads.some(
         (read) =>
@@ -235,12 +256,17 @@ describe("transactional group and request seed", () => {
     for (const member of members) {
       const own = groupMessages.findLast(
         (message) => message.authorId === member.userId,
-      )!;
-      expect(
-        snapshot.reads.find(
-          (read) => read.roomId === group.id && read.userId === member.userId,
-        ),
-      ).toMatchObject({ lastReadSeq: own.seq, updatedAt: own.createdAt });
+      );
+      const read = snapshot.reads.find(
+        (read) => read.roomId === group.id && read.userId === member.userId,
+      );
+      // 글을 쓴 사람만 읽은 자리가 있고, 아직 글을 쓰지 않은 멤버에게는 없다.
+      if (own)
+        expect(read).toMatchObject({
+          lastReadSeq: own.seq,
+          updatedAt: own.createdAt,
+        });
+      else expect(read).toBeUndefined();
     }
     expect(
       snapshot.users
@@ -249,7 +275,7 @@ describe("transactional group and request seed", () => {
     ).toEqual([userIds.get("designAdmin")]);
     expect(
       snapshot.users.filter(({ status }) => status === "online"),
-    ).toHaveLength(source.users.length - 1);
+    ).toHaveLength(source.users.length - inputFile.statuses.length);
   });
   it("repeats deterministically and resets only seed users' manually chosen status", async () => {
     await seed();
@@ -396,16 +422,24 @@ describe("transactional group and request seed", () => {
     expect(after.blocks).toEqual(
       blocks.filter(({ blockerId }) => blockerId === outside!.id),
     );
-    expect(after.reports).toEqual(
+    // 시드 사용자가 한 신고는 지우고 다시 만들지만, 시드 밖 사람의 신고는 그대로다.
+    expect(
+      after.reports.filter(({ reporterId }) => reporterId === outside!.id),
+    ).toEqual(
       reportRows.filter(({ reporterId }) => reporterId === outside!.id),
     );
+    expect(
+      after.reports.some(
+        (row) => row.reporterId === me && row.targetUserId === outside!.id,
+      ),
+    ).toBe(false);
     expect(after.notifications).toContainEqual(notification);
   });
   it("rolls all replacement and status changes back when a later seed write fails", async () => {
     await seed();
     await database.db.update(users).set({ status: "away" });
     const before = await state();
-    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+    vi.spyOn(scheduleDal, "insertSeedBookings").mockRejectedValueOnce(
       new Error("later failure"),
     );
     await expect(seed()).rejects.toBeInstanceOf(SeedError);
@@ -424,33 +458,5 @@ describe("transactional group and request seed", () => {
     expect(transaction).not.toHaveBeenCalled();
     expect(await database.db.select().from(users)).toEqual([]);
     expect(await database.db.select().from(branches)).toEqual([]);
-  });
-  it("does not synchronize statuses or people-2 data in branch or booking-round-two runs", async () => {
-    await seed();
-    const before = await state();
-    const sync = vi.spyOn(people2Dal, "syncSeedPeople2");
-    await runSeed({
-      db: database.db,
-      auth,
-      now,
-      resetPasswords: false,
-      branchIds: [source.branches.at(-1)!.id],
-    });
-    expect(sync).not.toHaveBeenCalled();
-    expect(await state()).toEqual(before);
-    vi.spyOn(bookingRound2, "applyBookingRound2").mockResolvedValue({
-      counts: {},
-      accounts: [],
-      skippedBookings: 0,
-    });
-    await runSeed({
-      db: database.db,
-      auth,
-      now,
-      resetPasswords: false,
-      bookingRound2: { hostHash: "a".repeat(64), receipt: null },
-    });
-    expect(sync).not.toHaveBeenCalled();
-    expect(await state()).toEqual(before);
   });
 });

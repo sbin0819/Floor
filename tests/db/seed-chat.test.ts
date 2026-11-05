@@ -11,7 +11,7 @@ import {
 } from "vitest";
 import chatFile from "@/docs/spec/examples/seed-chat.json";
 import { createAuth, type AuthInstance } from "@/lib/auth/auth";
-import * as seedDal from "@/lib/dal/seed";
+import * as scheduleDal from "@/lib/dal/seed-schedule";
 import * as chatDal from "@/lib/dal/seed-chat";
 import { createTeamSpace } from "@/lib/dal/chat-write";
 import { listChatNav } from "@/lib/dal/chat-read";
@@ -27,7 +27,6 @@ import {
 } from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import * as chatLoader from "@/lib/seed/chat";
-import * as bookingRound2 from "@/lib/seed/booking-round2";
 import { loadSeedData } from "@/lib/seed/data";
 import { SeedError } from "@/lib/seed/errors";
 import { runSeed } from "@/lib/seed/run-seed";
@@ -89,16 +88,17 @@ describe("transactional team chat seed", () => {
       .orderBy(chatRoomReads.roomId, chatRoomReads.userId),
   });
 
-  it("writes two general channels and eight sequenced messages, keeping channels and timestamps on rerun", async () => {
+  it("writes a general channel per team with the sequenced messages, keeping channels and timestamps on rerun", async () => {
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 8,
-      chatMessages: 50,
+      chatSpaces: data.teams.length + data.branches.length + 2,
     });
     const first = await state();
-    expect(first.spaces).toHaveLength(2);
-    expect(first.spaces.filter(({ kind }) => kind === "team")).toHaveLength(2);
-    expect(first.rooms).toHaveLength(2);
-    expect(first.messages).toHaveLength(8);
+    expect(first.spaces).toHaveLength(data.teams.length);
+    expect(first.spaces.filter(({ kind }) => kind === "team")).toHaveLength(
+      data.teams.length,
+    );
+    expect(first.rooms).toHaveLength(data.teams.length);
+    expect(first.messages).toHaveLength(chatFile.messages.length);
     for (const team of data.teams) {
       const space = first.spaces.find(({ teamId }) => teamId === team.id)!;
       const room = first.rooms.find(({ spaceId }) => spaceId === space.id)!;
@@ -220,7 +220,7 @@ describe("transactional team chat seed", () => {
       lastMessageAt: null,
       archivedAt: now,
     });
-    expect(after.messages).toHaveLength(9);
+    expect(after.messages).toHaveLength(chatFile.messages.length + 1);
     expect(after.reads.find(({ roomId }) => roomId === foreign.roomId)).toEqual(
       foreignRead,
     );
@@ -321,7 +321,7 @@ describe("transactional team chat seed", () => {
       .set({ name: "실패 뒤에도 남는 지점명" })
       .where(eq(branches.id, data.branches[0]!.id));
     const before = await state();
-    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+    vi.spyOn(scheduleDal, "insertSeedBookings").mockRejectedValueOnce(
       new Error("later seed failure"),
     );
     await expect(seed()).rejects.toBeInstanceOf(SeedError);
@@ -385,11 +385,11 @@ describe("transactional team chat seed", () => {
   });
 
   it("leaves empty channels with zero cursors when seed conversations are empty", async () => {
-    await seed();
+    const full = (await seed()).counts;
     vi.spyOn(chatLoader, "loadSeedChat").mockReturnValue({ messages: [] });
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 8,
-      chatMessages: 42,
+      chatSpaces: full.chatSpaces,
+      chatMessages: full.chatMessages! - chatFile.messages.length,
     });
     const after = await state();
     expect(after.messages).toEqual([]);
@@ -398,24 +398,5 @@ describe("transactional team chat seed", () => {
         ({ lastSeq, lastMessageAt }) => lastSeq === 0 && lastMessageAt === null,
       ),
     ).toBe(true);
-  });
-
-  it("does not synchronize chat in the booking round-two mode", async () => {
-    await seed();
-    const before = await state();
-    const sync = vi.spyOn(chatDal, "syncSeedChat");
-    const apply = vi
-      .spyOn(bookingRound2, "applyBookingRound2")
-      .mockResolvedValue({ counts: {}, skippedBookings: 0, accounts: [] });
-    await runSeed({
-      db: database.db,
-      auth,
-      now,
-      resetPasswords: false,
-      bookingRound2: { hostHash: "a".repeat(64), receipt: null },
-    });
-    expect(apply).toHaveBeenCalledOnce();
-    expect(sync).not.toHaveBeenCalled();
-    expect(await state()).toEqual(before);
   });
 });

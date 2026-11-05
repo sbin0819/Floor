@@ -29,8 +29,6 @@ import {
 import { loadSeedData } from "@/lib/seed/data";
 import * as dataLoader from "@/lib/seed/data";
 import * as spacesLoader from "@/lib/seed/spaces";
-import * as round2 from "@/lib/seed/booking-round2";
-import * as seedSpacesDal from "@/lib/dal/seed-chat-spaces";
 import { runSeed } from "@/lib/seed/run-seed";
 import * as schema from "@/lib/db/schema";
 import { SeedError } from "@/lib/seed/errors";
@@ -114,17 +112,31 @@ describe("transactional lounge and community seed", () => {
     return row!;
   };
 
-  it("writes five lounges, one community, six members and six ordered messages with correct read boundaries", async () => {
-    expect(await apply()).toEqual({
-      communitySpaces: 1,
-      spaceMembers: 6,
-      chatMessages: 6,
+  const expectedMembers =
+    data.loungeMembers.reduce((count, row) => count + row.userKeys.length, 0) +
+    data.communities.reduce(
+      (count, row) => count + 1 + row.adminKeys.length + row.memberKeys.length,
+      0,
+    );
+  const expectedMessages =
+    data.loungeMessages.length +
+    data.communities.reduce((count, row) => count + row.messages.length, 0);
+
+  it("writes five lounges, the communities, every member and ordered messages with correct read boundaries", async () => {
+    expect(await apply()).toMatchObject({
+      communitySpaces: data.communities.length,
+      spaceMembers: expectedMembers,
+      chatMessages: expectedMessages,
     });
     const state = await snapshot();
-    expect(state.spaces).toHaveLength(6);
-    expect(state.rooms).toHaveLength(18);
+    expect(state.spaces).toHaveLength(
+      branchIds.length + data.communities.length,
+    );
+    expect(state.rooms).toHaveLength(
+      branchIds.length * 3 + data.communities.length * 3,
+    );
     const voices = state.rooms.filter(({ kind }) => kind === "voice");
-    expect(voices).toHaveLength(6);
+    expect(voices).toHaveLength(branchIds.length + data.communities.length);
     expect(
       voices.every(
         ({ voiceCapacity, lastSeq, lastMessageAt }) =>
@@ -134,8 +146,8 @@ describe("transactional lounge and community seed", () => {
     expect(
       voices.find(({ spaceId }) => spaceId === community.id),
     ).toMatchObject({ id: seedCommunityVoiceId(community.id), name: "음성" });
-    expect(state.members).toHaveLength(6);
-    expect(state.messages).toHaveLength(6);
+    expect(state.members).toHaveLength(expectedMembers);
+    expect(state.messages).toHaveLength(expectedMessages);
     expect(state.spaces.find(({ id }) => id === community.id)).toMatchObject({
       kind: "community",
       name: community.name,
@@ -173,10 +185,11 @@ describe("transactional lounge and community seed", () => {
       );
       expect(row.lastReadSeq).toBe(Math.max(...authored.map(({ seq }) => seq)));
     }
+    // 라운지에 글을 쓰지 않은 멤버는 시드를 돌린 시각에 들어온 것으로 적는다.
     expect(
       state.members.find(
         ({ spaceId, userId }) =>
-          spaceId !== community.id && userId === ids.get("designMember"),
+          spaceId !== community.id && userId === ids.get("test14"),
       )?.joinedAt,
     ).toEqual(now);
     expect(await database.db.select().from(chatSpaceInvites)).toEqual([]);
@@ -293,7 +306,13 @@ describe("transactional lounge and community seed", () => {
           .from(chatRooms)
           .where(eq(chatRooms.id, room.id))
       )[0],
-    ).toMatchObject({ lastSeq: 22, lastMessageAt: now });
+    ).toMatchObject({
+      lastSeq:
+        20 +
+        data.loungeMessages.filter(({ branchId }) => branchId === gangnam)
+          .length,
+      lastMessageAt: now,
+    });
     const before = await snapshot();
     await apply();
     expect(await snapshot()).toEqual(before);
@@ -499,10 +518,14 @@ describe("transactional lounge and community seed", () => {
         tx,
       ),
     );
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       communitySpaces: 0,
-      spaceMembers: 3,
-      chatMessages: 2,
+      spaceMembers: data.loungeMembers.find(
+        ({ branchId }) => branchId === gangnam,
+      )!.userKeys.length,
+      chatMessages: data.loungeMessages.filter(
+        ({ branchId }) => branchId === gangnam,
+      ).length,
     });
     expect(
       (
@@ -598,25 +621,6 @@ describe("transactional lounge and community seed", () => {
       statements.some((query) => /^(insert|update|delete) /i.test(query)),
     ).toBe(false);
     expect(await snapshot()).toEqual(after);
-  });
-
-  it("keeps booking-round2 isolated from all lounge and community writes", async () => {
-    await apply();
-    const before = await snapshot();
-    vi.spyOn(round2, "applyBookingRound2").mockResolvedValue({
-      counts: {},
-      skippedBookings: 0,
-      accounts: [],
-    });
-    const sync = vi.spyOn(seedSpacesDal, "syncSeedChatSpaces");
-    await runSeed({
-      db: database.db,
-      now,
-      resetPasswords: false,
-      bookingRound2: { hostHash: "a".repeat(64), receipt: null },
-    });
-    expect(sync).not.toHaveBeenCalled();
-    expect(await snapshot()).toEqual(before);
   });
 
   it("rejects an invalid global source before opening even a scoped transaction", async () => {

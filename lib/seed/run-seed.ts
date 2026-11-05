@@ -12,39 +12,26 @@ import {
 } from "@/lib/dal";
 import * as seedDal from "@/lib/dal/seed";
 import { syncSeedChat } from "@/lib/dal/seed-chat";
-import { syncSeedChatSpaces } from "@/lib/dal/seed-chat-spaces";
+import {
+  insertSeedReports,
+  syncSeedChatSpaces,
+} from "@/lib/dal/seed-chat-spaces";
 import { syncSeedPeople } from "@/lib/dal/seed-people";
 import { syncSeedPeople2 } from "@/lib/dal/seed-people-2";
-import { insertSeedMeeting } from "@/lib/dal/seed-meeting";
 import {
   syncSeedBranchCovers,
   syncSeedSpacePhotos,
 } from "@/lib/dal/seed-photos";
-import { loadSeedData } from "@/lib/seed/data";
-import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
-import { loadSeedChat } from "@/lib/seed/chat";
-import { loadSeedSpaces } from "@/lib/seed/spaces";
-import { loadSeedPeople } from "@/lib/seed/people";
-import { loadSeedPeople2 } from "@/lib/seed/people-2";
-import { loadSeedMeeting, seedMeetingCreatedAt } from "@/lib/seed/meeting";
-import { insertSeedDeskSchedule } from "@/lib/seed/desk-schedule";
-import { insertSeedParticipants } from "@/lib/seed/participants";
-import { insertSeedReminders } from "@/lib/seed/reminders";
-import { SeedError } from "@/lib/seed/errors";
-import { loadSeedPhotos } from "@/lib/seed/photos";
-import { getOperatingDate } from "@/lib/time/open-hours";
-import { zonedDateTime } from "@/lib/time/zoned";
-import { addSeedBranches } from "@/lib/seed/add-branches";
-import { selectSeedBranches, validateSeedBranchIds } from "@/lib/seed/scope";
-import {
-  applyBookingRound2,
-  validateBookingRound2Options,
-  type BookingRound2Options,
-} from "@/lib/seed/booking-round2";
-import type { BookingRound2Receipt } from "@/lib/seed/booking-round2-receipt";
+import { setSeedDefaultBranches } from "@/lib/dal/seed-schedule";
 import { resetSeedDatabase } from "@/lib/dal/seed-reset";
+import { loadSeedData } from "./data";
+import { loadSeedChat } from "./chat";
+import { loadSeedSpaces, type SeedSpacesData } from "./spaces";
+import { loadSeedPeople } from "./people";
+import { loadSeedPeople2 } from "./people-2";
+import { loadSeedPhotos } from "./photos";
+import { SeedError } from "./errors";
 import { seedMigrations } from "./migrations";
-import { applyChatSpacesSeed } from "./chat-spaces";
 import { loadSeedPlans } from "./seed-plans";
 import { applyFloorPlansSeed } from "./floor-plans";
 import {
@@ -52,23 +39,26 @@ import {
   type FloorPlansOptions,
   type FloorPlansReceipt,
 } from "./floor-plans-receipt";
-import {
-  validateChatSpacesOptions,
-  type ChatSpacesOptions,
-  type ChatSpacesReceipt,
-} from "./chat-spaces-receipt";
+import { addSeedBranches } from "./add-branches";
+import { selectSeedBranches, validateSeedBranchIds } from "./scope";
+import { expandSeedSchedule, loadSeedSchedule } from "./schedule";
+import { applySeedSchedule } from "./apply-schedule";
 
 export type SeedResult = {
   counts: Record<string, number>;
   skippedBookings: number;
-  skippedMeetingMessages?: number;
   accounts: string[];
   branchScope?: { addedBranchIds: string[]; skippedBranchIds: string[] };
-  bookingRound2?: { applied: boolean; receipt: BookingRound2Receipt };
-  chatSpaces?: { applied: boolean; receipt: ChatSpacesReceipt };
   floorPlans?: { applied: boolean; receipt: FloorPlansReceipt };
   reset?: { migrationCount: number; counts: Record<string, number> };
 };
+
+/** 지점마다 라운지에 들어가 있는 시드 계정. 공지를 쓰는 운영자가 여기 있어야 한다. */
+export function loungeMembersByBranch(spaceChat: SeedSpacesData) {
+  return new Map(
+    spaceChat.loungeMembers.map((row) => [row.branchId, new Set(row.userKeys)]),
+  );
+}
 
 export async function runSeed({
   db,
@@ -76,8 +66,6 @@ export async function runSeed({
   now,
   resetPasswords,
   branchIds,
-  bookingRound2,
-  chatSpaces,
   floorPlans,
   resetData = false,
 }: {
@@ -86,61 +74,27 @@ export async function runSeed({
   now: Date;
   resetPasswords: boolean;
   branchIds?: readonly string[];
-  bookingRound2?: BookingRound2Options;
-  chatSpaces?: ChatSpacesOptions;
   floorPlans?: FloorPlansOptions;
   resetData?: boolean;
 }): Promise<SeedResult> {
   if (!Number.isFinite(now.getTime()))
     throw new SeedError("시드 기준 시각이 올바르지 않아요.");
   if (floorPlans !== undefined) {
-    if (
-      branchIds !== undefined ||
-      bookingRound2 !== undefined ||
-      chatSpaces !== undefined ||
-      resetPasswords ||
-      resetData
-    )
+    if (branchIds !== undefined || resetPasswords || resetData)
       throw new SeedError(
         "평면도 전용 모드는 다른 범위·초기화·비밀번호 재설정과 함께 쓸 수 없어요.",
       );
     validateFloorPlansOptions(floorPlans);
   }
-  if (chatSpaces !== undefined) {
-    if (
-      branchIds !== undefined ||
-      bookingRound2 !== undefined ||
-      resetPasswords ||
-      resetData
-    )
-      throw new SeedError(
-        "스페이스 전용 모드는 다른 범위·초기화·비밀번호 재설정과 함께 쓸 수 없어요.",
-      );
-    validateChatSpacesOptions(chatSpaces);
-  }
-  if (
-    resetData &&
-    (branchIds !== undefined || bookingRound2 !== undefined || resetPasswords)
-  )
+  if (resetData && (branchIds !== undefined || resetPasswords))
     throw new SeedError(
-      "전체 초기화는 지점 추가·예약 2차·비밀번호 재설정과 함께 실행할 수 없어요.",
+      "전체 초기화는 지점 추가·비밀번호 재설정과 함께 실행할 수 없어요.",
     );
-  if (bookingRound2 !== undefined) {
-    if (branchIds !== undefined || resetPasswords)
-      throw new SeedError(
-        "예약 2차 전용 모드는 지점 선택·비밀번호 재설정과 함께 쓸 수 없어요.",
-      );
-    validateBookingRound2Options(bookingRound2);
-  }
   let current = "시드 데이터";
   try {
     const data = loadSeedData();
-    // 지점·예약·채팅 추가는 별도 평면도 manifest의 범위를 요구하지 않는다.
-    const includePlans =
-      floorPlans !== undefined ||
-      (branchIds === undefined &&
-        bookingRound2 === undefined &&
-        chatSpaces === undefined);
+    // 지점 추가는 별도 평면도 manifest의 범위를 요구하지 않는다.
+    const includePlans = floorPlans !== undefined || branchIds === undefined;
     const plans = includePlans
       ? [...data.floorPlans, ...loadSeedPlans(data)]
       : data.floorPlans;
@@ -153,69 +107,18 @@ export async function runSeed({
       );
     }
     const photos = loadSeedPhotos(data);
-    const bookingExtras = loadSeedBookings2(data);
     const chat = loadSeedChat(data);
     const spaceChat = loadSeedSpaces(data);
     const people = loadSeedPeople(data);
     const people2 = loadSeedPeople2(data, people);
-    const meeting = loadSeedMeeting(data, bookingExtras);
+    current = "한 달치 일정";
+    const schedule = expandSeedSchedule(loadSeedSchedule(data), data, now);
     const migrations = resetData ? seedMigrations() : [];
-    if (chatSpaces !== undefined) {
-      current = "스페이스 추가 전용 데이터";
-      return await withTransaction(
-        (database) =>
-          applyChatSpacesSeed(
-            { ...chatSpaces, data, spaces: spaceChat, now },
-            database,
-          ),
-        db,
-      );
-    }
-    const meetingPlans = new Map(
-      data.bookings.map(({ id }) => {
-        const messages = meeting.messages.filter(
-          ({ bookingId }) => bookingId === id,
-        );
-        return [
-          id,
-          { messages, createdAt: seedMeetingCreatedAt(messages, now) },
-        ];
-      }),
-    );
-    if (bookingRound2 !== undefined) {
-      current = "예약 2차 추가 데이터";
-      return await withTransaction(
-        (database) =>
-          applyBookingRound2(
-            {
-              ...bookingRound2,
-              data,
-              extras: bookingExtras,
-              now,
-            },
-            database,
-          ),
-        db,
-      );
-    }
-    const attendeeCounts = new Map(
-      bookingExtras.attendeeCounts.map(({ bookingId, attendeeCount }) => [
-        bookingId,
-        attendeeCount,
-      ]),
-    );
     if (branchIds !== undefined) {
       const ids = validateSeedBranchIds(branchIds, data, resetPasswords);
-      const scope = selectSeedBranches(
-        data,
-        photos,
-        ids,
-        bookingExtras,
-        spaceChat,
-      );
+      const scope = selectSeedBranches(data, photos, ids, schedule, spaceChat);
       return await withTransaction(
-        (database) =>
-          addSeedBranches(scope, database, now, bookingExtras, meeting),
+        (database) => addSeedBranches(scope, database, now),
         db,
       );
     }
@@ -273,6 +176,15 @@ export async function runSeed({
           database,
         );
       }
+      current = "기본 지점";
+      await setSeedDefaultBranches(
+        data.users.flatMap(({ key, defaultBranchId }) =>
+          defaultBranchId
+            ? [{ userId: userId(key), branchId: defaultBranchId }]
+            : [],
+        ),
+        database,
+      );
       for (const { createdByKey, ...team } of data.teams) {
         current = `팀 ${team.id}`;
         await seedDal.upsertSeedTeam(
@@ -321,6 +233,30 @@ export async function runSeed({
         now,
         database,
       );
+      current = "신고";
+      const reportCount = await insertSeedReports(
+        spaceChat.loungeReports.map((report) => {
+          const messageId = spaceChatCounts.loungeMessageIds
+            .get(report.branchId)
+            ?.at(report.messageIndex);
+          if (!messageId)
+            throw new SeedError("신고 시드가 가리키는 라운지 메시지가 없어요.");
+          const author = spaceChat.loungeMessages.filter(
+            (row) => row.branchId === report.branchId,
+          )[report.messageIndex]!;
+          return {
+            messageId,
+            targetUserId: userId(author.authorKey),
+            reporterIds: report.reporterKeys.map(userId),
+            reason: report.reason,
+            detail: report.detail,
+            createdAt: new Date(
+              now.getTime() - (author.minutesAgo - 5) * 60_000,
+            ),
+          };
+        }),
+        database,
+      );
       for (const { userKey, ...staff } of data.branchStaff)
         await seedDal.upsertSeedStaff(
           { ...staff, userId: userId(userKey) },
@@ -344,127 +280,17 @@ export async function runSeed({
         )
           planCount++;
       }
-      const branches = new Map(
-        data.branches.map((branch) => [branch.id, branch]),
-      );
-      const floors = new Map(data.floors.map((floor) => [floor.id, floor]));
-      const spaces = new Map(data.spaces.map((space) => [space.id, space]));
-      const instant = (spaceId: string, offset: number, time: string) => {
-        const branch = branches.get(
-          floors.get(spaces.get(spaceId)!.floorId)!.branchId,
-        )!;
-        return zonedDateTime(
-          getOperatingDate(now, branch.timezone, branch.openHours, offset),
-          time,
-          branch.timezone,
-        );
-      };
-      await seedDal.clearSeedSchedule(
-        [...data.bookings, ...bookingExtras.deskBookings].map(({ id }) => id),
-        [...data.spaceBlocks, ...bookingExtras.deskBlocks].map(({ id }) => id),
-        database,
-      );
-      for (const {
-        startDayOffset,
-        endDayOffset,
-        start,
-        end,
-        createdByKey,
-        ...block
-      } of data.spaceBlocks) {
-        current = `점검 ${block.id}`;
-        await seedDal.insertSeedBlock(
-          {
-            ...block,
-            createdBy: userId(createdByKey),
-            during: {
-              start: instant(block.spaceId, startDayOffset, start),
-              end: instant(block.spaceId, endDayOffset, end),
-            },
-          },
-          database,
-        );
-      }
-      let skippedBookings = 0;
-      let skippedMeetingMessages = 0;
-      let meetingMessages = 0;
-      for (const {
-        dayOffset,
-        start,
-        end,
-        userKey,
-        cancelledByKey,
-        ...booking
-      } of data.bookings) {
-        current = `예약 ${booking.id}`;
-        const meetingPlan = meetingPlans.get(booking.id)!;
-        const during = {
-          start: instant(booking.spaceId, dayOffset, start),
-          end: instant(booking.spaceId, dayOffset, end),
-        };
-        if (
-          booking.status === "confirmed" &&
-          (await seedDal.hasSeedBookingOverlap(
-            booking.spaceId,
-            during,
-            database,
-          ))
-        ) {
-          skippedBookings++;
-          skippedMeetingMessages += meetingPlan.messages.length;
-          continue;
-        }
-        await seedDal.insertSeedBooking(
-          {
-            ...booking,
-            createdAt: meetingPlan.createdAt,
-            attendeeCount: attendeeCounts.get(booking.id) ?? null,
-            userId: userId(userKey),
-            during,
-            cancelledAt: booking.status === "cancelled" ? now : null,
-            cancelledBy:
-              booking.status === "cancelled" && cancelledByKey
-                ? userId(cancelledByKey)
-                : null,
-          },
-          database,
-        );
-        await insertSeedParticipants(
-          booking.id,
-          bookingExtras,
-          userIds,
-          meetingPlan.createdAt,
-          database,
-        );
-        const meetingResult = await insertSeedMeeting(
-          {
-            bookingId: booking.id,
-            bookerId: userId(userKey),
-            ...meetingPlan,
-            userIds,
-            now,
-          },
-          database,
-        );
-        meetingMessages += meetingResult.chatMessages;
-        await insertSeedReminders({
-          booking: { ...booking, during, userId: userId(userKey) },
+      current = "예약·점검·공지";
+      const applied = await applySeedSchedule(
+        {
+          schedule,
           data,
-          extras: bookingExtras,
           userIds,
           now,
-          database,
-        });
-      }
-      const deskResult = await insertSeedDeskSchedule({
-        data,
-        extras: bookingExtras,
-        userIds,
-        now,
+          loungeMemberKeys: loungeMembersByBranch(spaceChat),
+        },
         database,
-      });
-      const timeBookings = data.bookings.length - skippedBookings;
-      skippedBookings += deskResult.skippedBookings;
+      );
       return {
         counts: {
           ...chatCounts,
@@ -482,8 +308,9 @@ export async function runSeed({
             spaceChatCounts.chatMessages +
             peopleCounts.chatMessages +
             people2Counts.chatMessages +
-            meetingMessages,
-          meetingRooms: timeBookings,
+            applied.chatMessages,
+          meetingRooms: applied.meetingRooms,
+          reports: reportCount,
           users: data.users.length,
           branches: data.branches.length,
           floors: data.floors.length,
@@ -493,13 +320,14 @@ export async function runSeed({
           branchStaff: data.branchStaff.length,
           accessGrants: data.accessGrants.length,
           floorPlans: planCount,
-          bookings: timeBookings + deskResult.bookings,
-          spaceBlocks: data.spaceBlocks.length + deskResult.spaceBlocks,
+          bookings: applied.bookings,
+          spaceBlocks: applied.spaceBlocks,
+          announcements: applied.announcements,
+          notifications: applied.notifications,
           spacePhotos: photos.spacePhotos.length,
           branchCovers: photos.branchCovers.length,
         },
-        skippedBookings,
-        skippedMeetingMessages,
+        skippedBookings: applied.skippedBookings,
         accounts: data.users.map(({ email }) => email),
         ...(reset ? { reset } : {}),
       };
@@ -514,9 +342,13 @@ export async function runSeed({
       throw new SeedError(
         `${current}: 다른 행이 같은 고유 값을 사용하고 있어요. 시드를 되돌렸어요.`,
       );
-    if (resetData || chatSpaces !== undefined || floorPlans !== undefined)
+    if (getPostgresError(error)?.code === "23P01")
       throw new SeedError(
-        `${floorPlans !== undefined ? "평면도 추가" : chatSpaces === undefined ? "초기화" : "스페이스 추가"} 완료 여부를 확인하지 못했어요. 연결 오류는 커밋 응답 유실일 수 있어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.`,
+        `${current}: 다른 예약·점검과 겹치는 자리가 있어요. 시드를 되돌렸어요.`,
+      );
+    if (resetData || floorPlans !== undefined)
+      throw new SeedError(
+        `${floorPlans !== undefined ? "평면도 추가" : "초기화"} 완료 여부를 확인하지 못했어요. 연결 오류는 커밋 응답 유실일 수 있어요. 자동으로 다시 실행하지 말고 DB와 적용 표식을 확인해 주세요.`,
       );
     throw new SeedError(
       `${current}: 시드를 완료하지 못했어요. 모든 시드 변경을 되돌렸어요.`,

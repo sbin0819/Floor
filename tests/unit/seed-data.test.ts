@@ -35,21 +35,30 @@ describe("seed data", () => {
     expect(data.floors).toHaveLength(11);
     expect(data.spaces).toHaveLength(71);
     expect(data.users).toHaveLength(21);
-    expect(data.teams).toHaveLength(2);
-    expect(data.teamMembers).toHaveLength(5);
+    expect(data.teams).toHaveLength(4);
+    expect(data.teamMembers).toHaveLength(16);
     expect(data.branchStaff).toHaveLength(5);
     expect(data.accessGrants).toHaveLength(2);
     expect(data.floorPlans).toHaveLength(1);
-    expect(data.bookings).toHaveLength(21);
-    expect(
-      data.bookings.filter((row) => row.status === "confirmed"),
-    ).toHaveLength(17);
-    expect(
-      data.bookings.filter((row) => row.status === "cancelled"),
-    ).toHaveLength(4);
-    expect(data.spaceBlocks).toHaveLength(4);
+    expect(data).not.toHaveProperty("bookings");
+    expect(data).not.toHaveProperty("spaceBlocks");
     expect(first(data.floorPlans).document).toEqual(planFile);
     expect(data.users).toEqual(seedFile.users);
+    // 모든 계정이 기본 지점을 갖고, 그 지점은 시드 지점이다.
+    const branchIds = new Set(data.branches.map(({ id }) => id));
+    expect(
+      data.users.every(
+        ({ defaultBranchId }) =>
+          defaultBranchId !== null && branchIds.has(defaultBranchId),
+      ),
+    ).toBe(true);
+    // 팀마다 관리자가 정확히 한 명이고 만든 사람이 그 관리자다.
+    for (const team of data.teams) {
+      const admins = data.teamMembers.filter(
+        (row) => row.teamId === team.id && row.role === "admin",
+      );
+      expect(admins.map(({ userKey }) => userKey)).toEqual([team.createdByKey]);
+    }
   });
 
   it("merges 7F source rows and replaces their amenities without metadata", () => {
@@ -131,20 +140,6 @@ describe("seed data", () => {
         ),
       ).toBe(true);
       const spaceIds = new Set(spaces.map(({ id }) => id));
-      const bookings = data.bookings.filter(({ spaceId }) =>
-        spaceIds.has(spaceId),
-      );
-      expect(bookings).toHaveLength(4);
-      expect(
-        bookings.filter(({ status }) => status === "confirmed"),
-      ).toHaveLength(3);
-      expect(
-        bookings.filter(({ status }) => status === "cancelled"),
-      ).toHaveLength(1);
-      expect(bookings.every(({ teamId }) => teamId === null)).toBe(true);
-      expect(
-        data.spaceBlocks.filter(({ spaceId }) => spaceIds.has(spaceId)),
-      ).toHaveLength(1);
       expect(
         data.branchStaff.filter((staff) => staff.branchId === branchId),
       ).toEqual([{ branchId, userKey: "admin" }]);
@@ -169,11 +164,11 @@ describe("seed data", () => {
     expect(loadSeedData().users).toEqual(seedFile.users);
   });
 
-  it("accepts the next midnight as a booking end", () => {
+  it("defaults a missing default branch to null and rejects an unknown one", () => {
     const input = files();
-    first(input.seed.bookings).start = "23:30";
-    first(input.seed.bookings).end = "24:00";
-    expect(first(parseSeedData(input).bookings).end).toBe("24:00");
+    const user = first(input.seed.users) as { defaultBranchId?: string | null };
+    delete user.defaultBranchId;
+    expect(first(parseSeedData(input).users).defaultBranchId).toBeNull();
   });
 
   it.each(["김", "가".repeat(50)])(
@@ -243,39 +238,11 @@ describe("seed data", () => {
       path: ["spaces", "spaces", 0, "parentId"],
     },
     {
-      name: "missing booking space",
+      name: "missing default branch",
       change: ({ seed }) => {
-        first(seed.bookings).spaceId = missingId;
+        first(seed.users).defaultBranchId = missingId;
       },
-      path: ["seed", "bookings", 0, "spaceId"],
-    },
-    {
-      name: "missing booking user",
-      change: ({ seed }) => {
-        first(seed.bookings).userKey = "missing";
-      },
-      path: ["seed", "bookings", 0, "userKey"],
-    },
-    {
-      name: "missing booking team",
-      change: ({ seed }) => {
-        first(seed.bookings).teamId = missingId;
-      },
-      path: ["seed", "bookings", 0, "teamId"],
-    },
-    {
-      name: "missing booking canceller",
-      change: ({ seed }) => {
-        first(seed.bookings).cancelledByKey = "missing";
-      },
-      path: ["seed", "bookings", 0, "cancelledByKey"],
-    },
-    {
-      name: "missing creator",
-      change: ({ seed }) => {
-        first(seed.spaceBlocks).createdByKey = "missing";
-      },
-      path: ["seed", "spaceBlocks", 0, "createdByKey"],
+      path: ["seed", "users", 0, "defaultBranchId"],
     },
     {
       name: "missing membership team",
@@ -328,34 +295,6 @@ describe("seed data", () => {
         first(seed.branches).timezone = "invalid/timezone";
       },
       path: ["seed", "branches", 0, "timezone"],
-    },
-    {
-      name: "unaligned booking",
-      change: ({ seed }) => {
-        first(seed.bookings).start = "10:15";
-      },
-      path: ["seed", "bookings", 0, "start"],
-    },
-    {
-      name: "malformed clock",
-      change: ({ seed }) => {
-        first(seed.bookings).start = "not-a-time";
-      },
-      path: ["seed", "bookings", 0, "start"],
-    },
-    {
-      name: "empty booking range",
-      change: ({ seed }) => {
-        first(seed.bookings).end = first(seed.bookings).start;
-      },
-      path: ["seed", "bookings", 0, "end"],
-    },
-    {
-      name: "reversed maintenance range",
-      change: ({ seed }) => {
-        first(seed.spaceBlocks).startDayOffset = 2;
-      },
-      path: ["seed", "spaceBlocks", 0, "end"],
     },
     {
       name: "plan reference to another floor",

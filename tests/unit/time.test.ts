@@ -219,7 +219,26 @@ describe("operating hours", () => {
     ).toThrow("no operating days");
   });
 
-  it.each([-1, 0.5, Infinity])(
+  it.each([
+    ["2026-10-12T03:00:00Z", -1, "2026-10-09"],
+    ["2026-10-12T03:00:00Z", -5, "2026-10-05"],
+    ["2026-10-11T03:00:00Z", -1, "2026-10-09"],
+    ["2026-10-13T03:00:00Z", -2, "2026-10-09"],
+  ])(
+    "counts operating days backwards from %s by %i",
+    (now, offset, expected) => {
+      expect(
+        getOperatingDate(
+          new Date(now),
+          "Asia/Seoul",
+          { sat: null, sun: null },
+          offset,
+        ),
+      ).toBe(expected);
+    },
+  );
+
+  it.each([0.5, Infinity, Number.NaN])(
     "rejects invalid operating day offset %s",
     (offset) => {
       expect(() =>

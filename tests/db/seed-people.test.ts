@@ -11,8 +11,7 @@ import {
 } from "vitest";
 import peopleFile from "@/docs/spec/examples/seed-people.json";
 import { createAuth, type AuthInstance } from "@/lib/auth/auth";
-import * as seedDal from "@/lib/dal/seed";
-import * as peopleDal from "@/lib/dal/seed-people";
+import * as scheduleDal from "@/lib/dal/seed-schedule";
 import {
   authAccounts,
   branches,
@@ -26,7 +25,6 @@ import {
 } from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import * as peopleLoader from "@/lib/seed/people";
-import * as bookingRound2 from "@/lib/seed/booking-round2";
 import { loadSeedData } from "@/lib/seed/data";
 import { SeedError } from "@/lib/seed/errors";
 import { runSeed } from "@/lib/seed/run-seed";
@@ -167,17 +165,17 @@ describe("transactional people and direct-message seed", () => {
 
   it("writes exact names, friendships, notification snapshots, direct sequences and authored read cursors", async () => {
     expect((await seed()).counts).toMatchObject({
-      chatSpaces: 8,
-      chatMessages: 50,
-      friendships: 3,
-      directRooms: 3,
-      groupRooms: 1,
+      chatSpaces: source.teams.length + source.branches.length + 2,
+      friendships: people.friendships.length,
+      // 1:1 DM에 사람 2차 시드의 메시지 요청 두 개가 더해진다.
+      directRooms: people.directMessages.length + 2,
+      groupRooms: 2,
     });
     const snapshot = await state();
     const ids = await userIds();
     expect(
       snapshot.users.filter(({ username }) => username !== null),
-    ).toHaveLength(5);
+    ).toHaveLength(people.usernames.length);
     expect(
       snapshot.users.find(({ id }) => id === ids.get("admin"))?.username,
     ).toBeNull();
@@ -185,8 +183,10 @@ describe("transactional people and direct-message seed", () => {
       expect(
         snapshot.users.find(({ id }) => id === ids.get(userKey)),
       ).toMatchObject({ username, usernameChangedAt: null });
-    expect(snapshot.friendships).toHaveLength(3);
-    expect(snapshot.notifications).toHaveLength(2);
+    expect(snapshot.friendships).toHaveLength(people.friendships.length);
+    expect(snapshot.notifications).toHaveLength(
+      people.friendships.filter(({ status }) => status === "pending").length,
+    );
     for (const friendship of people.friendships) {
       const [low, high] = [
         ids.get(friendship.requestedBy),
@@ -222,10 +222,22 @@ describe("transactional people and direct-message seed", () => {
         });
       }
     }
-    expect(snapshot.rooms).toHaveLength(2);
-    expect(snapshot.messages).toHaveLength(5);
-    expect(snapshot.members).toHaveLength(4);
-    expect(snapshot.reads).toHaveLength(4);
+    expect(snapshot.rooms).toHaveLength(people.directMessages.length);
+    expect(snapshot.messages).toHaveLength(
+      people.directMessages.reduce(
+        (count, direct) => count + direct.messages.length,
+        0,
+      ),
+    );
+    expect(snapshot.members).toHaveLength(people.directMessages.length * 2);
+    expect(snapshot.reads).toHaveLength(
+      people.directMessages.reduce(
+        (count, direct) =>
+          count +
+          new Set(direct.messages.map(({ authorKey }) => authorKey)).size,
+        0,
+      ),
+    );
     for (const direct of people.directMessages) {
       const [low, high] = direct.users.map((key) => ids.get(key)).sort();
       const room = snapshot.rooms.find(
@@ -448,7 +460,7 @@ describe("transactional people and direct-message seed", () => {
       .set({ name: "실패 뒤에도 남을 지점" })
       .where(eq(branches.id, source.branches[0]!.id));
     const before = await state();
-    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+    vi.spyOn(scheduleDal, "insertSeedBookings").mockRejectedValueOnce(
       new Error("later failure"),
     );
     await expect(seed()).rejects.toBeInstanceOf(SeedError);
@@ -474,35 +486,6 @@ describe("transactional people and direct-message seed", () => {
       runSeed({ db: { transaction }, auth, now, resetPasswords: false }),
     ).rejects.toBeInstanceOf(SeedError);
     expect(transaction).not.toHaveBeenCalled();
-  });
-
-  it("does not touch people data in branch-scoped or booking round-two runs", async () => {
-    await seed();
-    const before = await state();
-    const sync = vi.spyOn(peopleDal, "syncSeedPeople");
-    await runSeed({
-      db: database.db,
-      auth,
-      now,
-      resetPasswords: false,
-      branchIds: [source.branches.at(-1)!.id],
-    });
-    expect(sync).not.toHaveBeenCalled();
-    expect(await state()).toEqual(before);
-    vi.spyOn(bookingRound2, "applyBookingRound2").mockResolvedValue({
-      counts: {},
-      skippedBookings: 0,
-      accounts: [],
-    });
-    await runSeed({
-      db: database.db,
-      auth,
-      now,
-      resetPasswords: false,
-      bookingRound2: { hostHash: "a".repeat(64), receipt: null },
-    });
-    expect(sync).not.toHaveBeenCalled();
-    expect(await state()).toEqual(before);
   });
 
   it("does not create a read cursor for a DM member who has not written a message", async () => {

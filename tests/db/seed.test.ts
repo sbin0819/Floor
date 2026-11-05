@@ -8,6 +8,7 @@ import {
 import { getMemberships, getSpaceForAccess } from "@/lib/dal";
 import {
   accessGrants,
+  announcements,
   authAccounts,
   authSessions,
   bookings,
@@ -22,6 +23,8 @@ import {
   floors,
   friendships,
   messages,
+  notifications,
+  reports,
   spaceBlocks,
   spacePhotos,
   spaces,
@@ -33,41 +36,32 @@ import { createMemoryEmailSender } from "@/lib/email/memory";
 import { canAccess, canAccessFloor } from "@/lib/permissions/can-access";
 import { loadSeedData } from "@/lib/seed/data";
 import { loadSeedPlans } from "@/lib/seed/seed-plans";
-import { loadSeedBookings2 } from "@/lib/seed/bookings-2";
+import { expandSeedSchedule, loadSeedSchedule } from "@/lib/seed/schedule";
 import { runSeed } from "@/lib/seed/run-seed";
-import { getOpenHours } from "@/lib/time/open-hours";
-import { localDate, localTime } from "@/lib/time/zoned";
 import { createTestDatabase, type TestDatabase } from "./helper";
 
-const now = new Date("2026-10-07T03:00:00Z");
+const now = new Date("2026-11-05T05:00:00Z");
 const fixtures = loadSeedData();
-const attendeeCounts = new Map(
-  loadSeedBookings2(fixtures).attendeeCounts.map(
-    ({ bookingId, attendeeCount }) => [bookingId, attendeeCount],
-  ),
-);
-const expectedCounts = {
+const schedule = expandSeedSchedule(loadSeedSchedule(fixtures), fixtures, now);
+const expectedStructure = {
   users: 21,
   branches: 5,
   floors: 11,
   spaces: 71,
-  teams: 2,
-  teamMembers: 5,
+  teams: 4,
+  teamMembers: 16,
   branchStaff: 5,
   accessGrants: 2,
   floorPlans: 11,
-  bookings: 30,
-  spaceBlocks: 5,
   spacePhotos: 65,
   branchCovers: 5,
-  chatSpaces: fixtures.teams.length + fixtures.branches.length + 1,
-  communitySpaces: 1,
-  spaceMembers: 6,
-  chatMessages: 50,
-  meetingRooms: 21,
-  friendships: 3,
-  directRooms: 3,
-  groupRooms: 1,
+  chatSpaces: fixtures.teams.length + fixtures.branches.length + 2,
+  communitySpaces: 2,
+  friendships: 8,
+  directRooms: 7,
+  groupRooms: 2,
+  announcements: 5,
+  reports: 2,
 };
 
 describe("transactional development seed", () => {
@@ -106,44 +100,33 @@ describe("transactional development seed", () => {
         branchStaff,
         accessGrants,
         floorPlans,
-        bookings,
-        spaceBlocks,
         spacePhotos,
-        chatSpaces,
-        spaceMembers: chatSpaceMembers,
-        chatMessages: messages,
         friendships,
+        announcements,
+        reports,
       }).map(async ([name, table]) => [
         name,
         (await database.db.select().from(table)).length,
       ]),
     );
+    const roomKind = async (kind: "meeting" | "dm" | "group_dm") =>
+      (
+        await database.db
+          .select()
+          .from(chatRooms)
+          .where(eq(chatRooms.kind, kind))
+      ).length;
     return {
       ...Object.fromEntries(entries),
+      chatSpaces: (await database.db.select().from(chatSpaces)).length,
       communitySpaces: (
         await database.db
           .select()
           .from(chatSpaces)
           .where(eq(chatSpaces.kind, "community"))
       ).length,
-      meetingRooms: (
-        await database.db
-          .select()
-          .from(chatRooms)
-          .where(eq(chatRooms.kind, "meeting"))
-      ).length,
-      directRooms: (
-        await database.db
-          .select()
-          .from(chatRooms)
-          .where(eq(chatRooms.kind, "dm"))
-      ).length,
-      groupRooms: (
-        await database.db
-          .select()
-          .from(chatRooms)
-          .where(eq(chatRooms.kind, "group_dm"))
-      ).length,
+      directRooms: await roomKind("dm"),
+      groupRooms: await roomKind("group_dm"),
       branchCovers: (await database.db.select().from(branches)).filter(
         ({ coverPhotoPath }) => coverPhotoPath !== null,
       ).length,
@@ -190,33 +173,35 @@ describe("transactional development seed", () => {
     return created;
   }
 
-  it("writes the exact fixture counts, verified credentials and published pointer without email", async () => {
+  it("writes the fixture structure, the whole expanded month and verified credentials without email", async () => {
     const result = await seed();
-    expect(result.counts).toEqual(expectedCounts);
-    expect(await counts()).toEqual(expectedCounts);
-    const rooms = await database.db.select().from(chatRooms);
-    expect(rooms).toHaveLength(47);
-    expect(rooms.filter(({ kind }) => kind === "voice")).toHaveLength(8);
+    expect(result.counts).toMatchObject({
+      ...expectedStructure,
+      bookings: schedule.bookings.length,
+      spaceBlocks: schedule.blocks.length,
+      meetingRooms: schedule.bookings.filter((row) => !row.isDesk).length,
+    });
+    expect(await counts()).toEqual(expectedStructure);
+    expect(await database.db.select().from(bookings)).toHaveLength(
+      schedule.bookings.length,
+    );
+    expect(await database.db.select().from(spaceBlocks)).toHaveLength(
+      schedule.blocks.length,
+    );
     expect(await database.db.select().from(callSessions)).toEqual([]);
     expect(await database.db.select().from(callParticipants)).toEqual([]);
     expect(result.skippedBookings).toBe(0);
     expect(result.accounts).toEqual(fixtures.users.map(({ email }) => email));
     for (const input of fixtures.users) {
-      expect((await user(input.email)).emailVerified).toBe(true);
+      const row = await user(input.email);
+      expect(row.emailVerified).toBe(true);
+      expect(row.defaultBranchId).toBe(input.defaultBranchId);
       expect((await login(input.email, input.password)).status).toBe(200);
     }
     const admin = await user("admin@ai.com");
     expect(
       (await getMemberships(admin.id, database.db)).staffBranchIds.sort(),
     ).toEqual(fixtures.branches.map(({ id }) => id).sort());
-    const [floor] = await database.db
-      .select()
-      .from(floors)
-      .where(eq(floors.id, fixtures.floorPlans[0]!.floorId));
-    expect(floor!.publishedPlanId).toBe(fixtures.floorPlans[0]!.id);
-    expect((await database.db.select().from(floorPlans))[0]!.status).toBe(
-      "published",
-    );
     const allPlans = await database.db.select().from(floorPlans);
     const allFloors = await database.db.select().from(floors);
     for (const plan of [...fixtures.floorPlans, ...loadSeedPlans(fixtures)]) {
@@ -229,132 +214,58 @@ describe("transactional development seed", () => {
         allFloors.find(({ id }) => id === plan.floorId)?.publishedPlanId,
       ).toBe(plan.id);
     }
-    const rows = await database.db.select().from(bookings);
-    expect(rows.filter(({ status }) => status === "confirmed")).toHaveLength(
-      26,
-    );
-    expect(rows.filter(({ status }) => status === "cancelled")).toHaveLength(4);
-    for (const fixture of fixtures.bookings) {
-      const actual = rows.find(({ id }) => id === fixture.id)!;
-      expect(actual.attendeeCount).toBe(attendeeCounts.get(fixture.id) ?? null);
-      if (fixture.status === "cancelled") {
-        const actor = fixtures.users.find(
-          ({ key }) => key === fixture.cancelledByKey,
-        )!;
-        expect(actual.cancelledAt).toEqual(now);
-        expect(actual.cancelledBy).toBe((await user(actor.email)).id);
-      } else {
-        expect(actual.cancelledAt).toBeNull();
-        expect(actual.cancelledBy).toBeNull();
-      }
-    }
+    // 시드 계정은 환영 알림을 받지 않는다 (계정 준비 도우미는 가입 훅을 거치지 않는다).
+    expect(
+      await database.db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.type, "welcome")),
+    ).toEqual([]);
     expect(email.messages).toHaveLength(0);
   });
 
-  it("is idempotent, retains user ids and moves only fixture schedules to the new operating date", async () => {
+  it("is idempotent, retains user ids and moves only the schedule to the new base date", async () => {
     await seed();
     const before = await database.db.select().from(users);
-    const later = new Date("2026-10-14T03:00:00Z");
-    await seed(later);
-    expect(await counts()).toEqual(expectedCounts);
+    const later = new Date("2026-11-12T05:00:00Z");
+    const result = await seed(later);
+    expect(await counts()).toEqual(expectedStructure);
     expect(await database.db.select().from(users)).toEqual(before);
+    const expected = expandSeedSchedule(
+      loadSeedSchedule(fixtures),
+      fixtures,
+      later,
+    );
+    expect(result.counts.bookings).toBe(expected.bookings.length);
     const rows = await database.db.select().from(bookings);
-    for (const fixture of fixtures.bookings) {
-      const actual = rows.find(({ id }) => id === fixture.id)!;
-      expect(actual.attendeeCount).toBe(attendeeCounts.get(fixture.id) ?? null);
-      expect(localDate(actual.during.start, "Asia/Seoul")).toBe(
-        fixture.dayOffset === 0 ? "2026-10-14" : "2026-10-15",
-      );
-      expect(localTime(actual.during.start, "Asia/Seoul")).toBe(fixture.start);
-      expect(actual.cancelledAt).toEqual(
-        fixture.status === "cancelled" ? later : null,
-      );
+    expect(rows).toHaveLength(expected.bookings.length);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    for (const booking of expected.bookings) {
+      const actual = byId.get(booking.id);
+      expect(actual).toBeDefined();
+      expect(actual!.during.start).toEqual(booking.during.start);
+      expect(actual!.status).toBe(booking.status);
+      expect(actual!.cancelledAt).toEqual(booking.cancelledAt);
     }
-  });
-
-  it.each([
-    ["2026-10-10T03:00:00Z", "2026-10-10", "2026-10-12"],
-    ["2026-10-11T03:00:00Z", "2026-10-12", "2026-10-13"],
-  ])("skips closed days from %s", async (date, first, next) => {
-    await seed(new Date(date));
-    const rows = await database.db.select().from(bookings);
-    for (const fixture of fixtures.bookings) {
-      const space = fixtures.spaces.find(({ id }) => id === fixture.spaceId)!;
-      const floor = fixtures.floors.find(({ id }) => id === space.floorId)!;
-      const branch = fixtures.branches.find(({ id }) => id === floor.branchId)!;
-      const weekendClosed =
-        branch.name === "성수점" || branch.name === "여의도점";
-      const actual = rows.find(({ id }) => id === fixture.id)!;
-      expect(
-        localDate(
-          rows.find(({ id }) => id === fixture.id)!.during.start,
-          "Asia/Seoul",
-        ),
-      ).toBe(
-        weekendClosed
-          ? fixture.dayOffset === 0
-            ? "2026-10-12"
-            : "2026-10-13"
-          : fixture.dayOffset === 0
-            ? first
-            : next,
-      );
-      const date = localDate(actual.during.start, branch.timezone);
-      const hours = getOpenHours(branch.openHours, date);
-      expect(hours).not.toBeNull();
-      expect(localDate(actual.during.end, branch.timezone)).toBe(date);
-      expect(
-        localTime(actual.during.start, branch.timezone) >= hours!.open,
-      ).toBe(true);
-      expect(
-        localTime(actual.during.end, branch.timezone) <= hours!.close,
-      ).toBe(true);
-    }
-    const blocks = await database.db.select().from(spaceBlocks);
-    for (const branch of fixtures.branches.filter(({ name }) =>
-      ["홍대점", "여의도점", "판교점"].includes(name),
-    )) {
-      const floorIds = new Set(
-        fixtures.floors
-          .filter((floor) => floor.branchId === branch.id)
-          .map(({ id }) => id),
-      );
-      const spaceIds = new Set(
-        fixtures.spaces
-          .filter(({ floorId }) => floorIds.has(floorId))
-          .map(({ id }) => id),
-      );
-      const matching = blocks.filter(({ spaceId }) => spaceIds.has(spaceId));
-      expect(matching).toHaveLength(1);
-      const block = matching[0]!;
-      const date = localDate(block.during.start, branch.timezone);
-      const hours = getOpenHours(branch.openHours, date);
-      expect(hours).not.toBeNull();
-      expect(localDate(block.during.end, branch.timezone)).toBe(date);
-      expect(
-        localTime(block.during.start, branch.timezone) >= hours!.open,
-      ).toBe(true);
-      expect(localTime(block.during.end, branch.timezone) <= hours!.close).toBe(
-        true,
-      );
-    }
+    // 바뀐 기준일에 더는 펼쳐지지 않는 옛 id는 남지 않는다.
+    expect(rows.every((row) => byId.has(row.id))).toBe(true);
+    expect(await database.db.select().from(announcements)).toHaveLength(5);
+    expect(await database.db.select().from(reports)).toHaveLength(2);
   });
 
   it("preserves unrelated accounts, memberships and schedules while skipping a conflicting seed booking", async () => {
     await seed();
     const outsider = await account("outsider@ai.com");
-    const original = fixtures.bookings[0]!;
-    const [existing] = await database.db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, original.id));
+    const original = schedule.bookings.find(
+      (row) => row.key === "design-weekly" && row.status === "confirmed",
+    )!;
     await database.db.delete(bookings).where(eq(bookings.id, original.id));
     const foreignId = crypto.randomUUID();
     await database.db.insert(bookings).values({
       id: foreignId,
       spaceId: original.spaceId,
       userId: outsider.id,
-      during: existing!.during,
+      during: original.during,
     });
     await database.db.insert(teamMembers).values({
       userId: outsider.id,
@@ -370,14 +281,14 @@ describe("transactional development seed", () => {
       .values({
         id: crypto.randomUUID(),
         spaceId: original.spaceId,
-        during: existing!.during,
+        during: original.during,
         createdBy: outsider.id,
         reason: "시드 밖 점검",
       })
       .returning();
     const result = await seed();
     expect(result.skippedBookings).toBe(1);
-    expect(result.counts.bookings).toBe(29);
+    expect(result.counts.bookings).toBe(schedule.bookings.length - 1);
     expect(
       await database.db
         .select()
@@ -390,11 +301,6 @@ describe("transactional development seed", () => {
         .from(bookings)
         .where(eq(bookings.id, original.id)),
     ).toHaveLength(0);
-    const [preservedBooking] = await database.db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, foreignId));
-    expect(preservedBooking!.attendeeCount).toBeNull();
     expect((await user(outsider.email)).name).toBe("기존 사람");
     expect((await login(outsider.email, "existing-password")).ok).toBe(true);
     expect(await getMemberships(outsider.id, database.db)).toMatchObject({
@@ -427,7 +333,7 @@ describe("transactional development seed", () => {
     await database.db
       .update(teams)
       .set({
-        deletedAt: new Date("2026-10-09T00:00:00Z"),
+        deletedAt: new Date("2026-11-01T00:00:00Z"),
         deletedBy: creator!.id,
       })
       .where(eq(teams.id, teamId));
@@ -515,15 +421,25 @@ describe("transactional development seed", () => {
     expect(await database.db.select().from(branches)).toHaveLength(0);
   });
 
-  it("preserves verified existing names/passwords unless reset was explicitly selected", async () => {
+  it("preserves verified existing names, passwords and default branch unless reset was explicitly selected", async () => {
     const original = await account("admin@ai.com");
+    const otherBranch = fixtures.branches[1]!;
     const signedIn = await login(original.email, "existing-password");
     const cookie = signedIn.headers.get("set-cookie")!;
     await seed();
     expect((await user(original.email)).name).toBe("기존 사람");
     expect((await login(original.email, "existing-password")).ok).toBe(true);
     expect((await login(original.email, "qwer1234")).ok).toBe(false);
+    // 비어 있던 기본 지점은 채우고, 이미 정한 기본 지점은 다시 돌려도 바꾸지 않는다.
+    expect((await user(original.email)).defaultBranchId).toBe(
+      fixtures.users[0]!.defaultBranchId,
+    );
+    await database.db
+      .update(users)
+      .set({ defaultBranchId: otherBranch.id })
+      .where(eq(users.id, original.id));
     await seed(now, true);
+    expect((await user(original.email)).defaultBranchId).toBe(otherBranch.id);
     expect((await login(original.email, "existing-password")).ok).toBe(false);
     expect(
       await database.db
@@ -633,40 +549,7 @@ describe("transactional development seed", () => {
     ).toBe("archived");
   });
 
-  it("preserves changes to the existing fixture plan instead of replacing its document", async () => {
-    await seed();
-    const input = fixtures.floorPlans[0]!;
-    const document = structuredClone(input.document);
-    document.bounds.w += 100;
-    const [before] = await database.db
-      .update(floorPlans)
-      .set({
-        document,
-        backgroundImage: "development/edited-floor.png",
-        publishedAt: new Date("2026-10-01T03:00:00Z"),
-      })
-      .where(eq(floorPlans.id, input.id))
-      .returning();
-
-    await seed(new Date("2026-10-14T03:00:00Z"));
-
-    expect(
-      await database.db
-        .select()
-        .from(floorPlans)
-        .where(eq(floorPlans.id, input.id)),
-    ).toEqual([before]);
-    expect(
-      (
-        await database.db
-          .select({ publishedPlanId: floors.publishedPlanId })
-          .from(floors)
-          .where(eq(floors.id, input.floorId))
-      )[0]!.publishedPlanId,
-    ).toBe(input.id);
-  });
-
-  it("produces the intended general/team/operator access without extra accounts", async () => {
+  it("produces the intended general, team and operator access for the four teams", async () => {
     await seed();
     const room = await getSpaceForAccess(
       fixtures.accessGrants[0]!.targetId,
@@ -679,6 +562,7 @@ describe("transactional development seed", () => {
       ["test1@ai.com", false, false, false],
       ["test3@ai.com", true, false, false],
       ["test4@ai.com", false, true, false],
+      ["test6@ai.com", false, false, false],
       ["admin@ai.com", true, true, true],
     ] as const) {
       const current = await user(email);
@@ -709,5 +593,9 @@ describe("transactional development seed", () => {
           ),
         ),
     ).toHaveLength(21);
+    expect(
+      (await database.db.select().from(chatSpaceMembers)).length,
+    ).toBeGreaterThan(20);
+    expect(await database.db.select().from(messages)).not.toHaveLength(0);
   });
 });

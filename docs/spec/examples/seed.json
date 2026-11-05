@@ -1,5 +1,5 @@
 {
-  "note": "가상 데이터다. 사용자는 id가 없고 key로 가리킨다(계정은 인증 인스턴스가 만들기 때문). userKey, createdByKey는 users[].key다. 7층의 공간·팀·허용 팀은 gangnam-7f.spaces.json, 7층 평면도는 gangnam-7f.plan.json에 있고 이 파일은 그 밖의 것을 담는다. dayOffset은 기준일부터 쉬는 날을 건너뛰고 센 운영일 수이고(기준일은 지점 시간대의 오늘, 오늘이 쉬는 날이면 다음 운영일), 시각은 지점 시간대의 현지 시각이다.",
+  "note": "가상 데이터다. 사용자는 id가 없고 key로 가리킨다(계정은 인증 인스턴스가 만들기 때문). userKey, createdByKey는 users[].key다. 7층의 공간·팀·허용 팀은 gangnam-7f.spaces.json, 7층 평면도는 gangnam-7f.plan.json, 한 달치 예약·점검·공지는 seed-schedule.json에 있고 이 파일은 그 밖의 것(지점, 층, 공간, 계정, 팀, 소속, 운영자, 허용 팀)을 담는다. users[].defaultBranchId는 기본 지점이고, 아직 기본 지점이 없는 계정에만 넣는다.",
   "branches": [
     {
       "id": "15eeb72a-6e7f-57ca-a905-d8797f988992",
@@ -778,127 +778,148 @@
       "key": "admin",
       "email": "admin@ai.com",
       "name": "김도윤",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "member",
       "email": "test1@ai.com",
       "name": "김하은",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "designAdmin",
       "email": "test2@ai.com",
       "name": "박지훈",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "designMember",
       "email": "test3@ai.com",
       "name": "이서연",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "growthAdmin",
       "email": "test4@ai.com",
       "name": "최민준",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "both",
       "email": "test5@ai.com",
       "name": "정유나",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "test6",
       "email": "test6@ai.com",
       "name": "이준서",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "48d209a7-fccd-5e26-b95d-466afaf62709"
     },
     {
       "key": "test7",
       "email": "test7@ai.com",
       "name": "박수빈",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "48d209a7-fccd-5e26-b95d-466afaf62709"
     },
     {
       "key": "test8",
       "email": "test8@ai.com",
       "name": "최현우",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "48d209a7-fccd-5e26-b95d-466afaf62709"
     },
     {
       "key": "test9",
       "email": "test9@ai.com",
       "name": "정지아",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "48d209a7-fccd-5e26-b95d-466afaf62709"
     },
     {
       "key": "test10",
       "email": "test10@ai.com",
       "name": "강민서",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd"
     },
     {
       "key": "test11",
       "email": "test11@ai.com",
       "name": "조서준",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd"
     },
     {
       "key": "test12",
       "email": "test12@ai.com",
       "name": "윤소윤",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd"
     },
     {
       "key": "test13",
       "email": "test13@ai.com",
       "name": "장예준",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "test14",
       "email": "test14@ai.com",
       "name": "임채원",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "test15",
       "email": "test15@ai.com",
       "name": "한지호",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "test16",
       "email": "test16@ai.com",
       "name": "오다은",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992"
     },
     {
       "key": "test17",
       "email": "test17@ai.com",
       "name": "신우진",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "34db02c8-7a13-5ca1-aae8-d7bcb74189f4"
     },
     {
       "key": "test18",
       "email": "test18@ai.com",
       "name": "서유진",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "bfc43c7c-c340-5a15-99ea-ccd4f4fca60e"
     },
     {
       "key": "test19",
       "email": "test19@ai.com",
       "name": "권태현",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd"
     },
     {
       "key": "test20",
       "email": "test20@ai.com",
       "name": "황서아",
-      "password": "qwer1234"
+      "password": "qwer1234",
+      "defaultBranchId": "48d209a7-fccd-5e26-b95d-466afaf62709"
     }
   ],
   "teams": [
@@ -915,8 +936,24 @@
       "name": "그로스팀",
       "createdByKey": "growthAdmin",
       "homeBranchId": "15eeb72a-6e7f-57ca-a905-d8797f988992",
-      "headcount": 5,
+      "headcount": 6,
       "contactPhone": "0200000002"
+    },
+    {
+      "id": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "name": "데브팀",
+      "createdByKey": "test6",
+      "homeBranchId": "48d209a7-fccd-5e26-b95d-466afaf62709",
+      "headcount": 6,
+      "contactPhone": "0200000003"
+    },
+    {
+      "id": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "name": "마케팅팀",
+      "createdByKey": "test10",
+      "homeBranchId": "30f94644-2de6-54db-93bd-0a1f5ad55cdd",
+      "headcount": 4,
+      "contactPhone": null
     }
   ],
   "teamMembers": [
@@ -939,6 +976,18 @@
       "title": null
     },
     {
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "userKey": "test13",
+      "role": "member",
+      "title": "UX 리서처"
+    },
+    {
+      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
+      "userKey": "test14",
+      "role": "member",
+      "title": "브랜드 디자이너"
+    },
+    {
       "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
       "userKey": "growthAdmin",
       "role": "admin",
@@ -949,6 +998,60 @@
       "userKey": "both",
       "role": "member",
       "title": null
+    },
+    {
+      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
+      "userKey": "test15",
+      "role": "member",
+      "title": "데이터 분석가"
+    },
+    {
+      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
+      "userKey": "test16",
+      "role": "member",
+      "title": "프로덕트 매니저"
+    },
+    {
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "userKey": "test6",
+      "role": "admin",
+      "title": "테크 리드"
+    },
+    {
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "userKey": "test7",
+      "role": "member",
+      "title": "백엔드 개발자"
+    },
+    {
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "userKey": "test8",
+      "role": "member",
+      "title": "프런트엔드 개발자"
+    },
+    {
+      "teamId": "cf991618-801e-5fef-9140-34b071bafe5b",
+      "userKey": "test9",
+      "role": "member",
+      "title": "QA 엔지니어"
+    },
+    {
+      "teamId": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "userKey": "test10",
+      "role": "admin",
+      "title": "마케팅 리드"
+    },
+    {
+      "teamId": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "userKey": "test11",
+      "role": "member",
+      "title": "콘텐츠 마케터"
+    },
+    {
+      "teamId": "e9f08b32-3e87-5815-9691-e0042676ade1",
+      "userKey": "test12",
+      "role": "member",
+      "title": "퍼포먼스 마케터"
     }
   ],
   "branchStaff": [
@@ -995,302 +1098,6 @@
       "version": 1,
       "status": "published",
       "documentFile": "gangnam-7f.plan.json",
-      "createdByKey": "admin"
-    }
-  ],
-  "bookings": [
-    {
-      "id": "0b67bf8e-1ac3-5b0c-86ce-1b89d5bbd6fe",
-      "spaceId": "bf9a611a-92eb-5825-9188-5ef9b191ca91",
-      "dayOffset": 0,
-      "start": "10:00",
-      "end": "11:30",
-      "userKey": "designAdmin",
-      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
-      "title": "디자인 리뷰",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "c885afbf-ea9b-596e-acfd-cdbea0a30902",
-      "spaceId": "bf9a611a-92eb-5825-9188-5ef9b191ca91",
-      "dayOffset": 0,
-      "start": "13:00",
-      "end": "14:00",
-      "userKey": "growthAdmin",
-      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
-      "title": "주간 회의",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "cd2a5869-de71-5f7c-8f59-501d73c2b06c",
-      "spaceId": "0495a219-c757-56ae-abda-4e212be70e5c",
-      "dayOffset": 0,
-      "start": "15:00",
-      "end": "16:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": "1:1",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "87ecccff-4d97-59c4-89b0-5de69ed957d0",
-      "spaceId": "b242f462-f1bf-5b6d-b1b0-8055297d9dd1",
-      "dayOffset": 0,
-      "start": "11:00",
-      "end": "12:00",
-      "userKey": "both",
-      "teamId": null,
-      "title": null,
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "a9252de8-cd9f-56f6-bae6-2f78ff6799bb",
-      "spaceId": "11bdd550-2a39-52d2-874b-9b00599172ca",
-      "dayOffset": 0,
-      "start": "16:00",
-      "end": "18:00",
-      "userKey": "admin",
-      "teamId": null,
-      "title": "외부 세션",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "389a05bd-250b-5cc5-9b3e-f42a74ea6b67",
-      "spaceId": "400527fa-3c66-5cd4-a627-bf65ffb0dee2",
-      "dayOffset": 1,
-      "start": "10:00",
-      "end": "12:00",
-      "userKey": "growthAdmin",
-      "teamId": "1647b59d-2deb-503a-8442-8a4b8de7811b",
-      "title": "스프린트 계획",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "2d02fe59-b4b2-56c7-a467-b2f0a817ac6e",
-      "spaceId": "4ad8994c-0567-513d-945f-3e2de1984423",
-      "dayOffset": 1,
-      "start": "14:00",
-      "end": "15:00",
-      "userKey": "designMember",
-      "teamId": null,
-      "title": null,
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "32947633-992f-5c71-9036-cb23a434c414",
-      "spaceId": "a58589df-bc23-5f96-a0fd-6a8c3fa5fa8e",
-      "dayOffset": 0,
-      "start": "14:00",
-      "end": "16:00",
-      "userKey": "designAdmin",
-      "teamId": "2b279fd1-5795-5a32-b94a-bbef2b785bff",
-      "title": "워크숍",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "7293f3bc-3ba8-570a-8926-d8796e9352ef",
-      "spaceId": "0495a219-c757-56ae-abda-4e212be70e5c",
-      "dayOffset": 0,
-      "start": "09:00",
-      "end": "10:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": null,
-      "status": "cancelled",
-      "cancelledByKey": "member"
-    },
-    {
-      "id": "74cc670c-e5d6-5394-8b16-aa1ca2eeee0a",
-      "spaceId": "41db933b-b175-54f6-b22f-93acc0ad977a",
-      "dayOffset": 0,
-      "start": "10:00",
-      "end": "11:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": "집중 회의",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "833c57f3-f55a-53e6-977a-bdd9cd52cc75",
-      "spaceId": "09712979-f2b1-57b9-baaa-657091b74c71",
-      "dayOffset": 0,
-      "start": "13:00",
-      "end": "14:00",
-      "userKey": "both",
-      "teamId": null,
-      "title": null,
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "99e49b2c-4337-51f5-a3dd-76481a896eaa",
-      "spaceId": "a9f2daf9-73f8-5816-9430-e2b631dc4aeb",
-      "dayOffset": 1,
-      "start": "14:00",
-      "end": "15:00",
-      "userKey": "designMember",
-      "teamId": null,
-      "title": "개인 리뷰",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "5c45c115-b8b7-59ac-8437-be0a2c3782f7",
-      "spaceId": "b06c7ca6-133a-5d93-b1f6-5c9ff3d2d525",
-      "dayOffset": 0,
-      "start": "11:00",
-      "end": "12:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": null,
-      "status": "cancelled",
-      "cancelledByKey": "member"
-    },
-    {
-      "id": "a1e3e078-fc50-58ce-a6bb-928da17d1a4a",
-      "spaceId": "045174e9-730c-5878-96d1-a8d29ec21903",
-      "dayOffset": 0,
-      "start": "10:00",
-      "end": "11:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": "집중 회의",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "4c22a7a1-234d-5d48-9b20-750157024e27",
-      "spaceId": "ec2e25ff-20c1-5690-b361-34aea33d64be",
-      "dayOffset": 0,
-      "start": "13:00",
-      "end": "14:00",
-      "userKey": "both",
-      "teamId": null,
-      "title": null,
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "d1ab9f1c-0023-58b4-9e27-230413a8357f",
-      "spaceId": "9d17ae4b-bdf2-58fd-97ff-33d6de242c97",
-      "dayOffset": 1,
-      "start": "14:00",
-      "end": "15:00",
-      "userKey": "designMember",
-      "teamId": null,
-      "title": "개인 리뷰",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "9bc4cb6a-b1e7-5e8e-b2d3-882a84b164d3",
-      "spaceId": "7037dafb-cbc1-5802-9503-fd1afffcd6b9",
-      "dayOffset": 0,
-      "start": "11:00",
-      "end": "12:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": null,
-      "status": "cancelled",
-      "cancelledByKey": "member"
-    },
-    {
-      "id": "89e5fef2-8fee-5238-a8ea-bde59d2c1243",
-      "spaceId": "37bb1db5-84d3-51b3-a8d9-d0894c1f5967",
-      "dayOffset": 0,
-      "start": "10:00",
-      "end": "11:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": "집중 회의",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "28da7feb-30fd-5a15-b698-af679344680a",
-      "spaceId": "ab58f368-a20b-5ca5-913c-2c168cfa41c0",
-      "dayOffset": 0,
-      "start": "13:00",
-      "end": "14:00",
-      "userKey": "both",
-      "teamId": null,
-      "title": null,
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "15853ab9-87f9-5ff6-b3b2-1178d720fa9d",
-      "spaceId": "f0ff16b7-1166-525c-b3ef-854f06825213",
-      "dayOffset": 1,
-      "start": "14:00",
-      "end": "15:00",
-      "userKey": "designMember",
-      "teamId": null,
-      "title": "개인 리뷰",
-      "status": "confirmed",
-      "cancelledByKey": null
-    },
-    {
-      "id": "d9dbfeed-c239-5760-bab9-06a098b4b72e",
-      "spaceId": "f0113f91-770f-59c2-a9e0-6f7d8555e77f",
-      "dayOffset": 0,
-      "start": "11:00",
-      "end": "12:00",
-      "userKey": "member",
-      "teamId": null,
-      "title": null,
-      "status": "cancelled",
-      "cancelledByKey": "member"
-    }
-  ],
-  "spaceBlocks": [
-    {
-      "id": "24611f91-c39c-541c-8af6-a51c8aaff485",
-      "spaceId": "62719efa-1f4a-5896-85ab-1dc1e1bbcfb8",
-      "startDayOffset": 0,
-      "start": "00:00",
-      "endDayOffset": 1,
-      "end": "12:00",
-      "reason": "모니터 교체",
-      "createdByKey": "admin"
-    },
-    {
-      "id": "a8ff325a-32b1-522e-8143-fd084afc4933",
-      "spaceId": "b5154fea-845e-542e-a3ea-8fa1f431a440",
-      "startDayOffset": 0,
-      "start": "15:00",
-      "endDayOffset": 0,
-      "end": "16:00",
-      "reason": "발표 장비 점검",
-      "createdByKey": "admin"
-    },
-    {
-      "id": "98bb1466-e29b-5edf-9626-fb694d71fb6b",
-      "spaceId": "b991f488-210c-58a1-be1c-3bef1273d07e",
-      "startDayOffset": 0,
-      "start": "15:00",
-      "endDayOffset": 0,
-      "end": "16:00",
-      "reason": "발표 장비 점검",
-      "createdByKey": "admin"
-    },
-    {
-      "id": "b09d4901-8389-551c-a896-6deaa40b1c75",
-      "spaceId": "bdfbdc4f-66ca-5ec1-8dab-a6bfa55e456b",
-      "startDayOffset": 0,
-      "start": "15:00",
-      "endDayOffset": 0,
-      "end": "16:00",
-      "reason": "발표 장비 점검",
       "createdByKey": "admin"
     }
   ]

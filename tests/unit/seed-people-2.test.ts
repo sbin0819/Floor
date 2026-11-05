@@ -9,14 +9,16 @@ const seed = loadSeedData();
 const people = loadSeedPeople(seed);
 type Input = typeof inputFile;
 describe("strict group and message-request seed", () => {
-  it("loads one status, one eligible group and an unrelated message request", () => {
+  it("loads chosen statuses, eligible groups and unrelated message requests", () => {
     const result = loadSeedPeople2(seed, people);
     expect(result.statuses).toEqual([
       { userKey: "designAdmin", status: "dnd" },
+      { userKey: "test6", status: "away" },
+      { userKey: "test17", status: "away" },
     ]);
-    expect(result.groupDirectMessages).toHaveLength(1);
-    expect(result.groupDirectMessages[0]?.messages).toHaveLength(3);
-    expect(result.messageRequests).toHaveLength(1);
+    expect(result.groupDirectMessages).toHaveLength(2);
+    expect(result.groupDirectMessages[0]?.messages).toHaveLength(4);
+    expect(result.messageRequests).toHaveLength(2);
     expect(result).not.toHaveProperty("note");
   });
   it("permits an unnamed group with only its creation message", () => {

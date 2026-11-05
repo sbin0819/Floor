@@ -52,6 +52,21 @@ const seedSpacesSchema = z.strictObject({
       body,
     }),
   ),
+  loungeReports: z
+    .array(
+      z.strictObject({
+        branchId: id,
+        messageIndex: z.int().nonnegative(),
+        reporterKeys: z.array(userKey).min(1).max(5),
+        reason: z.enum(["spam", "harassment", "inappropriate", "other"]),
+        detail: z
+          .string()
+          .trim()
+          .refine((value) => Array.from(value).length <= 500)
+          .nullable(),
+      }),
+    )
+    .default([]),
   communities: z.array(
     z.strictObject({
       id,
@@ -117,6 +132,26 @@ export function parseSeedSpaces(
           );
         previous.set(row.branchId, row.minutesAgo);
       });
+      data.loungeReports.forEach((row, index) => {
+        const path = ["loungeReports", index];
+        const entries = data.loungeMessages.filter(
+          (message) => message.branchId === row.branchId,
+        );
+        const target = entries[row.messageIndex];
+        if (!target)
+          issue([...path, "messageIndex"], "신고할 라운지 메시지가 없어요.");
+        checkUsers(row.reporterKeys, [...path, "reporterKeys"]);
+        const members = lounges.get(row.branchId);
+        if (
+          row.reporterKeys.some(
+            (key) => !members?.has(key) || key === target?.authorKey,
+          )
+        )
+          issue(
+            [...path, "reporterKeys"],
+            "신고한 사람은 작성자가 아닌 라운지 멤버여야 해요.",
+          );
+      });
       const spaceIds = new Set<string>();
       const roomIds = new Set(
         data.communities.map(({ id }) => seedCommunityVoiceId(id)),
@@ -181,8 +216,9 @@ export function parseSeedSpaces(
     throw new SeedError(
       `스페이스 시드 데이터 검증 실패: ${parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`,
     );
-  const { loungeMembers, loungeMessages, communities } = parsed.data;
-  return { loungeMembers, loungeMessages, communities };
+  const { loungeMembers, loungeMessages, loungeReports, communities } =
+    parsed.data;
+  return { loungeMembers, loungeMessages, loungeReports, communities };
 }
 
 export type SeedSpacesData = ReturnType<typeof parseSeedSpaces>;
@@ -203,6 +239,9 @@ export function selectSeedLounges(
       selected.has(branchId),
     ),
     loungeMessages: data.loungeMessages.filter(({ branchId }) =>
+      selected.has(branchId),
+    ),
+    loungeReports: data.loungeReports.filter(({ branchId }) =>
       selected.has(branchId),
     ),
     communities: [],

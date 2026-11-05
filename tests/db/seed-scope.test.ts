@@ -14,15 +14,16 @@ import seedFile from "@/docs/spec/examples/seed.json";
 import spacesFile from "@/docs/spec/examples/gangnam-7f.spaces.json";
 import planFile from "@/docs/spec/examples/gangnam-7f.plan.json";
 import photoFile from "@/docs/spec/examples/seed-photos.json";
-import bookingExtrasFile from "@/docs/spec/examples/seed-bookings-2.json";
+import scheduleFile from "@/docs/spec/examples/seed-schedule.json";
 import * as authModule from "@/lib/auth/auth";
-import * as seedDal from "@/lib/dal/seed";
+import * as scheduleDal from "@/lib/dal/seed-schedule";
 import * as schema from "@/lib/db/schema";
 import { createMemoryEmailSender } from "@/lib/email/memory";
 import { preflightSeedBranches } from "@/lib/seed/add-branches";
 import * as dataLoader from "@/lib/seed/data";
 import * as photoLoader from "@/lib/seed/photos";
 import * as planLoader from "@/lib/seed/seed-plans";
+import * as scheduleLoader from "@/lib/seed/schedule";
 import { runSeed } from "@/lib/seed/run-seed";
 import { localDate, localTime } from "@/lib/time/zoned";
 import { createTestDatabase, type TestDatabase } from "./helper";
@@ -49,15 +50,20 @@ const {
 } = schema;
 const now = new Date("2026-10-07T03:00:00Z");
 const base = dataLoader.loadSeedData();
+const baseSchedule = scheduleLoader.expandSeedSchedule(
+  scheduleLoader.loadSeedSchedule(base),
+  base,
+  now,
+);
 const ids = {
   branch: crypto.randomUUID(),
   firstFloor: crypto.randomUUID(),
   secondFloor: crypto.randomUUID(),
   firstSpace: crypto.randomUUID(),
   secondSpace: crypto.randomUUID(),
-  booking: crypto.randomUUID(),
-  cancelled: crypto.randomUUID(),
-  block: crypto.randomUUID(),
+  booking: scheduleLoader.seedScheduleId("oneoff:scope-added-booking"),
+  cancelled: scheduleLoader.seedScheduleId("oneoff:scope-added-cancelled"),
+  block: scheduleLoader.seedScheduleId("block:scope-added-block"),
 };
 
 // 신규 실제 fixture와 별개로, 이 테스트는 확장 전 두 지점 데이터만 있어도 실행된다.
@@ -103,9 +109,19 @@ function extension() {
     },
   );
   raw.branchStaff.push({ branchId: ids.branch, userKey: "admin" });
-  raw.bookings.push(
+  const data = dataLoader.parseSeedData({
+    seed: raw,
+    spaces: spacesFile,
+    plan: planFile,
+  });
+  // 새 지점의 일정은 전체 일정 파일에 한 번짜리 예약 두 개와 점검 하나를 더해 만든다.
+  const scheduleInput = structuredClone(scheduleFile) as unknown as {
+    oneOff: Record<string, unknown>[];
+    maintenance: Record<string, unknown>[];
+  };
+  scheduleInput.oneOff.push(
     {
-      id: ids.booking,
+      key: "scope-added-booking",
       spaceId: ids.firstSpace,
       dayOffset: 0,
       start: "10:00",
@@ -113,11 +129,12 @@ function extension() {
       userKey: "member",
       teamId: null,
       title: "추가 예약",
-      status: "confirmed",
-      cancelledByKey: null,
+      attendeeCount: null,
+      participantKeys: [],
+      createdDaysBefore: 1,
     },
     {
-      id: ids.cancelled,
+      key: "scope-added-cancelled",
       spaceId: ids.secondSpace,
       dayOffset: 1,
       start: "11:00",
@@ -125,12 +142,15 @@ function extension() {
       userKey: "member",
       teamId: null,
       title: null,
+      attendeeCount: null,
+      participantKeys: [],
+      createdDaysBefore: 1,
       status: "cancelled",
       cancelledByKey: "member",
     },
   );
-  raw.spaceBlocks.push({
-    id: ids.block,
+  scheduleInput.maintenance.push({
+    key: "scope-added-block",
     spaceId: ids.firstSpace,
     startDayOffset: 0,
     start: "15:00",
@@ -139,11 +159,7 @@ function extension() {
     reason: "추가 점검",
     createdByKey: "admin",
   });
-  const data = dataLoader.parseSeedData({
-    seed: raw,
-    spaces: spacesFile,
-    plan: planFile,
-  });
+  const schedule = scheduleLoader.parseSeedSchedule(scheduleInput, data);
   const photoInput = structuredClone(photoFile);
   photoInput.branchCovers.push({
     ...photoInput.branchCovers[0]!,
@@ -156,7 +172,11 @@ function extension() {
       name: "추가 회의실",
       photos: [photoInput.spacePhotos[0]!.photos[0]!],
     });
-  return { data, photos: photoLoader.parseSeedPhotos(photoInput, data) };
+  return {
+    data,
+    photos: photoLoader.parseSeedPhotos(photoInput, data),
+    schedule,
+  };
 }
 const fixtures = extension();
 
@@ -177,10 +197,12 @@ describe("transactional additive-only branch seed", () => {
     floorPlans: 0,
     bookings: 2,
     spaceBlocks: 1,
+    announcements: 0,
     spacePhotos: 2,
     branchCovers: 1,
     meetingRooms: 2,
-    chatMessages: 2,
+    // 예약을 만든 시스템 메시지 둘과 취소 시스템 메시지 하나.
+    chatMessages: 3,
     chatSpaces: 1,
     communitySpaces: 0,
     spaceMembers: 0,
@@ -209,6 +231,9 @@ describe("transactional additive-only branch seed", () => {
     );
     vi.spyOn(photoLoader, "loadSeedPhotos").mockReturnValue(
       structuredClone(fixtures.photos),
+    );
+    vi.spyOn(scheduleLoader, "loadSeedSchedule").mockReturnValue(
+      structuredClone(fixtures.schedule),
     );
     vi.spyOn(planLoader, "loadSeedPlans").mockImplementation(() => {
       throw new Error("Scoped seed must not load additional floor plans");
@@ -289,7 +314,11 @@ describe("transactional additive-only branch seed", () => {
     expect(await database.db.select().from(authSessions)).toHaveLength(1);
     const before = await snapshot();
     expect(
-      await preflightSeedBranches({ branchIds: [ids.branch], db: loggingDb() }),
+      await preflightSeedBranches({
+        branchIds: [ids.branch],
+        db: loggingDb(),
+        now,
+      }),
     ).toEqual({
       addedBranchIds: [ids.branch],
       skippedBranchIds: [],
@@ -340,17 +369,20 @@ describe("transactional additive-only branch seed", () => {
       .where(sql`${chatRooms.bookingId} in (${ids.booking}, ${ids.cancelled})`);
     expect(newRooms).toHaveLength(2);
     const newRoomIds = new Set(newRooms.map(({ id }) => id));
+    // 자기 id의 예약·점검을 지우는 문장 밖에는 기존 행을 바꾸는 쓰기가 없다.
     const updates = statements.flatMap((statement, index) =>
       /^(update|delete)\b/i.test(statement)
         ? [{ statement, params: statementParameters[index]! }]
         : [],
     );
-    expect(updates).toHaveLength(2);
-    for (const { statement, params } of updates) {
-      expect(statement).toMatch(/^update "chat_rooms" set "last_seq"/i);
-      expect(statement).toContain('where "chat_rooms"."id" =');
-      expect(newRoomIds.has(String(params.at(-1)))).toBe(true);
-    }
+    expect(
+      updates.every(({ statement }) =>
+        /^delete from "(bookings|space_blocks|announcements|messages|notifications)"/i.test(
+          statement,
+        ),
+      ),
+    ).toBe(true);
+    expect(newRoomIds.size).toBe(2);
     expect(
       statements.filter((statement) =>
         /insert into "(users|auth_|teams|team_members)/i.test(statement),
@@ -371,9 +403,10 @@ describe("transactional additive-only branch seed", () => {
       .where(eq(bookings.id, ids.cancelled));
     expect(cancelled).toMatchObject({
       status: "cancelled",
-      cancelledAt: now,
+      cancelledAt: expect.any(Date),
       cancelledBy: await memberId(),
     });
+    expect(cancelled!.cancelledAt! <= now).toBe(true);
   });
 
   it("leaves settings, changed photos, cancellations, accounts and dates exactly unchanged on rerun", async () => {
@@ -441,7 +474,14 @@ describe("transactional additive-only branch seed", () => {
     await database.db
       .update(bookings)
       .set({ attendeeCount: 1 })
-      .where(eq(bookings.id, bookingExtrasFile.attendeeCounts[0]!.bookingId));
+      .where(
+        eq(
+          bookings.id,
+          baseSchedule.bookings.find(
+            (booking) => booking.key === "design-weekly",
+          )!.id,
+        ),
+      );
     await database.db
       .update(branches)
       .set({ address: "기존 편집 유지" })
@@ -452,7 +492,7 @@ describe("transactional additive-only branch seed", () => {
       addedBranchIds: [ids.branch],
       skippedBranchIds: [existing.id],
     });
-    expect(result.counts).toEqual(expected);
+    expect(result.counts).toMatchObject(expected);
     const after = await snapshot();
     for (const [table, rows] of Object.entries(before))
       expect(after[table]).toEqual(expect.arrayContaining(rows));
@@ -460,7 +500,7 @@ describe("transactional additive-only branch seed", () => {
 
   it("rolls back all new structures and blocks after a late booking failure", async () => {
     const before = await snapshot();
-    vi.spyOn(seedDal, "insertSeedBooking").mockRejectedValueOnce(
+    vi.spyOn(scheduleDal, "insertSeedBookings").mockRejectedValueOnce(
       new Error("private-query-values"),
     );
     await expect(append()).rejects.toThrow("되돌렸어요");
@@ -533,7 +573,7 @@ describe("transactional additive-only branch seed", () => {
     },
   );
 
-  it.each(["floor", "booking", "operator", "photo", "cover"])(
+  it.each(["floor", "operator", "photo", "cover"])(
     "refuses to repair an existing incomplete or reparented bundle: %s",
     async (kind) => {
       await append();
@@ -542,11 +582,6 @@ describe("transactional additive-only branch seed", () => {
           .update(floors)
           .set({ branchId: base.branches[0]!.id, level: 91 })
           .where(eq(floors.id, ids.firstFloor));
-      if (kind === "booking")
-        await database.db
-          .update(bookings)
-          .set({ spaceId: base.spaces[0]!.id })
-          .where(eq(bookings.id, ids.cancelled));
       if (kind === "operator")
         await database.db
           .delete(branchStaff)

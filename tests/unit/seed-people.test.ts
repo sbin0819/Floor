@@ -7,19 +7,20 @@ import { loadSeedPeople, parseSeedPeople } from "@/lib/seed/people";
 const seed = loadSeedData();
 type PeopleFile = typeof peopleFile;
 describe("strict people seed data", () => {
-  it("loads five names, three friendships and two valid direct conversations", () => {
+  it("loads a name for everyone but the operator, friendships in both states and valid direct conversations", () => {
     const result = loadSeedPeople(seed);
-    expect(result.usernames).toHaveLength(5);
+    expect(result.usernames).toHaveLength(peopleFile.usernames.length);
+    expect(result.usernames.length).toBeGreaterThanOrEqual(15);
     expect(
       result.friendships.filter(({ status }) => status === "accepted"),
-    ).toHaveLength(1);
+    ).toHaveLength(5);
     expect(
       result.friendships.filter(({ status }) => status === "pending"),
-    ).toHaveLength(2);
-    expect(result.directMessages).toHaveLength(2);
+    ).toHaveLength(3);
+    expect(result.directMessages).toHaveLength(5);
     expect(
       result.directMessages.flatMap(({ messages }) => messages),
-    ).toHaveLength(5);
+    ).toHaveLength(12);
     expect(result).not.toHaveProperty("note");
     expect(result.usernames.some(({ userKey }) => userKey === "admin")).toBe(
       false,
@@ -29,7 +30,9 @@ describe("strict people seed data", () => {
     const input = structuredClone(peopleFile);
     input.directMessages.reverse();
     input.directMessages[0]!.users.reverse();
-    expect(parseSeedPeople(input, seed).directMessages).toHaveLength(2);
+    expect(parseSeedPeople(input, seed).directMessages).toHaveLength(
+      peopleFile.directMessages.length,
+    );
   });
   it("counts Unicode code points, trims bodies and does not change the source object", () => {
     const input = structuredClone(peopleFile);

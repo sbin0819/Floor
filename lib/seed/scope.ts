@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { SeedData } from "./data";
 import { SeedError } from "./errors";
 import type { SeedPhotoData } from "./photos";
-import type { SeedBookings2Data } from "./bookings-2";
+import { selectScheduleForBranches, type ExpandedSchedule } from "./schedule";
 import { selectSeedLounges, type SeedSpacesData } from "./spaces";
 
 export function validateSeedBranchIds(
@@ -26,16 +26,19 @@ export function validateSeedBranchIds(
   return result.data;
 }
 
+const emptySpaceChat: SeedSpacesData = {
+  loungeMembers: [],
+  loungeMessages: [],
+  loungeReports: [],
+  communities: [],
+};
+
 export function selectSeedBranches(
   data: SeedData,
   photos: SeedPhotoData,
   branchIds: readonly string[],
-  bookingExtras?: SeedBookings2Data,
-  spaceChat: SeedSpacesData = {
-    loungeMembers: [],
-    loungeMessages: [],
-    communities: [],
-  },
+  schedule: ExpandedSchedule,
+  spaceChat: SeedSpacesData = emptySpaceChat,
 ) {
   const selected = new Set(branchIds);
   const branches = data.branches.filter(({ id }) => selected.has(id));
@@ -43,10 +46,6 @@ export function selectSeedBranches(
   const floorIds = new Set(floors.map(({ id }) => id));
   const spaces = data.spaces.filter(({ floorId }) => floorIds.has(floorId));
   const spaceIds = new Set(spaces.map(({ id }) => id));
-  const bookings = data.bookings.filter(({ spaceId }) => spaceIds.has(spaceId));
-  const spaceBlocks = data.spaceBlocks.filter(({ spaceId }) =>
-    spaceIds.has(spaceId),
-  );
   const floorPlans = data.floorPlans.filter(({ floorId }) =>
     floorIds.has(floorId),
   );
@@ -56,34 +55,31 @@ export function selectSeedBranches(
   const accessGrants = data.accessGrants.filter(({ targetType, targetId }) =>
     (targetType === "floor" ? floorIds : spaceIds).has(targetId),
   );
+  const scopedSchedule = selectScheduleForBranches(schedule, branchIds);
+  const lounges = selectSeedLounges(spaceChat, branchIds);
   const userKeys = new Set([
-    ...spaceChat.loungeMembers
-      .filter(({ branchId }) => selected.has(branchId))
-      .flatMap(({ userKeys }) => userKeys),
-    ...(bookingExtras?.participants
-      .filter(({ bookingId }) => bookings.some(({ id }) => id === bookingId))
-      .flatMap(({ userKeys }) => userKeys) ?? []),
-    ...(bookingExtras?.deskBookings
-      .filter(({ deskId }) => spaceIds.has(deskId))
-      .map(({ userKey }) => userKey) ?? []),
-    ...(bookingExtras?.deskBlocks
-      .filter(({ spaceId }) => spaceIds.has(spaceId))
-      .map(({ createdByKey }) => createdByKey) ?? []),
-    ...bookings.flatMap(({ userKey, cancelledByKey }) =>
-      cancelledByKey ? [userKey, cancelledByKey] : [userKey],
-    ),
-    ...spaceBlocks.map(({ createdByKey }) => createdByKey),
+    ...lounges.loungeMembers.flatMap(({ userKeys }) => userKeys),
+    ...scopedSchedule.bookings.flatMap((booking) => [
+      booking.userKey,
+      ...booking.participantKeys,
+      ...(booking.cancelledByKey ? [booking.cancelledByKey] : []),
+      ...booking.messages.map(({ authorKey }) => authorKey),
+    ]),
+    ...scopedSchedule.blocks.map(({ createdByKey }) => createdByKey),
+    ...scopedSchedule.announcements.flatMap((row) => [
+      row.authorKey,
+      ...row.recipientKeys,
+    ]),
     ...floorPlans.map(({ createdByKey }) => createdByKey),
     ...branchStaff.map(({ userKey }) => userKey),
   ]);
   return {
-    spaceChat: selectSeedLounges(spaceChat, branchIds),
+    spaceChat: lounges,
+    schedule: scopedSchedule,
     data: {
       branches,
       floors,
       spaces,
-      bookings,
-      spaceBlocks,
       floorPlans,
       branchStaff,
       accessGrants,
@@ -105,7 +101,12 @@ export function selectSeedBranches(
 
 export type SeedBranchScope = ReturnType<typeof selectSeedBranches>;
 
-export function seedBranchCounts({ data, photos, spaceChat }: SeedBranchScope) {
+export function seedBranchCounts({
+  data,
+  photos,
+  spaceChat,
+  schedule,
+}: SeedBranchScope) {
   return {
     users: 0,
     branches: data.branches.length,
@@ -116,8 +117,9 @@ export function seedBranchCounts({ data, photos, spaceChat }: SeedBranchScope) {
     branchStaff: data.branchStaff.length,
     accessGrants: data.accessGrants.length,
     floorPlans: data.floorPlans.length,
-    bookings: data.bookings.length,
-    spaceBlocks: data.spaceBlocks.length,
+    bookings: schedule.bookings.length,
+    spaceBlocks: schedule.blocks.length,
+    announcements: schedule.announcements.length,
     spacePhotos: photos.spacePhotos.length,
     branchCovers: photos.branchCovers.length,
     chatSpaces: data.branches.length,

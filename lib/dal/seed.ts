@@ -1,19 +1,16 @@
 import "server-only";
 
 // 고정된 가상 데이터만 다루는 시드 전용 쓰기다. 기능 액션에서 사용하지 않는다.
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DalDatabase } from "@/lib/dal/database";
 import { createBranchLounge } from "./chat-write";
 import { SeedError } from "@/lib/seed/errors";
-import { serializeTimeRange, type TimeRange } from "@/lib/db/range";
 import {
   accessGrants,
-  bookings,
   branches,
   branchStaff,
   floorPlans,
   floors,
-  spaceBlocks,
   spaces,
   teamMembers,
   teams,
@@ -140,44 +137,4 @@ export async function putSeedPlan(
       .where(eq(floors.id, input.floorId));
   }
   return true;
-}
-export async function clearSeedSchedule(
-  bookingIds: string[],
-  blockIds: string[],
-  db: DalDatabase,
-) {
-  if (bookingIds.length)
-    await db.delete(bookings).where(inArray(bookings.id, bookingIds));
-  if (blockIds.length)
-    await db.delete(spaceBlocks).where(inArray(spaceBlocks.id, blockIds));
-}
-export async function insertSeedBlock(
-  input: typeof spaceBlocks.$inferInsert,
-  db: DalDatabase,
-) {
-  await db.insert(spaceBlocks).values(input);
-}
-export async function hasSeedBookingOverlap(
-  spaceId: string,
-  during: TimeRange,
-  db: DalDatabase,
-) {
-  const [row] = await db
-    .select({ id: bookings.id })
-    .from(bookings)
-    .where(
-      and(
-        eq(bookings.spaceId, spaceId),
-        eq(bookings.status, "confirmed"),
-        sql`${bookings.during} && ${serializeTimeRange(during)}::tstzrange`,
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
-}
-export async function insertSeedBooking(
-  input: typeof bookings.$inferInsert,
-  db: DalDatabase,
-) {
-  await db.insert(bookings).values(input);
 }
