@@ -111,6 +111,7 @@ beforeEach(() => {
     date: detail.date,
     branch: null,
     operatingState: null,
+    firstVisit: false,
   });
   vi.mocked(getHomeUpcomingBookings).mockResolvedValue({
     now: detail.now,
@@ -262,6 +263,7 @@ it("uses the resolved branch in both the header and free-space card, including a
     date: detail.date,
     branch: detail.branch,
     operatingState,
+    firstVisit: false,
   });
   vi.mocked(getHomeFreeSpaces).mockResolvedValue({
     state: "ready",

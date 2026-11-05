@@ -132,6 +132,7 @@ function Dashboard({ starter = false }: { starter?: boolean }) {
             date,
             branch,
             operatingState,
+            firstVisit: starter,
           }}
         />
       }

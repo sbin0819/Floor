@@ -88,6 +88,8 @@ describe("home and branch booking discovery", () => {
     const query = queries(fixture.person, new Date("2026-10-07T16:00:00Z"));
     expect(await query.getHomeHeader()).toEqual({
       name: "김하은",
+      // 사용자 이름·팀·예약·친구가 하나도 없는 사람은 처음 온 사람으로 맞이한다.
+      firstVisit: true,
       now: "2026-10-07T16:00:00.000Z",
       date: "2026-10-08",
       branch: null,
@@ -178,14 +180,12 @@ describe("home and branch booking discovery", () => {
         teamId: fixture.teamId,
         title: "비공개 예약 제목",
       });
-      await database.db
-        .insert(spaceBlocks)
-        .values({
-          spaceId: hiddenId,
-          during: bookingRange("13:00", "14:00"),
-          createdBy: fixture.operator.userId,
-          reason: "비공개 점검",
-        });
+      await database.db.insert(spaceBlocks).values({
+        spaceId: hiddenId,
+        during: bookingRange("13:00", "14:00"),
+        createdBy: fixture.operator.userId,
+        reason: "비공개 점검",
+      });
       const after = await queries().getHomeFreeSpaces();
       const branchAfter = await queries().getBranchList();
       expect(after).toEqual(before);
@@ -231,13 +231,11 @@ describe("home and branch booking discovery", () => {
     await insertFixtureBooking(database, fixture, {
       during: bookingRange("13:00", "14:00"),
     });
-    await database.db
-      .insert(spaceBlocks)
-      .values({
-        spaceId: fixture.secondSpaceId,
-        during: bookingRange("12:00", "13:00"),
-        createdBy: fixture.operator.userId,
-      });
+    await database.db.insert(spaceBlocks).values({
+      spaceId: fixture.secondSpaceId,
+      during: bookingRange("12:00", "13:00"),
+      createdBy: fixture.operator.userId,
+    });
     const now = new Date("2026-10-07T03:00:00Z");
     expect(
       await queries(fixture.person, now).getHomeFreeSpaces(),
@@ -257,15 +255,13 @@ describe("home and branch booking discovery", () => {
 
   it("sorts by free duration then floor order then name, caps four but retains complete counts", async () => {
     await selectBranch();
-    await database.db
-      .insert(spaces)
-      .values(
-        ["가", "나", "다", "라", "마"].map((name) => ({
-          floorId: fixture.floorId,
-          type: "phone_booth" as const,
-          name,
-        })),
-      );
+    await database.db.insert(spaces).values(
+      ["가", "나", "다", "라", "마"].map((name) => ({
+        floorId: fixture.floorId,
+        type: "phone_booth" as const,
+        name,
+      })),
+    );
     await insertFixtureBooking(database, fixture, {
       during: bookingRange("14:00", "15:00"),
     });
@@ -443,14 +439,12 @@ describe("home and branch booking discovery", () => {
 
   it("uses role overrides and clamps exhausted personal minutes to zero", async () => {
     await selectBranch();
-    await database.db
-      .insert(roleSettings)
-      .values({
-        branchId: fixture.branchId,
-        role: "user",
-        permissions: [...defaultPermissions.user],
-        limits: { maxMinutesPerDay: 30 },
-      });
+    await database.db.insert(roleSettings).values({
+      branchId: fixture.branchId,
+      role: "user",
+      permissions: [...defaultPermissions.user],
+      limits: { maxMinutesPerDay: 30 },
+    });
     await insertFixtureBooking(database, fixture);
     expect(await queries().getHomeBookingLimits()).toMatchObject({
       limitMinutes: 30,
@@ -463,13 +457,11 @@ describe("home and branch booking discovery", () => {
     await selectBranch();
     await selectBranch(fixture.operator.userId);
     expect(await queries(fixture.operator).getHomeBookingLimits()).toBeNull();
-    await database.db
-      .insert(roleSettings)
-      .values({
-        branchId: fixture.branchId,
-        role: "user",
-        permissions: ["floor.view"],
-      });
+    await database.db.insert(roleSettings).values({
+      branchId: fixture.branchId,
+      role: "user",
+      permissions: ["floor.view"],
+    });
     expect(await queries().getHomeBookingLimits()).toBeNull();
     await selectBranch(fixture.operator.userId, fixture.otherBranchId);
     expect(

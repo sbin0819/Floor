@@ -26,6 +26,7 @@ export function notificationHref({
   bookingId,
 }: NotificationContent) {
   if (type === "branch_announcement") return null;
+  if (type === "welcome") return "/";
   if (type === "friend_request") return "/friends?tab=received";
   if (type === "friend_accepted") return "/friends";
   if (type === "message_request") return "/friends?tab=requests";
@@ -39,7 +40,34 @@ export function notificationHref({
   return myBookingsCalendarHref(date.slice(0, 7), date);
 }
 
-export function notificationPresentation({ type, data }: NotificationSnapshot) {
+export type NotificationPresentation = {
+  parts: NotificationTextPart[];
+  text: string;
+  dateTime: string | undefined;
+  /** 날짜·시간 자리에 대신 보여 주는 안내 한 줄. */
+  detail?: string;
+};
+
+export const welcomeNotificationDetail =
+  "홈의 ‘Floor 시작하기’에서 사용자 이름부터 첫 예약까지 차례로 안내해 드려요";
+
+export function notificationPresentation({
+  type,
+  data,
+}: NotificationSnapshot): NotificationPresentation {
+  if (type === "welcome") {
+    const parts = [
+      { text: "환영해요, ", strong: false },
+      { text: data.name, strong: true },
+      { text: " 님! Floor에 처음 오셨네요", strong: false },
+    ];
+    return {
+      parts,
+      text: parts.map((part) => part.text).join(""),
+      dateTime: undefined,
+      detail: welcomeNotificationDetail,
+    };
+  }
   if (type === "branch_announcement") {
     const parts = [
       { text: data.branchName, strong: true },

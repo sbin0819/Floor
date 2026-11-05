@@ -60,6 +60,7 @@ import { ActionError } from "@/lib/actions/result";
 import { requireSession } from "@/lib/auth/session";
 import type { Session } from "@/lib/auth/types";
 import type { DalDatabase } from "@/lib/dal";
+import { readHomeChecklist } from "@/lib/dal/home";
 import {
   getBranch,
   listFloorsWithAccess,
@@ -379,7 +380,10 @@ export function createBookingQueries(
     async getHomeHeader(): Promise<HomeHeaderData> {
       const session = await readSession();
       const current = now();
-      const selected = await resolveBookingBranch(session.userId, db);
+      const [selected, checklist] = await Promise.all([
+        resolveBookingBranch(session.userId, db),
+        readHomeChecklist(session.userId, db),
+      ]);
       const branch = selected ? branchDto(selected) : null;
       return {
         name: session.name,
@@ -389,6 +393,14 @@ export function createBookingQueries(
         operatingState: branch
           ? getOperatingState(current, branch.timezone, branch.openHours)
           : null,
+        firstVisit:
+          checklist !== null &&
+          !checklist.isOperator &&
+          !checklist.dismissedAt &&
+          !checklist.username &&
+          !checklist.team &&
+          !checklist.booking &&
+          !checklist.friend,
       };
     },
     async getHomeUpcomingBookings(): Promise<HomeUpcomingBookingsData> {

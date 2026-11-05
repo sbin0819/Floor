@@ -221,6 +221,8 @@ export type HomeHeaderData = {
   date: string;
   branch: BranchDetails | null;
   operatingState: OperatingState | null;
+  /** 시작 안내가 보이는데 아직 한 단계도 마치지 않은 사람. 처음 온 사람에게 환영 인사를 한다. */
+  firstVisit: boolean;
 };
 export type HomeUpcomingBookingsData = {
   now: string;

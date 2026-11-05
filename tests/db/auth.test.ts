@@ -15,6 +15,7 @@ import {
   authAccounts,
   authSessions,
   authVerifications,
+  notifications,
   users,
 } from "@/lib/db/schema";
 import {
@@ -56,6 +57,8 @@ describe("Better Auth with real Drizzle migrations and PGlite", () => {
   });
   beforeEach(async () => {
     await harness.db.delete(authVerifications);
+    // 가입 훅이 남긴 환영 알림이 계정을 참조한다.
+    await harness.db.delete(notifications);
     await harness.db.delete(users);
     harness.email.messages.length = 0;
     Object.assign(harness.identity, socialIdentity());

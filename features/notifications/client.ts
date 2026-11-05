@@ -10,6 +10,7 @@ import {
   spaceInviteNotificationDataSchema,
   teamNotificationDataSchema,
   teamRoleNotificationDataSchema,
+  welcomeNotificationDataSchema,
   parseNotificationData,
   type NotificationSummary,
 } from "./types";
@@ -39,6 +40,13 @@ const itemSchema = z
       data: branchAnnouncementNotificationDataSchema,
       bookingId: z.null(),
       href: z.null(),
+    }),
+    z.strictObject({
+      ...itemFields,
+      type: z.literal("welcome"),
+      data: welcomeNotificationDataSchema,
+      bookingId: z.null(),
+      href: z.literal("/"),
     }),
     z.strictObject({
       ...itemFields,

@@ -33,6 +33,8 @@ export function HomeHeader({ data }: { data: HomeHeaderData }) {
 }
 
 export function HomeGreeting({ data }: { data: HomeHeaderData }) {
+  // 처음 온 사람(시작 안내가 보이고 아직 한 단계도 마치지 않음)에게는 환영 인사를 한다.
+  const firstVisit = data.firstVisit;
   const date = formatBookingDate(
     data.date,
     data.branch?.timezone ?? "Asia/Seoul",
@@ -41,10 +43,16 @@ export function HomeGreeting({ data }: { data: HomeHeaderData }) {
     ? data.operatingState?.status === "open"
       ? `${data.branch.name}은 오늘 ${data.operatingState.hours?.close}까지 열어요`
       : `${data.branch.name}은 지금 운영 시간이 아니에요`
-    : null;
+    : firstVisit
+      ? "가까운 지점을 골라 첫 공간을 예약해 보세요"
+      : null;
   return (
     <PageHeading
-      title={`안녕하세요, ${data.name}님`}
+      title={
+        firstVisit
+          ? `환영해요, ${data.name}님! Floor에 처음 오셨네요`
+          : `안녕하세요, ${data.name}님`
+      }
       description={
         <span className="tabular-nums">
           {date}

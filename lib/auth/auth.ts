@@ -7,7 +7,9 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 
 import { nameSchema, signupSchema } from "@/features/auth/schema";
+import { buildWelcomeNotification } from "@/features/notifications/builders";
 import type { DalDatabase, TransactionDatabase } from "@/lib/dal/database";
+import { insertNotifications } from "@/lib/dal/notifications";
 import { getDb } from "@/lib/db/client";
 import {
   authAccounts,
@@ -73,14 +75,21 @@ const logger: NonNullable<BetterAuthOptions["logger"]> = {
   },
 };
 
-async function afterCommitEmail(send: () => Promise<void>): Promise<void> {
+async function afterCommit(
+  task: () => Promise<void>,
+  failure: string,
+): Promise<void> {
   await queueAfterTransactionHook(async () => {
     try {
-      await send();
+      await task();
     } catch {
-      console.error("[auth] Email delivery failed.");
+      console.error(failure);
     }
   });
+}
+
+function afterCommitEmail(send: () => Promise<void>): Promise<void> {
+  return afterCommit(send, "[auth] Email delivery failed.");
 }
 
 function isSocialProvider(provider: string): provider is "google" | "github" {
@@ -201,6 +210,21 @@ export function createAuth(options: AuthOptions) {
               "회원"
             ).slice(0, 50);
             return { data: { ...user, name, email: user.email.toLowerCase() } };
+          },
+          // 처음 가입한 사람에게 환영 알림을 한 번 남긴다. 계정 준비 도우미(시드·운영자 스크립트)는 거치지 않는다.
+          async after(user) {
+            await afterCommit(
+              () =>
+                insertNotifications(
+                  buildWelcomeNotification({
+                    userId: user.id,
+                    name: user.name,
+                    now: user.createdAt,
+                  }),
+                  db,
+                ),
+              "[auth] Welcome notification failed.",
+            );
           },
         },
       },

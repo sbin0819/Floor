@@ -15,7 +15,7 @@ import {
 import { eq } from "drizzle-orm";
 import { APIError } from "better-auth/api";
 import { createAccountSecurity } from "@/lib/auth/account-security";
-import { authSessions, users } from "@/lib/db/schema";
+import { authSessions, notifications, users } from "@/lib/db/schema";
 import {
   authRequest,
   createAuthTestHarness,
@@ -47,6 +47,8 @@ describe("account security through the real Better Auth adapter", () => {
     vi.unstubAllGlobals();
   });
   beforeEach(async () => {
+    // 가입 훅이 남긴 환영 알림이 계정을 참조한다.
+    await harness.db.delete(notifications);
     await harness.db.delete(users);
     harness.email.messages.length = 0;
     await signup(harness.auth);

@@ -35,6 +35,28 @@ type BookingNotificationWrite = NotificationWrite & {
   bookingId: string;
 };
 
+export function buildWelcomeNotification(input: {
+  userId: string;
+  name: string;
+  now: Date;
+}): NotificationWrite[] {
+  const content = parseNotificationContent(
+    "welcome",
+    { name: input.name },
+    null,
+  );
+  if (!content) throw new Error("Invalid welcome snapshot.");
+  return [
+    {
+      ...content,
+      userId: input.userId,
+      actorId: null,
+      scheduledFor: input.now,
+      expiresAt: null,
+    },
+  ];
+}
+
 export function buildBranchAnnouncementNotifications(
   input: BranchAnnouncementNotificationData & {
     actorId: string;

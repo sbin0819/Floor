@@ -30,6 +30,7 @@ export const notificationTypes = [
   ...teamNotificationTypes,
   "space_invite",
   "branch_announcement",
+  "welcome",
 ] as const;
 
 export type NotificationType = (typeof notificationTypes)[number];
@@ -91,6 +92,10 @@ export const branchAnnouncementNotificationDataSchema = z.strictObject({
   body: announcementText(500),
   announcementId: z.uuid(),
 });
+// 가입 직후 한 번 보내는 환영 알림. 받는 사람의 가입 때 이름만 담는다.
+export const welcomeNotificationDataSchema = z.strictObject({
+  name: z.string().min(1),
+});
 export const notificationDataSchema = z.union([
   bookingNotificationDataSchema,
   personNotificationDataSchema,
@@ -98,7 +103,11 @@ export const notificationDataSchema = z.union([
   teamNotificationDataSchema,
   teamRoleNotificationDataSchema,
   branchAnnouncementNotificationDataSchema,
+  welcomeNotificationDataSchema,
 ]);
+export type WelcomeNotificationData = z.infer<
+  typeof welcomeNotificationDataSchema
+>;
 export type BranchAnnouncementNotificationData = z.infer<
   typeof branchAnnouncementNotificationDataSchema
 >;
@@ -121,7 +130,8 @@ export type NotificationData =
   | SpaceInviteNotificationData
   | TeamNotificationData
   | TeamRoleNotificationData
-  | BranchAnnouncementNotificationData;
+  | BranchAnnouncementNotificationData
+  | WelcomeNotificationData;
 export type NotificationSnapshot =
   | {
       [Type in BookingNotificationType]: {
@@ -139,7 +149,8 @@ export type NotificationSnapshot =
   | { type: "team_removed"; data: TeamNotificationData }
   | { type: "team_deleted"; data: TeamNotificationData }
   | { type: "team_role_changed"; data: TeamRoleNotificationData }
-  | { type: "branch_announcement"; data: BranchAnnouncementNotificationData };
+  | { type: "branch_announcement"; data: BranchAnnouncementNotificationData }
+  | { type: "welcome"; data: WelcomeNotificationData };
 export type NotificationContent = NotificationSnapshot & {
   bookingId: string | null;
 };
@@ -179,6 +190,10 @@ export function parseNotificationData(
   input: unknown,
 ): BranchAnnouncementNotificationData | null;
 export function parseNotificationData(
+  type: "welcome",
+  input: unknown,
+): WelcomeNotificationData | null;
+export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null;
@@ -186,6 +201,10 @@ export function parseNotificationData(
   type: NotificationType,
   input: unknown,
 ): NotificationData | null {
+  if (type === "welcome") {
+    const result = welcomeNotificationDataSchema.safeParse(input);
+    return result.success ? result.data : null;
+  }
   if (type === "branch_announcement") {
     const result = branchAnnouncementNotificationDataSchema.safeParse(input);
     return result.success ? result.data : null;
@@ -236,6 +255,10 @@ export function parseNotificationContent(
   input: unknown,
   bookingId: string | null,
 ): NotificationContent | null {
+  if (type === "welcome") {
+    const data = parseNotificationData(type, input);
+    return data ? { type, data, bookingId: null } : null;
+  }
   if (type === "branch_announcement") {
     const data = parseNotificationData(type, input);
     return data ? { type, data, bookingId: null } : null;

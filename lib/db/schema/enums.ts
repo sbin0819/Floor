@@ -133,4 +133,5 @@ export const notificationType = pgEnum("notification_type", [
   "team_role_changed",
   "team_deleted",
   "branch_announcement",
+  "welcome",
 ]);

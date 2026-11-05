@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, Megaphone } from "lucide-react";
+import { Clock3, Megaphone, Sparkles } from "lucide-react";
 import { useId, useState, type MouseEvent } from "react";
 import { cn } from "cn";
 import { UserAvatar } from "@/components/user-avatar";
@@ -40,6 +40,7 @@ export function NotificationRow({
     item.type !== "team_role_changed" &&
     item.type !== "team_deleted" &&
     item.type !== "branch_announcement" &&
+    item.type !== "welcome" &&
     item.type !== "message_request"
       ? item
       : null;
@@ -56,6 +57,7 @@ export function NotificationRow({
     !item.read ? "읽지 않음" : null,
     presentation.text,
     presentation.dateTime,
+    presentation.detail,
     title,
     age,
   ]
@@ -76,13 +78,16 @@ export function NotificationRow({
         )}
       </span>
       {item.type === "booking_reminder" ||
-      item.type === "branch_announcement" ? (
+      item.type === "branch_announcement" ||
+      item.type === "welcome" ? (
         <span
           aria-hidden="true"
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground"
         >
           {item.type === "branch_announcement" ? (
             <Megaphone className="size-5" />
+          ) : item.type === "welcome" ? (
+            <Sparkles className="size-5" />
           ) : (
             <Clock3 className="size-5" />
           )}
@@ -110,8 +115,11 @@ export function NotificationRow({
           {presentation.dateTime && (
             <span className="tabular-nums">{presentation.dateTime}</span>
           )}
+          {presentation.detail && <span>{presentation.detail}</span>}
           {title && <span> · {title}</span>}
-          {(presentation.dateTime || title) && <span> · </span>}
+          {(presentation.dateTime || presentation.detail || title) && (
+            <span> · </span>
+          )}
           <time dateTime={item.scheduledFor} className="tabular-nums">
             {age}
           </time>
